@@ -7,7 +7,7 @@ import {
 
 const API = "http://localhost:3000";
 const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_KEY = "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";
+const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
 
 const SUBJECT_COLORS = ["#ef4444","#f97316","#10b981","#8b5cf6","#06b6d4","#f59e0b","#ec4899","#84cc16","#14b8a6","#6366f1"];
 const BAND_COLORS: Record<string, string> = { "A": "#ef4444", "M2": "#f97316", "M1": "#f59e0b", "E2": "#84cc16", "E1": "#10b981", "A+": "#6366f1" };
