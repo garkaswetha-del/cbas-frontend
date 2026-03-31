@@ -1,78 +1,80 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router-dom';
 
-const navItems = [
+const NAV_ITEMS = [
   { path: '/users', label: 'User Management', icon: '👥' },
   { path: '/students', label: 'Student Management', icon: '🎓' },
   { path: '/appraisal', label: 'M4: Teachers Appraisal', icon: '📋' },
   { path: '/baseline', label: 'M1: Baseline Entry', icon: '📈' },
   { path: '/competencies', label: 'M2: Competency Registry', icon: '🗂️' },
   { path: '/activities', label: 'M2: Activities & Marks', icon: '🎯' },
-  { path: '/student-parent', label: 'M7: Student / Parent', icon: '👨‍👩‍👧' },
+  { path: '/pasa', label: 'M3: PA/SA Marks', icon: '📝' },
   { path: '/observation', label: 'M5: Class Observation', icon: '👁' },
-  { path: "/pasa", label: "M3: PA/SA Marks" },
+  { path: '/student-parent', label: 'M7: Student / Parent', icon: '👨‍👩‍👧' },
 ];
 
-export default function MainLayout() {
+interface MainLayoutProps {
+  user: any;
+  onLogout: () => void;
+}
+
+export default function MainLayout({ user, onLogout }: MainLayoutProps) {
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
-      <div className="w-56 bg-indigo-900 flex flex-col flex-shrink-0">
-        {/* Logo */}
+      <div className="w-64 bg-indigo-900 flex flex-col flex-shrink-0">
+        {/* Logo area */}
         <div className="px-4 py-5 border-b border-indigo-700">
-          <h1 className="text-white font-bold text-lg">CBAS</h1>
-          <p className="text-indigo-300 text-xs mt-0.5">School Management</p>
+          <h1 className="text-white text-sm font-bold leading-tight">Wisdom Techno School</h1>
+          <p className="text-indigo-300 text-xs mt-0.5">CBAS Portal</p>
         </div>
 
-        {/* Nav Items */}
-        <nav className="flex-1 px-2 py-3 overflow-y-auto">
-          {navItems.map((item) => (
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto py-3">
+          {NAV_ITEMS.map(item => (
             <NavLink
               key={item.path}
               to={item.path}
-              end={item.path === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-2 px-3 py-2 rounded-lg mb-1 text-sm transition-all ${
+                `flex items-center gap-3 px-4 py-2.5 text-sm transition-all ${
                   isActive
-                    ? 'bg-indigo-600 text-white font-semibold'
+                    ? 'bg-indigo-700 text-white font-semibold border-r-4 border-yellow-400'
                     : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
                 }`
               }
             >
-              <span>{item.icon}</span>
-              <span>{item.label}</span>
+              <span className="text-base">{item.icon}</span>
+              <span className="leading-tight">{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
-        {/* Bottom user info */}
-        <div className="px-4 py-3 border-t border-indigo-700">
-          <p className="text-indigo-300 text-xs">Logged in as</p>
-          <p className="text-white text-sm font-semibold">Principal</p>
-          <p className="text-indigo-400 text-xs mt-0.5">2025-26</p>
+        {/* User info + logout */}
+        <div className="border-t border-indigo-700 p-4">
+          <div className="flex items-center gap-3 mb-3">
+            {user?.photo ? (
+              <img src={user.photo} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-indigo-400" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+                {user?.name?.[0]?.toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-xs font-semibold truncate">{user?.name}</p>
+              <p className="text-indigo-300 text-xs capitalize">{user?.role}</p>
+            </div>
+          </div>
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 bg-indigo-700 hover:bg-red-600 text-white text-xs py-2 rounded-lg transition-all font-medium"
+          >
+            <span>🚪</span> Sign Out
+          </button>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Bar */}
-        <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-gray-700 font-semibold text-base">
-            Competency Based Assessment System
-          </h2>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-              Academic Year: 2025-26
-            </span>
-            <button className="text-xs text-red-500 hover:text-red-700">
-              Logout
-            </button>
-          </div>
-        </div>
-
-        {/* Page Content */}
-        <div className="flex-1 overflow-y-auto">
-          <Outlet />
-        </div>
+      {/* Main content */}
+      <div className="flex-1 overflow-y-auto">
+        <Outlet />
       </div>
     </div>
   );

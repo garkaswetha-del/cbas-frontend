@@ -3,6 +3,7 @@ import axios from "axios";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis,
+  LineChart, Line, Legend,
 } from "recharts";
 
 const API = "http://localhost:3000";
@@ -82,7 +83,7 @@ export default function ActivitiesPage() {
   const [saving, setSaving] = useState(false);
 
   // Dashboard tab
-  const [dashTab, setDashTab] = useState<"school" | "grade" | "section" | "student" | "alerts">("school");
+  const [dashTab, setDashTab] = useState<"school" | "grade" | "section" | "student" | "alerts" | "coverage" | "longitudinal">("school");
   const [dashGrade, setDashGrade] = useState("");
   const [dashSection, setDashSection] = useState("");
   const [dashSections, setDashSections] = useState<string[]>([]);
@@ -94,6 +95,9 @@ export default function ActivitiesPage() {
   const [studentSearch, setStudentSearch] = useState("");
   const [studentList, setStudentList] = useState<any[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [coverageData, setCoverageData] = useState<any>(null);
+  const [longitudinalData, setLongitudinalData] = useState<any>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState("");
 
   // ── EFFECTS ───────────────────────────────────────────────────
 
@@ -109,6 +113,7 @@ export default function ActivitiesPage() {
     if (dashTab === "grade" && dashGrade) fetchGradeDash();
     if (dashTab === "section" && dashGrade && dashSection) fetchSectionDash();
     if (dashTab === "alerts") fetchAlerts();
+    if (dashTab === "coverage" && dashGrade && dashSection) fetchCoverage();
   }, [dashTab, dashGrade, dashSection, academicYear]);
   useEffect(() => { if (dashGrade) fetchSections(dashGrade, setDashSections); }, [dashGrade]);
 
@@ -179,6 +184,22 @@ export default function ActivitiesPage() {
 
   const fetchAlerts = async () => {
     try { const r = await axios.get(`${API}/activities/alerts/decline?academic_year=${academicYear}`); setAlerts(r.data || []); } catch { }
+  };
+
+  const fetchCoverage = async () => {
+    if (!dashGrade || !dashSection) return;
+    try {
+      const r = await axios.get(`${API}/activities/coverage/section/${encodeURIComponent(dashGrade)}/${encodeURIComponent(dashSection)}?academic_year=${academicYear}`);
+      setCoverageData(r.data);
+    } catch { setCoverageData(null); }
+  };
+
+  const fetchLongitudinal = async (studentId: string) => {
+    if (!studentId) return;
+    try {
+      const r = await axios.get(`${API}/activities/longitudinal/student/${studentId}`);
+      setLongitudinalData(r.data);
+    } catch { setLongitudinalData(null); }
   };
 
   const fetchStudentList = async (grade: string, section: string) => {
@@ -754,6 +775,8 @@ export default function ActivitiesPage() {
               { id: "section", label: "🏛 Section" },
               { id: "student", label: "👤 Student" },
               { id: "alerts", label: "⚠️ Alerts" },
+              { id: "coverage", label: "🗺️ Coverage" },
+              { id: "longitudinal", label: "📈 Longitudinal" },
             ].map(t => (
               <button key={t.id} onClick={() => setDashTab(t.id as any)}
                 className={`px-4 py-2 text-sm rounded-lg font-medium ${dashTab === t.id ? "bg-indigo-600 text-white" : "bg-white text-gray-600 border border-gray-300 hover:bg-indigo-50"}`}>
@@ -763,7 +786,7 @@ export default function ActivitiesPage() {
           </div>
 
           {/* Grade/Section selectors */}
-          {(dashTab === "grade" || dashTab === "section" || dashTab === "student") && (
+          {(dashTab === "grade" || dashTab === "section" || dashTab === "student" || dashTab === "coverage" || dashTab === "longitudinal") && (
             <div className="flex gap-3 mb-4 items-end flex-wrap">
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Grade</label>
@@ -773,7 +796,7 @@ export default function ActivitiesPage() {
                   {CLASSES.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
-              {(dashTab === "section" || dashTab === "student") && dashGrade && (
+              {(dashTab === "section" || dashTab === "student" || dashTab === "coverage" || dashTab === "longitudinal") && dashGrade && (
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Section</label>
                   <select value={dashSection} onChange={e => {
@@ -786,11 +809,16 @@ export default function ActivitiesPage() {
                   </select>
                 </div>
               )}
-              {dashTab === "student" && dashSection && (
+              {(dashTab === "student" || dashTab === "longitudinal") && dashSection && (
                 <div className="flex-1 min-w-[200px]">
                   <label className="text-xs text-gray-500 block mb-1">Student</label>
-                  <select onChange={e => { if (e.target.value) fetchStudentDash(e.target.value); }}
-                    className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                  <select value={selectedStudentId} onChange={e => {
+                    setSelectedStudentId(e.target.value);
+                    if (e.target.value) {
+                      if (dashTab === "student") fetchStudentDash(e.target.value);
+                      if (dashTab === "longitudinal") fetchLongitudinal(e.target.value);
+                    }
+                  }} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
                     <option value="">Select Student</option>
                     {studentList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
@@ -799,7 +827,153 @@ export default function ActivitiesPage() {
             </div>
           )}
 
-          {/* ── SCHOOL DASHBOARD ── */}
+          {/* ── COVERAGE TAB ── */}
+          {dashTab === "coverage" && (
+            <div className="space-y-5 mt-4">
+              {!dashSection ? (
+                <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Select a grade and section above to view competency coverage.</div>
+              ) : !coverageData ? (
+                <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No coverage data yet. Create activities with competency mappings first.</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-white rounded-xl shadow p-4 border-l-4 border-indigo-500"><p className="text-xs text-gray-500">Total Competencies</p><p className="text-2xl font-bold text-gray-800">{coverageData.total_competencies}</p></div>
+                    <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500"><p className="text-xs text-gray-500">Covered via Activities</p><p className="text-2xl font-bold text-green-700">{coverageData.activity_covered}</p><p className="text-xs text-gray-400">{coverageData.activity_coverage_percent}%</p></div>
+                    <div className="bg-white rounded-xl shadow p-4 border-l-4 border-red-400"><p className="text-xs text-gray-500">Not Yet Covered</p><p className="text-2xl font-bold text-red-600">{coverageData.total_competencies - coverageData.activity_covered}</p></div>
+                  </div>
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <div className="flex items-center justify-between mb-2"><h3 className="text-sm font-semibold text-gray-700">Overall Coverage — {dashGrade} · {dashSection}</h3><span className="text-sm font-bold text-indigo-600">{coverageData.activity_coverage_percent}%</span></div>
+                    <div className="w-full bg-gray-200 rounded-full h-4"><div className="h-4 rounded-full bg-indigo-500" style={{ width: `${coverageData.activity_coverage_percent}%` }} /></div>
+                  </div>
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Coverage by Subject</h3>
+                    <div className="space-y-3">
+                      {coverageData.bySubject?.map((s: any, i: number) => (
+                        <div key={s.subject}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium text-gray-700">{s.subject}</span>
+                            <div className="flex items-center gap-3 text-xs"><span className="text-green-600 font-bold">{s.covered} covered</span><span className="text-red-500">{s.uncovered} not covered</span><span className="font-bold text-indigo-600">{s.coverage_percent}%</span></div>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-2.5"><div className="h-2.5 rounded-full" style={{ width: `${s.coverage_percent}%`, backgroundColor: ["#3b82f6","#22c55e","#a855f7","#f97316","#ec4899","#f59e0b"][i%6] }} /></div>
+                          {s.uncovered_competencies?.length > 0 && (
+                            <details className="mt-1">
+                              <summary className="text-xs text-red-500 cursor-pointer">▶ {s.uncovered_competencies.length} not yet covered</summary>
+                              <div className="mt-1 ml-3 space-y-0.5">
+                                {s.uncovered_competencies.map((c: any, j: number) => (
+                                  <div key={j} className="flex items-center gap-2 text-xs text-gray-600 py-0.5">
+                                    <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                                    <span className="font-mono text-red-600 font-semibold">{c.competency_code}</span>
+                                    <span className="truncate">{c.description?.substring(0,80)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Student-wise Coverage Ranking</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs border-collapse">
+                        <thead><tr className="bg-indigo-700 text-white"><th className="px-3 py-2 text-center w-10">Rank</th><th className="px-3 py-2 text-left min-w-[160px]">Student</th><th className="px-3 py-2 text-center">Covered</th><th className="px-3 py-2 text-center">Total</th><th className="px-3 py-2 text-center min-w-[120px]">Coverage %</th><th className="px-3 py-2 text-center">Avg Score</th></tr></thead>
+                        <tbody>
+                          {coverageData.studentCoverage?.map((s: any, i: number) => (
+                            <tr key={s.student_id} className={i%2===0?"bg-white":"bg-gray-50"}>
+                              <td className="px-3 py-2 text-center text-gray-400 font-bold">{i+1}</td>
+                              <td className="px-3 py-2 font-medium text-gray-800">{s.student_name}</td>
+                              <td className="px-3 py-2 text-center text-green-700 font-bold">{s.covered}</td>
+                              <td className="px-3 py-2 text-center text-gray-500">{s.total}</td>
+                              <td className="px-3 py-2"><div className="flex items-center gap-2"><div className="flex-1 bg-gray-200 rounded-full h-2"><div className="h-2 rounded-full bg-indigo-500" style={{width:`${s.coverage_percent}%`}} /></div><span className="font-bold text-indigo-600 w-10 text-right">{s.coverage_percent}%</span></div></td>
+                              <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.avg_score>=3.5?"bg-purple-100 text-purple-700":s.avg_score>=2.5?"bg-green-100 text-green-700":s.avg_score>=1.5?"bg-yellow-100 text-yellow-700":s.avg_score>0?"bg-red-100 text-red-700":"bg-gray-100 text-gray-400"}`}>{s.avg_score>0?s.avg_score.toFixed(2):"—"}</span></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── LONGITUDINAL TAB ── */}
+          {dashTab === "longitudinal" && (
+            <div className="space-y-5 mt-4">
+              {!selectedStudentId ? (
+                <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Select a grade, section and student above to view their Pre-KG → Grade 10 journey.</div>
+              ) : !longitudinalData ? (
+                <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No longitudinal data yet. Student needs activity assessments across multiple years.</div>
+              ) : (
+                <>
+                  <div className="bg-white rounded-xl shadow p-4 border-l-4 border-indigo-500">
+                    <h2 className="text-base font-bold text-gray-800">{longitudinalData.student?.name}</h2>
+                    <p className="text-sm text-gray-500">Current: {longitudinalData.student?.current_class} · Assessed across {longitudinalData.academicYears?.length} year(s)</p>
+                  </div>
+                  {longitudinalData.gradeTimeline?.length > 0 && (
+                    <div className="bg-white rounded-xl shadow p-4">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">📈 Overall Journey — Pre-KG to Grade 10</h3>
+                      <p className="text-xs text-gray-400 mb-3">Average competency score per grade · 1=Beginning → 4=Exceeding</p>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <LineChart data={longitudinalData.gradeTimeline} margin={{top:10,right:20,left:0,bottom:10}}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="grade" tick={{fontSize:10}} />
+                          <YAxis domain={[0,4]} ticks={[1,2,3,4]} tickFormatter={(v)=>v===1?"Beg":v===2?"App":v===3?"Meet":"Exc"} tick={{fontSize:9}} />
+                          <Tooltip formatter={(v:any)=>[`${Number(v).toFixed(2)} — ${Number(v)>=3.5?"Exceeding":Number(v)>=2.5?"Meeting":Number(v)>=1.5?"Approaching":"Beginning"}`,"Avg Score"]} />
+                          <Line type="monotone" dataKey="avg" stroke="#6366f1" strokeWidth={3} dot={{fill:"#6366f1",r:6}} activeDot={{r:8}} label={{position:"top",fontSize:10,fill:"#6366f1",formatter:(v:any)=>Number(v).toFixed(1)}} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                  {longitudinalData.timeline?.length > 0 && longitudinalData.subjects?.length > 0 && (
+                    <div className="bg-white rounded-xl shadow p-4">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">📊 Subject-wise Scores by Academic Year</h3>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={longitudinalData.timeline} margin={{top:10,right:20,left:0,bottom:40}}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="academic_year" tick={{fontSize:10}} />
+                          <YAxis domain={[0,4]} ticks={[1,2,3,4]} tickFormatter={(v)=>v===1?"Beg":v===2?"App":v===3?"Meet":"Exc"} tick={{fontSize:9}} />
+                          <Tooltip formatter={(v:any,name:any)=>[v?`${Number(v).toFixed(2)}`:"Not assessed",name]} />
+                          <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{fontSize:"10px",paddingTop:"8px"}} />
+                          {longitudinalData.subjects?.map((sub:string,i:number)=>(
+                            <Line key={sub} type="monotone" dataKey={sub} stroke={["#3b82f6","#22c55e","#a855f7","#f97316","#ec4899","#f59e0b","#06b6d4","#84cc16"][i%8]} strokeWidth={2} dot={{r:4}} connectNulls={false} />
+                          ))}
+                          <Line type="monotone" dataKey="overall" stroke="#374151" strokeWidth={3} strokeDasharray="5 5" dot={{r:5}} connectNulls={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                  {longitudinalData.timeline?.length > 0 && (
+                    <div className="bg-white rounded-xl shadow p-4">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Year-wise Summary</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs border-collapse">
+                          <thead><tr className="bg-indigo-700 text-white"><th className="px-3 py-2 text-left">Year</th><th className="px-3 py-2 text-center">Grade</th>{longitudinalData.subjects?.map((s:string)=><th key={s} className="px-3 py-2 text-center border-l border-indigo-600">{s}</th>)}<th className="px-3 py-2 text-center border-l border-indigo-600">Overall</th></tr></thead>
+                          <tbody>
+                            {longitudinalData.timeline?.map((row:any,i:number)=>(
+                              <tr key={row.academic_year} className={i%2===0?"bg-white":"bg-gray-50"}>
+                                <td className="px-3 py-2 font-bold text-indigo-700">{row.academic_year}</td>
+                                <td className="px-3 py-2 text-center text-gray-600">{row.grade}</td>
+                                {longitudinalData.subjects?.map((sub:string)=>(
+                                  <td key={sub} className="px-3 py-2 text-center border-l border-gray-100">
+                                    {row[sub]!=null?<span className={`text-xs font-bold px-2 py-0.5 rounded-full ${row[sub]>=3.5?"bg-purple-100 text-purple-700":row[sub]>=2.5?"bg-green-100 text-green-700":row[sub]>=1.5?"bg-yellow-100 text-yellow-700":"bg-red-100 text-red-700"}`}>{Number(row[sub]).toFixed(1)}</span>:<span className="text-gray-300">—</span>}
+                                  </td>
+                                ))}
+                                <td className="px-3 py-2 text-center border-l border-gray-100">
+                                  {row.overall!=null?<span className={`text-xs font-bold px-2 py-0.5 rounded-full ${row.overall>=3.5?"bg-purple-100 text-purple-700":row.overall>=2.5?"bg-green-100 text-green-700":row.overall>=1.5?"bg-yellow-100 text-yellow-700":"bg-red-100 text-red-700"}`}>{Number(row.overall).toFixed(2)}</span>:<span className="text-gray-300">—</span>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           {dashTab === "school" && schoolDash && (
             <div className="space-y-4">
               <div className="grid grid-cols-4 gap-3">

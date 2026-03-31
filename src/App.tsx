@@ -1,38 +1,110 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
-//import Dashboard from './pages/Dashboard';
-import AppraisalPage from './pages/AppraisalPage';
+import LoginPage from './pages/LoginPage';
 import UserManagementPage from './pages/UserManagementPage';
 import StudentManagementPage from './pages/StudentManagementPage';
+import AppraisalPage from './pages/AppraisalPage';
 import BaselinePage from './pages/BaselinePage';
-//import BaselineDashboard from './pages/BaselineDashboard';
 import CompetencyManagementPage from './pages/CompetencyManagementPage';
 import ActivitiesPage from './pages/ActivitiesPage';
-//import ActivitiesDashboard from './pages/ActivitiesDashboard';
 import ClassObservationPage from "./pages/ClassObservationPage";
 import PASAPage from "./pages/PASAPage";
-
+import TeacherDashboardPage from "./pages/TeacherDashboardPage";
 
 function App() {
+  const [user, setUser] = useState<any>(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("cbas_user");
+    if (stored) {
+      try { setUser(JSON.parse(stored)); } catch { localStorage.removeItem("cbas_user"); }
+    }
+    setChecking(false);
+  }, []);
+
+  const handleLogin = (userData: any) => {
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("cbas_user");
+    setUser(null);
+  };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-indigo-900 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
+  // Teachers get their own dedicated dashboard
+  if (user.role === "teacher") {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/*" element={
+            <div className="flex h-screen bg-gray-100">
+              {/* Teacher sidebar */}
+              <div className="w-64 bg-indigo-900 flex flex-col flex-shrink-0">
+                <div className="px-4 py-5 border-b border-indigo-700">
+                  <h1 className="text-white text-sm font-bold leading-tight">Wisdom Techno School</h1>
+                  <p className="text-indigo-300 text-xs mt-0.5">Teacher Portal</p>
+                </div>
+                <div className="flex-1" />
+                <div className="border-t border-indigo-700 p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    {user?.photo ? (
+                      <img src={user.photo} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-indigo-400" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+                        {user?.name?.[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-xs font-semibold truncate">{user?.name}</p>
+                      <p className="text-indigo-300 text-xs capitalize">{user?.role}</p>
+                    </div>
+                  </div>
+                  <button onClick={handleLogout}
+                    className="w-full flex items-center justify-center gap-2 bg-indigo-700 hover:bg-red-600 text-white text-xs py-2 rounded-lg transition-all font-medium">
+                    <span>🚪</span> Sign Out
+                  </button>
+                </div>
+              </div>
+              {/* Teacher main content */}
+              <div className="flex-1 overflow-y-auto">
+                <TeacherDashboardPage user={user} />
+              </div>
+            </div>
+          } />
+        </Routes>
+      </BrowserRouter>
+    );
+  }
+
+  // Principal / Admin get the full admin app
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<MainLayout />}>
-        <Route index element={<UserManagementPage />} />
-          
+        <Route path="/" element={<MainLayout user={user} onLogout={handleLogout} />}>
+          <Route index element={<UserManagementPage />} />
           <Route path="users" element={<UserManagementPage />} />
           <Route path="students" element={<StudentManagementPage />} />
           <Route path="appraisal" element={<AppraisalPage />} />
           <Route path="baseline" element={<BaselinePage />} />
-          
           <Route path="competencies" element={<CompetencyManagementPage />} />
           <Route path="activities" element={<ActivitiesPage />} />
-          
-          
-          <Route path="/observation" element={<ClassObservationPage />} />
-          
-          
-          <Route path="/pasa" element={<PASAPage />} />
+          <Route path="observation" element={<ClassObservationPage />} />
+          <Route path="pasa" element={<PASAPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>
@@ -40,3 +112,4 @@ function App() {
 }
 
 export default App;
+

@@ -128,6 +128,9 @@ export default function PASAPage() {
   const [dashSortCol, setDashSortCol] = useState("grand_percentage");
   const [dashSortDir, setDashSortDir] = useState<"asc" | "desc">("desc");
   const [pasaAlerts, setPasaAlerts] = useState<any[]>([]);
+  const [alertGrade, setAlertGrade] = useState("");
+  const [alertSection, setAlertSection] = useState("");
+  const [alertSections, setAlertSections] = useState<string[]>([]);
 
   const effectiveExam = entryExam === "Custom" ? customExam : entryExam;
 
@@ -897,7 +900,131 @@ export default function PASAPage() {
                   </div>
                 </div>
               )}
+{/* Advancing / Retracting — Exam to Exam */}
+              {(gradeData.advancing?.length > 0 || gradeData.retracting?.length > 0) && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      📈 Advancing Students <span className="text-xs font-normal text-gray-400">(vs previous exam)</span>
+                    </h3>
+                    {gradeData.advancing?.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-3">No advancing students</p>
+                    ) : (
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {gradeData.advancing?.map((s: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between p-2 bg-green-50 rounded border border-green-100">
+                            <div>
+                              <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
+                              <span className="text-xs text-gray-400 ml-1">{s.section}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
+                              <span className="text-xs text-green-600">→</span>
+                              <span className="text-xs font-bold text-green-700">{s.grand_percentage?.toFixed(1)}%</span>
+                              <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">+{s.change?.toFixed(1)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      📉 Retracting Students <span className="text-xs font-normal text-gray-400">(vs previous exam)</span>
+                    </h3>
+                    {gradeData.retracting?.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-3">No retracting students</p>
+                    ) : (
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {gradeData.retracting?.map((s: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between p-2 bg-red-50 rounded border border-red-100">
+                            <div>
+                              <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
+                              <span className="text-xs text-gray-400 ml-1">{s.section}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
+                              <span className="text-xs text-red-400">→</span>
+                              <span className="text-xs font-bold text-red-700">{s.grand_percentage?.toFixed(1)}%</span>
+                              <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">{s.change?.toFixed(1)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
+              {/* Year-over-Year Advancing / Retracting */}
+              {(gradeData.yoy_advancing?.length > 0 || gradeData.yoy_retracting?.length > 0) && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      🚀 Year-on-Year Advancing <span className="text-xs font-normal text-gray-400">(vs last year same exam)</span>
+                    </h3>
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {gradeData.yoy_advancing?.map((s: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between p-2 bg-emerald-50 rounded border border-emerald-100">
+                          <div>
+                            <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
+                            <span className="text-xs text-gray-400 ml-1">{s.section}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
+                            <span className="text-xs text-emerald-600">→</span>
+                            <span className="text-xs font-bold text-emerald-700">{s.grand_percentage?.toFixed(1)}%</span>
+                            <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">+{s.change?.toFixed(1)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      ⚠️ Year-on-Year Retracting <span className="text-xs font-normal text-gray-400">(vs last year same exam)</span>
+                    </h3>
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {gradeData.yoy_retracting?.map((s: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between p-2 bg-orange-50 rounded border border-orange-100">
+                          <div>
+                            <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
+                            <span className="text-xs text-gray-400 ml-1">{s.section}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
+                            <span className="text-xs text-orange-400">→</span>
+                            <span className="text-xs font-bold text-orange-700">{s.grand_percentage?.toFixed(1)}%</span>
+                            <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-bold">{s.change?.toFixed(1)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Longitudinal within year */}
+              {gradeData.longitudinal?.length > 0 && (
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-1">📈 Longitudinal — All Exams This Year</h3>
+                  <p className="text-xs text-gray-400 mb-3">X = Exam · Y = Avg % · Each line = one subject · Dashed = Overall</p>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={gradeData.longitudinal} margin={{ top: 5, right: 20, left: 0, bottom: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="exam" tick={{ fontSize: 11 }} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                      <Tooltip formatter={(v: any, name: any) => [`${v}%`, name]} />
+                      <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }} />
+                      {gradeData.subjects?.map((sub: string, i: number) => (
+                        <Line key={sub} type="monotone" dataKey={sub} stroke={SUBJECT_COLORS[i % SUBJECT_COLORS.length]}
+                          strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls={false} />
+                      ))}
+                      <Line type="monotone" dataKey="overall" stroke="#374151" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 5 }} activeDot={{ r: 7 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
               {/* Longitudinal */}
               {longData?.data?.length > 0 && (
                 <div className="bg-white rounded-xl shadow p-4">
@@ -973,6 +1100,65 @@ export default function PASAPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Advancing / Retracting vs previous exam */}
+              {(sectionData.advancing?.length > 0 || sectionData.retracting?.length > 0) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Advancing */}
+                  <div className="bg-white rounded-xl shadow p-4 border-t-4 border-green-400">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <span className="text-green-500 text-base">📈</span>
+                      Advancing Students
+                      <span className="text-xs font-normal text-gray-400">(vs previous exam, &gt;2% gain)</span>
+                      <span className="ml-auto bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">{sectionData.advancing?.length}</span>
+                    </h3>
+                    {sectionData.advancing?.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-4">No advancing students</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                        {sectionData.advancing.map((s: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between px-3 py-2 bg-green-50 rounded-lg border border-green-100">
+                            <span className="text-xs font-medium text-gray-800 truncate max-w-[140px]">{s.student_name}</span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-xs text-gray-400">{n(s.prev_percentage).toFixed(1)}%</span>
+                              <span className="text-green-500 text-xs">→</span>
+                              <span className="text-xs font-bold text-green-700">{n(s.grand_percentage).toFixed(1)}%</span>
+                              <span className="text-xs bg-green-200 text-green-800 px-1.5 py-0.5 rounded-full font-bold">▲+{n(s.change).toFixed(1)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Retracting */}
+                  <div className="bg-white rounded-xl shadow p-4 border-t-4 border-red-400">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <span className="text-red-500 text-base">📉</span>
+                      Retracting Students
+                      <span className="text-xs font-normal text-gray-400">(vs previous exam, &gt;2% drop)</span>
+                      <span className="ml-auto bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">{sectionData.retracting?.length}</span>
+                    </h3>
+                    {sectionData.retracting?.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-4">No retracting students</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                        {sectionData.retracting.map((s: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between px-3 py-2 bg-red-50 rounded-lg border border-red-100">
+                            <span className="text-xs font-medium text-gray-800 truncate max-w-[140px]">{s.student_name}</span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-xs text-gray-400">{n(s.prev_percentage).toFixed(1)}%</span>
+                              <span className="text-red-400 text-xs">→</span>
+                              <span className="text-xs font-bold text-red-700">{n(s.grand_percentage).toFixed(1)}%</span>
+                              <span className="text-xs bg-red-200 text-red-800 px-1.5 py-0.5 rounded-full font-bold">▼{n(s.change).toFixed(1)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <RankingLineChart students={sectionData.students_ranked || []} title={`Student Rankings — ${sectionData.section} (Top to Bottom by Grand %)`} />
 
@@ -1068,6 +1254,120 @@ export default function PASAPage() {
                 </div>
               </div>
 
+              {/* Advancing / Retracting — Exam to Exam */}
+              {(sectionData.advancing?.length > 0 || sectionData.retracting?.length > 0) && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      📈 Advancing Students <span className="text-xs font-normal text-gray-400">(vs previous exam)</span>
+                    </h3>
+                    {sectionData.advancing?.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-3">No advancing students</p>
+                    ) : (
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {sectionData.advancing?.map((s: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between p-2 bg-green-50 rounded border border-green-100">
+                            <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
+                              <span className="text-xs text-green-600">→</span>
+                              <span className="text-xs font-bold text-green-700">{s.grand_percentage?.toFixed(1)}%</span>
+                              <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">+{s.change?.toFixed(1)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      📉 Retracting Students <span className="text-xs font-normal text-gray-400">(vs previous exam)</span>
+                    </h3>
+                    {sectionData.retracting?.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-3">No retracting students</p>
+                    ) : (
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {sectionData.retracting?.map((s: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between p-2 bg-red-50 rounded border border-red-100">
+                            <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
+                              <span className="text-xs text-red-400">→</span>
+                              <span className="text-xs font-bold text-red-700">{s.grand_percentage?.toFixed(1)}%</span>
+                              <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">{s.change?.toFixed(1)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Year-on-Year Advancing / Retracting */}
+              {(sectionData.yoy_advancing?.length > 0 || sectionData.yoy_retracting?.length > 0) && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      🚀 Year-on-Year Advancing <span className="text-xs font-normal text-gray-400">(vs last year same exam)</span>
+                    </h3>
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {sectionData.yoy_advancing?.map((s: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between p-2 bg-emerald-50 rounded border border-emerald-100">
+                          <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
+                            <span className="text-xs text-emerald-600">→</span>
+                            <span className="text-xs font-bold text-emerald-700">{s.grand_percentage?.toFixed(1)}%</span>
+                            <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">+{s.change?.toFixed(1)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      ⚠️ Year-on-Year Retracting <span className="text-xs font-normal text-gray-400">(vs last year same exam)</span>
+                    </h3>
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {sectionData.yoy_retracting?.map((s: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between p-2 bg-orange-50 rounded border border-orange-100">
+                          <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
+                            <span className="text-xs text-orange-400">→</span>
+                            <span className="text-xs font-bold text-orange-700">{s.grand_percentage?.toFixed(1)}%</span>
+                            <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-bold">{s.change?.toFixed(1)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Longitudinal within year */}
+              {sectionData.longitudinal?.length > 0 && (
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-1">📈 Longitudinal — All Exams This Year ({sectionData.section})</h3>
+                  <p className="text-xs text-gray-400 mb-3">X = Exam · Y = Avg % · Each line = one subject · Dashed = Overall</p>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={sectionData.longitudinal} margin={{ top: 5, right: 20, left: 0, bottom: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="exam" tick={{ fontSize: 11 }} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                      <Tooltip formatter={(v: any, name: any) => [`${v}%`, name]} />
+                      <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }} />
+                      {sectionData.subjects?.map((sub: string, i: number) => (
+                        <Line key={sub} type="monotone" dataKey={sub} stroke={SUBJECT_COLORS[i % SUBJECT_COLORS.length]}
+                          strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls={false} />
+                      ))}
+                      <Line type="monotone" dataKey="overall" stroke="#374151" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 5 }} activeDot={{ r: 7 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
               {/* Student rankings */}
               <div className="bg-white rounded-xl shadow p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">
@@ -1096,10 +1396,17 @@ export default function PASAPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {dashSortedStudents(sectionData.students_ranked || []).map((s: any, i: number) => (
+                      {dashSortedStudents(sectionData.students_ranked || []).map((s: any, i: number) => {
+                        const isAdv = sectionData.advancing?.some((a: any) => a.student_name === s.student_name);
+                        const isRet = sectionData.retracting?.some((r: any) => r.student_name === s.student_name);
+                        return (
                         <tr key={s.student_name} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                           <td className="px-3 py-2 text-center font-bold text-gray-400 sticky left-0 bg-inherit border-r border-gray-200">{s.rank}</td>
-                          <td className="px-3 py-2 font-medium text-gray-800 sticky left-[50px] bg-inherit border-r border-gray-200">{s.student_name}</td>
+                          <td className="px-3 py-2 font-medium text-gray-800 sticky left-[50px] bg-inherit border-r border-gray-200">
+                            <span>{s.student_name}</span>
+                            {isAdv && <span className="ml-1 text-green-500 text-xs font-bold" title="Advancing">▲</span>}
+                            {isRet && <span className="ml-1 text-red-500 text-xs font-bold" title="Retracting">▼</span>}
+                          </td>
                           {sectionData.subjects?.map((sub: string) => {
                             const sd = s.subjects?.[sub];
                             return (
@@ -1120,7 +1427,8 @@ export default function PASAPage() {
                             {s.band && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: BAND_COLORS[s.band] + "20", color: BAND_COLORS[s.band] }}>{s.band}</span>}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                       <tr className="bg-indigo-50 border-t-2 border-indigo-300 font-bold">
                         <td colSpan={2} className="px-3 py-2 text-indigo-700 text-xs sticky left-0 bg-indigo-50">Subject Average</td>
                         {sectionData.subjects?.map((sub: string) => (
@@ -1197,14 +1505,23 @@ export default function PASAPage() {
                         <p className="text-lg font-bold text-gray-800">{studentData.student_name}</p>
                         <p className="text-sm text-gray-500">{studentData.grade} — {studentData.section}</p>
                       </div>
-                      {studentData.exam_summary?.map((e: any) => (
+                      {studentData.exam_summary?.map((e: any, idx: number) => {
+                        const prev = studentData.exam_summary[idx - 1];
+                        const diff = prev ? n(e.grand_percentage) - n(prev.grand_percentage) : null;
+                        return (
                         <div key={e.exam} className="text-center border border-gray-200 rounded-lg px-3 py-2 min-w-[70px]">
                           <p className="text-xs font-bold text-gray-500">{e.exam}</p>
                           <p className={`text-sm font-bold ${scoreColor(n(e.grand_percentage))}`}>{e.grand_percentage ? fmtPct(n(e.grand_percentage)) : "—"}</p>
+                          {diff !== null && (
+                            <p className={`text-xs font-bold ${diff > 0 ? "text-green-600" : diff < 0 ? "text-red-500" : "text-gray-400"}`}>
+                              {diff > 0 ? `▲+${diff.toFixed(1)}` : diff < 0 ? `▼${diff.toFixed(1)}` : "→"}
+                            </p>
+                          )}
                           {e.band && <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ backgroundColor: BAND_COLORS[e.band] + "20", color: BAND_COLORS[e.band] }}>{e.band}</span>}
                           {studentData.rank_per_exam?.[e.exam] && <p className="text-xs text-indigo-600 font-bold mt-0.5">#{studentData.rank_per_exam[e.exam]}</p>}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -1289,28 +1606,88 @@ export default function PASAPage() {
           )}
 
           {/* ALERTS */}
-          {dashTab === "alerts" && (
+          {dashTab === "alerts" && (() => {
+            const filteredAlerts = pasaAlerts.filter(s => {
+              if (alertGrade && s.grade !== alertGrade) return false;
+              if (alertSection && s.section !== alertSection) return false;
+              return true;
+            });
+            return (
             <div className="space-y-4">
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
                 <h3 className="text-sm font-bold text-yellow-800 mb-1">⚠️ Consecutive Score Decline Alert</h3>
                 <p className="text-xs text-yellow-600">
-                  Students whose overall grand % has dropped across 3 consecutive exams — needs attention.
+                  Students whose overall grand % has dropped across 3 consecutive exams — needs immediate attention.
                 </p>
+              </div>
+
+              {/* Filter bar */}
+              <div className="bg-white rounded-xl shadow p-4">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">View</label>
+                    <div className="flex gap-2">
+                      {[
+                        { label: "🏫 School-wide", grade: "", section: "" },
+                      ].map(opt => (
+                        <button key="school" onClick={() => { setAlertGrade(""); setAlertSection(""); setAlertSections([]); }}
+                          className={`px-3 py-1.5 text-xs rounded-lg font-medium border ${!alertGrade ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
+                          🏫 School-wide ({pasaAlerts.length})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Filter by Grade</label>
+                    <select value={alertGrade} onChange={e => {
+                      setAlertGrade(e.target.value);
+                      setAlertSection("");
+                      if (e.target.value) {
+                        const secs = [...new Set(pasaAlerts.filter(s => s.grade === e.target.value).map(s => s.section))].sort();
+                        setAlertSections(secs as string[]);
+                      } else setAlertSections([]);
+                    }} className="border border-gray-300 rounded px-2 py-1.5 text-xs">
+                      <option value="">All Grades</option>
+                      {[...new Set(pasaAlerts.map(s => s.grade))].sort().map(g => (
+                        <option key={g} value={g}>{g} ({pasaAlerts.filter(s => s.grade === g).length})</option>
+                      ))}
+                    </select>
+                  </div>
+                  {alertGrade && (
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Filter by Section</label>
+                      <select value={alertSection} onChange={e => setAlertSection(e.target.value)}
+                        className="border border-gray-300 rounded px-2 py-1.5 text-xs">
+                        <option value="">All Sections</option>
+                        {alertSections.map(s => (
+                          <option key={s} value={s}>{s} ({pasaAlerts.filter(st => st.grade === alertGrade && st.section === s).length})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div className="ml-auto">
+                    <span className="text-sm font-bold text-red-700 bg-red-100 px-3 py-1.5 rounded-lg">
+                      {filteredAlerts.length} student{filteredAlerts.length !== 1 ? "s" : ""} at risk
+                      {alertGrade ? ` in ${alertGrade}${alertSection ? ` — ${alertSection}` : ""}` : " school-wide"}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="bg-white rounded-xl shadow p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                  Students with Consecutive Decline ({pasaAlerts.length})
+                  Students with 3+ Consecutive Exam Declines
+                  {alertGrade && <span className="ml-2 text-indigo-600 font-normal">· {alertGrade}{alertSection ? ` — ${alertSection}` : ""}</span>}
                 </h3>
-                {pasaAlerts.length === 0 ? (
+                {filteredAlerts.length === 0 ? (
                   <p className="text-sm text-gray-400 text-center py-6">
-                    No students with 3 consecutive exam declines found for {academicYear}.
+                    No students with 3 consecutive exam declines found{alertGrade ? ` in ${alertGrade}${alertSection ? ` — ${alertSection}` : ""}` : ""}.
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {pasaAlerts.map((s: any, i: number) => (
+                    {filteredAlerts.map((s: any, i: number) => (
                       <div key={i} className="bg-red-50 border border-red-200 rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                           <div>
                             <span className="text-sm font-bold text-red-800">{s.student_name}</span>
                             <span className="text-xs text-gray-500 ml-2">{s.grade} — {s.section}</span>
@@ -1324,8 +1701,13 @@ export default function PASAPage() {
                             <div key={j} className={`text-center rounded-lg px-3 py-2 text-xs border min-w-[70px] ${
                               j > 0 && sc.pct < s.exam_scores[j - 1].pct ? "bg-red-100 border-red-300" : "bg-gray-50 border-gray-200"
                             }`}>
-                              <p className="font-bold text-sm text-gray-800">{sc.pct}%</p>
+                              <p className={`font-bold text-sm ${j > 0 && sc.pct < s.exam_scores[j - 1].pct ? "text-red-700" : "text-gray-800"}`}>{sc.pct}%</p>
                               <p className="text-gray-600 font-medium">{sc.exam}</p>
+                              {j > 0 && (
+                                <p className={`text-xs font-bold ${sc.pct < s.exam_scores[j-1].pct ? "text-red-500" : "text-green-600"}`}>
+                                  {sc.pct < s.exam_scores[j-1].pct ? `▼${(s.exam_scores[j-1].pct - sc.pct).toFixed(1)}` : `▲${(sc.pct - s.exam_scores[j-1].pct).toFixed(1)}`}
+                                </p>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -1335,7 +1717,8 @@ export default function PASAPage() {
                 )}
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
     </div>
