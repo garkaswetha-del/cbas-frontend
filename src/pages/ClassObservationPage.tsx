@@ -221,7 +221,7 @@ export default function ClassObservationPage() {
   const stickyR3 = (bg: string) => `sticky right-0 z-20 ${bg} border-l border-gray-200`;
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Class Observation — Module 5</h1>
@@ -231,7 +231,7 @@ export default function ClassObservationPage() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1 flex-nowrap">
         {[
           { id: "table", label: "👩‍🏫 Observation Entry" },
           { id: "dashboard", label: "📊 Dashboard" },
@@ -529,7 +529,7 @@ export default function ClassObservationPage() {
       {/* DASHBOARD */}
       {activeTab === "dashboard" && dashboard && (
         <div className="space-y-6">
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {[
               { label: "Total Teachers", value: dashboard.total_teachers, color: "border-indigo-500" },
               { label: "Total Observations", value: dashboard.total_observations, color: "border-blue-500" },
@@ -544,7 +544,7 @@ export default function ClassObservationPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-white rounded-xl shadow p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">School Criteria Radar</h3>
               <ResponsiveContainer width="100%" height={280}>
@@ -643,7 +643,7 @@ export default function ClassObservationPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Growth line chart with jitter */}
                     <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
                       <h4 className="text-xs font-bold text-gray-700 mb-1">

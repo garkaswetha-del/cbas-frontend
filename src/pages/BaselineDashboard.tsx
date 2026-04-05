@@ -76,7 +76,7 @@ export default function BaselineDashboard() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-800">Baseline Assessment Dashboard</h1>
         <p className="text-sm text-gray-500">School-wide competency overview — {ACADEMIC_YEAR}</p>
@@ -103,13 +103,20 @@ export default function BaselineDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-5 overflow-x-auto pb-1 flex-nowrap items-center">
         {[{ id: "school", label: "🏫 School" }, { id: "grade", label: "📚 Grade" }, { id: "teachers", label: "👩‍🏫 Teachers" }].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id as any)}
             className={`px-4 py-2 text-sm rounded-lg font-medium transition-all ${activeTab === t.id ? "bg-indigo-600 text-white" : "bg-white text-gray-600 border border-gray-300 hover:bg-indigo-50"}`}>
             {t.label}
           </button>
         ))}
+        <button onClick={() => {
+          if (activeTab==="school") fetchSchool();
+          else if (activeTab==="grade") fetchGrade();
+          else fetchTeachers();
+        }} className="ml-auto px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
+          🔄 Refresh
+        </button>
       </div>
 
       {loading && <div className="text-center py-10 text-gray-400">Loading...</div>}
@@ -117,7 +124,7 @@ export default function BaselineDashboard() {
       {/* ── SCHOOL DASHBOARD ── */}
       {activeTab === "school" && schoolData && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
             <KPICard label="Total Students" value={schoolData.totalStudents} color="border-indigo-500" />
             <KPICard label="Assessed" value={schoolData.assessed} color="border-green-500" />
             <KPICard label="Pending" value={schoolData.pending} color="border-red-400" />
@@ -326,7 +333,7 @@ export default function BaselineDashboard() {
       {activeTab === "teachers" && teacherData && (
         <div className="space-y-6">
           {/* KPIs */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
             <KPICard label="Total Teachers" value={teacherData.totalTeachers} color="border-indigo-500" />
             <KPICard label="Assessed" value={teacherData.assessed} color="border-green-500" />
             <KPICard label="Pending" value={teacherData.pending} color="border-red-400" />

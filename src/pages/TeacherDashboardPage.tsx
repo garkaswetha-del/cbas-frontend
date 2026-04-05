@@ -25,7 +25,8 @@ interface TeacherDashboardProps {
 }
 
 export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"profile" | "students" | "class" | "pasa" | "activities" | "promotion" | "examconfig" | "alerts" | "appraisal" | "baseline" | "homework">("profile");
+  const [activeGroup, setActiveGroup] = useState<"class" | "self">("class");
+  const [activeTab, setActiveTab] = useState<"students" | "classview" | "pasa" | "examconfig" | "activities" | "baseline_entry" | "baseline_dash" | "student_ai" | "alerts" | "promotion" | "profile" | "self_baseline" | "appraisal" | "self_ai" | "homework">("students");
   const [academicYear, setAcademicYear] = useState("2025-26");
   const [mappings, setMappings] = useState<any>(null);
 
@@ -39,59 +40,103 @@ export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
     } catch { }
   };
 
-  const TABS = [
-    { id: "profile",    label: "👤 My Profile",      show: true },
-    { id: "students",   label: "📚 My Students",     show: true },
-    { id: "class",      label: "🏛 My Class",        show: !!mappings?.is_class_teacher },
-    { id: "pasa",       label: "✏️ PA/SA",            show: true },
-    { id: "examconfig", label: "⚙️ Exam Config",      show: !!mappings?.is_class_teacher },
-    { id: "activities", label: "🎯 Activities",       show: true },
-    { id: "alerts",     label: "⚠️ Alerts",           show: true },
-    { id: "promotion",  label: "🎓 Promotion",        show: !!mappings?.is_class_teacher },
-    { id: "appraisal",  label: "📋 My Appraisal",    show: true },
-    { id: "baseline",   label: "📈 My Baseline",     show: true },
-    { id: "homework",   label: "🤖 AI Homework",     show: true },
+  const isClassTeacher = !!(mappings?.is_class_teacher || user?.class_teacher_of);
+
+  const CLASS_TABS = [
+    { id: "students",       label: "👥 My Students",      show: true },
+    { id: "classview",      label: "🏛 My Class",         show: isClassTeacher },
+    { id: "examconfig",     label: "⚙️ Exam Config",       show: isClassTeacher },
+    { id: "pasa",           label: "✏️ PA/SA Marks",       show: true },
+    { id: "baseline_entry", label: "📊 Baseline Entry",    show: isClassTeacher },
+    { id: "baseline_dash",  label: "📈 Baseline Dashboard", show: true },
+    { id: "activities",     label: "🎯 Activities",        show: true },
+    { id: "student_ai",     label: "🤖 Student AI",        show: true },
+    { id: "alerts",         label: "⚠️ Alerts",            show: true },
+    { id: "promotion",      label: "🎓 Promotion",         show: isClassTeacher },
   ];
 
+  const SELF_TABS = [
+    { id: "profile",        label: "👤 My Profile",       show: true },
+    { id: "self_baseline",  label: "📈 My Baseline",      show: true },
+    { id: "appraisal",      label: "📋 My Appraisal",     show: true },
+    { id: "self_ai",        label: "🤖 AI Learning",      show: true },
+    { id: "homework",       label: "📝 AI Homework Gen",  show: true },
+  ];
+
+  const activeTabs = activeGroup === "class" ? CLASS_TABS : SELF_TABS;
+
+  // When switching group, reset to first tab
+  const switchGroup = (g: "class" | "self") => {
+    setActiveGroup(g);
+    setActiveTab(g === "class" ? "students" : "profile");
+  };
+
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       {/* Header */}
       <div className="mb-4 flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Teacher Dashboard</h1>
-          <p className="text-sm text-gray-500">Welcome, {user?.name} · {user?.role}</p>
+          <h1 className="text-lg sm:text-xl font-bold text-gray-800">Teacher Dashboard</h1>
+          <p className="text-xs sm:text-sm text-gray-500">Welcome, {user?.name} · {user?.role}</p>
         </div>
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">Academic Year</label>
-          <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-            {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+        <div className="flex items-end gap-3">
+          {academicYear !== "2025-26" && (
+            <div className="px-3 py-1.5 bg-yellow-50 border border-yellow-300 rounded-lg text-xs text-yellow-700 font-medium">
+              👁 Viewing {academicYear} — past year
+            </div>
+          )}
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Academic Year</label>
+            <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+              {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-5 flex-wrap">
-        {TABS.filter(t => t.show).map(t => (
+      {/* Group switcher */}
+      <div className="flex gap-2 mb-3 overflow-x-auto pb-1 flex-nowrap">
+        <button onClick={() => switchGroup("class")}
+          className={`px-4 py-2 text-xs sm:text-sm rounded-xl font-bold transition-all border-2 whitespace-nowrap flex-shrink-0 ${activeGroup === "class" ? "bg-indigo-600 text-white border-indigo-600 shadow-md" : "bg-white text-indigo-600 border-indigo-300 hover:bg-indigo-50"}`}>
+          🏫 Class Management
+        </button>
+        <button onClick={() => switchGroup("self")}
+          className={`px-4 py-2 text-xs sm:text-sm rounded-xl font-bold transition-all border-2 whitespace-nowrap flex-shrink-0 ${activeGroup === "self" ? "bg-purple-600 text-white border-purple-600 shadow-md" : "bg-white text-purple-600 border-purple-300 hover:bg-purple-50"}`}>
+          👤 Self Management
+        </button>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex gap-1.5 mb-5 overflow-x-auto pb-2 flex-nowrap">
+        {activeTabs.filter(t => t.show).map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id as any)}
-            className={`px-4 py-2 text-sm rounded-lg font-medium transition-all ${activeTab === t.id ? "bg-indigo-600 text-white shadow" : "bg-white text-gray-600 border border-gray-300 hover:bg-indigo-50"}`}>
+            className={`px-3 py-1.5 text-xs sm:text-sm rounded-lg font-medium transition-all whitespace-nowrap flex-shrink-0 ${activeTab === t.id
+              ? activeGroup === "class" ? "bg-indigo-600 text-white shadow" : "bg-purple-600 text-white shadow"
+              : "bg-white text-gray-600 border border-gray-300 hover:bg-indigo-50"}`}>
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* Tab Content */}
-      {activeTab === "profile"     && <ProfileTab user={user} />}
-      {activeTab === "students"    && <StudentsTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "class"       && <ClassTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "pasa"        && <PASATab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "examconfig"  && <ExamConfigTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "activities"  && <ActivitiesTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "alerts"      && <AlertsTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "promotion"   && <PromotionTab user={user} mappings={mappings} />}
-      {activeTab === "appraisal"   && <AppraisalTab user={user} academicYear={academicYear} />}
-      {activeTab === "baseline"    && <BaselineTab user={user} academicYear={academicYear} />}
-      {activeTab === "homework"    && <HomeworkTab user={user} mappings={mappings} academicYear={academicYear} />}
+      {/* Class Management tabs */}
+      {activeTab === "students"       && <StudentsTab user={user} mappings={mappings} academicYear={academicYear} />}
+      {activeTab === "classview"      && <ClassTab user={user} mappings={mappings} academicYear={academicYear} />}
+      {activeTab === "examconfig"     && <ExamConfigTab user={user} mappings={mappings} academicYear={academicYear} />}
+      {activeTab === "pasa"           && <PASATab user={user} mappings={mappings} academicYear={academicYear} />}
+      {activeTab === "baseline_entry" && <BaselineEntryTab user={user} mappings={mappings} academicYear={academicYear} />}
+      {activeTab === "baseline_dash"  && <BaselineDashTab user={user} mappings={mappings} academicYear={academicYear} />}
+      {activeTab === "activities"     && <ActivitiesTab user={user} mappings={mappings} academicYear={academicYear} />}
+      {activeTab === "student_ai"     && <StudentAITab user={user} mappings={mappings} academicYear={academicYear} />}
+      {activeTab === "alerts"         && <AlertsTab user={user} mappings={mappings} academicYear={academicYear} />}
+      {activeTab === "promotion"      && <PromotionTab user={user} mappings={mappings} />}
+
+      {/* Self Management tabs */}
+      {activeTab === "profile"        && <ProfileTab user={user} />}
+      {activeTab === "self_baseline"  && <BaselineTab user={user} academicYear={academicYear} />}
+      {activeTab === "appraisal"      && <AppraisalTab user={user} academicYear={academicYear} />}
+      {activeTab === "self_ai"        && <SelfAITab user={user} academicYear={academicYear} />}
+      {activeTab === "homework"       && <HomeworkTab user={user} mappings={mappings} academicYear={academicYear} />}
     </div>
   );
 }
@@ -259,7 +304,7 @@ function StudentAnalysisView({ students, subjects, sectionData, pasaData, baseli
           {sectionData?.[selectedExam] ? (
             <div className="space-y-4">
               {/* Summary cards */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { label: "Students", value: sectionData[selectedExam].total_students || students.length, color: "border-indigo-500" },
                   { label: "Section Avg", value: fmtPct(n(sectionData[selectedExam].section_avg)), color: "border-green-500" },
@@ -275,7 +320,7 @@ function StudentAnalysisView({ students, subjects, sectionData, pasaData, baseli
 
               {/* Advancing / Retracting indicators */}
               {(sectionData[selectedExam].advancing?.length > 0 || sectionData[selectedExam].retracting?.length > 0) && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-white rounded-xl shadow p-4 border-t-4 border-green-400">
                     <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                       📈 Advancing
@@ -509,9 +554,17 @@ function StudentsTab({ user, mappings, academicYear }: any) {
     if (selectedGrade && selectedSection) fetchData();
   }, [selectedGrade, selectedSection, academicYear]);
 
+  const [students, setStudents] = useState<any[]>([]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
+      // Fetch actual students first
+      try {
+        const sr = await axios.get(`${API}/students?grade=${encodeURIComponent(selectedGrade)}&section=${encodeURIComponent(selectedSection)}`);
+        setStudents((sr.data?.data || sr.data || []).filter((s: any) => s.is_active !== false));
+      } catch { setStudents([]); }
+
       // Fetch PA/SA for all exam types
       const examData: Record<string, any> = {};
       await Promise.all(EXAM_TYPES.map(async exam => {
@@ -552,7 +605,7 @@ function StudentsTab({ user, mappings, academicYear }: any) {
       {/* Section selector */}
       <div className="bg-white rounded-xl shadow p-4">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Your Assigned Sections</h3>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
           {combos.map(c => (
             <button key={`${c.grade}-${c.section}`}
               onClick={() => { setSelectedGrade(c.grade); setSelectedSection(c.section); }}
@@ -568,7 +621,7 @@ function StudentsTab({ user, mappings, academicYear }: any) {
         <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400"><p className="text-sm">Loading...</p></div>
       ) : (
         <StudentAnalysisView
-          students={[]}
+          students={students}
           subjects={currentCombo?.subjects}
           sectionData={sectionData}
           baselineData={baselineData}
@@ -584,57 +637,63 @@ function StudentsTab({ user, mappings, academicYear }: any) {
 // TAB 3: MY CLASS (class teacher only)
 // ─────────────────────────────────────────────────────────────────
 function ClassTab({ user, mappings, academicYear }: any) {
-  const [sectionData, setSectionData] = useState<Record<string, any>>({});
-  const [baselineData, setBaselineData] = useState<any[]>([]);
-  const [activitiesData, setActivitiesData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const API = "http://localhost:3000";
+  const [students, setStudents] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [sectionData, setSectionData] = useState<any>({});
+  const [baselineData, setBaselineData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const classGrade = mappings?.class_grade || "";
-  const classSection = mappings?.class_section || "";
+  const rawCTO = (mappings?.class_teacher_of || user?.class_teacher_of || "").trim();
+  const ctoParts = rawCTO.split(' ').filter(Boolean);
+  const classGrade = mappings?.class_grade || (ctoParts.length >= 3 ? ctoParts.slice(0,-1).join(' ') : ctoParts.length === 2 ? ctoParts[0] : "");
+  const classSection = mappings?.class_section || (ctoParts.length >= 2 ? ctoParts[ctoParts.length-1] : "");
 
   useEffect(() => {
-    if (classGrade && classSection) fetchData();
+    if (classGrade && classSection) fetchAll();
   }, [classGrade, classSection, academicYear]);
 
-  const fetchData = async () => {
+  const fetchAll = async () => {
     setLoading(true);
     try {
-      const examData: Record<string, any> = {};
-      await Promise.all(EXAM_TYPES.map(async exam => {
-        try {
-          const r = await axios.get(`${API}/pasa/analysis/section?academic_year=${academicYear}&exam_type=${exam}&grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`);
-          if (r.data?.students_ranked?.length) examData[exam] = r.data;
-        } catch { }
-      }));
-      setSectionData(examData);
-      try { const r = await axios.get(`${API}/baseline/section?academic_year=${academicYear}&grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`); setBaselineData(r.data || []); } catch { }
-      try { const r = await axios.get(`${API}/activities/section?academic_year=${academicYear}&grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`); setActivitiesData(r.data || []); } catch { }
-    } catch { }
+      const [sr, pr, br] = await Promise.all([
+        axios.get(`${API}/students?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`),
+        axios.get(`${API}/pasa/analysis/section?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}&academic_year=${academicYear}`).catch(() => ({ data: {} })),
+        axios.get(`${API}/baseline/section/rounds?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}&academic_year=${academicYear}`).catch(() => ({ data: null })),
+      ]);
+      const studs = (sr.data?.data || sr.data || []).filter((s: any) => s.is_active !== false);
+      setStudents(studs);
+      setSectionData(pr.data || {});
+      setBaselineData(br.data);
+      const subj = [...new Set((mappings?.mappings || []).filter((m: any) => m.grade === classGrade).map((m: any) => m.subject).filter(Boolean))] as string[];
+      setSubjects(subj);
+    } catch {}
     setLoading(false);
   };
 
-  if (!mappings?.is_class_teacher) {
-    return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400"><p className="text-sm">You are not assigned as a class teacher.</p></div>;
-  }
+  if (!classGrade || !classSection) return (
+    <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">
+      No class assigned. Contact admin to set your class teacher assignment.
+    </div>
+  );
+
+  if (loading) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Loading...</div>;
 
   return (
     <div className="space-y-4">
       <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-        <p className="text-sm font-semibold text-indigo-800">🏛 Class Teacher — {classGrade} · Section {classSection}</p>
-        <p className="text-xs text-indigo-600 mt-0.5">Showing all subjects for your full class</p>
+        <h3 className="text-sm font-bold text-indigo-800">🏛 My Class — {classGrade} · {classSection}</h3>
+        <p className="text-xs text-indigo-600 mt-0.5">{students.length} students</p>
       </div>
-      {loading ? (
-        <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400"><p className="text-sm">Loading...</p></div>
-      ) : (
-        <StudentAnalysisView
-          students={[]}
-          subjects={null}
-          sectionData={sectionData}
-          baselineData={baselineData}
-          activitiesData={activitiesData}
-          academicYear={academicYear}
-        />
-      )}
+      <StudentAnalysisView
+        students={students}
+        subjects={subjects}
+        sectionData={sectionData}
+        pasaData={sectionData}
+        baselineData={baselineData}
+        activitiesData={[]}
+        academicYear={academicYear}
+      />
     </div>
   );
 }
@@ -658,11 +717,18 @@ function AppraisalTab({ user, academicYear }: any) {
   };
 
   if (loading) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400"><p className="text-sm">Loading...</p></div>;
-  if (!data) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400"><p className="text-sm">No appraisal data found for {academicYear}.</p></div>;
+  if (!data) return (
+    <div className="bg-white rounded-xl shadow p-10 text-center">
+      <p className="text-4xl mb-3">📋</p>
+      <p className="text-sm font-semibold text-gray-600">No appraisal found for {academicYear}</p>
+      <p className="text-xs text-gray-400 mt-1">Your appraisal will appear here once the principal completes your evaluation.</p>
+    </div>
+  );
 
-  const score = n(data.total_score || data.final_score);
-  const maxScore = n(data.max_score || 100);
-  const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
+  // overall_score is stored as fraction (0-1), overall_percentage = overall_score * 100
+  const pct = n(data.overall_percentage || (data.overall_score ? data.overall_score * 100 : 0));
+  const score = pct.toFixed(2);
+  const maxScore = 100;
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -674,8 +740,8 @@ function AppraisalTab({ user, academicYear }: any) {
             <p className="text-sm text-gray-500">Appraisal Report — {academicYear}</p>
           </div>
           <div className="text-center">
-            <p className="text-3xl font-bold" style={{ color: pct >= 80 ? "#10b981" : pct >= 60 ? "#6366f1" : pct >= 40 ? "#f59e0b" : "#ef4444" }}>{score}</p>
-            <p className="text-xs text-gray-400">out of {maxScore}</p>
+            <p className="text-3xl font-bold" style={{ color: pct >= 80 ? "#10b981" : pct >= 60 ? "#6366f1" : pct >= 40 ? "#f59e0b" : "#ef4444" }}>{score}%</p>
+            <p className="text-xs text-gray-400">out of {maxScore}%</p>
             <p className={`text-xs font-bold mt-0.5 ${scoreBg(pct)} px-2 py-0.5 rounded-full`}>{fmtPct(pct)}</p>
           </div>
         </div>
@@ -744,8 +810,20 @@ function AppraisalTab({ user, academicYear }: any) {
 // TAB 5: MY BASELINE
 // ─────────────────────────────────────────────────────────────────
 function BaselineTab({ user, academicYear }: any) {
+  const STAGE_ORDER = ["foundation","preparatory","middle","secondary"];
+  const STAGE_LABELS: Record<string,string> = { foundation:"Foundation", preparatory:"Preparatory", middle:"Middle", secondary:"Secondary" };
+  const STAGE_GRADE: Record<string,string> = { foundation:"Grade 2", preparatory:"Grade 5", middle:"Grade 8", secondary:"Grade 10" };
+  const PROMOTION_THRESHOLD = 80;
+  const LIT_DOMAINS = ["listening_score","speaking_score","reading_score","writing_score"];
+  const NUM_DOMAINS = ["operations_score","base10_score","measurement_score","geometry_score"];
+  const LIT_LABELS  = ["Listening","Speaking","Reading","Writing"];
+  const NUM_LABELS  = ["Operations","Base 10","Measurement","Geometry"];
+  const DOMAIN_COLORS = ["#6366f1","#8b5cf6","#06b6d4","#10b981","#f59e0b","#ef4444","#ec4899","#84cc16"];
+
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [activeSubj, setActiveSubj] = useState<"literacy"|"numeracy">("literacy");
+  const [lastUpdated, setLastUpdated] = useState<string>("");
 
   useEffect(() => { fetchData(); }, [academicYear]);
 
@@ -754,274 +832,310 @@ function BaselineTab({ user, academicYear }: any) {
     try {
       const r = await axios.get(`${API}/baseline/teacher/${user.id}?academic_year=${academicYear}`);
       setData(r.data);
+      setLastUpdated(new Date().toLocaleTimeString());
     } catch { setData(null); }
     setLoading(false);
   };
 
-  if (loading) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400"><p className="text-sm">Loading...</p></div>;
-  if (!data) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400"><p className="text-sm">No baseline data found for {academicYear}.</p></div>;
+  if (loading) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Loading...</div>;
+  if (!data?.assessments?.length) return (
+    <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400">
+      <p className="text-2xl mb-2">📊</p>
+      <p className="text-sm font-medium">No baseline data found for {academicYear}.</p>
+      <p className="text-xs mt-1">Your administrator will enter your assessment scores.</p>
+    </div>
+  );
 
-  // Assessments array — one per round
   const assessments: any[] = data.assessments || [];
-  // Current year assessment (or latest)
-  const current = assessments.find((a: any) => a.academic_year === academicYear) || assessments[assessments.length - 1];
 
-  const domains = [
-    { key: "listening_score",  label: "Listening" },
-    { key: "speaking_score",   label: "Speaking" },
-    { key: "reading_score",    label: "Reading" },
-    { key: "writing_score",    label: "Writing" },
-    { key: "operations_score", label: "Operations" },
-    { key: "base10_score",     label: "Base 10" },
-    { key: "measurement_score",label: "Measurement" },
-    { key: "geometry_score",   label: "Geometry" },
-  ].filter(d => current?.[d.key] != null);
+  // Group by subject
+  const litRounds = assessments.filter((a:any) => a.subject === "literacy").sort((a:any,b:any) => a.round > b.round ? 1 : -1);
+  const numRounds = assessments.filter((a:any) => a.subject === "numeracy").sort((a:any,b:any) => a.round > b.round ? 1 : -1);
 
-  // Longitudinal: overall_score across rounds/years
-  const longitudinal = assessments
-    .filter((a: any) => a.overall_score != null)
-    .sort((a: any, b: any) => (a.academic_year > b.academic_year ? 1 : -1))
-    .map((a: any) => ({
-      year: a.academic_year,
-      round: a.round,
-      overall: +a.overall_score,
-      literacy: a.literacy_total ? +a.literacy_total : null,
-      numeracy: a.numeracy_total ? +a.numeracy_total : null,
-      label: `${a.academic_year} (${a.round || "R1"})`,
-    }));
+  const hasLit = litRounds.length > 0;
+  const hasNum = numRounds.length > 0;
 
-  // Consecutive decline: last 3 entries declining
-  const hasDecline = longitudinal.length >= 3 &&
-    longitudinal[longitudinal.length - 1].overall < longitudinal[longitudinal.length - 2].overall &&
-    longitudinal[longitudinal.length - 2].overall < longitudinal[longitudinal.length - 3].overall;
+  // Latest per subject
+  const latestLit = litRounds[litRounds.length - 1];
+  const latestNum = numRounds[numRounds.length - 1];
 
-  // Download Report Card as HTML
-  const downloadReportCard = () => {
-    const domainRows = domains.map(d => `
-      <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${d.label}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:bold;color:${+(current[d.key]||0)>=80?"#16a34a":+(current[d.key]||0)>=60?"#2563eb":+(current[d.key]||0)>=40?"#d97706":"#dc2626"}">
-          ${+(current[d.key]||0).toFixed(1)}%
-        </td>
-      </tr>`).join("");
+  const litAvg = latestLit ? (LIT_DOMAINS.reduce((s,d) => s + +(latestLit[d]||0),0)/LIT_DOMAINS.length) : null;
+  const numAvg = latestNum ? (NUM_DOMAINS.reduce((s,d) => s + +(latestNum[d]||0),0)/NUM_DOMAINS.length) : null;
+  const overall = litAvg !== null && numAvg !== null ? (litAvg+numAvg)/2 : (litAvg ?? numAvg ?? 0);
 
-    const html = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<title>Baseline Report Card — ${user?.name}</title>
-<style>
-  body { font-family: Arial, sans-serif; max-width: 720px; margin: 40px auto; color: #111; }
-  h1 { color: #4338ca; margin-bottom: 4px; }
-  .subtitle { color: #6b7280; font-size: 14px; margin-bottom: 24px; }
-  .kpi { display: flex; gap: 16px; margin-bottom: 24px; }
-  .kpi-card { flex: 1; background: #f5f3ff; border-left: 4px solid #6366f1; padding: 12px 16px; border-radius: 8px; }
-  .kpi-card .val { font-size: 22px; font-weight: bold; color: #4338ca; }
-  .kpi-card .lbl { font-size: 12px; color: #6b7280; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th { background: #4338ca; color: white; padding: 10px 12px; text-align: left; }
-  tr:nth-child(even) { background: #f9fafb; }
-  .footer { margin-top: 40px; font-size: 12px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 12px; }
-  .alert { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; color: #dc2626; font-size: 13px; }
-</style></head>
-<body>
-  <h1>Baseline Assessment Report Card</h1>
-  <p class="subtitle">${user?.name} &nbsp;·&nbsp; ${user?.role} &nbsp;·&nbsp; Academic Year: ${current?.academic_year || academicYear} &nbsp;·&nbsp; Round: ${current?.round || "—"} &nbsp;·&nbsp; Stage: ${current?.stage || "—"}</p>
-  ${hasDecline ? `<div class="alert">⚠️ Consecutive Decline Detected — Overall score has dropped in the last 3 assessments.</div>` : ""}
-  <div class="kpi">
-    <div class="kpi-card"><div class="val">${current?.overall_score != null ? (+current.overall_score).toFixed(1) + "%" : "—"}</div><div class="lbl">Overall Score</div></div>
-    <div class="kpi-card"><div class="val">${current?.literacy_total != null ? (+current.literacy_total).toFixed(1) + "%" : "—"}</div><div class="lbl">Literacy Total</div></div>
-    <div class="kpi-card"><div class="val">${current?.numeracy_total != null ? (+current.numeracy_total).toFixed(1) + "%" : "—"}</div><div class="lbl">Numeracy Total</div></div>
-    <div class="kpi-card"><div class="val">${current?.level || current?.proficiency_level || "—"}</div><div class="lbl">Level</div></div>
-  </div>
-  <table>
-    <thead><tr><th>Domain</th><th>Score</th></tr></thead>
-    <tbody>${domainRows}</tbody>
-  </table>
-  ${current?.learning_gaps?.length ? `<h3 style="margin-top:24px;color:#dc2626;">Learning Gaps</h3><p style="font-size:13px;color:#374151;">${Array.isArray(current.learning_gaps) ? current.learning_gaps.join(", ") : current.learning_gaps}</p>` : ""}
-  ${longitudinal.length > 1 ? `
-  <h3 style="margin-top:24px;">Longitudinal — Overall Score Trend</h3>
-  <table>
-    <thead><tr><th>Year</th><th>Round</th><th>Overall %</th><th>Literacy %</th><th>Numeracy %</th></tr></thead>
-    <tbody>${longitudinal.map(r => `<tr><td style="padding:6px 12px">${r.year}</td><td style="padding:6px 12px">${r.round}</td><td style="padding:6px 12px;font-weight:bold">${r.overall.toFixed(1)}%</td><td style="padding:6px 12px">${r.literacy != null ? r.literacy.toFixed(1)+"%" : "—"}</td><td style="padding:6px 12px">${r.numeracy != null ? r.numeracy.toFixed(1)+"%" : "—"}</td></tr>`).join("")}</tbody>
-  </table>` : ""}
-  <div class="footer">Generated by CBAS — Wisdom Techno School &nbsp;·&nbsp; ${new Date().toLocaleDateString()}</div>
-</body></html>`;
+  const litStage = latestLit?.stage || "foundation";
+  const numStage = latestNum?.stage || "foundation";
+  const litGrade = STAGE_GRADE[litStage];
+  const numGrade = STAGE_GRADE[numStage];
 
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Baseline_ReportCard_${user?.name?.replace(/\s+/g, "_")}_${academicYear}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+  // Gaps = domains below subject avg
+  const litGaps = hasLit ? LIT_DOMAINS.filter(d => litAvg !== null && +(latestLit[d]||0) < litAvg).map((d,i) => LIT_LABELS[LIT_DOMAINS.indexOf(d)]) : [];
+  const numGaps = hasNum ? NUM_DOMAINS.filter(d => numAvg !== null && +(latestNum[d]||0) < numAvg).map((d,i) => NUM_LABELS[NUM_DOMAINS.indexOf(d)]) : [];
+
+  // Stage progression per subject
+  const getStageGroups = (rounds: any[], domains: string[]) => {
+    const groups: Record<string, any[]> = {};
+    rounds.forEach(r => {
+      const s = r.stage || "foundation";
+      if (!groups[s]) groups[s] = [];
+      groups[s].push(r);
+    });
+    return groups;
   };
 
-  const subjects = data.subjects || Object.keys(data.subject_scores || {});
+  // Chart data for a subject: one point per round
+  const buildTrendData = (rounds: any[], domains: string[], labels: string[]) =>
+    rounds.map((r:any, i:number) => {
+      const obj: any = { name: `R${i+1}`, round: r.round };
+      labels.forEach((l,j) => { obj[l] = +(r[domains[j]]||0); });
+      const vals = domains.map(d => +(r[d]||0)).filter(v=>v>0);
+      obj["Avg"] = vals.length ? +(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : 0;
+      return obj;
+    });
+
+  const litTrend = buildTrendData(litRounds, LIT_DOMAINS, LIT_LABELS);
+  const numTrend = buildTrendData(numRounds, NUM_DOMAINS, NUM_LABELS);
+
+  const litStageGroups = getStageGroups(litRounds, LIT_DOMAINS);
+  const numStageGroups = getStageGroups(numRounds, NUM_DOMAINS);
+
+  const scoreBadge = (v: number) => v >= 80 ? "bg-green-100 text-green-800" : v >= 60 ? "bg-blue-100 text-blue-800" : v >= 40 ? "bg-yellow-100 text-yellow-800" : v > 0 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-400";
+
+  const SubjectCharts = ({ rounds, trend, domains, labels, stageGroups, subj }: any) => {
+    if (!rounds.length) return null;
+    const latest = rounds[rounds.length-1];
+    const avg = domains.reduce((s:number,d:string)=>s + Number(latest[d]||0),0)/domains.length;
+    const promoted = latest?.promoted;
+    const promotedTo = latest?.promoted_to_stage;
+
+    return (
+      <div className="space-y-4">
+        {/* Stage journey */}
+        <div className="flex gap-2 flex-wrap items-center">
+          <span className="text-xs text-gray-500 font-medium">Stage Journey:</span>
+          {STAGE_ORDER.map((s,i) => {
+            const hasStage = !!stageGroups[s];
+            const isCurrentStage = (latest?.stage || "foundation") === s;
+            const wasPromoted = rounds.some((r:any) => r.stage === s && r.promoted);
+            return (
+              <span key={s} className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                wasPromoted ? "bg-green-600 text-white border-green-600" :
+                isCurrentStage ? "bg-indigo-600 text-white border-indigo-600" :
+                hasStage ? "bg-gray-200 text-gray-600 border-gray-300" :
+                "bg-gray-50 text-gray-300 border-gray-200"
+              }`}>
+                {STAGE_LABELS[s]} {wasPromoted ? "✓" : isCurrentStage ? "← now" : ""}
+              </span>
+            );
+          })}
+        </div>
+
+        {/* Promotion banner */}
+        {promoted && (
+          <div className="bg-green-50 border border-green-300 rounded-xl p-3 flex items-center gap-3">
+            <span className="text-2xl">🎉</span>
+            <div>
+              <p className="text-sm font-bold text-green-800">Stage Promoted!</p>
+              <p className="text-xs text-green-600">Promoted to <strong>{promotedTo}</strong> stage · Grade: {STAGE_GRADE[promotedTo?.toLowerCase()||"foundation"]}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Domain scores — latest round */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h4 className="text-xs font-bold text-gray-600 mb-3">Latest Round — {STAGE_LABELS[latest?.stage||"foundation"]} Stage ({STAGE_GRADE[latest?.stage||"foundation"]})</h4>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {labels.map((label:string, i:number) => {
+              const val = +(latest[domains[i]]||0);
+              return (
+                <div key={label} className={`rounded-lg p-3 text-center ${scoreBadge(val)}`}>
+                  <div className="text-lg font-bold">{val > 0 ? val.toFixed(1)+"%" : "—"}</div>
+                  <div className="text-xs mt-0.5">{label}</div>
+                  {avg > 0 && val > 0 && val < avg && <div className="text-xs mt-0.5">⚠️ gap</div>}
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+            <span className="text-xs text-gray-500">Subject Average</span>
+            <span className={`text-sm font-bold px-3 py-1 rounded-lg ${scoreBadge(avg)}`}>
+              {avg > 0 ? avg.toFixed(1)+"%" : "—"} {avg >= 80 ? "🎉" : ""}
+            </span>
+          </div>
+        </div>
+
+        {/* Trend chart — only if 2+ rounds */}
+        {trend.length >= 2 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h4 className="text-xs font-bold text-gray-600 mb-3">Score Trend Across Rounds</h4>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={trend} margin={{ top:5, right:20, bottom:5, left:0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize:11 }} />
+                <YAxis domain={[0,100]} tick={{ fontSize:11 }} tickFormatter={v=>`${v}%`} />
+                <Tooltip formatter={(v:any)=>`${(+v).toFixed(1)}%`} />
+                <Legend wrapperStyle={{ fontSize:11 }} />
+                {/* 80% threshold line */}
+                <Line type="monotone" dataKey="Avg" stroke="#6366f1" strokeWidth={3} dot={{ r:5 }} name="Avg" />
+                {labels.map((l:string,i:number) => (
+                  <Line key={l} type="monotone" dataKey={l} stroke={DOMAIN_COLORS[i]} strokeWidth={1.5} dot={{ r:3 }} strokeDasharray="4 2" />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+            {/* 80% indicator */}
+            <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+              <div className="w-6 h-0.5 bg-green-500"></div>
+              <span>80% = Promotion threshold</span>
+            </div>
+          </div>
+        )}
+
+        {/* Per-domain bar chart */}
+        {trend.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h4 className="text-xs font-bold text-gray-600 mb-3">Domain Breakdown (Latest Round)</h4>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={labels.map((l:string,i:number) => ({ domain:l, score: +(latest[domains[i]]||0), threshold:80 }))} margin={{top:5,right:10,bottom:5,left:0}}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="domain" tick={{ fontSize:10 }} />
+                <YAxis domain={[0,100]} tick={{ fontSize:10 }} tickFormatter={v=>`${v}%`} />
+                <Tooltip formatter={(v:any)=>`${(+v).toFixed(1)}%`} />
+                <Bar dataKey="score" radius={[4,4,0,0]}>
+                  {labels.map((_:string,i:number) => {
+                    const val = +(latest[domains[i]]||0);
+                    return <Cell key={i} fill={val >= 80 ? "#10b981" : val >= 60 ? "#6366f1" : val >= 40 ? "#f59e0b" : "#ef4444"} />;
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <div className="max-w-3xl space-y-4">
-      {/* Consecutive Decline Alert */}
-      {hasDecline && (
-        <div className="bg-red-50 border border-red-300 rounded-xl p-4 flex items-start gap-3">
-          <span className="text-xl">⚠️</span>
-          <div>
-            <p className="text-sm font-bold text-red-800">Consecutive Decline Detected</p>
-            <p className="text-xs text-red-600 mt-0.5">Your overall baseline score has dropped in the last 3 consecutive assessments: {longitudinal.slice(-3).map(r => `${r.overall.toFixed(1)}%`).join(" → ")}</p>
-          </div>
+    <div className="space-y-4 w-full max-w-3xl">
+      {/* Header with refresh */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-gray-700">📊 My Baseline Assessment</h3>
+          {lastUpdated && <p className="text-xs text-gray-400">Last synced: {lastUpdated}</p>}
         </div>
-      )}
+        <button onClick={fetchData} disabled={loading}
+          className="px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-1 disabled:opacity-50">
+          {loading ? "⏳" : "🔄"} Refresh
+        </button>
+      </div>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label:"Overall", val: overall > 0 ? overall.toFixed(1)+"%" : "—", color: scoreBadge(overall) },
+          { label:"Lit Avg", val: litAvg !== null ? litAvg.toFixed(1)+"%" : "—", color: scoreBadge(litAvg||0) },
+          { label:"Num Avg", val: numAvg !== null ? numAvg.toFixed(1)+"%" : "—", color: scoreBadge(numAvg||0) },
+          { label:"Gaps", val: [...litGaps,...numGaps].length, color:"bg-orange-50 text-orange-800" },
+        ].map(k => (
+          <div key={k.label} className={`rounded-xl p-3 text-center border ${k.color}`}>
+            <div className="text-xl font-bold">{k.val}</div>
+            <div className="text-xs mt-0.5">{k.label}</div>
+          </div>
+        ))}
+      </div>
 
-      {/* Summary + Download */}
-      <div className="bg-white rounded-xl shadow p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h2 className="text-base font-bold text-gray-800">{user?.name} — Baseline Assessment</h2>
-            <p className="text-sm text-gray-500">{current?.academic_year || academicYear} · Round: {current?.round || "—"} · Stage: {current?.stage || "—"}</p>
-          </div>
-          <button onClick={downloadReportCard}
-            className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 font-semibold flex items-center gap-1">
-            ⬇️ Download Report Card
-          </button>
-        </div>
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            { label: "Overall Score", value: current?.overall_score != null ? fmtPct(n(current.overall_score)) : "—", color: "border-indigo-500" },
-            { label: "Literacy", value: current?.literacy_total != null ? fmtPct(n(current.literacy_total)) : "—", color: "border-blue-500" },
-            { label: "Numeracy", value: current?.numeracy_total != null ? fmtPct(n(current.numeracy_total)) : "—", color: "border-green-500" },
-            { label: "Level", value: current?.level || current?.proficiency_level || "—", color: "border-purple-500" },
-          ].map(s => (
-            <div key={s.label} className={`bg-gray-50 rounded-xl p-4 border-l-4 ${s.color}`}>
-              <p className="text-xs text-gray-500">{s.label}</p>
-              <p className="text-lg font-bold text-gray-800">{s.value}</p>
+      {/* Stage summary */}
+      <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
+        <h3 className="text-sm font-bold text-gray-700 mb-3">Current Stage</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {hasLit && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="text-xs text-blue-600 font-semibold mb-1">📖 Literacy</div>
+              <div className="text-sm font-bold text-blue-800">{STAGE_LABELS[litStage]} Stage</div>
+              <div className="text-xs text-blue-600">Assessed on {litGrade} competencies</div>
+              {latestLit?.promoted && <div className="text-xs text-green-700 font-bold mt-1">🎉 Promoted to {latestLit.promoted_to_stage}</div>}
             </div>
-          ))}
+          )}
+          {hasNum && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+              <div className="text-xs text-purple-600 font-semibold mb-1">🔢 Numeracy</div>
+              <div className="text-sm font-bold text-purple-800">{STAGE_LABELS[numStage]} Stage</div>
+              <div className="text-xs text-purple-600">Assessed on {numGrade} competencies</div>
+              {latestNum?.promoted && <div className="text-xs text-green-700 font-bold mt-1">🎉 Promoted to {latestNum.promoted_to_stage}</div>}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Domain breakdown */}
-      {domains.length > 0 && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Domain-wise Scores</h3>
-          <div className="space-y-2">
-            {domains.map((d, i) => {
-              const score = n(current[d.key]);
-              return (
-                <div key={d.key} className="flex items-center gap-3">
-                  <span className="text-xs font-medium text-gray-600 w-28 shrink-0">{d.label}</span>
-                  <div className="flex-1 bg-gray-200 rounded-full h-3">
-                    <div className="h-3 rounded-full transition-all" style={{ width: `${Math.min(score, 100)}%`, backgroundColor: SUBJECT_COLORS[i % SUBJECT_COLORS.length] }} />
-                  </div>
-                  <span className={`text-xs font-bold w-14 text-right ${scoreBg(score)} px-1.5 py-0.5 rounded-full`}>{score.toFixed(1)}%</span>
-                </div>
-              );
-            })}
+      {/* Gap analysis */}
+      {(litGaps.length > 0 || numGaps.length > 0) && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+          <h3 className="text-sm font-bold text-orange-800 mb-2">⚠️ Gap Areas (below subject average)</h3>
+          <div className="flex flex-wrap gap-2">
+            {litGaps.map(g => <span key={g} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">📖 {g}</span>)}
+            {numGaps.map(g => <span key={g} className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">🔢 {g}</span>)}
           </div>
+          <p className="text-xs text-orange-600 mt-2">These domains are below your subject average. Use AI Practice Paper to improve.</p>
         </div>
       )}
 
-      {/* Chart */}
-      {domains.length > 1 && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Domain Score Chart</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={domains.map(d => ({ name: d.label, score: n(current[d.key]) }))} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
-              <Tooltip formatter={(v: any) => [`${v}%`, "Score"]} />
-              <Bar dataKey="score" radius={[0, 4, 4, 0]}>
-                {domains.map((_, i) => <Cell key={i} fill={SUBJECT_COLORS[i % SUBJECT_COLORS.length]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+      {/* Subject tabs */}
+      {hasLit && hasNum && (
+        <div className="flex gap-2">
+          {["literacy","numeracy"].map(s => (
+            <button key={s} onClick={()=>setActiveSubj(s as any)}
+              className={`px-4 py-2 text-sm rounded-lg font-medium border ${activeSubj===s?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
+              {s === "literacy" ? "📖 Literacy" : "🔢 Numeracy"}
+            </button>
+          ))}
         </div>
       )}
 
-      {/* Longitudinal trend */}
-      {longitudinal.length > 1 && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-1">📈 Longitudinal — Score Trend Across Rounds</h3>
-          <p className="text-xs text-gray-400 mb-3">Overall % · Literacy · Numeracy across all assessed rounds</p>
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={longitudinal} margin={{ top: 5, right: 20, left: 0, bottom: 40 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" tick={{ fontSize: 9 }} angle={-20} textAnchor="end" />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(v: any, name: any) => [`${Number(v).toFixed(1)}%`, name]} />
-              <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} />
-              <Line type="monotone" dataKey="overall" name="Overall" stroke="#6366f1" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 7 }} />
-              <Line type="monotone" dataKey="literacy" name="Literacy" stroke="#22c55e" strokeWidth={2} dot={{ r: 4 }} connectNulls />
-              <Line type="monotone" dataKey="numeracy" name="Numeracy" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} connectNulls />
-            </LineChart>
-          </ResponsiveContainer>
-
-          {/* Year-wise table */}
-          <table className="w-full text-xs border-collapse mt-3">
-            <thead>
-              <tr className="bg-indigo-700 text-white">
-                <th className="px-3 py-2 text-left">Year</th>
-                <th className="px-3 py-2 text-center">Round</th>
-                <th className="px-3 py-2 text-center">Overall %</th>
-                <th className="px-3 py-2 text-center">Literacy %</th>
-                <th className="px-3 py-2 text-center">Numeracy %</th>
-                <th className="px-3 py-2 text-center">Trend</th>
-              </tr>
-            </thead>
-            <tbody>
-              {longitudinal.map((row, i) => {
-                const prev = i > 0 ? longitudinal[i - 1].overall : null;
-                const trend = prev == null ? "—" : row.overall > prev ? "▲" : row.overall < prev ? "▼" : "→";
-                const tColor = trend === "▲" ? "text-green-600" : trend === "▼" ? "text-red-500" : "text-gray-400";
-                return (
-                  <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                    <td className="px-3 py-2 font-bold text-indigo-700">{row.year}</td>
-                    <td className="px-3 py-2 text-center text-gray-600">{row.round}</td>
-                    <td className="px-3 py-2 text-center">
-                      <span className={`font-bold px-2 py-0.5 rounded-full text-xs ${scoreBg(row.overall)}`}>{row.overall.toFixed(1)}%</span>
-                    </td>
-                    <td className="px-3 py-2 text-center">{row.literacy != null ? `${row.literacy.toFixed(1)}%` : "—"}</td>
-                    <td className="px-3 py-2 text-center">{row.numeracy != null ? `${row.numeracy.toFixed(1)}%` : "—"}</td>
-                    <td className={`px-3 py-2 text-center font-bold text-lg ${tColor}`}>{trend}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      {/* Charts */}
+      {(!hasLit || !hasNum || activeSubj === "literacy") && hasLit && (
+        <SubjectCharts rounds={litRounds} trend={litTrend} domains={LIT_DOMAINS} labels={LIT_LABELS} stageGroups={litStageGroups} subj="literacy" />
+      )}
+      {(!hasLit || !hasNum || activeSubj === "numeracy") && hasNum && (
+        <SubjectCharts rounds={numRounds} trend={numTrend} domains={NUM_DOMAINS} labels={NUM_LABELS} stageGroups={numStageGroups} subj="numeracy" />
       )}
 
-      {/* Learning gaps */}
-      {(current?.learning_gaps?.length > 0) && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-red-800 mb-2">📌 Learning Gaps</h3>
-          <div className="flex gap-2 flex-wrap">
-            {(Array.isArray(current.learning_gaps) ? current.learning_gaps : [current.learning_gaps]).map((g: string, i: number) => (
-              <span key={i} className="text-xs bg-white text-red-700 border border-red-300 px-2 py-1 rounded-lg">{g}</span>
-            ))}
+      {/* All rounds history table */}
+      {assessments.length > 0 && (
+        <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <h3 className="text-sm font-bold text-gray-700">All Rounds History</h3>
           </div>
-        </div>
-      )}
-
-      {/* Subject-wise (legacy fallback) */}
-      {subjects.length > 0 && !domains.length && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject-wise Performance</h3>
-          <div className="space-y-3">
-            {subjects.map((sub: string, i: number) => {
-              const score = n(data.subject_scores?.[sub] ?? data.subjects?.[i]?.score);
-              const max = n(data.subject_max?.[sub] ?? data.subjects?.[i]?.max ?? 100);
-              const pct = max > 0 ? (score / max) * 100 : 0;
-              return (
-                <div key={sub} className="border border-gray-200 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-gray-700">{sub}</span>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(pct)}`}>{score}/{max} ({fmtPct(pct)})</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="h-2 rounded-full" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: SUBJECT_COLORS[i % SUBJECT_COLORS.length] }} />
-                  </div>
-                </div>
-              );
-            })}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse" style={{minWidth:"600px"}}>
+              <thead>
+                <tr className="bg-indigo-700 text-white">
+                  <th className="px-3 py-2 text-left">Round</th>
+                  <th className="px-3 py-2 text-center">Subject</th>
+                  <th className="px-3 py-2 text-center">Stage</th>
+                  <th className="px-3 py-2 text-center">Date</th>
+                  <th className="px-3 py-2 text-center">Avg</th>
+                  <th className="px-3 py-2 text-center">Promoted?</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assessments.map((a:any,i:number) => {
+                  const domains = a.subject==="literacy" ? LIT_DOMAINS : NUM_DOMAINS;
+                  const avg = domains.reduce((s:number,d:string)=>s + Number(a[d]||0),0)/domains.length;
+                  return (
+                    <tr key={a.id||i} className={`border-b border-gray-100 ${i%2===0?"bg-white":"bg-gray-50"}`}>
+                      <td className="px-3 py-2 font-medium">{a.round?.replace("baseline_","R")}</td>
+                      <td className="px-3 py-2 text-center">{a.subject==="literacy"?"📖 Literacy":"🔢 Numeracy"}</td>
+                      <td className="px-3 py-2 text-center capitalize">{STAGE_LABELS[a.stage]||a.stage}</td>
+                      <td className="px-3 py-2 text-center text-gray-500">{a.assessment_date||"—"}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`px-2 py-0.5 rounded font-bold ${scoreBadge(avg)}`}>{avg>0?avg.toFixed(1)+"%":"—"}</span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {a.promoted ? <span className="text-green-700 font-bold">🎉 → {a.promoted_to_stage}</span> : <span className="text-gray-400">—</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -1069,33 +1183,31 @@ function PASATab({ user, mappings, academicYear }: any) {
     if (!selectedCombo) return;
     try {
       const r = await axios.get(`${API}/pasa/marks/table?academic_year=${academicYear}&exam_type=${selectedExam}&grade=${encodeURIComponent(selectedCombo.grade)}&section=${encodeURIComponent(selectedCombo.section)}`);
-      // If no configs but students exist, build a minimal table with just the teacher's subject
       let data = r.data;
-      if ((!data?.configs?.length || !data?.subjects?.length) && data?.students?.length) {
-        // Inject teacher's subject as a config so marks can still be entered
+
+      // Only show marks table if exam config actually exists for this grade
+      // Do NOT inject default 100 marks - teacher must configure exam first
+      if (!data?.configs?.length) {
+        setMarksTable({ no_config: true, grade: selectedCombo.grade, exam_type: selectedExam });
+        setMarks({});
+        return;
+      }
+
+      // Filter configs to only show teacher's subject
+      if (data?.configs?.length) {
         data = {
           ...data,
-          subjects: [selectedCombo.subject],
-          configs: [{ subject: selectedCombo.subject, max_marks: 100, exam_type: selectedExam, grade: selectedCombo.grade }],
+          configs: data.configs.filter((c: any) => c.subject === selectedCombo.subject),
+          subjects: (data.subjects || []).filter((s: any) => s === selectedCombo.subject),
           students: data.students.map((s: any) => ({
             ...s,
-            subjects: { ...s.subjects, [selectedCombo.subject]: s.subjects?.[selectedCombo.subject] || { marks: null, max_marks: 100, percentage: null, is_absent: false } },
+            subjects: Object.fromEntries(
+              Object.entries(s.subjects || {}).filter(([k]) => k === selectedCombo.subject)
+            ),
           })),
         };
       }
-      // If no students at all, fetch them directly
-      if (!data?.students?.length) {
-        const sr = await axios.get(`${API}/students?grade=${encodeURIComponent(selectedCombo.grade)}&section=${encodeURIComponent(selectedCombo.section)}`);
-        const students = (sr.data?.data || sr.data || []).filter((s: any) => s.is_active !== false);
-        data = {
-          students: students.map((s: any) => ({
-            student_id: s.id, student_name: s.name, roll_number: s.admission_no,
-            subjects: { [selectedCombo.subject]: { marks: null, max_marks: 100, percentage: null, is_absent: false } },
-          })),
-          subjects: [selectedCombo.subject],
-          configs: [{ subject: selectedCombo.subject, max_marks: 100 }],
-        };
-      }
+
       setMarksTable(data);
       const m: Record<string, Record<string, any>> = {};
       (data?.students || []).forEach((s: any) => {
@@ -1106,23 +1218,8 @@ function PASATab({ user, mappings, academicYear }: any) {
       });
       setMarks(m);
     } catch (e) {
-      // Even on error, try to load students directly
-      try {
-        const sr = await axios.get(`${API}/students?grade=${encodeURIComponent(selectedCombo.grade)}&section=${encodeURIComponent(selectedCombo.section)}`);
-        const students = (sr.data?.data || sr.data || []).filter((s: any) => s.is_active !== false);
-        const data = {
-          students: students.map((s: any) => ({
-            student_id: s.id, student_name: s.name, roll_number: s.admission_no,
-            subjects: { [selectedCombo.subject]: { marks: null, max_marks: 100, percentage: null, is_absent: false } },
-          })),
-          subjects: [selectedCombo.subject],
-          configs: [{ subject: selectedCombo.subject, max_marks: 100 }],
-        };
-        setMarksTable(data);
-        const m: Record<string, Record<string, any>> = {};
-        students.forEach((s: any) => { m[s.name] = { [selectedCombo.subject]: { marks: "", is_absent: false } }; });
-        setMarks(m);
-      } catch { setMarksTable(null); }
+      setMarksTable({ no_config: true, grade: selectedCombo.grade, exam_type: selectedExam });
+      setMarks({});
     }
   };
 
@@ -1195,7 +1292,7 @@ function PASATab({ user, mappings, academicYear }: any) {
       </div>
 
       {/* Section selector */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
         {combos.map(c => (
           <button key={`${c.grade}-${c.section}-${c.subject}`}
             onClick={() => setSelectedCombo(c)}
@@ -1211,7 +1308,12 @@ function PASATab({ user, mappings, academicYear }: any) {
       {subTab === "entry" && (
         <div>
           {!marksTable ? (
-            <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No marks table found for {selectedCombo?.grade} · {selectedCombo?.section} · {selectedExam}. Config may not be set up yet.</div>
+            <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Loading...</div>
+          ) : marksTable.no_config ? (
+            <div className="bg-white rounded-xl shadow p-10 text-center">
+              <p className="text-gray-500 text-sm font-medium">⚠️ No exam configuration found for {marksTable.grade} — {marksTable.exam_type}</p>
+              <p className="text-gray-400 text-xs mt-2">Admin needs to configure the exam for this grade first via Exam Config tab.</p>
+            </div>
           ) : (
             <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
@@ -1284,7 +1386,7 @@ function PASATab({ user, mappings, academicYear }: any) {
           !sectionData ? <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No analysis data for {selectedCombo?.grade} · {selectedCombo?.section} · {selectedExam}.</div> : (
             <>
               {/* Stats */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { label: "Total Students", value: sectionData.total_students, color: "border-indigo-500" },
                   { label: "Section Avg", value: fmtP(nv(sectionData.section_avg)), color: "border-green-500" },
@@ -1300,7 +1402,7 @@ function PASATab({ user, mappings, academicYear }: any) {
 
               {/* Advancing / Retracting */}
               {(sectionData.advancing?.length > 0 || sectionData.retracting?.length > 0) && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-white rounded-xl shadow p-4 border-t-4 border-green-400">
                     <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">📈 Advancing <span className="ml-auto bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">{sectionData.advancing?.length}</span></h3>
                     <div className="space-y-1 max-h-40 overflow-y-auto">
@@ -1434,7 +1536,7 @@ function PASATab({ user, mappings, academicYear }: any) {
 
               {/* YoY panels */}
               {(sectionData.yoy_advancing?.length > 0 || sectionData.yoy_retracting?.length > 0) && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-white rounded-xl shadow p-4 border-t-4 border-emerald-400">
                     <h3 className="text-sm font-semibold text-gray-700 mb-2">🚀 Year-on-Year Advancing <span className="text-xs font-normal text-gray-400">(vs last year)</span></h3>
                     <div className="space-y-1 max-h-40 overflow-y-auto">
@@ -1466,29 +1568,43 @@ function PASATab({ user, mappings, academicYear }: any) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// ACTIVITIES TAB — Create + Marks Entry + Graphical Analysis
+// ACTIVITIES TAB — Create + Marks Entry + Coverage + Analysis
 // ─────────────────────────────────────────────────────────────────
 function ActivitiesTab({ user, mappings, academicYear }: any) {
   const API = "http://localhost:3000";
   const ACTIVITY_TYPES = ["Individual","Group","Project","Assessment","Workshop","Other"];
-  const STAGES = ["foundation","preparatory","middle","secondary"];
-  const RATING_COLORS: Record<string, string> = { beginning: "bg-red-100 text-red-700 border-red-300", approaching: "bg-yellow-100 text-yellow-700 border-yellow-300", meeting: "bg-green-100 text-green-700 border-green-300", exceeding: "bg-purple-100 text-purple-700 border-purple-300" };
-  const CROSS_CURRICULAR = ["Arts","Vocational Education","Interdisciplinary"];
+  const CROSS_CURRICULAR = ["arts","vocational_education","interdisciplinary"];
+  const CROSS_LABELS: Record<string,string> = { arts: "Arts", vocational_education: "Vocational Education", interdisciplinary: "Interdisciplinary" };
+  const RATING_COLORS: Record<string, string> = {
+    beginning: "bg-red-100 text-red-700 border-red-300",
+    approaching: "bg-yellow-100 text-yellow-700 border-yellow-300",
+    meeting: "bg-green-100 text-green-700 border-green-300",
+    exceeding: "bg-purple-100 text-purple-700 border-purple-300"
+  };
+  const GRADE_TO_STAGE: Record<string, string> = {
+    "Pre-KG":"foundation","LKG":"foundation","UKG":"foundation",
+    "Grade 1":"foundation","Grade 2":"foundation",
+    "Grade 3":"preparatory","Grade 4":"preparatory","Grade 5":"preparatory",
+    "Grade 6":"middle","Grade 7":"middle","Grade 8":"middle",
+    "Grade 9":"secondary","Grade 10":"secondary",
+  };
+  const normalizeSubject = (s: string) => s.trim().toLowerCase().replace(/\s+/g,'_').replace(/[()]/g,'');
 
-  const [subTab, setSubTab] = useState<"create" | "marks" | "analysis">("create");
+  const [subTab, setSubTab] = useState<"create"|"marks"|"coverage"|"analysis">("create");
   const [activities, setActivities] = useState<any[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
   const [combinedMarks, setCombinedMarks] = useState<any>(null);
-  const [localRatings, setLocalRatings] = useState<Record<string, Record<string, Record<string, string>>>>({});
+  const [localRatings, setLocalRatings] = useState<Record<string,Record<string,Record<string,string>>>>({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
-  const [sectionDash, setSectionDash] = useState<any>(null);
-  const [selectedSection, setSelectedSection] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [coverage, setCoverage] = useState<any>(null);
+  const [coverageGrade, setCoverageGrade] = useState("");
 
-  // Build teacher's grade+section+subject combos
+  // Build teacher's combos
   const combos: { grade: string; section: string; subject: string }[] = [];
   const gradeSet = new Set<string>();
+  const sectionsByGrade: Record<string,string[]> = {};
   if (mappings?.mappings) {
     const seen = new Set<string>();
     mappings.mappings.forEach((m: any) => {
@@ -1496,56 +1612,78 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
       const key = `${m.grade}||${m.section}||${m.subject}`;
       if (!seen.has(key)) { seen.add(key); combos.push({ grade: m.grade, section: m.section, subject: m.subject }); }
       gradeSet.add(m.grade);
+      if (!sectionsByGrade[m.grade]) sectionsByGrade[m.grade] = [];
+      if (!sectionsByGrade[m.grade].includes(m.section)) sectionsByGrade[m.grade].push(m.section);
     });
   }
-
   const allSubjects = [...new Set(combos.map(c => c.subject))].sort();
   const allGrades = [...gradeSet].sort();
-  const allSections = [...new Set(combos.map(c => c.section))].sort();
 
-  // Form state — multi-subject support
+  // Form state
   const [form, setForm] = useState({
-    name: "", description: "", grade: allGrades[0] || "", section: allSections[0] || "",
-    subject: allSubjects[0] || "", activity_type: "Individual", stage: "preparatory",
+    name: "", description: "", grade: allGrades[0] || "",
+    sections: [] as string[], // multi-section
+    subject: allSubjects[0] || "", activity_type: "Individual",
     activity_date: new Date().toISOString().split("T")[0],
-    competency_areas: [] as string[], // can include cross-curricular
-    competency_mappings: [] as string[], apply_to_all_sections: false,
+    competency_areas: [] as string[],
+    competency_mappings: [] as string[],
   });
   const [competencies, setCompetencies] = useState<any[]>([]);
-  const [extraCompetencies, setExtraCompetencies] = useState<any[]>([]);
+  const [crossCompetencies, setCrossCompetencies] = useState<Record<string,any[]>>({});
+
+  const sectionsForGrade = sectionsByGrade[form.grade] || [];
 
   useEffect(() => { fetchActivities(); }, [academicYear]);
-  useEffect(() => { if (form.grade && form.subject) fetchCompetencies(); }, [form.grade, form.subject]);
-  useEffect(() => { if (form.competency_areas.length) fetchExtraCompetencies(); }, [form.competency_areas, form.grade]);
-  useEffect(() => { if (selectedActivity && selectedActivity.grade && selectedActivity.section && selectedActivity.subject) fetchCombinedMarks(); }, [selectedActivity]);
-  useEffect(() => { if (subTab === "analysis" && selectedSection && allGrades[0]) fetchSectionDash(); }, [subTab, selectedSection]);
+  useEffect(() => {
+    if (form.grade && form.subject) fetchCompetencies();
+    // Reset sections when grade changes
+    setForm(p => ({ ...p, sections: [], competency_mappings: [] }));
+  }, [form.grade, form.subject]);
+  useEffect(() => { if (form.competency_areas.length) fetchCrossCompetencies(); }, [form.competency_areas, form.grade]);
+  useEffect(() => { if (selectedActivity) fetchCombinedMarks(); }, [selectedActivity]);
+  useEffect(() => { if (subTab === "coverage" && coverageGrade) fetchCoverage(); }, [subTab, coverageGrade]);
 
   const fetchActivities = async () => {
     try {
-      const params = new URLSearchParams({ academic_year: academicYear });
-      combos.forEach(c => { /* filter by teacher's grades */ });
-      if (allGrades[0]) params.append("grade", allGrades[0]);
-      const r = await axios.get(`${API}/activities?${params}`);
-      setActivities(r.data || []);
-    } catch { }
+      const results = await Promise.all(allGrades.map(async grade => {
+        try {
+          const r = await axios.get(`${API}/activities?academic_year=${academicYear}&grade=${encodeURIComponent(grade)}`);
+          return r.data || [];
+        } catch { return []; }
+      }));
+      const merged = results.flat();
+      const seen = new Set<string>();
+      setActivities(merged.filter((a: any) => { if (seen.has(a.id)) return false; seen.add(a.id); return true; }));
+    } catch {}
   };
 
   const fetchCompetencies = async () => {
     try {
-      const r = await axios.get(`${API}/activities/competencies?grade=${encodeURIComponent(form.grade)}&subject=${encodeURIComponent(form.subject)}`);
-      setCompetencies(r.data || []);
+      const subjectNorm = normalizeSubject(form.subject);
+      const stage = GRADE_TO_STAGE[form.grade] || "middle";
+      let data: any[] = [];
+      // Try grade + subject first
+      const r = await axios.get(`${API}/activities/competencies?grade=${encodeURIComponent(form.grade)}&subject=${encodeURIComponent(subjectNorm)}`);
+      data = r.data || [];
+      // Fallback: try stage + subject
+      if (!data.length) {
+        const r2 = await axios.get(`${API}/activities/competencies?stage=${encodeURIComponent(stage)}&subject=${encodeURIComponent(subjectNorm)}`);
+        data = r2.data || [];
+      }
+      setCompetencies(data);
     } catch { setCompetencies([]); }
   };
 
-  const fetchExtraCompetencies = async () => {
-    const all: any[] = [];
+  const fetchCrossCompetencies = async () => {
+    const map: Record<string,any[]> = {};
     for (const area of form.competency_areas) {
       try {
-        const r = await axios.get(`${API}/activities/competencies?grade=${encodeURIComponent(form.grade)}&subject=${encodeURIComponent(area)}`);
-        all.push(...(r.data || []));
-      } catch { }
+        const stage = GRADE_TO_STAGE[form.grade] || "middle";
+        const r = await axios.get(`${API}/activities/competencies?stage=${encodeURIComponent(stage)}&subject=${encodeURIComponent(area)}`);
+        map[area] = r.data || [];
+      } catch { map[area] = []; }
     }
-    setExtraCompetencies(all);
+    setCrossCompetencies(map);
   };
 
   const fetchCombinedMarks = async () => {
@@ -1553,30 +1691,55 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
     try {
       const r = await axios.get(`${API}/activities/combined-marks/${encodeURIComponent(selectedActivity.grade)}/${encodeURIComponent(selectedActivity.section)}/${encodeURIComponent(selectedActivity.subject)}?academic_year=${academicYear}`);
       setCombinedMarks(r.data);
-      const init: Record<string, Record<string, Record<string, string>>> = {};
+      const init: Record<string,Record<string,Record<string,string>>> = {};
       (r.data?.students || []).forEach((s: any) => {
         init[s.student_id] = {};
         (r.data?.activities || []).forEach((act: any) => { init[s.student_id][act.id] = { ...(s.activity_data?.[act.id] || {}) }; });
       });
       setLocalRatings(init);
-    } catch { }
+    } catch {}
   };
 
-  const fetchSectionDash = async () => {
+  const fetchCoverage = async () => {
+    if (!coverageGrade) return;
     try {
-      const grade = allGrades[0];
-      const r = await axios.get(`${API}/activities/dashboard/section/${encodeURIComponent(grade)}/${encodeURIComponent(selectedSection)}?academic_year=${academicYear}`);
-      setSectionDash(r.data);
-    } catch { setSectionDash(null); }
+      // Try with section-based coverage first (most accurate)
+      const sectionForGrade = (mappings?.mappings || []).find((m: any) => m.grade === coverageGrade)?.section;
+      if (sectionForGrade) {
+        const r = await axios.get(`${API}/activities/coverage/section/${encodeURIComponent(coverageGrade)}/${encodeURIComponent(sectionForGrade)}?academic_year=${academicYear}`);
+        if (r.data?.total > 0) { setCoverage(r.data); return; }
+      }
+      // Try subject-based coverage
+      const subjectNorm = normalizeSubject(allSubjects[0] || "");
+      const r = await axios.get(`${API}/activities/coverage/detail/${encodeURIComponent(coverageGrade)}/${encodeURIComponent(subjectNorm)}?academic_year=${academicYear}`);
+      let data = r.data;
+      if (!data?.total) {
+        const ar = await axios.get(`${API}/activities?academic_year=${academicYear}&grade=${encodeURIComponent(coverageGrade)}`);
+        const acts = ar.data || [];
+        const allMappedIds = new Set<string>();
+        acts.forEach((a: any) => (a.competency_mappings || []).forEach((id: string) => allMappedIds.add(id)));
+        data = { total: allMappedIds.size, covered: allMappedIds.size, uncovered: 0, coverage_percent: allMappedIds.size > 0 ? 100 : 0, covered_competencies: [], uncovered_competencies: [], note: "Coverage based on activities created." };
+      }
+      setCoverage(data);
+    } catch { setCoverage(null); }
   };
 
   const saveActivity = async () => {
-    if (!form.name || !form.grade || !form.subject) { setMsg("❌ Name, Grade and Subject are required"); setTimeout(() => setMsg(""), 3000); return; }
+    if (!form.name || !form.grade || !form.subject || !form.sections.length) {
+      setMsg("❌ Name, Grade, Subject and at least one Section are required");
+      setTimeout(() => setMsg(""), 3000); return;
+    }
     try {
-      const allCompetencies = [...form.competency_mappings];
-      await axios.post(`${API}/activities`, { ...form, academic_year: academicYear, created_by: user?.id });
-      setMsg("✅ Activity created");
+      const stage = GRADE_TO_STAGE[form.grade] || "middle";
+      // Create activity for each selected section
+      await Promise.all(form.sections.map(section =>
+        axios.post(`${API}/activities`, {
+          ...form, section, stage, academic_year: academicYear, created_by: user?.id
+        })
+      ));
+      setMsg(`✅ Activity created for ${form.sections.length} section(s)`);
       setShowForm(false);
+      setForm(p => ({ ...p, name: "", description: "", sections: [], competency_mappings: [], competency_areas: [] }));
       fetchActivities();
     } catch { setMsg("❌ Error creating activity"); }
     setTimeout(() => setMsg(""), 3000);
@@ -1589,14 +1752,17 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
   };
 
   const updateRating = (studentId: string, activityId: string, competencyId: string, rating: string) => {
-    setLocalRatings(prev => ({ ...prev, [studentId]: { ...(prev[studentId] || {}), [activityId]: { ...(prev[studentId]?.[activityId] || {}), [competencyId]: rating } } }));
+    setLocalRatings(prev => ({ ...prev, [studentId]: { ...(prev[studentId]||{}), [activityId]: { ...(prev[studentId]?.[activityId]||{}), [competencyId]: rating } } }));
   };
 
   const saveActivityMarks = async (activityId: string) => {
     if (!combinedMarks) return;
     setSaving(true);
     try {
-      const entries = (combinedMarks.students || []).map((s: any) => ({ student_id: s.student_id, student_name: s.student_name, competency_ratings: localRatings[s.student_id]?.[activityId] || {} }));
+      const entries = (combinedMarks.students || []).map((s: any) => ({
+        student_id: s.student_id, student_name: s.student_name,
+        competency_ratings: localRatings[s.student_id]?.[activityId] || {}
+      }));
       await axios.post(`${API}/activities/${activityId}/marks`, { academic_year: academicYear, entries });
       setMsg("✅ Marks saved"); fetchCombinedMarks();
     } catch { setMsg("❌ Error saving marks"); }
@@ -1604,15 +1770,28 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
     setTimeout(() => setMsg(""), 3000);
   };
 
-  const allDisplayCompetencies = [...competencies, ...extraCompetencies];
+  const toggleSection = (s: string) => {
+    setForm(p => ({ ...p, sections: p.sections.includes(s) ? p.sections.filter(x => x !== s) : [...p.sections, s] }));
+  };
+
+  const toggleCompetency = (id: string) => {
+    setForm(p => ({ ...p, competency_mappings: p.competency_mappings.includes(id) ? p.competency_mappings.filter(x => x !== id) : [...p.competency_mappings, id] }));
+  };
+
+  const allCrossCompetencies = Object.values(crossCompetencies).flat();
 
   if (!combos.length) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No subject assignments found. Contact admin.</div>;
 
   return (
     <div className="space-y-4">
       {/* Sub-tabs */}
-      <div className="flex gap-2">
-        {[{ id: "create", label: "📋 Activities" }, { id: "marks", label: "✏️ Marks Entry" }, { id: "analysis", label: "📊 Analysis" }].map(t => (
+      <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
+        {[
+          { id: "create", label: "📋 Activities" },
+          { id: "marks", label: "✏️ Marks Entry" },
+          { id: "coverage", label: "📊 Coverage" },
+          { id: "analysis", label: "📈 Analysis" },
+        ].map(t => (
           <button key={t.id} onClick={() => setSubTab(t.id as any)}
             className={`px-4 py-2 text-sm rounded-lg font-medium border ${subTab === t.id ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>{t.label}</button>
         ))}
@@ -1620,7 +1799,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
 
       {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
-      {/* CREATE / LIST */}
+      {/* ── CREATE / LIST ── */}
       {subTab === "create" && (
         <div className="space-y-4">
           <div className="flex justify-end">
@@ -1630,46 +1809,105 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
           </div>
 
           {showForm && (
-            <div className="bg-white rounded-xl shadow border border-gray-200 p-4 space-y-3">
+            <div className="bg-white rounded-xl shadow border border-gray-200 p-5 space-y-4">
               <h3 className="text-sm font-bold text-gray-700">New Activity</h3>
-              <div className="grid grid-cols-3 gap-3">
-                <div><label className="text-xs text-gray-500 block mb-1">Activity Name *</label><input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Story Writing" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
-                <div><label className="text-xs text-gray-500 block mb-1">Grade *</label><select value={form.grade} onChange={e => setForm(p => ({ ...p, grade: e.target.value, competency_mappings: [] }))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">{allGrades.map(g => <option key={g} value={g}>{g}</option>)}</select></div>
-                <div><label className="text-xs text-gray-500 block mb-1">Subject *</label><select value={form.subject} onChange={e => setForm(p => ({ ...p, subject: e.target.value, competency_mappings: [] }))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">{allSubjects.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
-                <div><label className="text-xs text-gray-500 block mb-1">Section</label><select value={form.section} onChange={e => setForm(p => ({ ...p, section: e.target.value }))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">{allSections.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
-                <div><label className="text-xs text-gray-500 block mb-1">Type</label><select value={form.activity_type} onChange={e => setForm(p => ({ ...p, activity_type: e.target.value }))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">{ACTIVITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                <div><label className="text-xs text-gray-500 block mb-1">Date</label><input type="date" value={form.activity_date} onChange={e => setForm(p => ({ ...p, activity_date: e.target.value }))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
+
+              {/* Basic info */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Activity Name *</label>
+                  <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Story Writing" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
+                <div><label className="text-xs text-gray-500 block mb-1">Grade *</label>
+                  <select value={form.grade} onChange={e => setForm(p => ({ ...p, grade: e.target.value }))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                    {allGrades.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select></div>
+                <div><label className="text-xs text-gray-500 block mb-1">Subject *</label>
+                  <select value={form.subject} onChange={e => setForm(p => ({ ...p, subject: e.target.value, competency_mappings: [] }))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                    {allSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select></div>
+                <div><label className="text-xs text-gray-500 block mb-1">Activity Type</label>
+                  <select value={form.activity_type} onChange={e => setForm(p => ({ ...p, activity_type: e.target.value }))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                    {ACTIVITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select></div>
+                <div><label className="text-xs text-gray-500 block mb-1">Date</label>
+                  <input type="date" value={form.activity_date} onChange={e => setForm(p => ({ ...p, activity_date: e.target.value }))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
               </div>
 
-              {/* Cross-curricular areas */}
+              {/* Multi-section selector */}
               <div>
-                <label className="text-xs text-gray-500 block mb-1 font-semibold">Also maps to cross-curricular areas (optional)</label>
-                <div className="flex gap-2 flex-wrap">
-                  {CROSS_CURRICULAR.map(area => (
-                    <label key={area} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer text-xs ${form.competency_areas.includes(area) ? "bg-purple-100 border-purple-400 text-purple-700 font-bold" : "bg-white border-gray-300 text-gray-600"}`}>
-                      <input type="checkbox" checked={form.competency_areas.includes(area)} onChange={() => setForm(p => ({ ...p, competency_areas: p.competency_areas.includes(area) ? p.competency_areas.filter(x => x !== area) : [...p.competency_areas, area] }))} className="accent-purple-600" />
-                      {area}
-                    </label>
+                <label className="text-xs text-gray-500 block mb-1 font-semibold">
+                  Sections * ({form.sections.length} selected)
+                  <button onClick={() => setForm(p => ({ ...p, sections: sectionsForGrade }))} className="ml-2 text-indigo-600 hover:underline text-xs font-normal">Select All</button>
+                  <button onClick={() => setForm(p => ({ ...p, sections: [] }))} className="ml-2 text-gray-400 hover:underline text-xs font-normal">Clear</button>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {sectionsForGrade.map(s => (
+                    <button key={s} onClick={() => toggleSection(s)}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-medium ${form.sections.includes(s) ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:border-indigo-400"}`}>
+                      {s}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              {/* Competency selector */}
-              {allDisplayCompetencies.length > 0 && (
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1 font-semibold">Select Competencies ({form.competency_mappings.length} selected)</label>
-                  <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
-                    {allDisplayCompetencies.map((c: any) => (
-                      <label key={c.id} className={`flex items-start gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 text-xs ${form.competency_mappings.includes(c.id) ? "bg-indigo-50" : ""}`}>
-                        <input type="checkbox" checked={form.competency_mappings.includes(c.id)} onChange={() => setForm(p => ({ ...p, competency_mappings: p.competency_mappings.includes(c.id) ? p.competency_mappings.filter(x => x !== c.id) : [...p.competency_mappings, c.id] }))} className="accent-indigo-600 mt-0.5" />
-                        <span className="font-mono text-indigo-600 font-semibold shrink-0">{c.competency_code}</span>
-                        <span className="text-gray-600 truncate">{c.description?.substring(0, 80)}</span>
-                        {c.subject !== form.subject && <span className="shrink-0 text-purple-600 text-xs font-bold">[{c.subject}]</span>}
+              {/* Competencies from registry — live from backend */}
+              <div>
+                <label className="text-xs text-gray-500 block mb-1 font-semibold">
+                  Competencies — {form.subject} · {form.grade} ({competencies.length} available, {form.competency_mappings.length} selected)
+                  <button onClick={() => setForm(p => ({ ...p, competency_mappings: competencies.map((c:any) => c.id) }))} className="ml-2 text-indigo-600 hover:underline text-xs font-normal">Select All</button>
+                  <button onClick={() => setForm(p => ({ ...p, competency_mappings: [] }))} className="ml-2 text-gray-400 hover:underline text-xs font-normal">Clear</button>
+                </label>
+                {competencies.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic py-2">No competencies found for {form.subject} — {form.grade}. Add them in Admin → Competency Registry.</p>
+                ) : (
+                  <div className="max-h-52 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
+                    {/* Group by domain */}
+                    {[...new Set(competencies.map((c:any) => c.domain))].map(domain => (
+                      <div key={domain}>
+                        {domain && <div className="text-xs font-semibold text-indigo-700 px-1 py-0.5 mt-1">{domain}</div>}
+                        {competencies.filter((c:any) => c.domain === domain).map((c: any) => (
+                          <label key={c.id} className={`flex items-start gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 text-xs ${form.competency_mappings.includes(c.id) ? "bg-indigo-50" : ""}`}>
+                            <input type="checkbox" checked={form.competency_mappings.includes(c.id)} onChange={() => toggleCompetency(c.id)} className="accent-indigo-600 mt-0.5 shrink-0" />
+                            <span className="font-mono text-indigo-600 font-semibold shrink-0">{c.competency_code}</span>
+                            <span className="text-gray-600">{c.description}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Cross-curricular areas */}
+              <div>
+                <label className="text-xs text-gray-500 block mb-1 font-semibold">Cross-curricular areas (optional)</label>
+                <div className="flex gap-2 flex-wrap mb-2">
+                  {CROSS_CURRICULAR.map(area => (
+                    <label key={area} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer text-xs ${form.competency_areas.includes(area) ? "bg-purple-100 border-purple-400 text-purple-700 font-bold" : "bg-white border-gray-300 text-gray-600"}`}>
+                      <input type="checkbox" checked={form.competency_areas.includes(area)}
+                        onChange={() => setForm(p => ({ ...p, competency_areas: p.competency_areas.includes(area) ? p.competency_areas.filter(x => x !== area) : [...p.competency_areas, area] }))}
+                        className="accent-purple-600" />
+                      {CROSS_LABELS[area]}
+                    </label>
+                  ))}
+                </div>
+                {/* Cross-curricular competencies dropdown */}
+                {allCrossCompetencies.length > 0 && (
+                  <div className="max-h-36 overflow-y-auto border border-purple-200 rounded-lg p-2 space-y-1 bg-purple-50">
+                    <div className="text-xs font-semibold text-purple-700 mb-1">Cross-curricular competencies ({allCrossCompetencies.length})</div>
+                    {allCrossCompetencies.map((c: any) => (
+                      <label key={c.id} className={`flex items-start gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-purple-100 text-xs ${form.competency_mappings.includes(c.id) ? "bg-purple-100" : ""}`}>
+                        <input type="checkbox" checked={form.competency_mappings.includes(c.id)} onChange={() => toggleCompetency(c.id)} className="accent-purple-600 mt-0.5 shrink-0" />
+                        <span className="font-mono text-purple-600 font-semibold shrink-0">{c.competency_code}</span>
+                        <span className="text-gray-600">{c.description}</span>
+                        <span className="text-purple-500 text-xs shrink-0">[{c.subject}]</span>
                       </label>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+
+              <div><label className="text-xs text-gray-500 block mb-1">Description (optional)</label>
+                <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={2} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
 
               <div className="flex gap-2 pt-2 border-t border-gray-100">
                 <button onClick={saveActivity} className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-semibold">💾 Save Activity</button>
@@ -1689,10 +1927,10 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                   <div key={a.id} className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div>
                       <p className="text-sm font-medium text-gray-800">{a.name}</p>
-                      <p className="text-xs text-gray-400">{a.grade} · {a.section} · {a.subject} · {a.activity_date}</p>
+                      <p className="text-xs text-gray-400">{a.grade} · {a.section} · {a.subject} · {a.activity_date} · {(a.competency_mappings||[]).length} competencies</p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => { setSelectedActivity(a); setSubTab("marks"); }} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-xs rounded-lg hover:bg-indigo-200 font-medium">✏️ Enter Marks</button>
+                      <button onClick={() => { setSelectedActivity(a); setSubTab("marks"); }} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-xs rounded-lg hover:bg-indigo-200 font-medium">✏️ Marks</button>
                       <button onClick={() => deleteActivity(a.id)} className="px-3 py-1.5 bg-red-100 text-red-700 text-xs rounded-lg hover:bg-red-200 font-medium">🗑️</button>
                     </div>
                   </div>
@@ -1703,12 +1941,11 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
         </div>
       )}
 
-      {/* MARKS ENTRY */}
+      {/* ── MARKS ENTRY ── */}
       {subTab === "marks" && (
         <div className="space-y-4">
-          {/* Activity selector */}
           <div className="bg-white rounded-xl shadow p-4">
-            <label className="text-xs text-gray-500 block mb-2">Select Activity for Marks Entry</label>
+            <label className="text-xs text-gray-500 block mb-2">Select Activity</label>
             <select value={selectedActivity?.id || ""} onChange={e => { const a = activities.find(x => x.id === e.target.value); setSelectedActivity(a || null); }}
               className="border border-gray-300 rounded px-3 py-2 text-sm w-full max-w-md">
               <option value="">-- Select activity --</option>
@@ -1716,166 +1953,1438 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
             </select>
           </div>
 
-          {selectedActivity && combinedMarks && (
-            <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                <h3 className="text-sm font-bold text-gray-700">{selectedActivity.name} — {selectedActivity.grade} · {selectedActivity.section}</h3>
-                <p className="text-xs text-gray-500 mt-0.5">{combinedMarks.students?.length} students · {combinedMarks.activities?.length} activities</p>
-              </div>
-              <div className="overflow-x-auto p-4">
-                {combinedMarks.activities?.filter((act: any) => act.id === selectedActivity.id).map((act: any) => (
-                  <div key={act.id} className="mb-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-indigo-700">{act.name}</h4>
-                      <button onClick={() => saveActivityMarks(act.id)} disabled={saving} className="px-4 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-                        {saving ? "Saving..." : "💾 Save Marks"}
-                      </button>
-                    </div>
-                    <table className="w-full text-xs border-collapse" style={{ minWidth: `${300 + (combinedMarks.domains?.length || 0) * 120}px` }}>
-                      <thead>
-                        <tr className="bg-indigo-700 text-white">
-                          <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[160px]">Student</th>
-                          {combinedMarks.competencies?.filter((c: any) => act.competency_mappings?.includes(c.id)).map((c: any) => (
-                            <th key={c.id} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[110px]">
-                              <div className="font-mono text-xs">{c.competency_code}</div>
-                              <div className="text-indigo-300 text-xs font-normal truncate max-w-[100px]">{c.domain}</div>
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {combinedMarks.students?.map((student: any, i: number) => (
-                          <tr key={student.student_id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                            <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{student.student_name}</td>
-                            {combinedMarks.competencies?.filter((c: any) => act.competency_mappings?.includes(c.id)).map((c: any) => (
-                              <td key={c.id} className="px-2 py-2 text-center border-l border-gray-100">
-                                <div className="flex flex-col gap-1">
-                                  {["beginning","approaching","meeting","exceeding"].map(r => (
-                                    <label key={r} className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer text-xs ${localRatings[student.student_id]?.[act.id]?.[c.id] === r ? RATING_COLORS[r] : "border-gray-200 text-gray-400 hover:bg-gray-50"}`}>
-                                      <input type="radio" name={`${student.student_id}-${act.id}-${c.id}`} value={r} checked={localRatings[student.student_id]?.[act.id]?.[c.id] === r} onChange={() => updateRating(student.student_id, act.id, c.id, r)} className="hidden" />
-                                      {r.charAt(0).toUpperCase() + r.slice(1)}
-                                    </label>
-                                  ))}
-                                </div>
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {selectedActivity && (
+            <MarksEntryPanel
+              activity={selectedActivity}
+              combinedMarks={combinedMarks}
+              localRatings={localRatings}
+              updateRating={updateRating}
+              saveActivityMarks={saveActivityMarks}
+              saving={saving}
+              RATING_COLORS={RATING_COLORS}
+              API={API}
+              academicYear={academicYear}
+            />
           )}
         </div>
       )}
 
-      {/* ANALYSIS */}
-      {subTab === "analysis" && (
+      {/* ── COVERAGE TAB ── */}
+      {subTab === "coverage" && (
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <label className="text-xs text-gray-500">Section:</label>
-            <select value={selectedSection} onChange={e => setSelectedSection(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-              <option value="">Select section</option>
-              {allSections.map(s => <option key={s} value={s}>{allGrades[0]} · {s}</option>)}
-            </select>
-            <button onClick={fetchSectionDash} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-xs rounded-lg hover:bg-indigo-200 font-medium">Load</button>
-          </div>
+          <div className="bg-white rounded-xl shadow p-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Grade</label>
+                <select value={coverageGrade} onChange={e => setCoverageGrade(e.target.value)}
+                  className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+                  <option value="">-- Select grade --</option>
+                  {allGrades.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+              <button onClick={fetchCoverage} className="mt-4 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">Check Coverage</button>
+            </div>
 
-          {sectionDash && (
-            <div className="space-y-4">
-              {/* KPI */}
-              <div className="grid grid-cols-4 gap-3">
+            {coverage && (
+              <div>
+                {/* Summary KPIs */}
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  {[
+                    { label: "Total Competencies", value: coverage.total, color: "text-gray-700" },
+                    { label: "Covered", value: coverage.covered, color: "text-green-700" },
+                    { label: "Pending", value: coverage.uncovered, color: "text-red-600" },
+                    { label: "Coverage %", value: `${coverage.coverage_percent}%`, color: coverage.coverage_percent >= 80 ? "text-green-700" : coverage.coverage_percent >= 50 ? "text-yellow-600" : "text-red-600" },
+                  ].map(k => (
+                    <div key={k.label} className="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
+                      <div className={`text-2xl font-bold ${k.color}`}>{k.value}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{k.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Coverage bar */}
+                <div className="mb-4">
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>Coverage Progress</span><span>{coverage.coverage_percent}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div className={`h-3 rounded-full transition-all ${coverage.coverage_percent >= 80 ? "bg-green-500" : coverage.coverage_percent >= 50 ? "bg-yellow-500" : "bg-red-500"}`}
+                      style={{ width: `${coverage.coverage_percent}%` }} />
+                  </div>
+                </div>
+
+                {/* Covered competencies */}
+                {coverage.covered_competencies?.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-xs font-semibold text-green-700 mb-2">✅ Covered ({coverage.covered_competencies.length})</div>
+                    <div className="grid grid-cols-1 gap-1">
+                      {coverage.covered_competencies.map((c: any) => (
+                        <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
+                          <span className="font-mono text-green-700 font-semibold shrink-0">{c.competency_code}</span>
+                          <span className="text-gray-600">{c.description}</span>
+                          {c.domain && <span className="text-green-500 shrink-0 ml-auto">{c.domain}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Uncovered competencies */}
+                {coverage.uncovered_competencies?.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold text-red-600 mb-2">⏳ Pending ({coverage.uncovered_competencies.length})</div>
+                    <div className="grid grid-cols-1 gap-1">
+                      {coverage.uncovered_competencies.map((c: any) => (
+                        <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs">
+                          <span className="font-mono text-red-600 font-semibold shrink-0">{c.competency_code}</span>
+                          <span className="text-gray-600">{c.description}</span>
+                          {c.domain && <span className="text-red-400 shrink-0 ml-auto">{c.domain}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── ANALYSIS TAB ── */}
+      {subTab === "analysis" && (
+        <ActivityAnalysisPanel
+          allGrades={allGrades.length ? allGrades : (user?.assigned_classes || []).map((c:string) => c.startsWith("Grade") || ["Pre-KG","LKG","UKG"].includes(c) ? c : `Grade ${c}`).filter((v:string,i:number,a:string[])=>a.indexOf(v)===i)}
+          sectionsByGrade={Object.keys(sectionsByGrade).length ? sectionsByGrade : (() => { const m: Record<string,string[]> = {}; (user?.assigned_classes||[]).forEach((g:string)=>{ const ng = g.startsWith("Grade")||["Pre-KG","LKG","UKG"].includes(g)?g:`Grade ${g}`; m[ng]=(user?.assigned_sections||[]); }); return m; })()}
+          allSubjects={allSubjects.length ? allSubjects : (user?.subjects || [])}
+          academicYear={academicYear}
+          API={API}
+        />
+      )}
+    </div>
+  );
+}
+
+
+// ── ACTIVITY ANALYSIS PANEL — mirrors admin activities dashboard ──
+function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academicYear, API }: any) {
+  const DOMAIN_COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#f97316","#84cc16"];
+  const scoreBg = (v: number) => v >= 3.5 ? "bg-green-100 text-green-800" : v >= 2.5 ? "bg-blue-100 text-blue-800" : v >= 1.5 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800";
+  const RATING_COLORS: Record<string,string> = { beginning:"bg-red-100 text-red-700 border-red-200", approaching:"bg-yellow-100 text-yellow-700 border-yellow-200", meeting:"bg-green-100 text-green-700 border-green-200", exceeding:"bg-purple-100 text-purple-700 border-purple-200" };
+
+  if (!allGrades?.length) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No grade assignments found. Contact admin.</div>;
+
+  const [dashTab, setDashTab] = useState<"grade"|"section"|"student"|"alerts"|"coverage">("grade");
+  const [dashGrade, setDashGrade] = useState(allGrades[0] || "");
+  const [dashSection, setDashSection] = useState("");
+  const [gradeDash, setGradeDash] = useState<any>(null);
+  const [sectionDash, setSectionDash] = useState<any>(null);
+  const [studentDash, setStudentDash] = useState<any>(null);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [coverageData, setCoverageData] = useState<any>(null);
+  const [studentList, setStudentList] = useState<any[]>([]);
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const sectionsForGrade = sectionsByGrade[dashGrade] || [];
+
+  useEffect(() => { if (sectionsForGrade.length) setDashSection(sectionsForGrade[0]); }, [dashGrade]);
+  useEffect(() => {
+    if (dashTab === "grade" && dashGrade) fetchGradeDash();
+    if (dashTab === "section" && dashGrade && dashSection) fetchSectionDash();
+    if (dashTab === "alerts") fetchAlerts();
+    if (dashTab === "coverage" && dashGrade && dashSection) fetchCoverage();
+  }, [dashTab, dashGrade, dashSection, academicYear]);
+  useEffect(() => { if (dashTab === "student" && dashGrade && dashSection) fetchStudentList(); }, [dashSection, dashTab]);
+
+  const fetchGradeDash = async () => { setLoading(true); try { const r = await axios.get(`${API}/activities/dashboard/grade/${encodeURIComponent(dashGrade)}?academic_year=${academicYear}`); setGradeDash(r.data); } catch {} setLoading(false); };
+  const fetchSectionDash = async () => { setLoading(true); try { const r = await axios.get(`${API}/activities/dashboard/section/${encodeURIComponent(dashGrade)}/${encodeURIComponent(dashSection)}?academic_year=${academicYear}`); setSectionDash(r.data); } catch {} setLoading(false); };
+  const fetchAlerts = async () => {
+    try {
+      const r = await axios.get(`${API}/activities/alerts/decline?academic_year=${academicYear}`);
+      const myGrades = Object.keys(sectionsByGrade).map(g => g.toLowerCase());
+      const myAlerts = (r.data||[]).filter((a:any) =>
+        myGrades.includes((a.grade||"").toLowerCase())
+      );
+      setAlerts(myAlerts);
+    } catch { setAlerts([]); }
+  };
+  const fetchCoverage = async () => {
+    try {
+      const subject = (allSubjects[0]||"").toLowerCase().replace(/\s+/g,"_").replace(/[()]/g,"");
+      const r = await axios.get(`${API}/activities/coverage/section/${encodeURIComponent(dashGrade)}/${encodeURIComponent(dashSection)}?academic_year=${academicYear}`);
+      setCoverageData(r.data);
+    } catch { setCoverageData(null); }
+  };
+  const fetchStudentList = async () => { try { const r = await axios.get(`${API}/students?grade=${encodeURIComponent(dashGrade)}&section=${encodeURIComponent(dashSection)}`); setStudentList(r.data?.data||r.data||[]); } catch {} };
+  const fetchStudentDash = async (id: string) => { try { const r = await axios.get(`${API}/activities/dashboard/student/${id}?academic_year=${academicYear}`); setStudentDash(r.data); } catch {} };
+
+  const DASH_TABS = [
+    { id:"grade", label:"📊 Grade" },
+    { id:"section", label:"🏫 Section" },
+    { id:"student", label:"👤 Student" },
+    { id:"alerts", label:"⚠️ Alerts" },
+    { id:"coverage", label:"📋 Coverage" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Grade + Section selector */}
+      <div className="bg-white rounded-xl shadow p-4 flex gap-4 flex-wrap items-end">
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Grade</label>
+          <select value={dashGrade} onChange={e => { setDashGrade(e.target.value); setGradeDash(null); setSectionDash(null); }}
+            className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+            {allGrades.map((g:string) => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+        {(dashTab==="section"||dashTab==="student"||dashTab==="coverage") && (
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Section</label>
+            <select value={dashSection} onChange={e => setDashSection(e.target.value)}
+              className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+              {sectionsForGrade.map((s:string) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
+        {DASH_TABS.map(t => (
+          <button key={t.id} onClick={() => setDashTab(t.id as any)}
+            className={`px-4 py-2 text-sm rounded-lg font-medium border ${dashTab===t.id ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading && <div className="bg-white rounded-xl shadow p-6 text-center text-gray-400 text-sm">Loading...</div>}
+
+      {/* ── GRADE DASHBOARD ── */}
+      {!loading && dashTab==="grade" && (
+        <div className="space-y-4">
+          {gradeDash ? (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: "Total Students", value: sectionDash.total_students, color: "border-indigo-500" },
-                  { label: "Overall Avg", value: sectionDash.overall_avg ? `${sectionDash.overall_avg}/4` : "—", color: "border-green-500" },
-                  { label: "Competencies Assessed", value: sectionDash.competencyAvgs?.length || 0, color: "border-blue-500" },
-                  { label: "Weakest Domain", value: sectionDash.weakest?.[0]?.domain || "—", color: "border-orange-500" },
+                  { label:"Total Students", value:gradeDash.total_students, color:"border-indigo-500" },
+                  { label:"Assessed", value:gradeDash.total_assessed, color:"border-green-500" },
+                  { label:"Overall Avg", value:gradeDash.overall_avg?.toFixed(2)+"/4", color:"border-blue-500" },
+                  { label:"Grade", value:gradeDash.grade, color:"border-orange-500" },
                 ].map(s => (
                   <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
                     <p className="text-xs text-gray-500">{s.label}</p>
-                    <p className="text-lg font-bold text-gray-800">{s.value}</p>
+                    <p className="text-2xl font-bold text-gray-800">{s.value}</p>
                   </div>
                 ))}
               </div>
-
-              {/* Domain avg chart */}
-              {sectionDash.domains?.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Domain-wise Average Score</h3>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={sectionDash.domains?.map((d: any) => ({ name: d.domain, avg: d.avg }))} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" domain={[0, 4]} ticks={[1,2,3,4]} tick={{ fontSize: 10 }} />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={120} />
-                      <Tooltip formatter={(v: any) => [`${v}/4`, "Avg"]} />
-                      <Bar dataKey="avg" radius={[0, 4, 4, 0]}>
-                        {sectionDash.domains?.map((_: any, i: number) => <Cell key={i} fill={SUBJECT_COLORS[i % SUBJECT_COLORS.length]} />)}
-                      </Bar>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Section-wise Average</h3>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={(gradeDash.sections||[]).map((s:any)=>({name:s.section,avg:s.avg}))}>
+                      <CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name" tick={{fontSize:10}}/><YAxis domain={[0,4]} ticks={[0,1,2,3,4]} tick={{fontSize:10}}/>
+                      <Tooltip formatter={(v:any)=>[`${v}/4`,"Avg"]}/>
+                      <Bar dataKey="avg" radius={[4,4,0,0]}>{(gradeDash.sections||[]).map((_:any,i:number)=><Cell key={i} fill={DOMAIN_COLORS[i%DOMAIN_COLORS.length]}/>)}</Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Domain-wise Average</h3>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={(gradeDash.domains||[]).map((d:any)=>({name:d.domain,avg:d.avg}))} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3"/><XAxis type="number" domain={[0,4]} tick={{fontSize:10}}/><YAxis type="category" dataKey="name" tick={{fontSize:10}} width={120}/>
+                      <Tooltip formatter={(v:any)=>[`${v}/4`,"Avg"]}/>
+                      <Bar dataKey="avg" radius={[0,4,4,0]}>{(gradeDash.domains||[]).map((_:any,i:number)=><Cell key={i} fill={DOMAIN_COLORS[i%DOMAIN_COLORS.length]}/>)}</Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              {gradeDash.competencies?.length > 0 && (
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Competency Averages</h3>
+                  <ResponsiveContainer width="100%" height={Math.min(400,gradeDash.competencies.slice(0,15).length*28)}>
+                    <BarChart data={gradeDash.competencies.slice(0,15).map((c:any)=>({name:c.competency_code,avg:c.avg,domain:c.domain}))} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3"/><XAxis type="number" domain={[0,4]} tick={{fontSize:10}}/><YAxis type="category" dataKey="name" tick={{fontSize:10}} width={80}/>
+                      <Tooltip formatter={(v:any,_,p)=>[`${v}/4 — ${p.payload.domain}`,"Avg"]}/>
+                      <Bar dataKey="avg" radius={[0,4,4,0]}>{gradeDash.competencies.slice(0,15).map((c:any,i:number)=><Cell key={i} fill={c.avg>=3.5?"#10b981":c.avg>=2.5?"#6366f1":c.avg>=1.5?"#f59e0b":"#ef4444"}/>)}</Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               )}
-
-              {/* Student ranking by overall activity score */}
-              <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Student Rankings by Competency Score</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-indigo-700 text-white">
-                        <th className="px-3 py-2 text-center w-10">Rank</th>
-                        <th className="px-3 py-2 text-left min-w-[160px]">Student</th>
-                        <th className="px-3 py-2 text-center">Overall Avg</th>
-                        <th className="px-3 py-2 text-center">Level</th>
-                        {sectionDash.domains?.slice(0, 4).map((d: any) => <th key={d.domain} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[80px]">{d.domain.substring(0,12)}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...(sectionDash.studentDomainBreakdown || [])].sort((a: any, b: any) => b.overall_avg - a.overall_avg).map((s: any, i: number) => (
-                        <tr key={s.student_id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                          <td className="px-3 py-2 text-center font-bold text-gray-400">{i+1}</td>
-                          <td className="px-3 py-2 font-medium text-gray-800">{s.student_name}</td>
-                          <td className="px-3 py-2 text-center">
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.overall_avg >= 3.5 ? "bg-purple-100 text-purple-700" : s.overall_avg >= 2.5 ? "bg-green-100 text-green-700" : s.overall_avg >= 1.5 ? "bg-yellow-100 text-yellow-700" : s.overall_avg > 0 ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-400"}`}>
-                              {s.overall_avg > 0 ? s.overall_avg.toFixed(2) : "—"}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-center text-xs text-gray-500">{s.overall_avg >= 3.5 ? "Exceeding" : s.overall_avg >= 2.5 ? "Meeting" : s.overall_avg >= 1.5 ? "Approaching" : s.overall_avg > 0 ? "Beginning" : "—"}</td>
-                          {sectionDash.domains?.slice(0, 4).map((d: any) => (
-                            <td key={d.domain} className="px-2 py-2 text-center border-l border-gray-100">
-                              {s.domain_avgs?.[d.domain] > 0 ? <span className="text-xs font-bold">{s.domain_avgs[d.domain].toFixed(1)}</span> : <span className="text-gray-300">—</span>}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Weakest competencies */}
-              {sectionDash.weakest?.length > 0 && (
+              {gradeDash.studentRankings?.length > 0 && (
                 <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">🔴 Weakest Competencies (needs attention)</h3>
-                  <div className="space-y-2">
-                    {sectionDash.weakest.map((c: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between px-3 py-2 bg-red-50 rounded-lg border border-red-100">
-                        <div>
-                          <span className="font-mono text-xs font-bold text-red-700">{c.competency_code}</span>
-                          <span className="text-xs text-gray-500 ml-2">{c.domain} · {c.subject}</span>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Student Rankings</h3>
+                  <div className="space-y-1 max-h-60 overflow-y-auto">
+                    {gradeDash.studentRankings.map((s:any,i:number)=>(
+                      <div key={s.student_id} className="flex items-center justify-between p-2 rounded border border-gray-100 hover:bg-gray-50">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-gray-400 w-6">{i+1}.</span>
+                          <span className="text-xs font-medium text-gray-800">{s.name}</span>
+                          <span className="text-xs text-gray-400">{s.section}</span>
                         </div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${c.avg >= 2.5 ? "bg-green-100 text-green-700" : c.avg >= 1.5 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}`}>
-                          {c.avg.toFixed(2)}/4
-                        </span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.avg)}`}>{s.avg.toFixed(2)}/4</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
+            </>
+          ) : <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No data for {dashGrade}. Create activities and enter marks first.</div>}
+        </div>
+      )}
+
+      {/* ── SECTION DASHBOARD ── */}
+      {!loading && dashTab==="section" && (
+        <div className="space-y-4">
+          {sectionDash ? (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  {label:"Total Students",value:sectionDash.total_students,color:"border-indigo-500"},
+                  {label:"Overall Avg",value:sectionDash.overall_avg?.toFixed(2)+"/4",color:"border-green-500"},
+                  {label:"Grade",value:sectionDash.grade,color:"border-blue-500"},
+                  {label:"Section",value:sectionDash.section,color:"border-orange-500"},
+                ].map(s=>(
+                  <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
+                    <p className="text-xs text-gray-500">{s.label}</p>
+                    <p className="text-2xl font-bold text-gray-800">{s.value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-white rounded-xl shadow p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Domain-wise Average</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={(sectionDash.domains||[]).map((d:any)=>({name:d.domain,avg:d.avg}))} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3"/><XAxis type="number" domain={[0,4]} tick={{fontSize:10}}/><YAxis type="category" dataKey="name" tick={{fontSize:10}} width={120}/>
+                    <Tooltip formatter={(v:any)=>[`${v}/4`,"Avg"]}/>
+                    <Bar dataKey="avg" radius={[0,4,4,0]}>{(sectionDash.domains||[]).map((_:any,i:number)=><Cell key={i} fill={DOMAIN_COLORS[i%DOMAIN_COLORS.length]}/>)}</Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {sectionDash.weakest?.length > 0 && (
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">⚠️ Weakest Competencies</h3>
+                  <div className="space-y-2">
+                    {sectionDash.weakest.map((c:any)=>(
+                      <div key={c.competency_id} className="flex items-center justify-between p-2 bg-red-50 rounded border border-red-100">
+                        <div><span className="text-xs font-bold text-red-700">{c.competency_code}</span><span className="text-xs text-gray-500 ml-2">{c.domain}</span></div>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(c.avg)}`}>{c.avg.toFixed(2)}/4</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {sectionDash.studentDomainBreakdown?.length > 0 && (
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Student × Domain Breakdown</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-indigo-700 text-white">
+                          <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[160px]">Student</th>
+                          {(sectionDash.domains||[]).map((d:any)=><th key={d.domain} className="px-3 py-2 text-center border-l border-indigo-600 min-w-[90px]">{d.domain}</th>)}
+                          <th className="px-3 py-2 text-center border-l border-indigo-600 min-w-[80px]">Overall</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sectionDash.studentDomainBreakdown.map((s:any,i:number)=>(
+                          <tr key={s.student_id} className={i%2===0?"bg-white":"bg-gray-50"}>
+                            <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
+                            {(sectionDash.domains||[]).map((d:any)=>{const val=s.domain_avgs?.[d.domain]||0;return(
+                              <td key={d.domain} className="px-3 py-2 text-center border-l border-gray-100">
+                                {val>0?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(val)}`}>{val.toFixed(1)}</span>:<span className="text-gray-300">—</span>}
+                              </td>
+                            );})}
+                            <td className="px-3 py-2 text-center border-l border-gray-200">
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.overall_avg)}`}>{s.overall_avg.toFixed(2)}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No data for {dashGrade} — {dashSection}.</div>}
+        </div>
+      )}
+
+      {/* ── STUDENT DASHBOARD ── */}
+      {!loading && dashTab==="student" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl shadow p-4">
+            <label className="text-xs text-gray-500 block mb-2">Select Student</label>
+            <select value={selectedStudentId} onChange={e => { setSelectedStudentId(e.target.value); if(e.target.value) fetchStudentDash(e.target.value); }}
+              className="border border-gray-300 rounded px-3 py-2 text-sm w-full max-w-md">
+              <option value="">-- Select student --</option>
+              {studentList.map((s:any)=><option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          {studentDash && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-xl shadow p-4 border-l-4 border-indigo-500">
+                <p className="text-lg font-bold text-gray-800">{studentDash.student?.name}</p>
+                <p className="text-sm text-gray-500">{studentDash.student?.current_class} — {studentDash.student?.section}</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject-wise Average</h3>
+                  <div className="space-y-2">
+                    {(studentDash.subjectSummary||[]).map((s:any)=>(
+                      <div key={s.subject} className="flex items-center justify-between p-2 rounded border border-gray-100">
+                        <span className="text-xs font-medium text-gray-700">{s.subject}</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.avg)}`}>{s.avg.toFixed(2)}/4</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Domain-wise Average</h3>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={(studentDash.domainSummary||[]).map((d:any)=>({name:d.domain,avg:d.avg}))} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3"/><XAxis type="number" domain={[0,4]} tick={{fontSize:10}}/><YAxis type="category" dataKey="name" tick={{fontSize:9}} width={100}/>
+                      <Tooltip formatter={(v:any)=>[`${v}/4`,"Avg"]}/>
+                      <Bar dataKey="avg" radius={[0,4,4,0]}>{(studentDash.domainSummary||[]).map((_:any,i:number)=><Cell key={i} fill={DOMAIN_COLORS[i%DOMAIN_COLORS.length]}/>)}</Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              {studentDash.competencyScores?.length > 0 && (
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Individual Competency Scores</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead><tr className="bg-indigo-700 text-white">
+                        <th className="px-3 py-2 text-left">Code</th><th className="px-3 py-2 text-left">Description</th>
+                        <th className="px-3 py-2 text-left">Domain</th><th className="px-3 py-2 text-center">Score</th>
+                        <th className="px-3 py-2 text-center">Rating</th><th className="px-3 py-2 text-center">Attempts</th>
+                      </tr></thead>
+                      <tbody>
+                        {studentDash.competencyScores.map((c:any,i:number)=>(
+                          <tr key={c.competency_id} className={i%2===0?"bg-white":"bg-gray-50"}>
+                            <td className="px-3 py-2 font-medium text-indigo-700">{c.competency_code}</td>
+                            <td className="px-3 py-2 text-gray-600 max-w-[200px] truncate">{c.description}</td>
+                            <td className="px-3 py-2 text-gray-500">{c.domain}</td>
+                            <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(c.avg)}`}>{c.avg.toFixed(2)}/4</span></td>
+                            <td className="px-3 py-2 text-center"><span className={`text-xs px-2 py-0.5 rounded border ${RATING_COLORS[c.rating?.toLowerCase()]||"bg-gray-100"}`}>{c.rating}</span></td>
+                            <td className="px-3 py-2 text-center text-gray-400">{c.assessment_count}x</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── ALERTS ── */}
+      {!loading && dashTab==="alerts" && (
+        <div className="space-y-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+            <h3 className="text-sm font-bold text-yellow-800 mb-1">⚠️ Consecutive Decline Alert</h3>
+            <p className="text-xs text-yellow-600">Students in your sections whose competency average dropped in 3 consecutive activities.</p>
+          </div>
+          <div className="bg-white rounded-xl shadow p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Students with Consecutive Decline ({alerts.length})</h3>
+            {alerts.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No students with 3 consecutive declines in your sections.</p>
+            ) : (
+              <div className="space-y-3">
+                {alerts.map((s:any,i:number)=>(
+                  <div key={i} className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div><span className="text-sm font-bold text-red-800">{s.student_name}</span><span className="text-xs text-gray-500 ml-2">{s.grade} — {s.section}</span></div>
+                      <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">Drop: {s.decline_from} → {s.decline_to} (-{s.drop})</span>
+                    </div>
+                    <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
+                      {s.scores?.map((sc:any,j:number)=>(
+                        <div key={j} className={`text-center rounded px-2 py-1 text-xs border ${scoreBg(sc.avg)}`}>
+                          <p className="font-bold">{sc.avg?.toFixed(2)}/4</p>
+                          <p className="text-gray-500 text-xs truncate max-w-[80px]">{sc.name}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── COVERAGE ── */}
+      {!loading && dashTab==="coverage" && (
+        <div className="space-y-4">
+          {coverageData ? (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  {label:"Total Competencies",value:coverageData.total,color:"text-gray-700"},
+                  {label:"Covered",value:coverageData.covered,color:"text-green-700"},
+                  {label:"Pending",value:coverageData.uncovered,color:"text-red-600"},
+                  {label:"Coverage %",value:`${coverageData.coverage_percent}%`,color:coverageData.coverage_percent>=80?"text-green-700":coverageData.coverage_percent>=50?"text-yellow-600":"text-red-600"},
+                ].map(k=>(
+                  <div key={k.label} className="bg-white rounded-xl shadow p-4 text-center border border-gray-200">
+                    <div className={`text-2xl font-bold ${k.color}`}>{k.value}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{k.label}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div className={`h-3 rounded-full transition-all ${coverageData.coverage_percent>=80?"bg-green-500":coverageData.coverage_percent>=50?"bg-yellow-500":"bg-red-500"}`}
+                  style={{width:`${coverageData.coverage_percent}%`}}/>
+              </div>
+              {coverageData.covered_competencies?.length > 0 && (
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-green-700 mb-2">✅ Covered ({coverageData.covered_competencies.length})</h3>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {coverageData.covered_competencies.map((c:any)=>(
+                      <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
+                        <span className="font-mono text-green-700 font-semibold shrink-0">{c.competency_code}</span>
+                        <span className="text-gray-600">{c.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {coverageData.uncovered_competencies?.length > 0 && (
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-red-600 mb-2">⏳ Pending ({coverageData.uncovered_competencies.length})</h3>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {coverageData.uncovered_competencies.map((c:any)=>(
+                      <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs">
+                        <span className="font-mono text-red-600 font-semibold shrink-0">{c.competency_code}</span>
+                        <span className="text-gray-600">{c.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No coverage data for {dashGrade} — {dashSection}. Add competencies to the registry first.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── MARKS ENTRY PANEL — fetches students directly, works even before any marks entered ──
+function MarksEntryPanel({ activity, combinedMarks, localRatings, updateRating, saveActivityMarks, saving, RATING_COLORS, API, academicYear }: any) {
+  const [students, setStudents] = useState<any[]>([]);
+  const [competencies, setCompetencies] = useState<any[]>([]);
+  const [ratings, setRatings] = useState<Record<string, Record<string, string>>>({});
+  const [localSaving, setLocalSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    if (!activity) return;
+    fetchStudentsAndCompetencies();
+  }, [activity]);
+
+  const fetchStudentsAndCompetencies = async () => {
+    try {
+      // Fetch students directly
+      const sr = await axios.get(`${API}/students?grade=${encodeURIComponent(activity.grade)}&section=${encodeURIComponent(activity.section)}`);
+      const studentList = (sr.data?.data || sr.data || []).filter((s: any) => s.is_active !== false);
+      setStudents(studentList);
+
+      // Fetch ALL competencies (no filter) then match by mapped IDs
+      // This ensures cross-curricular competencies are also found
+      const mappedIds: string[] = activity.competency_mappings || [];
+      if (mappedIds.length) {
+        // Fetch competencies for the activity's grade AND without grade filter as fallback
+        const [r1, r2] = await Promise.all([
+          axios.get(`${API}/activities/competencies?grade=${encodeURIComponent(activity.grade)}`).catch(() => ({ data: [] })),
+          axios.get(`${API}/activities/competencies`).catch(() => ({ data: [] })),
+        ]);
+        const all = [...(r1.data || []), ...(r2.data || [])];
+        // Deduplicate by id
+        const seen = new Set<string>();
+        const unique = all.filter((c: any) => { if (seen.has(c.id)) return false; seen.add(c.id); return true; });
+        // Keep only mapped ones, preserve order
+        const mapped = mappedIds.map(id => unique.find((c: any) => c.id === id)).filter(Boolean);
+        setCompetencies(mapped);
+      } else {
+        setCompetencies([]);
+      }
+
+      // Load existing marks if any
+      try {
+        const mr = await axios.get(`${API}/activities/${activity.id}/marks?academic_year=${academicYear}`);
+        const existingRatings: Record<string, Record<string, string>> = {};
+        (mr.data?.entries || mr.data || []).forEach((entry: any) => {
+          existingRatings[entry.student_id] = entry.competency_ratings || {};
+        });
+        setRatings(existingRatings);
+      } catch { setRatings({}); }
+    } catch { setStudents([]); }
+  };
+
+  const updateLocalRating = (studentId: string, competencyId: string, value: string) => {
+    setRatings(prev => ({ ...prev, [studentId]: { ...(prev[studentId]||{}), [competencyId]: value } }));
+  };
+
+  const saveMarks = async () => {
+    setLocalSaving(true);
+    try {
+      const entries = students.map(s => ({
+        student_id: s.id,
+        student_name: s.name,
+        competency_ratings: ratings[s.id] || {},
+      }));
+      await axios.post(`${API}/activities/${activity.id}/marks`, { academic_year: academicYear, entries });
+      setMsg("✅ Marks saved successfully");
+    } catch { setMsg("❌ Error saving marks"); }
+    setLocalSaving(false);
+    setTimeout(() => setMsg(""), 3000);
+  };
+
+  if (!students.length) return <div className="bg-white rounded-xl shadow p-6 text-center text-gray-400 text-sm">Loading students...</div>;
+
+  return (
+    <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+        <div>
+          <h3 className="text-sm font-bold text-gray-700">{activity.name} — {activity.grade} · {activity.section}</h3>
+          <p className="text-xs text-gray-500 mt-0.5">{students.length} students · {competencies.length} competencies</p>
+        </div>
+        <button onClick={saveMarks} disabled={localSaving}
+          className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold">
+          {localSaving ? "Saving..." : "💾 Save Marks"}
+        </button>
+      </div>
+      {msg && <div className={`px-4 py-2 text-sm ${msg.startsWith("✅") ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>{msg}</div>}
+      {competencies.length === 0 ? (
+        <div className="p-6 text-center text-gray-400 text-sm">No competencies mapped to this activity. Edit the activity to add competencies.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse" style={{ minWidth: `${200 + competencies.length * 130}px` }}>
+            <thead>
+              <tr className="bg-indigo-700 text-white">
+                <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[180px]">Student</th>
+                {competencies.map((c: any) => (
+                  <th key={c.id} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[140px]">
+                    <div className="font-mono text-xs font-bold">{c.competency_code}</div>
+                    <div className="text-indigo-200 text-xs font-normal" style={{fontSize:'10px', lineHeight:'1.2'}}>{c.description?.substring(0, 40)}{c.description?.length > 40 ? '...' : ''}</div>
+                    {c.subject !== activity.subject && <div className="text-purple-300 text-xs">[{c.subject}]</div>}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {students.map((student: any, i: number) => (
+                <tr key={student.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                  <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{student.name}</td>
+                  {competencies.map((c: any) => {
+                    const current = ratings[student.id]?.[c.id] || "";
+                    return (
+                      <td key={c.id} className="px-2 py-1 text-center border-l border-gray-100">
+                        <select value={current} onChange={e => updateLocalRating(student.id, c.id, e.target.value)}
+                          className={`text-xs rounded px-1 py-0.5 border w-full ${current ? RATING_COLORS[current] : "border-gray-200 bg-white"}`}>
+                          <option value="">—</option>
+                          <option value="beginning">Beginning</option>
+                          <option value="approaching">Approaching</option>
+                          <option value="meeting">Meeting</option>
+                          <option value="exceeding">Exceeding</option>
+                        </select>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Sub-component: Analytics panel — class averages, level distribution, domain charts
+function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS, NUMERACY_DOMAINS, getLevel, calcAvg, grade, section }: any) {
+  if (!sectionData?.students?.length || !sectionData?.rounds?.length) return null;
+
+  const roundKey = sectionData.rounds[activeRoundIdx];
+  const DOMAIN_COLORS = ["#2196F3","#E91E63","#9C27B0","#FF5722","#00BCD4","#8BC34A","#FF9800","#607D8B"];
+  const allDomains = [...LITERACY_DOMAINS, ...NUMERACY_DOMAINS];
+
+  // Compute class stats for this round
+  const assessed = sectionData.students.filter((s: any) => s.rounds[activeRoundIdx]?.exists);
+  if (!assessed.length) return null;
+
+  const litAvgs = assessed.map((s: any) => s.rounds[activeRoundIdx].literacy.avg || 0);
+  const numAvgs = assessed.map((s: any) => s.rounds[activeRoundIdx].numeracy.avg || 0);
+  const overallAvgs = assessed.map((s: any) => s.rounds[activeRoundIdx].overall || 0);
+  const avg = (arr: number[]) => arr.length ? +(arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1) : 0;
+
+  const classLitAvg = avg(litAvgs);
+  const classNumAvg = avg(numAvgs);
+  const classOverall = avg(overallAvgs);
+
+  // Level distribution
+  const levelDist: Record<string, number> = { "Exceeding": 0, "Meeting": 0, "Approaching": 0, "Beginning": 0 };
+  overallAvgs.forEach(o => { const lv = getLevel(o); levelDist[lv.label] = (levelDist[lv.label] || 0) + 1; });
+
+  // Domain averages across all students for this round
+  const domainData = allDomains.map((d: string, i: number) => {
+    const isLit = LITERACY_DOMAINS.includes(d);
+    const vals = assessed.map((s: any) => s.rounds[activeRoundIdx][isLit ? "literacy" : "numeracy"][d] || 0);
+    return { domain: d, avg: avg(vals), type: isLit ? "literacy" : "numeracy" };
+  });
+
+  // Progress over rounds
+  const progressData = sectionData.rounds.map((rk: string, i: number) => {
+    const roundStudents = sectionData.students.filter((s: any) => s.rounds[i]?.exists);
+    if (!roundStudents.length) return null;
+    const ovs = roundStudents.map((s: any) => s.rounds[i].overall || 0);
+    const lits = roundStudents.map((s: any) => s.rounds[i].literacy.avg || 0);
+    const nums = roundStudents.map((s: any) => s.rounds[i].numeracy.avg || 0);
+    return { name: `Round ${i + 1}`, overall: avg(ovs), literacy: avg(lits), numeracy: avg(nums) };
+  }).filter(Boolean);
+
+  // Download class report
+  const downloadReport = () => {
+    const rows = assessed.map((s: any) => {
+      const r = s.rounds[activeRoundIdx];
+      return [s.student_name,
+        ...LITERACY_DOMAINS.map((d: string) => r.literacy[d] || 0),
+        r.literacy.avg?.toFixed(1),
+        ...NUMERACY_DOMAINS.map((d: string) => r.numeracy[d] || 0),
+        r.numeracy.avg?.toFixed(1),
+        r.overall?.toFixed(1),
+        getLevel(r.overall).label,
+        r.promoted ? `Promoted → ${r.promoted_to_stage}` : "In progress"
+      ].join(",");
+    });
+    const header = ["Student", ...LITERACY_DOMAINS, "Lit%", ...NUMERACY_DOMAINS, "Num%", "Overall%", "Level", "Status"].join(",");
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Baseline_${grade}_${section}_Round${activeRoundIdx + 1}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  const downloadHTMLReport = () => {
+    const rows = assessed.map((s: any) => {
+      const r = s.rounds[activeRoundIdx];
+      const lv = getLevel(r.overall);
+      return `<tr>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:600">${s.student_name}</td>
+        ${LITERACY_DOMAINS.map((d: string) => `<td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${r.literacy[d] || 0}</td>`).join("")}
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;color:#2563eb">${r.literacy.avg?.toFixed(1)}%</td>
+        ${NUMERACY_DOMAINS.map((d: string) => `<td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${r.numeracy[d] || 0}</td>`).join("")}
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;color:#d97706">${r.numeracy.avg?.toFixed(1)}%</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;color:${lv.label === "Exceeding" ? "#16a34a" : lv.label === "Meeting" ? "#2563eb" : lv.label === "Approaching" ? "#d97706" : "#dc2626"}">${r.overall?.toFixed(1)}%</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${lv.label}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;color:${r.promoted ? "#16a34a" : "#6b7280"}">${r.promoted ? "🎉 Promoted" : "In progress"}</td>
+      </tr>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>Baseline Report — ${grade} ${section} Round ${activeRoundIdx + 1}</title>
+    <style>body{font-family:Arial,sans-serif;max-width:1100px;margin:30px auto;color:#111}
+    h1{color:#4338ca}table{width:100%;border-collapse:collapse;font-size:13px}
+    th{background:#4338ca;color:white;padding:10px 8px;text-align:center}
+    tr:nth-child(even){background:#f9fafb}
+    .kpi{display:flex;gap:16px;margin:20px 0}
+    .kpi-card{flex:1;background:#f5f3ff;border-left:4px solid #6366f1;padding:12px 16px;border-radius:8px}
+    .kpi-card .val{font-size:22px;font-weight:700;color:#4338ca}
+    .kpi-card .lbl{font-size:12px;color:#6b7280}
+    </style></head><body>
+    <h1>Baseline Assessment Report</h1>
+    <p style="color:#6b7280">${grade} — ${section} &nbsp;·&nbsp; Round ${activeRoundIdx + 1} &nbsp;·&nbsp; ${new Date().toLocaleDateString()}</p>
+    <div class="kpi">
+      <div class="kpi-card"><div class="val">${assessed.length}</div><div class="lbl">Students Assessed</div></div>
+      <div class="kpi-card"><div class="val">${classLitAvg}%</div><div class="lbl">Class Literacy Avg</div></div>
+      <div class="kpi-card"><div class="val">${classNumAvg}%</div><div class="lbl">Class Numeracy Avg</div></div>
+      <div class="kpi-card"><div class="val">${classOverall}%</div><div class="lbl">Class Overall Avg</div></div>
+      <div class="kpi-card"><div class="val">${assessed.filter((s: any) => s.rounds[activeRoundIdx].promoted).length}</div><div class="lbl">Promoted (≥80%)</div></div>
+    </div>
+    <table><thead><tr>
+      <th style="text-align:left">Student</th>
+      ${LITERACY_DOMAINS.map((d: string) => `<th>${d.substring(0,5)}</th>`).join("")}<th>📖%</th>
+      ${NUMERACY_DOMAINS.map((d: string) => `<th>${d.substring(0,5)}</th>`).join("")}<th>🔢%</th>
+      <th>Overall</th><th>Level</th><th>Status</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    <p style="margin-top:30px;color:#9ca3af;font-size:12px">Generated by CBAS — Wisdom Techno School</p>
+    </body></html>`;
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Baseline_Report_${grade}_${section}_Round${activeRoundIdx + 1}.html`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  const LEVEL_COLORS: Record<string, string> = { "Exceeding": "#16a34a", "Meeting": "#2563eb", "Approaching": "#d97706", "Beginning": "#dc2626" };
+
+  return (
+    <div className="space-y-4 mt-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold text-gray-700">📊 Analytics — Round {activeRoundIdx + 1}</h3>
+        <div className="flex gap-2">
+          <button onClick={downloadReport} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">⬇️ CSV</button>
+          <button onClick={downloadHTMLReport} className="px-3 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium">⬇️ Report Card</button>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-5 gap-3">
+        {[
+          { label: "Assessed", value: assessed.length, color: "border-indigo-500" },
+          { label: "Lit Avg", value: `${classLitAvg}%`, color: "border-blue-500" },
+          { label: "Num Avg", value: `${classNumAvg}%`, color: "border-orange-500" },
+          { label: "Overall Avg", value: `${classOverall}%`, color: "border-green-500" },
+          { label: "Promoted", value: assessed.filter((s: any) => s.rounds[activeRoundIdx].promoted).length, color: "border-purple-500" },
+        ].map(k => (
+          <div key={k.label} className={`bg-white rounded-xl shadow p-3 border-l-4 ${k.color}`}>
+            <p className="text-xs text-gray-500">{k.label}</p>
+            <p className="text-lg font-bold text-gray-800">{k.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Level distribution */}
+        <div className="bg-white rounded-xl shadow p-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Level Distribution</h4>
+          <div className="space-y-2">
+            {Object.entries(levelDist).map(([level, count]) => {
+              const pct = assessed.length > 0 ? (count / assessed.length) * 100 : 0;
+              return (
+                <div key={level}>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs font-medium text-gray-600">{level}</span>
+                    <span className="text-xs font-bold" style={{ color: LEVEL_COLORS[level] }}>{count} students ({pct.toFixed(0)}%)</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div className="h-2.5 rounded-full" style={{ width: `${pct}%`, backgroundColor: LEVEL_COLORS[level] }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Domain averages */}
+        <div className="bg-white rounded-xl shadow p-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Domain Averages</h4>
+          <div className="space-y-1.5">
+            {domainData.map((d: any, i: number) => (
+              <div key={d.domain} className="flex items-center gap-2">
+                <span className="text-xs text-gray-600 w-24 shrink-0">{d.domain}</span>
+                <div className="flex-1 bg-gray-200 rounded-full h-2.5">
+                  <div className="h-2.5 rounded-full" style={{ width: `${Math.min(d.avg, 100)}%`, backgroundColor: DOMAIN_COLORS[i % 8] }} />
+                </div>
+                <span className="text-xs font-bold w-12 text-right" style={{ color: DOMAIN_COLORS[i % 8] }}>{d.avg}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Progress chart — only if multiple rounds */}
+      {progressData.length > 1 && (
+        <div className="bg-white rounded-xl shadow p-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">📈 Class Progress Across Rounds</h4>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={progressData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+              <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+              <Tooltip formatter={(v: any) => [`${Number(v).toFixed(1)}%`]} />
+              <Legend wrapperStyle={{ fontSize: "11px" }} />
+              <Line type="monotone" dataKey="overall" name="Overall" stroke="#6366f1" strokeWidth={3} dot={{ r: 5 }} />
+              <Line type="monotone" dataKey="literacy" name="Literacy" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey="numeracy" name="Numeracy" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey={() => 80} name="Target (80%)" stroke="#22c55e" strokeDasharray="5 5" strokeWidth={1.5} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Student ranking table for this round */}
+      <div className="bg-white rounded-xl shadow p-4">
+        <h4 className="text-sm font-semibold text-gray-700 mb-3">Student Rankings — Round {activeRoundIdx + 1}</h4>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-indigo-700 text-white">
+                <th className="px-3 py-2 text-center w-10">Rank</th>
+                <th className="px-3 py-2 text-left min-w-[150px]">Student</th>
+                <th className="px-3 py-2 text-center">📖 Literacy</th>
+                <th className="px-3 py-2 text-center">🔢 Numeracy</th>
+                <th className="px-3 py-2 text-center">Overall</th>
+                <th className="px-3 py-2 text-center">Level</th>
+                <th className="px-3 py-2 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...assessed]
+                .sort((a: any, b: any) => (b.rounds[activeRoundIdx].overall || 0) - (a.rounds[activeRoundIdx].overall || 0))
+                .map((s: any, i: number) => {
+                  const r = s.rounds[activeRoundIdx];
+                  const lv = getLevel(r.overall || 0);
+                  return (
+                    <tr key={s.student_id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                      <td className="px-3 py-2 text-center font-bold text-gray-400">{i + 1}</td>
+                      <td className="px-3 py-2 font-semibold text-gray-800">{s.student_name}</td>
+                      <td className="px-3 py-2 text-center font-bold text-blue-700">{r.literacy.avg?.toFixed(1)}%</td>
+                      <td className="px-3 py-2 text-center font-bold text-orange-600">{r.numeracy.avg?.toFixed(1)}%</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv.bg} ${lv.color}`}>{r.overall?.toFixed(1)}%</span>
+                      </td>
+                      <td className="px-3 py-2 text-center text-xs text-gray-600">{lv.label}</td>
+                      <td className="px-3 py-2 text-center text-xs">
+                        {r.promoted
+                          ? <span className="text-green-600 font-bold">🎉 Promoted</span>
+                          : <span className="text-gray-400">In progress</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Sub-component: Read-only or editable marks table for existing rounds
+function MarksTable({ students, roundKey, roundIdx, isEditing, localMarks, updateMark, LITERACY_DOMAINS, NUMERACY_DOMAINS, calcAvg, getLevel, onStudentClick }: any) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs border-collapse" style={{ minWidth: `${400 + (LITERACY_DOMAINS.length + NUMERACY_DOMAINS.length) * 70}px` }}>
+        <thead>
+          <tr className="bg-indigo-700 text-white">
+            <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[160px]">Student</th>
+            {LITERACY_DOMAINS.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[65px]"><span className="text-blue-200">📖</span> {d.substring(0, 5)}</th>)}
+            <th className="px-2 py-2 text-center border-l border-indigo-500 bg-blue-800 min-w-[55px]">📖 Avg</th>
+            {NUMERACY_DOMAINS.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[65px]"><span className="text-orange-200">🔢</span> {d.substring(0, 5)}</th>)}
+            <th className="px-2 py-2 text-center border-l border-indigo-500 bg-orange-800 min-w-[55px]">🔢 Avg</th>
+            <th className="px-2 py-2 text-center border-l border-indigo-500 min-w-[65px]">Overall</th>
+          </tr>
+        </thead>
+        <tbody>
+          {students.map((s: any, i: number) => {
+            const rnd = s.rounds[roundIdx];
+            const litVals = isEditing
+              ? (localMarks[s.student_id]?.literacy || Object.fromEntries(LITERACY_DOMAINS.map((d: string) => [d, 0])))
+              : (rnd?.exists ? rnd.literacy : Object.fromEntries(LITERACY_DOMAINS.map((d: string) => [d, 0])));
+            const numVals = isEditing
+              ? (localMarks[s.student_id]?.numeracy || Object.fromEntries(NUMERACY_DOMAINS.map((d: string) => [d, 0])))
+              : (rnd?.exists ? rnd.numeracy : Object.fromEntries(NUMERACY_DOMAINS.map((d: string) => [d, 0])));
+            const litAvg = calcAvg(litVals);
+            const numAvg = calcAvg(numVals);
+            const overall = (litAvg + numAvg) / 2;
+            const lv = getLevel(overall);
+            const bg = i % 2 === 0 ? "bg-white" : "bg-gray-50";
+            return (
+              <tr key={s.student_id} className={`border-b border-gray-100 ${bg}`}>
+                <td className={`px-3 py-2 sticky left-0 ${bg}`}>
+                  <button onClick={() => onStudentClick(s.student_id)} className="text-left hover:text-indigo-600">
+                    <span className="font-bold text-gray-800">{s.student_name}</span>
+                    <span className="ml-1 text-gray-400 text-xs">({s.rounds.filter((r: any) => r.exists).length} rounds)</span>
+                  </button>
+                </td>
+                {LITERACY_DOMAINS.map((d: string) => (
+                  <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
+                    {isEditing ? (
+                      <input type="number" min={0} max={100} value={litVals[d] ?? 0}
+                        onChange={e => updateMark(s.student_id, "literacy", d, +e.target.value)}
+                        className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-xs" />
+                    ) : <span>{litVals[d] ?? 0}</span>}
+                  </td>
+                ))}
+                <td className="px-2 py-2 text-center border-l border-blue-100 bg-blue-50">
+                  <span className="font-bold text-blue-700">{litAvg.toFixed(0)}%</span>
+                </td>
+                {NUMERACY_DOMAINS.map((d: string) => (
+                  <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
+                    {isEditing ? (
+                      <input type="number" min={0} max={100} value={numVals[d] ?? 0}
+                        onChange={e => updateMark(s.student_id, "numeracy", d, +e.target.value)}
+                        className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-xs" />
+                    ) : <span>{numVals[d] ?? 0}</span>}
+                  </td>
+                ))}
+                <td className="px-2 py-2 text-center border-l border-orange-100 bg-orange-50">
+                  <span className="font-bold text-orange-700">{numAvg.toFixed(0)}%</span>
+                </td>
+                <td className="px-2 py-2 text-center border-l border-gray-100">
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv.bg} ${lv.color}`}>{overall.toFixed(0)}%</span>
+                  {rnd?.promoted && <div className="text-xs text-green-600 font-bold">🎉 Promoted</div>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Sub-component: New round entry table with number inputs
+function NewRoundTable({ students, localMarks, updateMark, LITERACY_DOMAINS, NUMERACY_DOMAINS, calcAvg, getLevel, initMarks }: any) {
+  useEffect(() => { if (Object.keys(localMarks).length === 0) initMarks(); }, [students]);
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs border-collapse" style={{ minWidth: `${400 + (LITERACY_DOMAINS.length + NUMERACY_DOMAINS.length) * 70}px` }}>
+        <thead>
+          <tr className="bg-blue-700 text-white">
+            <th className="px-3 py-2 text-left sticky left-0 bg-blue-700 min-w-[160px]">Student</th>
+            {LITERACY_DOMAINS.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-blue-600 min-w-[70px]">📖 {d.substring(0,5)}</th>)}
+            <th className="px-2 py-2 text-center border-l border-blue-500 min-w-[55px]">📖%</th>
+            {NUMERACY_DOMAINS.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-blue-600 min-w-[70px]">🔢 {d.substring(0,5)}</th>)}
+            <th className="px-2 py-2 text-center border-l border-blue-500 min-w-[55px]">🔢%</th>
+            <th className="px-2 py-2 text-center border-l border-blue-500 min-w-[65px]">Overall</th>
+          </tr>
+        </thead>
+        <tbody>
+          {students.map((s: any, i: number) => {
+            const litVals = localMarks[s.student_id]?.literacy || Object.fromEntries(LITERACY_DOMAINS.map((d: string) => [d, 0]));
+            const numVals = localMarks[s.student_id]?.numeracy || Object.fromEntries(NUMERACY_DOMAINS.map((d: string) => [d, 0]));
+            const litAvg = calcAvg(litVals);
+            const numAvg = calcAvg(numVals);
+            const overall = (litAvg + numAvg) / 2;
+            const lv = getLevel(overall);
+            const bg = i % 2 === 0 ? "bg-white" : "bg-gray-50";
+            return (
+              <tr key={s.student_id} className={`border-b border-gray-100 ${bg}`}>
+                <td className={`px-3 py-2 font-bold text-gray-800 sticky left-0 ${bg}`}>
+                  {s.student_name}
+                  <div className="text-gray-400 font-normal text-xs">{s.rounds.filter((r: any) => r.exists).length} prev rounds</div>
+                </td>
+                {LITERACY_DOMAINS.map((d: string) => (
+                  <td key={d} className="px-1 py-1.5 border-l border-gray-100">
+                    <input type="number" min={0} max={100} value={litVals[d] ?? 0}
+                      onChange={e => updateMark(s.student_id, "literacy", d, Math.min(100, Math.max(0, +e.target.value)))}
+                      className="w-full text-center border border-gray-300 rounded px-1 py-1 text-xs font-medium" />
+                  </td>
+                ))}
+                <td className="px-2 py-2 text-center border-l border-blue-100 bg-blue-50">
+                  <span className="font-bold text-blue-700">{litAvg.toFixed(0)}%</span>
+                </td>
+                {NUMERACY_DOMAINS.map((d: string) => (
+                  <td key={d} className="px-1 py-1.5 border-l border-gray-100">
+                    <input type="number" min={0} max={100} value={numVals[d] ?? 0}
+                      onChange={e => updateMark(s.student_id, "numeracy", d, Math.min(100, Math.max(0, +e.target.value)))}
+                      className="w-full text-center border border-gray-300 rounded px-1 py-1 text-xs font-medium" />
+                  </td>
+                ))}
+                <td className="px-2 py-2 text-center border-l border-orange-100 bg-orange-50">
+                  <span className="font-bold text-orange-700">{numAvg.toFixed(0)}%</span>
+                </td>
+                <td className="px-2 py-2 text-center border-l border-gray-100">
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv.bg} ${lv.color}`}>{overall.toFixed(0)}%</span>
+                  {overall >= 80 && <div className="text-xs text-green-600 font-bold">🎉 Will promote</div>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Sub-component: Student baseline profile with charts
+function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITERACY_DOMAINS, NUMERACY_DOMAINS }: any) {
+  const student = sectionData.students.find((s: any) => s.student_id === studentId);
+  if (!student) return null;
+
+  const DOMAIN_COLORS = ["#2196F3","#E91E63","#9C27B0","#FF5722","#00BCD4","#8BC34A","#FF9800","#607D8B"];
+  const rounds = student.rounds.filter((r: any) => r.exists);
+
+  // Compute strengths and weaknesses from rolling averages
+  const domainAvgs: Record<string, number[]> = {};
+  rounds.forEach((r: any) => {
+    LITERACY_DOMAINS.forEach((d: string) => { domainAvgs[d] = domainAvgs[d] || []; domainAvgs[d].push(r.literacy[d] || 0); });
+    NUMERACY_DOMAINS.forEach((d: string) => { domainAvgs[d] = domainAvgs[d] || []; domainAvgs[d].push(r.numeracy[d] || 0); });
+  });
+  const strengths: string[] = [], weaknesses: string[] = [];
+  Object.entries(domainAvgs).forEach(([d, vals]) => {
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    if (avg >= 80) strengths.push(`${d} — ${avg.toFixed(0)}%`);
+    else if (avg < 60) weaknesses.push(`${d} — ${avg.toFixed(0)}%`);
+  });
+
+  const lastRound = rounds[rounds.length - 1];
+  const litAvg = lastRound ? lastRound.literacy.avg : 0;
+  const numAvg = lastRound ? lastRound.numeracy.avg : 0;
+  const overall = lastRound ? lastRound.overall : 0;
+  const lv = getLevel(overall);
+
+  // Chart data for overall trend
+  const chartData = rounds.map((r: any, i: number) => ({
+    name: `Round ${i + 1}`,
+    overall: r.overall,
+    literacy: r.literacy.avg,
+    numeracy: r.numeracy.avg,
+  }));
+
+  return (
+    <div className="bg-white rounded-xl shadow border border-gray-200 p-4 space-y-4">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium">← Back</button>
+        <h3 className="text-base font-bold text-gray-800">{student.student_name}</h3>
+        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv.bg} ${lv.color}`}>{lv.label}</span>
+        {lastRound?.promoted && <span className="text-xs text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full">🎉 Promoted → {lastRound.promoted_to_stage}</span>}
+      </div>
+
+      {rounds.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-6">No assessment rounds yet.</p>
+      ) : (
+        <>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: "Rounds", value: rounds.length, color: "border-indigo-500" },
+              { label: "📖 Literacy", value: `${litAvg.toFixed(1)}%`, color: "border-blue-500" },
+              { label: "🔢 Numeracy", value: `${numAvg.toFixed(1)}%`, color: "border-orange-500" },
+              { label: "Overall", value: `${overall.toFixed(1)}%`, color: "border-green-500" },
+            ].map(k => (
+              <div key={k.label} className={`bg-gray-50 rounded-xl p-3 border-l-4 ${k.color}`}>
+                <p className="text-xs text-gray-500">{k.label}</p>
+                <p className="text-lg font-bold text-gray-800">{k.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Progress charts */}
+          {rounds.length > 1 && (
+            <>
+              <div className="bg-gray-50 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">📈 Overall Progress</h4>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                    <Tooltip formatter={(v: any) => [`${Number(v).toFixed(1)}%`]} />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                    <Line type="monotone" dataKey="overall" name="Overall" stroke="#6366f1" strokeWidth={3} dot={{ r: 5 }} />
+                    <Line type="monotone" dataKey="literacy" name="Literacy" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="numeracy" name="Numeracy" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} />
+                    {/* Promotion threshold */}
+                    <Line type="monotone" dataKey={() => 80} name="Target (80%)" stroke="#22c55e" strokeDasharray="5 5" strokeWidth={1.5} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Domain charts */}
+              {["literacy", "numeracy"].map(subj => {
+                const domains = subj === "literacy" ? LITERACY_DOMAINS : NUMERACY_DOMAINS;
+                const domData = rounds.map((r: any, i: number) => {
+                  const row: any = { name: `Round ${i+1}` };
+                  domains.forEach((d: string) => { row[d] = r[subj][d] || 0; });
+                  return row;
+                });
+                return (
+                  <div key={subj} className="bg-gray-50 rounded-xl p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">{subj === "literacy" ? "📖 Literacy" : "🔢 Numeracy"} — Domain-wise</h4>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={domData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                        <Tooltip />
+                        <Legend wrapperStyle={{ fontSize: "10px" }} />
+                        {domains.map((d: string, i: number) => (
+                          <Line key={d} type="monotone" dataKey={d} stroke={DOMAIN_COLORS[i % 8]} strokeWidth={2} dot={{ r: 3 }} />
+                        ))}
+                        <Line type="monotone" dataKey={() => 80} name="Target" stroke="#22c55e" strokeDasharray="4 4" strokeWidth={1} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {/* Strengths & Weaknesses */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <h4 className="text-sm font-semibold text-green-800 mb-2">✨ Strengths (≥80%)</h4>
+              {strengths.length > 0 ? strengths.map((s, i) => (
+                <div key={i} className="text-xs text-green-700 bg-white rounded-lg px-3 py-1.5 mb-1 border border-green-100">{s}</div>
+              )) : <p className="text-xs text-green-600">Keep working — strengths will appear here!</p>}
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <h4 className="text-sm font-semibold text-red-800 mb-2">📌 Needs Improvement (&lt;60%)</h4>
+              {weaknesses.length > 0 ? weaknesses.map((w, i) => (
+                <div key={i} className="text-xs text-red-700 bg-white rounded-lg px-3 py-1.5 mb-1 border border-red-100">{w}</div>
+              )) : <div className="text-xs text-green-600 bg-white rounded-lg px-3 py-1.5 border border-green-100">No weak areas — great job! 🎉</div>}
+            </div>
+          </div>
+
+          {/* Assessment history table */}
+          <div>
+            <h4 className="text-sm font-semibold text-gray-700 mb-2">📋 Assessment History</h4>
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-indigo-700 text-white">
+                  <th className="px-3 py-2">Round</th>
+                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Stage</th>
+                  <th className="px-3 py-2">📖 Literacy</th>
+                  <th className="px-3 py-2">🔢 Numeracy</th>
+                  <th className="px-3 py-2">Overall</th>
+                  <th className="px-3 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rounds.map((r: any, i: number) => {
+                  const lv2 = getLevel(r.overall);
+                  return (
+                    <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                      <td className="px-3 py-2 text-center font-bold text-indigo-700">Round {i+1}</td>
+                      <td className="px-3 py-2 text-center text-gray-500">{r.date}</td>
+                      <td className="px-3 py-2 text-center capitalize text-gray-600">{r.stage}</td>
+                      <td className="px-3 py-2 text-center font-bold text-blue-700">{r.literacy.avg?.toFixed(1)}%</td>
+                      <td className="px-3 py-2 text-center font-bold text-orange-600">{r.numeracy.avg?.toFixed(1)}%</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv2.bg} ${lv2.color}`}>{r.overall?.toFixed(1)}%</span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {r.promoted ? <span className="text-green-600 font-bold text-xs">🎉 Promoted → {r.promoted_to_stage}</span> : <span className="text-gray-400 text-xs">In progress</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// STUDENT AI TAB — AI homework + assessment for students
+// ─────────────────────────────────────────────────────────────────
+function StudentAITab({ user, mappings, academicYear }: any) {
+  const API = "http://localhost:3000";
+  const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
+  const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
+  const LITERACY_DOMAINS = ["Listening", "Speaking", "Reading", "Writing"];
+  const NUMERACY_DOMAINS = ["Operations", "Base 10", "Measurement", "Geometry"];
+
+  const combos: { grade: string; section: string }[] = [];
+  if (mappings?.mappings) {
+    const seen = new Set<string>();
+    mappings.mappings.forEach((m: any) => {
+      const key = `${m.grade}||${m.section}`;
+      if (!seen.has(key)) { seen.add(key); combos.push({ grade: m.grade, section: m.section }); }
+    });
+  }
+
+  const [selectedCombo, setSelectedCombo] = useState(combos[0] || null);
+  const [students, setStudents] = useState<any[]>([]);
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [mode, setMode] = useState<"homework" | "assessment">("homework");
+  const [numQ, setNumQ] = useState(10);
+  const [qTypes, setQTypes] = useState("Mixed");
+  const [generating, setGenerating] = useState(false);
+  const [output, setOutput] = useState("");
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => { if (selectedCombo) fetchStudents(); }, [selectedCombo, academicYear]);
+
+  const fetchStudents = async () => {
+    try {
+      const r = await axios.get(`${API}/baseline/section/rounds?grade=${encodeURIComponent(selectedCombo!.grade)}&section=${encodeURIComponent(selectedCombo!.section)}&academic_year=${academicYear}`);
+      setStudents(r.data.students || []);
+    } catch { }
+  };
+
+  const getStudentGaps = (student: any) => {
+    const rounds = student.rounds.filter((r: any) => r.exists);
+    if (!rounds.length) return { literacy: [], numeracy: [] };
+    const last = rounds[rounds.length - 1];
+    const litGaps = LITERACY_DOMAINS.filter(d => (last.literacy[d] || 0) < 60);
+    const numGaps = NUMERACY_DOMAINS.filter(d => (last.numeracy[d] || 0) < 60);
+    return { literacy: litGaps, numeracy: numGaps };
+  };
+
+  const generate = async () => {
+    if (!selectedStudents.length) { setMsg("Select at least one student"); return; }
+    setGenerating(true); setOutput(""); setMsg("");
+    const selStudents = students.filter(s => selectedStudents.includes(s.student_id));
+
+    const studentContext = selStudents.map(s => {
+      const rounds = s.rounds.filter((r: any) => r.exists);
+      const gaps = getStudentGaps(s);
+      const last = rounds[rounds.length - 1];
+      return `Student: ${s.student_name}
+Overall: ${last ? last.overall.toFixed(1) + "%" : "Not assessed"}
+Literacy gaps: ${gaps.literacy.join(", ") || "None"}
+Numeracy gaps: ${gaps.numeracy.join(", ") || "None"}`;
+    }).join("\n\n");
+
+    const prompt = mode === "homework"
+      ? `You are an expert school teacher creating a weekly homework plan for ${selectedCombo?.grade} students.
+
+STUDENTS:
+${studentContext}
+
+Create a 5-day (Monday-Friday) homework plan addressing their gaps.
+Each day must have minimum 3 questions per subject (Literacy and Numeracy).
+Friday must have 5 check questions with answers.
+
+FORMAT:
+📖 LITERACY HOMEWORK
+**MONDAY** — [Topic + competency code]
+1. [task]
+2. [task]
+3. [task]
+...
+**FRIDAY — Mini Check**
+1-5 questions + Answers
+
+🔢 NUMERACY HOMEWORK
+[Same format]
+
+📝 Parent Note: [Brief note for each student]`
+      : `You are an expert teacher creating a ${numQ}-question ${qTypes} assessment for ${selectedCombo?.grade} students.
+
+STUDENTS AND GAPS:
+${studentContext}
+
+Create ${numQ} ${qTypes} questions targeting their specific gaps.
+Include answer key at the end.
+Questions must be appropriate for ${selectedCombo?.grade} level.`;
+
+    try {
+      const res = await fetch(GROQ_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
+        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }], max_tokens: 2000 }),
+      });
+      const data = await res.json();
+      setOutput(data.choices?.[0]?.message?.content || "No response from AI");
+    } catch (e) { setMsg("❌ AI generation failed"); }
+    setGenerating(false);
+  };
+
+  const download = () => {
+    const blob = new Blob([output], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${mode === "homework" ? "Homework" : "Assessment"}_${selectedCombo?.grade}_${selectedCombo?.section}_${new Date().toISOString().split("T")[0]}.txt`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  if (!combos.length) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No sections assigned.</div>;
+
+  return (
+    <div className="space-y-4 w-full max-w-4xl">
+      <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4">
+        <h3 className="text-sm font-bold text-purple-800 mb-1">🤖 AI Learning Module — Students</h3>
+        <p className="text-xs text-purple-600">Generate personalized homework or assessment based on each student's baseline gaps.</p>
+      </div>
+
+      {/* Section selector */}
+      <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
+        {combos.map(c => (
+          <button key={`${c.grade}-${c.section}`} onClick={() => setSelectedCombo(c)}
+            className={`px-3 py-2 text-xs rounded-lg font-medium border ${selectedCombo?.grade === c.grade && selectedCombo?.section === c.section ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-600 border-gray-300"}`}>
+            {c.grade} · {c.section}
+          </button>
+        ))}
+      </div>
+
+      {msg && <div className="px-4 py-2 bg-red-50 border border-red-300 rounded text-sm text-red-700">{msg}</div>}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Config */}
+        <div className="bg-white rounded-xl shadow p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-gray-700">Configuration</h3>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Mode</label>
+            <div className="flex gap-2">
+              {[{ id: "homework", label: "📝 Weekly Homework" }, { id: "assessment", label: "📋 Assessment Paper" }].map(m => (
+                <button key={m.id} onClick={() => setMode(m.id as any)}
+                  className={`flex-1 text-xs py-1.5 rounded-lg border font-medium ${mode === m.id ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-600 border-gray-300"}`}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {mode === "assessment" && (
+            <>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Questions: {numQ}</label>
+                <input type="range" min={5} max={30} step={5} value={numQ} onChange={e => setNumQ(+e.target.value)} className="w-full accent-purple-600" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Type</label>
+                <div className="flex gap-1 flex-wrap">
+                  {["MCQ","Short","Fill","Mixed"].map(t => (
+                    <button key={t} onClick={() => setQTypes(t)}
+                      className={`px-3 py-1 text-xs rounded-lg border font-medium ${qTypes === t ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-600 border-gray-300"}`}>{t}</button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Student selector */}
+        <div className="bg-white rounded-xl shadow p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">
+            Select Students
+            <button onClick={() => setSelectedStudents(students.map(s => s.student_id))} className="ml-2 text-xs text-purple-600 hover:underline">All</button>
+            <button onClick={() => setSelectedStudents([])} className="ml-2 text-xs text-gray-400 hover:underline">Clear</button>
+            <span className="ml-2 text-xs text-gray-400">({selectedStudents.length} selected)</span>
+          </h3>
+          <div className="space-y-1 max-h-52 overflow-y-auto">
+            {students.map(s => {
+              const gaps = getStudentGaps(s);
+              const hasGaps = gaps.literacy.length + gaps.numeracy.length > 0;
+              return (
+                <label key={s.student_id} className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 ${selectedStudents.includes(s.student_id) ? "bg-purple-50" : ""}`}>
+                  <input type="checkbox" checked={selectedStudents.includes(s.student_id)}
+                    onChange={() => setSelectedStudents(prev => prev.includes(s.student_id) ? prev.filter(x => x !== s.student_id) : [...prev, s.student_id])}
+                    className="accent-purple-600" />
+                  <span className="text-xs text-gray-700">{s.student_name}</span>
+                  {hasGaps && <span className="ml-auto text-xs text-red-500">⚠️ {gaps.literacy.length + gaps.numeracy.length} gaps</span>}
+                </label>
+              );
+            })}
+            {!students.length && <p className="text-xs text-gray-400 text-center py-4">No students assessed yet. Enter baseline marks first.</p>}
+          </div>
+        </div>
+      </div>
+
+      <button onClick={generate} disabled={generating}
+        className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold rounded-xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50">
+        {generating ? "🤖 Generating..." : `✨ Generate ${mode === "homework" ? "Homework Plan" : "Assessment Paper"}`}
+      </button>
+
+      {output && (
+        <div className="bg-white rounded-xl shadow p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-700">Generated Output</h3>
+            <div className="flex gap-2">
+              <button onClick={() => navigator.clipboard.writeText(output)} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium">📋 Copy</button>
+              <button onClick={download} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">⬇️ Download</button>
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto border border-gray-200">
+            {output}
+          </div>
         </div>
       )}
     </div>
@@ -1883,227 +3392,408 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// EXAM CONFIG TAB — class teacher configures exams for their grade
-// Shared DB with admin — changes reflect in both directions
+// SELF AI TAB — AI learning module for teacher's own baseline gaps
 // ─────────────────────────────────────────────────────────────────
-function ExamConfigTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
-  const EXAM_TYPES = ["PA1","PA2","SA1","PA3","PA4","SA2","Custom"];
-  const grade = mappings?.class_grade || "";
+function SelfAITab({ user, academicYear }: any) {
+  const GROQ_API2 = "https://api.groq.com/openai/v1/chat/completions";
+  const GROQ_KEY2 = import.meta.env.VITE_GROQ_API_KEY || "";
 
-  const [examType, setExamType] = useState("PA1");
-  const [customExam, setCustomExam] = useState("");
-  const [subjects, setSubjects] = useState<{subject:string;max_marks:number}[]>([]);
-  const [newSubject, setNewSubject] = useState("");
-  const [newMax, setNewMax] = useState(100);
-  const [examDate, setExamDate] = useState("");
+  const STAGE_GRADE: Record<string,string> = { foundation:"Grade 2", preparatory:"Grade 5", middle:"Grade 8", secondary:"Grade 10" };
+  const LIT_DOMAINS = ["Listening","Speaking","Reading","Writing"];
+  const NUM_DOMAINS = ["Operations","Base 10","Measurement","Geometry"];
+  const LIT_KEYS   = ["listening_score","speaking_score","reading_score","writing_score"];
+  const NUM_KEYS   = ["operations_score","base10_score","measurement_score","geometry_score"];
+
+  const [baselineData, setBaselineData] = useState<any>(null);
+  const [mode, setMode] = useState<"gap"|"custom">("gap");
+  const [ppMode, setPpMode] = useState<"practice"|"assessment">("practice");
+  // Gap-based settings
+  const [numQ, setNumQ] = useState(10);
+  const [difficulty, setDifficulty] = useState("Mixed");
+  const [qTypes, setQTypes] = useState(["MCQ","Short Answer","Case-Based"]);
+  const [focusGap, setFocusGap] = useState("All my gaps");
+  // Custom topic settings
+  const [custSubj, setCustSubj] = useState("literacy");
+  const [custDomain, setCustDomain] = useState("Listening");
+  const [custComps, setCustComps] = useState<any[]>([]);
+  const [loadingComps, setLoadingComps] = useState(false);
+  // Output
+  const [generating, setGenerating] = useState(false);
+  const [output, setOutput] = useState("");
   const [msg, setMsg] = useState("");
-  const [saved, setSaved] = useState(false);
 
-  const effectiveExam = examType === "Custom" ? customExam : examType;
+  useEffect(() => { fetchBaseline(); }, [academicYear]);
+  useEffect(() => { if (mode === "custom") fetchCustomComps(); }, [custSubj, custDomain, baselineData]);
 
-  useEffect(() => { if (grade && effectiveExam) loadConfig(); }, [grade, effectiveExam, academicYear]);
-
-  const loadConfig = async () => {
+  const fetchBaseline = async () => {
     try {
-      const r = await axios.get(`${API}/pasa/config?academic_year=${academicYear}&exam_type=${effectiveExam}&grade=${encodeURIComponent(grade)}`);
-      if (r.data?.length) {
-        setSubjects(r.data.map((c: any) => ({ subject: c.subject, max_marks: +c.max_marks })));
-        setExamDate(r.data[0]?.exam_date || "");
-      } else {
-        setSubjects([]);
+      const r = await axios.get(`${API}/baseline/teacher/${user.id}?academic_year=${academicYear}`);
+      setBaselineData(r.data);
+    } catch {}
+  };
+
+  // Fetch competencies for custom mode
+  const fetchCustomComps = async () => {
+    if (!baselineData?.assessments?.length) return;
+    const assessments = baselineData.assessments || [];
+    const subjectRounds = assessments.filter((a:any) => a.subject === custSubj);
+    const latest = subjectRounds[subjectRounds.length-1];
+    const stage = latest?.stage || "foundation";
+    const grade = STAGE_GRADE[stage];
+    setLoadingComps(true);
+    try {
+      const r = await axios.get(`${API}/activities/competencies?subject=${custSubj}&stage=${stage}&grade=${encodeURIComponent(grade)}`);
+      const all = r.data?.data || r.data || [];
+      const domainMap: Record<string,string> = {
+        "Listening":"listening","Speaking":"speaking","Reading":"reading","Reading and Comprehension":"reading","Writing":"writing",
+        "Operations":"operations","Base 10":"base10","Measurement":"measurement","Geometry":"geometry",
+      };
+      const filtered = all.filter((c:any) => {
+        const cd = (c.domain||"").toLowerCase();
+        const sel = custDomain.toLowerCase().replace(" ","").replace("10","10");
+        return cd.includes(sel) || cd.includes(custDomain.toLowerCase());
+      });
+      setCustComps(filtered.length ? filtered : all.slice(0,10));
+    } catch { setCustComps([]); }
+    setLoadingComps(false);
+  };
+
+  // Build gap list with competencies
+  const buildGapContext = async () => {
+    const assessments = baselineData?.assessments || [];
+    const litRounds = assessments.filter((a:any)=>a.subject==="literacy");
+    const numRounds = assessments.filter((a:any)=>a.subject==="numeracy");
+    const latestLit = litRounds[litRounds.length-1];
+    const latestNum = numRounds[numRounds.length-1];
+
+    const gaps: any[] = [];
+    if (latestLit) {
+      const avg = LIT_KEYS.reduce((s,k)=>s + Number(latestLit[k]||0),0)/LIT_KEYS.length;
+      for (let i=0;i<LIT_KEYS.length;i++) {
+        const sc = +(latestLit[LIT_KEYS[i]]||0);
+        if (sc < avg && sc > 0) gaps.push({ domain:"Literacy", sub:LIT_DOMAINS[i], score:sc, subject:"literacy", stage:latestLit.stage||"foundation" });
       }
-    } catch { }
+    }
+    if (latestNum) {
+      const avg = NUM_KEYS.reduce((s,k)=>s + Number(latestNum[k]||0),0)/NUM_KEYS.length;
+      for (let i=0;i<NUM_KEYS.length;i++) {
+        const sc = +(latestNum[NUM_KEYS[i]]||0);
+        if (sc < avg && sc > 0) gaps.push({ domain:"Numeracy", sub:NUM_DOMAINS[i], score:sc, subject:"numeracy", stage:latestNum.stage||"foundation" });
+      }
+    }
+
+    // Fetch competencies for each gap
+    const gapWithComps = await Promise.all(gaps.map(async (g:any) => {
+      const grade = STAGE_GRADE[g.stage];
+      try {
+        const r = await axios.get(`${API}/activities/competencies?subject=${g.subject}&stage=${g.stage}&grade=${encodeURIComponent(grade)}`);
+        const all = r.data?.data || r.data || [];
+        const comps = all.filter((c:any) => {
+          const cd = (c.domain||"").toLowerCase();
+          return cd.includes(g.sub.toLowerCase()) || cd.includes(g.sub.toLowerCase().replace(" ",""));
+        }).slice(0,5);
+        return { ...g, grade, competencies: comps };
+      } catch { return { ...g, grade, competencies:[] }; }
+    }));
+
+    return gapWithComps;
   };
 
-  const saveConfig = async () => {
-    if (!grade) { setMsg("❌ No class assigned. Contact admin."); return; }
-    if (!effectiveExam) { setMsg("❌ Enter exam name."); return; }
-    if (!subjects.length) { setMsg("❌ Add at least one subject."); return; }
+  const generate = async () => {
+    if (!baselineData?.assessments?.length) { setMsg("No baseline data found. Complete your assessment first."); return; }
+    setGenerating(true); setOutput(""); setMsg("");
+
+    const assessments = baselineData.assessments || [];
+    const litRounds = assessments.filter((a:any)=>a.subject==="literacy");
+    const numRounds = assessments.filter((a:any)=>a.subject==="numeracy");
+    const latestLit = litRounds[litRounds.length-1];
+    const latestNum = numRounds[numRounds.length-1];
+    const litAvg = latestLit ? LIT_KEYS.reduce((s:number,k:string)=>s + Number(latestLit[k]||0),0)/LIT_KEYS.length : null;
+    const numAvg = latestNum ? NUM_KEYS.reduce((s:number,k:string)=>s + Number(latestNum[k]||0),0)/NUM_KEYS.length : null;
+    const overallAvg = litAvg!==null&&numAvg!==null?(litAvg+numAvg)/2:litAvg??numAvg??0;
+
+    let prompt = "";
+
+    if (mode === "gap") {
+      const gaps = await buildGapContext();
+      const selectedGaps = focusGap === "All my gaps" ? gaps : gaps.filter(g=>`${g.domain} – ${g.sub}`===focusGap);
+
+      const compBlock = selectedGaps.map((g:any) => {
+        const compLines = g.competencies.length
+          ? g.competencies.map((c:any)=>`  - [${c.competency_code}]: ${c.description||c.desc||""}`).join("\n")
+          : "  - General competencies";
+        return `DOMAIN: ${g.domain} – ${g.sub} | Stage: ${g.stage} | Grade: ${g.grade} | Score: ${g.score.toFixed(0)}%\nCompetencies:\n${compLines}`;
+      }).join("\n\n");
+
+      const diffNote: Record<string,string> = {
+        "Easy":"Recall and basic application only.",
+        "Moderate":"Mix of recall, application and simple analysis.",
+        "Challenging":"Prioritise analysis, evaluation and synthesis.",
+        "Mixed":"40% easy, 40% moderate, 20% challenging."
+      };
+
+      const qtStr = qTypes.join(", ");
+
+      prompt = `You are an expert educational assessor for teacher professional development in India.
+
+Create a ${ppMode === "practice" ? "PRACTICE PAPER" : "ASSESSMENT PAPER"} for teacher ${user?.name} targeting their competency gaps.
+
+TEACHER: ${user?.name}
+Overall: ${overallAvg.toFixed(1)}%
+Literacy Stage: ${latestLit?.stage||"—"} (Grade: ${STAGE_GRADE[latestLit?.stage||"foundation"]})
+Numeracy Stage: ${latestNum?.stage||"—"} (Grade: ${STAGE_GRADE[latestNum?.stage||"foundation"]})
+
+FOCUS COMPETENCIES (from gap analysis):
+${compBlock || "General competencies — no specific gaps identified"}
+
+PAPER REQUIREMENTS:
+- Exactly ${numQ} questions
+- Question types: ${qtStr}
+- Difficulty: ${difficulty} — ${diffNote[difficulty]||"Mixed difficulty"}
+- Tag every question with its competency code [CODE]
+- Test both THEORETICAL KNOWLEDGE and CLASSROOM APPLICATION
+- Include complete Answer Key with explanations
+
+QUESTION FORMAT:
+[MCQ] 4 options A/B/C/D, mark correct with ✓, 1-line reason
+[SA] Short Answer: model answer 2-3 sentences
+[LA] Long Answer: model answer 5-8 sentences
+[TF] True/False: answer + explanation
+[Case-Based] 4-5 line classroom scenario + question + model answer
+
+Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.name} — ${new Date().toLocaleDateString()}`;
+
+    } else {
+      // Custom topic mode
+      const compLines = custComps.length
+        ? custComps.map((c:any)=>`  - [${c.competency_code}]: ${c.description||c.desc||""}`).join("\n")
+        : "  - General competencies";
+
+      const subjectRounds = assessments.filter((a:any)=>a.subject===custSubj);
+      const latest = subjectRounds[subjectRounds.length-1];
+      const stage = latest?.stage || "foundation";
+      const grade = STAGE_GRADE[stage];
+
+      prompt = `You are an expert educational assessor for teacher professional development in India.
+
+Create a ${ppMode === "practice" ? "PRACTICE PAPER" : "ASSESSMENT PAPER"} for teacher ${user?.name}.
+
+TEACHER: ${user?.name}
+Subject: ${custSubj === "literacy" ? "Literacy" : "Numeracy"}
+Domain: ${custDomain}
+Stage: ${stage} | Grade: ${grade}
+
+COMPETENCIES TO ASSESS:
+${compLines}
+
+PAPER REQUIREMENTS:
+- Exactly ${numQ} questions
+- Question types: ${qTypes.join(", ")}
+- Difficulty: ${difficulty}
+- Tag every question with its competency code [CODE]
+- Test THEORETICAL KNOWLEDGE and CLASSROOM APPLICATION
+- Include complete Answer Key
+
+Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.name} — ${custSubj} — ${custDomain} — ${new Date().toLocaleDateString()}`;
+    }
+
     try {
-      await axios.post(`${API}/pasa/config`, { academic_year: academicYear, exam_type: effectiveExam, grade, subjects, exam_date: examDate || undefined });
-      setMsg("✅ Config saved — visible to all teachers for this grade and in admin login");
-      setSaved(true);
-    } catch { setMsg("❌ Error saving config"); }
-    setTimeout(() => setMsg(""), 4000);
+      const res = await fetch(GROQ_API2, {
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":`Bearer ${GROQ_KEY2}`},
+        body: JSON.stringify({ model:"llama-3.3-70b-versatile", messages:[{role:"user",content:prompt}], max_tokens:3000 }),
+      });
+      const d = await res.json();
+      setOutput(d.choices?.[0]?.message?.content || "No response from AI");
+    } catch { setMsg("❌ AI generation failed. Check API key."); }
+    setGenerating(false);
   };
 
-  const addSubject = () => {
-    if (!newSubject.trim()) return;
-    if (subjects.find(s => s.subject.toLowerCase() === newSubject.toLowerCase())) { setMsg("Subject already added"); setTimeout(() => setMsg(""), 2000); return; }
-    setSubjects(prev => [...prev, { subject: newSubject.trim().toUpperCase(), max_marks: newMax }]);
-    setNewSubject(""); setNewMax(100); setSaved(false);
-  };
+  const assessments = baselineData?.assessments || [];
+  const litRounds = assessments.filter((a:any)=>a.subject==="literacy");
+  const numRounds = assessments.filter((a:any)=>a.subject==="numeracy");
+  const latestLit = litRounds[litRounds.length-1];
+  const latestNum = numRounds[numRounds.length-1];
+  const litAvg = latestLit ? LIT_KEYS.reduce((s:number,k:string)=>s + Number(latestLit[k]||0),0)/LIT_KEYS.length : null;
+  const numAvg = latestNum ? NUM_KEYS.reduce((s:number,k:string)=>s + Number(latestNum[k]||0),0)/NUM_KEYS.length : null;
 
-  if (!mappings?.is_class_teacher) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Only class teachers can configure exams.</div>;
+  // Compute gaps for display
+  const gapList: string[] = [];
+  if (latestLit && litAvg !== null) LIT_DOMAINS.forEach((l,i) => { if (+(latestLit[LIT_KEYS[i]]||0) < litAvg!) gapList.push(`Literacy – ${l}`); });
+  if (latestNum && numAvg !== null) NUM_DOMAINS.forEach((l,i) => { if (+(latestNum[NUM_KEYS[i]]||0) < numAvg!) gapList.push(`Numeracy – ${l}`); });
+
+  const custDomains = custSubj === "literacy" ? LIT_DOMAINS : NUM_DOMAINS;
 
   return (
-    <div className="space-y-4 max-w-2xl">
-      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-indigo-800">⚙️ Exam Configuration — {grade}</h3>
-        <p className="text-xs text-indigo-600 mt-0.5">Configure subjects and max marks for each exam. This is shared — changes reflect in admin login and all subject teachers for {grade}.</p>
+    <div className="space-y-4 w-full max-w-3xl">
+      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
+        <h3 className="text-sm font-bold text-indigo-800 mb-1">✍️ AI Practice & Assessment Paper</h3>
+        <p className="text-xs text-indigo-600">Questions mapped to your exact competency framework — tagged with competency codes.</p>
       </div>
 
-      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+      {!assessments.length ? (
+        <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No baseline data found for {academicYear}. Complete assessment first.</div>
+      ) : (
+        <>
+          {/* Paper type */}
+          <div className="bg-white rounded-xl shadow p-4 space-y-3">
+            <div className="flex gap-2">
+              {[{id:"practice",label:"✍️ Practice Paper"},{id:"assessment",label:"📋 Assessment Paper"}].map(p=>(
+                <button key={p.id} onClick={()=>setPpMode(p.id as any)}
+                  className={`px-4 py-2 text-xs rounded-lg border font-medium ${ppMode===p.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
 
-      <div className="bg-white rounded-xl shadow p-4 space-y-3">
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Exam Type</label>
-            <select value={examType} onChange={e => { setExamType(e.target.value); setSaved(false); }} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-              {EXAM_TYPES.map(e => <option key={e} value={e}>{e}</option>)}
-            </select>
+            {/* Mode */}
+            <div className="flex gap-2">
+              {[{id:"gap",label:"📌 Based on My Gaps"},{id:"custom",label:"🎯 Custom Topic"}].map(m=>(
+                <button key={m.id} onClick={()=>setMode(m.id as any)}
+                  className={`px-4 py-2 text-xs rounded-lg border font-medium ${mode===m.id?"bg-purple-600 text-white border-purple-600":"bg-white text-gray-600 border-gray-300 hover:bg-purple-50"}`}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
           </div>
-          {examType === "Custom" && (
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Custom Name</label>
-              <input value={customExam} onChange={e => setCustomExam(e.target.value)} placeholder="e.g. Unit Test 1" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
+
+          {mode === "gap" && (
+            <div className="bg-white rounded-xl shadow p-4 space-y-3">
+              {gapList.length === 0 ? (
+                <div className="text-sm text-green-700 bg-green-50 rounded-lg p-3">🎉 No gaps found — you're above average in all domains! Switch to Custom Topic to practise any area.</div>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs text-gray-500 font-semibold block mb-1">Gap Areas (below subject average)</label>
+                    <div className="flex flex-wrap gap-2">
+                      {gapList.map(g=><span key={g} className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">⚠️ {g}</span>)}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Focus on</label>
+                      <select value={focusGap} onChange={e=>setFocusGap(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                        <option>All my gaps</option>
+                        {gapList.map(g=><option key={g}>{g}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Number of Questions</label>
+                      <select value={numQ} onChange={e=>setNumQ(+e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                        {[5,10,15,20].map(n=><option key={n}>{n}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Difficulty</label>
+                      <select value={difficulty} onChange={e=>setDifficulty(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                        {["Easy","Moderate","Challenging","Mixed"].map(d=><option key={d}>{d}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Question Types</label>
+                      <div className="flex flex-wrap gap-1">
+                        {["MCQ","Short Answer","Long Answer","True/False","Fill-in-Blank","Case-Based"].map(qt=>(
+                          <button key={qt} onClick={()=>setQTypes(prev=>prev.includes(qt)?prev.filter(x=>x!==qt):[...prev,qt])}
+                            className={`px-2 py-0.5 rounded text-xs border ${qTypes.includes(qt)?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>
+                            {qt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Exam Date (optional)</label>
-            <input type="date" value={examDate} onChange={e => setExamDate(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Grade (auto)</label>
-            <input value={grade} disabled className="border border-gray-200 rounded px-2 py-1.5 text-sm w-full bg-gray-50 text-gray-400" />
-          </div>
-        </div>
 
-        {/* Current subjects */}
-        {subjects.length > 0 && (
-          <div className="flex gap-2 flex-wrap">
-            {subjects.map((s, i) => (
-              <div key={i} className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5">
-                <span className="text-xs font-bold text-indigo-700">{s.subject}</span>
-                <span className="text-xs text-gray-400">Max:</span>
-                <input type="number" value={s.max_marks}
-                  onChange={e => setSubjects(prev => prev.map((x, j) => j === i ? { ...x, max_marks: +e.target.value } : x))}
-                  className="w-16 text-xs border border-indigo-300 rounded px-1 py-0.5 text-center font-bold text-indigo-700" />
-                <button onClick={() => { setSubjects(prev => prev.filter((_, j) => j !== i)); setSaved(false); }} className="text-red-400 hover:text-red-600 text-xs font-bold">✕</button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Add subject */}
-        <div className="flex gap-2 items-end flex-wrap">
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Add Subject</label>
-            <input value={newSubject} onChange={e => setNewSubject(e.target.value)} onKeyDown={e => e.key === "Enter" && addSubject()}
-              placeholder="e.g. MATHEMATICS" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-44" />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Max Marks</label>
-            <input type="number" value={newMax} onChange={e => setNewMax(+e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-24" />
-          </div>
-          <button onClick={addSubject} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-200">+ Add</button>
-          <button onClick={saveConfig} className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">💾 Save Config</button>
-        </div>
-        {saved && <p className="text-xs text-green-600">✅ Config saved for {grade} · {effectiveExam} · {academicYear}</p>}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────
-// ALERTS TAB — PA/SA consecutive decline + Activities decline
-// ─────────────────────────────────────────────────────────────────
-function AlertsTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
-  const [pasaAlerts, setPasaAlerts] = useState<any[]>([]);
-  const [actAlerts, setActAlerts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Get teacher's grades to filter alerts to only their sections
-  const myGrades = [...new Set((mappings?.mappings || []).map((m: any) => m.grade))] as string[];
-  const mySections = [...new Set((mappings?.mappings || []).map((m: any) => m.section))] as string[];
-
-  useEffect(() => { fetchAlerts(); }, [academicYear]);
-
-  const fetchAlerts = async () => {
-    setLoading(true);
-    try {
-      const [pa, ac] = await Promise.all([
-        axios.get(`${API}/pasa/alerts/decline?academic_year=${academicYear}`),
-        axios.get(`${API}/activities/alerts/decline?academic_year=${academicYear}`),
-      ]);
-      // Filter to teacher's own sections
-      const filterMine = (arr: any[]) => myGrades.length
-        ? arr.filter((a: any) => myGrades.includes(a.grade) && mySections.includes(a.section))
-        : arr;
-      setPasaAlerts(filterMine(pa.data || []));
-      setActAlerts(filterMine(ac.data || []));
-    } catch { }
-    setLoading(false);
-  };
-
-  if (loading) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Loading alerts...</div>;
-
-  const total = pasaAlerts.length + actAlerts.length;
-
-  return (
-    <div className="space-y-4 max-w-3xl">
-      <div className={`rounded-xl p-4 border ${total > 0 ? "bg-red-50 border-red-300" : "bg-green-50 border-green-300"}`}>
-        <h3 className={`text-sm font-bold ${total > 0 ? "text-red-800" : "text-green-800"}`}>
-          {total > 0 ? `⚠️ ${total} student(s) need attention across your sections` : "✅ No consecutive decline alerts in your sections"}
-        </h3>
-        <p className="text-xs mt-0.5 text-gray-500">Students with 3+ consecutive declining scores in PA/SA exams or Activities</p>
-      </div>
-
-      {/* PA/SA Decline */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-          📊 PA/SA Consecutive Decline
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pasaAlerts.length > 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>{pasaAlerts.length}</span>
-        </h3>
-        {pasaAlerts.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">No PA/SA consecutive declines in your sections.</p>
-        ) : (
-          <div className="space-y-2">
-            {pasaAlerts.map((s: any, i: number) => (
-              <div key={i} className="flex items-center justify-between px-4 py-3 bg-red-50 rounded-lg border border-red-100">
+          {mode === "custom" && (
+            <div className="bg-white rounded-xl shadow p-4 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <p className="text-sm font-bold text-gray-800">{s.student_name}</p>
-                  <p className="text-xs text-gray-500">{s.grade} · {s.section}</p>
-                  <p className="text-xs text-red-600 mt-0.5">{s.scores?.map((sc: any) => `${sc.exam}: ${sc.percentage?.toFixed(1) ?? sc.grand_percentage?.toFixed(1) ?? "—"}%`).join(" → ")}</p>
+                  <label className="text-xs text-gray-500 block mb-1">Subject</label>
+                  <select value={custSubj} onChange={e=>{setCustSubj(e.target.value);setCustDomain(e.target.value==="literacy"?"Listening":"Operations");}} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                    <option value="literacy">📖 Literacy</option>
+                    <option value="numeracy">🔢 Numeracy</option>
+                  </select>
                 </div>
-                <div className="text-right">
-                  <span className="text-sm font-bold text-red-600">▼ {s.drop?.toFixed(1)}%</span>
-                  <p className="text-xs text-gray-400">drop</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Activities Decline */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-          🎯 Activities Consecutive Decline
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${actAlerts.length > 0 ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>{actAlerts.length}</span>
-        </h3>
-        {actAlerts.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">No activity consecutive declines in your sections.</p>
-        ) : (
-          <div className="space-y-2">
-            {actAlerts.map((s: any, i: number) => (
-              <div key={i} className="flex items-center justify-between px-4 py-3 bg-orange-50 rounded-lg border border-orange-100">
                 <div>
-                  <p className="text-sm font-bold text-gray-800">{s.student_name}</p>
-                  <p className="text-xs text-gray-500">{s.grade} · {s.section}</p>
-                  <p className="text-xs text-orange-600 mt-0.5">{s.scores?.map((sc: any) => `${sc.name}: ${sc.avg?.toFixed(2)}`).join(" → ")}</p>
+                  <label className="text-xs text-gray-500 block mb-1">Domain</label>
+                  <select value={custDomain} onChange={e=>setCustDomain(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                    {custDomains.map(d=><option key={d}>{d}</option>)}
+                  </select>
                 </div>
-                <div className="text-right">
-                  <span className="text-sm font-bold text-orange-600">▼ {s.drop?.toFixed(2)}</span>
-                  <p className="text-xs text-gray-400">score drop</p>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">No. of Questions</label>
+                  <select value={numQ} onChange={e=>setNumQ(+e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                    {[5,10,15,20].map(n=><option key={n}>{n}</option>)}
+                  </select>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+
+              {loadingComps ? (
+                <div className="text-xs text-gray-400">Loading competencies...</div>
+              ) : custComps.length > 0 ? (
+                <div className="bg-indigo-50 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-indigo-800 mb-2">{custComps.length} competencies found</p>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {custComps.map((c:any,i:number)=>(
+                      <div key={i} className="flex gap-2 text-xs">
+                        <span className="font-mono text-indigo-600 font-bold shrink-0">[{c.competency_code}]</span>
+                        <span className="text-gray-600 truncate">{c.description||c.desc}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-gray-400 bg-gray-50 rounded p-3">No competencies found for this selection. Questions will be general.</div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Difficulty</label>
+                  <select value={difficulty} onChange={e=>setDifficulty(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                    {["Easy","Moderate","Challenging","Mixed"].map(d=><option key={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Question Types</label>
+                  <div className="flex flex-wrap gap-1">
+                    {["MCQ","Short Answer","Case-Based"].map(qt=>(
+                      <button key={qt} onClick={()=>setQTypes(prev=>prev.includes(qt)?prev.filter(x=>x!==qt):[...prev,qt])}
+                        className={`px-2 py-0.5 rounded text-xs border ${qTypes.includes(qt)?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>
+                        {qt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {msg && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{msg}</p>}
+
+          <button onClick={generate} disabled={generating||!GROQ_KEY2}
+            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-bold rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50">
+            {generating ? "⏳ Generating..." : `🎯 Generate ${ppMode==="practice"?"Practice":"Assessment"} Paper (${numQ} questions)`}
+          </button>
+          {!GROQ_KEY2 && <p className="text-xs text-amber-600 text-center">⚠️ VITE_GROQ_API_KEY not set in .env</p>}
+
+          {output && (
+            <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-bold text-gray-800">Generated Paper</h4>
+                <button onClick={()=>{const b=new Blob([output],{type:"text/plain"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=`Paper_${user?.name?.replace(/\s+/g,"_")}_${new Date().toISOString().split("T")[0]}.txt`;a.click();URL.revokeObjectURL(u);}}
+                  className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700">
+                  📥 Download .txt
+                </button>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-800 whitespace-pre-wrap font-mono leading-relaxed max-h-[600px] overflow-y-auto border border-gray-200">
+                {output}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -2111,45 +3801,151 @@ function AlertsTab({ user, mappings, academicYear }: any) {
 // ─────────────────────────────────────────────────────────────────
 // PROMOTION TAB — class teacher only
 // ─────────────────────────────────────────────────────────────────
+function AlertsTab({ user, mappings, academicYear }: any) {
+  const API = "http://localhost:3000";
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const myGrades = (mappings?.mappings || []).map((m: any) => m.grade).filter(Boolean);
+  const uniqueGrades = [...new Set(myGrades)] as string[];
+
+  useEffect(() => { fetchAlerts(); }, [academicYear]);
+
+  const fetchAlerts = async () => {
+    setLoading(true);
+    try {
+      const r = await axios.get(`${API}/activities/alerts/decline?academic_year=${academicYear}`);
+      const all = r.data || [];
+      // Filter to teacher's grades only
+      const teacherGrades = (user?.assigned_classes || []).map((g: string) => g.toLowerCase());
+      const filtered = teacherGrades.length
+        ? all.filter((a: any) => teacherGrades.includes((a.grade || "").toLowerCase()))
+        : all;
+      setAlerts(filtered);
+    } catch { setAlerts([]); }
+    setLoading(false);
+  };
+
+  const scoreBg = (v: number) => v >= 3.5 ? "bg-green-100 text-green-800" : v >= 2.5 ? "bg-blue-100 text-blue-800" : v >= 1.5 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800";
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+        <h3 className="text-sm font-bold text-yellow-800 mb-1">⚠️ Consecutive Decline Alert</h3>
+        <p className="text-xs text-yellow-600">Students in your sections whose competency average dropped in 3 consecutive activities.</p>
+      </div>
+      <div className="bg-white rounded-xl shadow p-4">
+        {loading ? (
+          <p className="text-sm text-gray-400 text-center py-4">Loading...</p>
+        ) : alerts.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">No students with consecutive declines in your sections. 🎉</p>
+        ) : (
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Students with Consecutive Decline ({alerts.length})</h3>
+            {alerts.map((s: any, i: number) => (
+              <div key={i} className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <span className="text-sm font-bold text-red-800">{s.student_name}</span>
+                    <span className="text-xs text-gray-500 ml-2">{s.grade} — {s.section}</span>
+                  </div>
+                  <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+                    Drop: {s.decline_from} → {s.decline_to} (-{s.drop})
+                  </span>
+                </div>
+                <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
+                  {(s.scores || []).map((sc: any, j: number) => (
+                    <div key={j} className={`text-center rounded px-2 py-1 text-xs border ${scoreBg(sc.avg)}`}>
+                      <p className="font-bold">{sc.avg?.toFixed(2)}/4</p>
+                      <p className="text-gray-500 text-xs truncate max-w-[80px]">{sc.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PromotionTab({ user, mappings }: any) {
   const API = "http://localhost:3000";
   const GRADE_ORDER = ["Pre-KG","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
   const ALL_SECTIONS = ["Duke","Popeye","Daisy","Lotus","Orchid","Tulip","Eagle","Robin","Skylark","Asteroid","Comet","Galaxy","Apus","Pavo","Volans","Edison","Einstein","Kalam","Raman","Diamond","Emerald","Ruby","Ganga","Godavari","Kaveri","Sathya","Shanthi","Vedha","Jupiter","Mars","Mercury","Venus","Centaurus","Orion","Pegasus","Himalaya","Meru","Vindhya","Bendre","Karanth","Kuvempu"];
 
-  const classGrade = mappings?.class_grade || "";
-  const classSection = mappings?.class_section || "";
+  // Derive class teacher info from mappings OR directly from user.class_teacher_of
+  const rawCTO = (mappings?.class_teacher_of || user?.class_teacher_of || "").trim();
+  const ctoParts = rawCTO.split(' ').filter(Boolean);
+  const rawGrade = mappings?.class_grade || (ctoParts.length >= 3 ? ctoParts.slice(0,-1).join(' ') : ctoParts.length === 2 ? ctoParts[0] : "");
+  const rawSection = mappings?.class_section || (ctoParts.length >= 2 ? ctoParts[ctoParts.length-1] : "");
+  const classGrade = rawGrade && !/^grade\s/i.test(rawGrade) && !["Pre-KG","LKG","UKG"].includes(rawGrade) && /^\d+$/.test(rawGrade.trim()) ? `Grade ${rawGrade.trim()}` : rawGrade;
+  const classSection = rawSection;
+  const isClassTeacher = !!(classGrade && classSection);
 
   const nextGradeIdx = GRADE_ORDER.indexOf(classGrade) + 1;
   const nextGrade = nextGradeIdx < GRADE_ORDER.length ? GRADE_ORDER[nextGradeIdx] : null;
 
-  const [preview, setPreview] = useState<any>(null);
-  const [newSection, setNewSection] = useState("");
+  const [students, setStudents] = useState<any[]>([]);
+  // Per-student section selection
+  const [studentSections, setStudentSections] = useState<Record<string, string>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [defaultSection, setDefaultSection] = useState("");
   const [promoting, setPromoting] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [msg, setMsg] = useState("");
   const [step, setStep] = useState<"preview" | "confirm" | "done">("preview");
+  const [loading, setLoading] = useState(false);
 
-  const loadPreview = async () => {
+  const loadStudents = async () => {
+    setLoading(true);
     try {
-      const r = await axios.get(`${API}/students/promotion/preview?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`);
-      setPreview(r.data);
-      setSelectedIds(r.data.students.map((s: any) => s.id));
+      const r = await axios.get(`${API}/students?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`);
+      const list = (r.data?.data || r.data || []).filter((s: any) => s.is_active !== false);
+      setStudents(list);
+      setSelectedIds(list.map((s: any) => s.id));
+      // Default all students to same section
+      const initSections: Record<string,string> = {};
+      list.forEach((s: any) => { initSections[s.id] = ""; });
+      setStudentSections(initSections);
       setStep("confirm");
-    } catch { setMsg("❌ Could not load preview. Check backend."); }
+    } catch { setMsg("❌ Could not load students."); }
+    setLoading(false);
+  };
+
+  // Apply default section to all selected students
+  const applyDefaultSection = (section: string) => {
+    setDefaultSection(section);
+    const updated: Record<string,string> = { ...studentSections };
+    selectedIds.forEach(id => { updated[id] = section; });
+    setStudentSections(updated);
   };
 
   const executePromotion = async () => {
-    if (!newSection) { setMsg("❌ Please select the new section for next year."); return; }
+    const missing = selectedIds.filter(id => !studentSections[id]);
+    if (missing.length) { setMsg(`❌ Please select a section for all ${missing.length} student(s).`); return; }
     setPromoting(true);
     try {
-      const r = await axios.post(`${API}/students/promotion/execute`, {
-        grade: classGrade,
-        section: classSection,
-        new_section: newSection,
-        student_ids: selectedIds,
+      // Group students by their target section and promote each group
+      const sectionGroups: Record<string, string[]> = {};
+      selectedIds.forEach(id => {
+        const sec = studentSections[id];
+        if (!sectionGroups[sec]) sectionGroups[sec] = [];
+        sectionGroups[sec].push(id);
       });
-      setResult(r.data);
+
+      let totalPromoted = 0;
+      for (const [targetSection, ids] of Object.entries(sectionGroups)) {
+        const r = await axios.post(`${API}/students/promotion/execute`, {
+          grade: classGrade,
+          section: classSection,
+          new_section: targetSection,
+          student_ids: ids,
+        });
+        totalPromoted += r.data?.promoted || ids.length;
+      }
+      setResult({ promoted: totalPromoted });
       setStep("done");
     } catch { setMsg("❌ Promotion failed. Try again."); }
     setPromoting(false);
@@ -2159,7 +3955,7 @@ function PromotionTab({ user, mappings }: any) {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  if (!mappings?.is_class_teacher) {
+  if (!isClassTeacher) {
     return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Only class teachers can access the Promotion tab.</div>;
   }
 
@@ -2168,108 +3964,125 @@ function PromotionTab({ user, mappings }: any) {
   }
 
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-4 w-full max-w-4xl">
       <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
         <h3 className="text-sm font-bold text-indigo-800 mb-1">🎓 Student Promotion</h3>
         <p className="text-xs text-indigo-600">
           Promote students from <strong>{classGrade} · {classSection}</strong> to <strong>{nextGrade}</strong>.
-          After promotion, their grade in the system is automatically updated.
+          You can assign each student to a different section in {nextGrade}.
         </p>
       </div>
 
       {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
-      {/* Step 1 — Preview */}
+      {/* Step 1 — Load */}
       {step === "preview" && (
         <div className="bg-white rounded-xl shadow p-6 text-center">
           <p className="text-sm text-gray-600 mb-1">Your class: <strong>{classGrade} · {classSection}</strong></p>
           <p className="text-sm text-gray-600 mb-4">Will be promoted to: <strong>{nextGrade}</strong></p>
-          <button onClick={loadPreview}
-            className="px-6 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-semibold">
-            📋 Load Student List
+          <button onClick={loadStudents} disabled={loading}
+            className="px-6 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-semibold disabled:opacity-50">
+            {loading ? "Loading..." : "📋 Load Student List"}
           </button>
         </div>
       )}
 
-      {/* Step 2 — Confirm */}
-      {step === "confirm" && preview && (
+      {/* Step 2 — Confirm with per-student section */}
+      {step === "confirm" && students.length > 0 && (
         <div className="space-y-4">
+          {/* Default section apply to all */}
           <div className="bg-white rounded-xl shadow p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">
-              {preview.student_count} students in {classGrade} · {classSection}
-              <span className="ml-2 text-xs text-gray-400">({selectedIds.length} selected for promotion)</span>
-            </h3>
-            <div className="space-y-1 max-h-64 overflow-y-auto border border-gray-100 rounded-lg p-2">
-              {preview.students?.map((s: any) => (
-                <label key={s.id} className={`flex items-center gap-3 px-3 py-2 rounded cursor-pointer hover:bg-gray-50 ${selectedIds.includes(s.id) ? "bg-indigo-50" : ""}`}>
-                  <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => toggleStudent(s.id)} className="accent-indigo-600" />
-                  <span className="text-sm font-medium text-gray-800">{s.name}</span>
-                  <span className="text-xs text-gray-400 ml-auto">{s.admission_no}</span>
-                </label>
-              ))}
-            </div>
-            <div className="flex gap-2 mt-2">
-              <button onClick={() => setSelectedIds(preview.students.map((s: any) => s.id))} className="text-xs text-indigo-600 hover:underline">Select All</button>
-              <button onClick={() => setSelectedIds([])} className="text-xs text-gray-400 hover:underline">Clear All</button>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Apply same section to all students</h3>
+            <div className="flex gap-3 items-center">
+              <select value={defaultSection} onChange={e => applyDefaultSection(e.target.value)}
+                className="border border-gray-300 rounded px-3 py-2 text-sm flex-1 max-w-xs">
+                <option value="">-- Select default section for all --</option>
+                {ALL_SECTIONS.map(s => <option key={s} value={s}>{nextGrade} · {s}</option>)}
+              </select>
+              <span className="text-xs text-gray-400">Or assign individually per student below</span>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow p-4">
-            <label className="text-sm font-semibold text-gray-700 block mb-2">
-              New Section for {nextGrade} <span className="text-red-500">*</span>
-            </label>
-            <p className="text-xs text-gray-400 mb-3">Select which section these students will be assigned to in {nextGrade}. This can be different from their current section.</p>
-            <select value={newSection} onChange={e => setNewSection(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2 text-sm w-full max-w-xs">
-              <option value="">-- Select new section --</option>
-              {ALL_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+          {/* Student list with individual section selection */}
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-700">
+                {students.length} students in {classGrade} · {classSection}
+                <span className="ml-2 text-xs text-gray-400">({selectedIds.length} selected)</span>
+              </h3>
+              <div className="flex gap-2">
+                <button onClick={() => setSelectedIds(students.map(s => s.id))} className="text-xs text-indigo-600 hover:underline">Select All</button>
+                <button onClick={() => setSelectedIds([])} className="text-xs text-gray-400 hover:underline">Clear All</button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-indigo-700 text-white text-xs">
+                    <th className="px-3 py-2 w-8"></th>
+                    <th className="px-3 py-2 text-left">Student Name</th>
+                    <th className="px-3 py-2 text-left">Admission No</th>
+                    <th className="px-3 py-2 text-left min-w-[200px]">New Section in {nextGrade} *</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((s: any, i: number) => (
+                    <tr key={s.id} className={`${i % 2 === 0 ? "bg-white" : "bg-gray-50"} ${!selectedIds.includes(s.id) ? "opacity-40" : ""}`}>
+                      <td className="px-3 py-2 text-center">
+                        <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => toggleStudent(s.id)} className="accent-indigo-600" />
+                      </td>
+                      <td className="px-3 py-2 font-medium text-gray-800">{s.name}</td>
+                      <td className="px-3 py-2 text-gray-400 text-xs">{s.admission_no || "—"}</td>
+                      <td className="px-3 py-2">
+                        <select
+                          value={studentSections[s.id] || ""}
+                          onChange={e => setStudentSections(prev => ({ ...prev, [s.id]: e.target.value }))}
+                          disabled={!selectedIds.includes(s.id)}
+                          className={`border rounded px-2 py-1 text-xs w-full ${!studentSections[s.id] && selectedIds.includes(s.id) ? "border-red-300 bg-red-50" : "border-gray-300"}`}>
+                          <option value="">-- Select section --</option>
+                          {ALL_SECTIONS.map(sec => <option key={sec} value={sec}>{sec}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
             <p className="text-sm font-bold text-yellow-800 mb-1">⚠️ Important</p>
             <ul className="text-xs text-yellow-700 space-y-1 list-disc ml-4">
-              <li>This will update the grade and section for {selectedIds.length} student(s) in the database immediately.</li>
-              <li>All their historical PA/SA marks, activities, and competency scores are preserved.</li>
-              <li>Students not selected will remain in {classGrade} · {classSection}.</li>
-              <li>This action cannot be undone from the teacher dashboard.</li>
+              <li>Students will be moved to {nextGrade} with their selected sections immediately.</li>
+              <li>All historical PA/SA marks, activities, and competency scores are preserved.</li>
+              <li>Unselected students remain in {classGrade} · {classSection}.</li>
+              <li>This cannot be undone from the teacher dashboard.</li>
             </ul>
           </div>
 
-          <div className="flex gap-3">
-            <button onClick={executePromotion} disabled={promoting || !newSection || !selectedIds.length}
-              className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-semibold disabled:opacity-50">
-              {promoting ? "Promoting..." : `✅ Promote ${selectedIds.length} Students to ${nextGrade}`}
-            </button>
-            <button onClick={() => { setStep("preview"); setPreview(null); }}
-              className="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
-              Cancel
-            </button>
-          </div>
+          <button onClick={executePromotion} disabled={promoting || !selectedIds.length}
+            className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-semibold disabled:opacity-50">
+            {promoting ? "Promoting..." : `✅ Promote ${selectedIds.length} Students to ${nextGrade}`}
+          </button>
         </div>
       )}
 
       {/* Step 3 — Done */}
       {step === "done" && result && (
-        <div className="bg-green-50 border border-green-300 rounded-xl p-6 text-center">
-          <p className="text-2xl mb-2">🎉</p>
-          <p className="text-base font-bold text-green-800">{result.message}</p>
-          <p className="text-sm text-green-600 mt-2">
-            {result.promoted_count} student(s) moved from <strong>{result.from_grade} · {result.from_section}</strong> to <strong>{result.to_grade} · {result.to_section}</strong>
-          </p>
-          <button onClick={() => { setStep("preview"); setPreview(null); setResult(null); setNewSection(""); setSelectedIds([]); setMsg(""); }}
-            className="mt-4 px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
-            Promote Another Section
+        <div className="bg-white rounded-xl shadow p-8 text-center">
+          <div className="text-5xl mb-4">🎉</div>
+          <h3 className="text-xl font-bold text-green-700 mb-2">Promotion Complete!</h3>
+          <p className="text-gray-600">{result.promoted} students promoted to <strong>{nextGrade}</strong></p>
+          <p className="text-sm text-gray-400 mt-1">Each student assigned to their selected section.</p>
+          <button onClick={() => { setStep("preview"); setStudents([]); setResult(null); setMsg(""); }}
+            className="mt-4 px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
+            ↩ Back
           </button>
         </div>
       )}
     </div>
   );
 }
-
-// ─────────────────────────────────────────────────────────────────
-// TAB 6: AI HOMEWORK GENERATOR
-// ─────────────────────────────────────────────────────────────────
 function HomeworkTab({ user, mappings, academicYear }: any) {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [gapSource, setGapSource] = useState<"baseline" | "pasa" | "activities">("baseline");
@@ -2387,13 +4200,13 @@ Format:
   };
 
   return (
-    <div className="space-y-4 max-w-4xl">
+    <div className="space-y-4 w-full max-w-4xl">
       <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
         <h3 className="text-sm font-bold text-indigo-800 mb-1">🤖 AI-Powered Homework Generator</h3>
         <p className="text-xs text-indigo-600">Uses Groq LLaMA 3.3 to generate personalized homework based on student assessment gaps.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Configuration */}
         <div className="bg-white rounded-xl shadow p-4 space-y-3">
           <h3 className="text-sm font-semibold text-gray-700">Configuration</h3>
@@ -2484,6 +4297,660 @@ Format:
           </div>
           <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto border border-gray-200">
             {output}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// BASELINE ENTRY TAB — matches Python app structure exactly
+// Literacy: Listening, Speaking, Reading, Writing
+// Numeracy: Operations, Base 10, Measurement, Geometry
+// Unlimited rounds, stage progression, promotion at 80%
+// ─────────────────────────────────────────────────────────────────
+const LITERACY_DOMAINS = ["Listening", "Speaking", "Reading", "Writing"];
+const NUMERACY_DOMAINS = ["Operations", "Base 10", "Measurement", "Geometry"];
+const STAGES = ["foundation", "preparatory", "middle", "secondary"];
+const STAGE_LABELS: Record<string, string> = { foundation: "Foundation", preparatory: "Preparatory", middle: "Middle", secondary: "Secondary" };
+const GRADE_TO_STAGE: Record<string, string> = {
+  "Pre-KG": "foundation", "LKG": "foundation", "UKG": "foundation",
+  "Grade 1": "foundation", "Grade 2": "foundation",
+  "Grade 3": "preparatory", "Grade 4": "preparatory", "Grade 5": "preparatory",
+  "Grade 6": "middle", "Grade 7": "middle", "Grade 8": "middle",
+  "Grade 9": "secondary", "Grade 10": "secondary",
+};
+
+function getLevel(score: number) {
+  if (score >= 80) return { label: "Advanced", color: "#059669", bg: "bg-green-100 text-green-800" };
+  if (score >= 60) return { label: "Proficient", color: "#0284C7", bg: "bg-blue-100 text-blue-800" };
+  if (score >= 40) return { label: "Developing", color: "#D97706", bg: "bg-yellow-100 text-yellow-800" };
+  return { label: "Beginning", color: "#DC2626", bg: "bg-red-100 text-red-800" };
+}
+
+
+// ─────────────────────────────────────────────────────────────────
+// EXAM CONFIG TAB
+// ─────────────────────────────────────────────────────────────────
+function ExamConfigTab({ user, mappings, academicYear }: any) {
+  const API = "http://localhost:3000";
+  const EXAM_TYPES = ["PA1","PA2","SA1","PA3","PA4","SA2","Custom"];
+  const grade = mappings?.class_grade || user?.class_teacher_of?.split(' ').slice(0,-1).join(' ') || "";
+
+  const [examType, setExamType] = useState("PA1");
+  const [customExam, setCustomExam] = useState("");
+  const [subjects, setSubjects] = useState<{subject:string;max_marks:number}[]>([]);
+  const [newSubject, setNewSubject] = useState("");
+  const [newMax, setNewMax] = useState(100);
+  const [examDate, setExamDate] = useState("");
+  const [msg, setMsg] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  const effectiveExam = examType === "Custom" ? customExam : examType;
+
+  useEffect(() => { if (grade && effectiveExam) loadConfig(); }, [grade, effectiveExam, academicYear]);
+
+  const loadConfig = async () => {
+    try {
+      const r = await axios.get(`${API}/pasa/config?academic_year=${academicYear}&exam_type=${effectiveExam}&grade=${encodeURIComponent(grade)}`);
+      if (r.data?.length) {
+        setSubjects(r.data.map((c: any) => ({ subject: c.subject, max_marks: +c.max_marks })));
+        setExamDate(r.data[0]?.exam_date || "");
+      } else { setSubjects([]); }
+    } catch {}
+  };
+
+  const saveConfig = async () => {
+    if (!grade) { setMsg("❌ No class assigned."); return; }
+    if (!effectiveExam) { setMsg("❌ Enter exam name."); return; }
+    if (!subjects.length) { setMsg("❌ Add at least one subject."); return; }
+    try {
+      await axios.post(`${API}/pasa/config`, { academic_year: academicYear, exam_type: effectiveExam, grade, subjects, exam_date: examDate || undefined });
+      setMsg("✅ Config saved — visible in admin login");
+      setSaved(true);
+    } catch { setMsg("❌ Error saving"); }
+    setTimeout(() => setMsg(""), 4000);
+  };
+
+  const addSubject = () => {
+    if (!newSubject.trim()) return;
+    setSubjects(prev => [...prev, { subject: newSubject.trim().toUpperCase(), max_marks: newMax }]);
+    setNewSubject(""); setNewMax(100); setSaved(false);
+  };
+
+  const isClassTeacher = !!(mappings?.class_grade || user?.class_teacher_of);
+  if (!isClassTeacher) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Only class teachers can configure exams.</div>;
+
+  return (
+    <div className="space-y-4 w-full max-w-2xl">
+      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+        <h3 className="text-sm font-bold text-indigo-800">⚙️ Exam Configuration — {grade}</h3>
+        <p className="text-xs text-indigo-600 mt-0.5">Configure subjects and max marks. Changes reflect in admin login.</p>
+      </div>
+      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+      <div className="bg-white rounded-xl shadow p-4 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Exam Type</label>
+            <select value={examType} onChange={e => { setExamType(e.target.value); setSaved(false); }} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+              {EXAM_TYPES.map(e => <option key={e} value={e}>{e}</option>)}
+            </select>
+          </div>
+          {examType === "Custom" && (
+            <div><label className="text-xs text-gray-500 block mb-1">Custom Name</label>
+              <input value={customExam} onChange={e => setCustomExam(e.target.value)} placeholder="e.g. Unit Test 1" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
+          )}
+          <div><label className="text-xs text-gray-500 block mb-1">Exam Date</label>
+            <input type="date" value={examDate} onChange={e => setExamDate(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
+        </div>
+        {subjects.length > 0 && (
+          <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
+            {subjects.map((s, i) => (
+              <div key={i} className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5">
+                <span className="text-xs font-bold text-indigo-700">{s.subject}</span>
+                <span className="text-xs text-gray-400">Max:</span>
+                <input type="number" value={s.max_marks}
+                  onChange={e => setSubjects(prev => prev.map((x, j) => j === i ? { ...x, max_marks: +e.target.value } : x))}
+                  className="w-16 text-xs border border-indigo-300 rounded px-1 py-0.5 text-center font-bold text-indigo-700" />
+                <button onClick={() => setSubjects(prev => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-xs font-bold">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2 items-end flex-wrap">
+          <div><label className="text-xs text-gray-500 block mb-1">Add Subject</label>
+            <input value={newSubject} onChange={e => setNewSubject(e.target.value)} onKeyDown={e => e.key === "Enter" && addSubject()} placeholder="e.g. MATHEMATICS" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-44" /></div>
+          <div><label className="text-xs text-gray-500 block mb-1">Max Marks</label>
+            <input type="number" value={newMax} onChange={e => setNewMax(+e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-24" /></div>
+          <button onClick={addSubject} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-200">+ Add</button>
+          <button onClick={saveConfig} className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">💾 Save Config</button>
+        </div>
+        {saved && <p className="text-xs text-green-600">✅ Saved for {grade} · {effectiveExam} · {academicYear}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// BASELINE ENTRY TAB
+// ─────────────────────────────────────────────────────────────────
+function BaselineDashTab({ user, mappings, academicYear }: any) {
+  const API = "http://localhost:3000";
+  const ROUNDS = [
+    { value: "baseline_1", label: "Round 1" },
+    { value: "baseline_2", label: "Round 2" },
+    { value: "baseline_3", label: "Round 3" },
+  ];
+
+  const rawCTO = (mappings?.class_teacher_of || user?.class_teacher_of || "").trim();
+  const ctoParts = rawCTO.split(' ').filter(Boolean);
+  const classGrade = mappings?.class_grade || (ctoParts.length >= 3 ? ctoParts.slice(0,-1).join(' ') : ctoParts.length === 2 ? ctoParts[0] : "");
+  const classSection = mappings?.class_section || (ctoParts.length >= 2 ? ctoParts[ctoParts.length-1] : "");
+  const myGrades = [...new Set((mappings?.mappings || []).map((m: any) => m.grade).filter(Boolean))] as string[];
+
+  const [dashTab, setDashTab] = useState<"section"|"grade"|"alerts">("section");
+  const [round, setRound] = useState("baseline_1");
+  const [sectionDash, setSectionDash] = useState<any>(null);
+  const [gradeDash, setGradeDash] = useState<any>(null);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const scoreBg = (v: number) => v >= 80 ? "bg-green-100 text-green-800" : v >= 60 ? "bg-blue-100 text-blue-800" : v >= 40 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800";
+
+  useEffect(() => {
+    if (dashTab === "section" && classGrade && classSection) fetchSectionDash();
+    if (dashTab === "grade" && classGrade) fetchGradeDash();
+    if (dashTab === "alerts") fetchAlerts();
+  }, [dashTab, round, classGrade, classSection, academicYear]);
+
+  const fetchSectionDash = async () => {
+    setLoading(true);
+    try {
+      const r = await axios.get(`${API}/baseline/section/rounds?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}&academic_year=${academicYear}`);
+      setSectionDash(r.data);
+    } catch { setSectionDash(null); }
+    setLoading(false);
+  };
+
+  const fetchGradeDash = async () => {
+    setLoading(true);
+    try {
+      const r = await axios.get(`${API}/baseline/dashboard/grade/${encodeURIComponent(classGrade)}?academic_year=${academicYear}&round=${round}`);
+      setGradeDash(r.data);
+    } catch { setGradeDash(null); }
+    setLoading(false);
+  };
+
+  const fetchAlerts = async () => {
+    setLoading(true);
+    try {
+      const r = await axios.get(`${API}/baseline/alerts/students?academic_year=${academicYear}`);
+      const all = r.data || [];
+      const myGradesLower = myGrades.map(g => g.toLowerCase());
+      const filtered = myGrades.length
+        ? all.filter((a: any) => myGradesLower.includes((a.grade||"").toLowerCase()))
+        : all;
+      setAlerts(filtered);
+    } catch { setAlerts([]); }
+    setLoading(false);
+  };
+
+  const DASH_TABS = [
+    { id: "section", label: "🏫 My Section" },
+    { id: "grade",   label: "📊 My Grade" },
+    { id: "alerts",  label: "⚠️ Alerts" },
+  ];
+
+  // Compute section stats from rounds data
+  const computeSectionStats = () => {
+    if (!sectionDash?.students?.length) return null;
+    const students = sectionDash.students;
+    // Get latest round data
+    const latestRound = sectionDash.rounds?.[sectionDash.rounds.length - 1];
+    if (!latestRound) return null;
+
+    const calcAvg = (marks: Record<string,number>) => {
+      const v = Object.entries(marks).filter(([k,x]) => k !== 'avg' && x > 0).map(([,x]) => x);
+      return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0;
+    };
+    const getLvl = (s: number) => s >= 80 ? "L4" : s >= 60 ? "L3" : s >= 40 ? "L2" : "L1";
+
+    const studentStats = students.map((s: any) => {
+      const rnd = s.rounds?.find((r: any) => r.round === latestRound);
+      if (!rnd?.exists) return null;
+      const lit = calcAvg(rnd.literacy || {});
+      const num = calcAvg(rnd.numeracy || {});
+      const overall = (lit + num) / 2;
+      return { name: s.student_name, lit, num, overall, level: getLvl(overall) };
+    }).filter(Boolean);
+
+    if (!studentStats.length) return null;
+    const litAvg = studentStats.reduce((a: number, s: any) => a + s.lit, 0) / studentStats.length;
+    const numAvg = studentStats.reduce((a: number, s: any) => a + s.num, 0) / studentStats.length;
+    const overallAvg = studentStats.reduce((a: number, s: any) => a + s.overall, 0) / studentStats.length;
+    const levelDist = { L4: 0, L3: 0, L2: 0, L1: 0 } as Record<string,number>;
+    studentStats.forEach((s: any) => levelDist[s.level] = (levelDist[s.level] || 0) + 1);
+    return { studentStats, litAvg, numAvg, overallAvg, levelDist, total: studentStats.length };
+  };
+
+  const stats = dashTab === "section" ? computeSectionStats() : null;
+
+  return (
+    <div className="space-y-4">
+      {/* Controls */}
+      <div className="bg-white rounded-xl shadow p-4 flex gap-4 items-end flex-wrap">
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Round</label>
+          <select value={round} onChange={e => setRound(e.target.value)} className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+            {ROUNDS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+        </div>
+        <div className="text-xs text-gray-500">
+          Class: <span className="font-bold text-indigo-700">{classGrade} · {classSection}</span>
+        </div>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex gap-2">
+        {DASH_TABS.map(t => (
+          <button key={t.id} onClick={() => setDashTab(t.id as any)}
+            className={`px-4 py-2 text-sm rounded-lg font-medium border ${dashTab === t.id ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading && <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Loading...</div>}
+
+      {/* ── MY SECTION ── */}
+      {!loading && dashTab === "section" && (
+        <div className="space-y-4">
+          {stats ? (
+            <>
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Students Assessed", value: stats.total, color: "border-indigo-500" },
+                  { label: "Literacy Avg", value: `${stats.litAvg.toFixed(1)}%`, color: "border-blue-500" },
+                  { label: "Numeracy Avg", value: `${stats.numAvg.toFixed(1)}%`, color: "border-purple-500" },
+                  { label: "Overall Avg", value: `${stats.overallAvg.toFixed(1)}%`, color: "border-green-500" },
+                ].map(s => (
+                  <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
+                    <p className="text-xs text-gray-500">{s.label}</p>
+                    <p className="text-2xl font-bold text-gray-800">{s.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Level Distribution */}
+              <div className="bg-white rounded-xl shadow p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Level Distribution — {classGrade} · {classSection}</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { key: "L4", label: "Level 4 – Exceeding", color: "#10b981", bg: "bg-green-50 border-green-200" },
+                    { key: "L3", label: "Level 3 – Meeting",   color: "#6366f1", bg: "bg-blue-50 border-blue-200" },
+                    { key: "L2", label: "Level 2 – Approaching", color: "#f59e0b", bg: "bg-yellow-50 border-yellow-200" },
+                    { key: "L1", label: "Level 1 – Beginning", color: "#ef4444", bg: "bg-red-50 border-red-200" },
+                  ].map(l => (
+                    <div key={l.key} className={`rounded-xl p-4 text-center border ${l.bg}`}>
+                      <p className="text-xs font-medium mb-1" style={{ color: l.color }}>{l.label}</p>
+                      <p className="text-3xl font-bold text-gray-800">{stats.levelDist[l.key] || 0}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {stats.total > 0 ? (((stats.levelDist[l.key]||0) / stats.total) * 100).toFixed(1) : 0}%
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Student breakdown table */}
+              <div className="bg-white rounded-xl shadow overflow-hidden">
+                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700">Student Breakdown — {classGrade} · {classSection}</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-indigo-700 text-white">
+                        <th className="px-3 py-2 text-left">Student</th>
+                        <th className="px-3 py-2 text-center">Literacy Avg</th>
+                        <th className="px-3 py-2 text-center">Numeracy Avg</th>
+                        <th className="px-3 py-2 text-center">Overall Avg</th>
+                        <th className="px-3 py-2 text-center">Level</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.studentStats
+                        .sort((a: any, b: any) => b.overall - a.overall)
+                        .map((s: any, i: number) => (
+                        <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                          <td className="px-3 py-2 font-medium text-gray-800">{s.name}</td>
+                          <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.lit)}`}>{s.lit.toFixed(1)}%</span></td>
+                          <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.num)}`}>{s.num.toFixed(1)}%</span></td>
+                          <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.overall)}`}>{s.overall.toFixed(1)}%</span></td>
+                          <td className="px-3 py-2 text-center">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.overall)}`}>{s.level}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">
+              No baseline data for {classGrade} · {classSection}. Enter baseline data first.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── MY GRADE ── */}
+      {!loading && dashTab === "grade" && (
+        <div className="space-y-4">
+          {gradeDash ? (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Assessed", value: gradeDash.totalAssessed, color: "border-indigo-500" },
+                  { label: "Literacy Avg", value: `${gradeDash.literacyAvg}%`, color: "border-blue-500" },
+                  { label: "Numeracy Avg", value: `${gradeDash.numeracyAvg}%`, color: "border-purple-500" },
+                  { label: "Overall Avg", value: `${gradeDash.overallAvg}%`, color: "border-green-500" },
+                ].map(s => (
+                  <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
+                    <p className="text-xs text-gray-500">{s.label}</p>
+                    <p className="text-2xl font-bold text-gray-800">{s.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Section comparison bar chart */}
+              <div className="bg-white rounded-xl shadow p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Section-wise Overall Average — {classGrade}</h3>
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={(gradeDash.sections || []).map((s: any) => ({ name: s.section, overall: s.overallAvg, lit: s.literacyAvg, num: s.numeracyAvg, atRisk: s.atRisk, count: s.count }))}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                    <Tooltip formatter={(v: any, _, p) => [`${v}% (${p.payload.count} students)`, p.payload.name]} />
+                    <Bar dataKey="overall" radius={[4,4,0,0]}>
+                      {(gradeDash.sections||[]).map((s: any, i: number) => (
+                        <Cell key={i} fill={s.section.toLowerCase() === classSection.toLowerCase() ? "#4f46e5" : s.overallAvg >= 60 ? "#6366f1" : s.overallAvg >= 40 ? "#f59e0b" : "#ef4444"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <p className="text-xs text-indigo-600 mt-1">Dark bar = your section ({classSection})</p>
+              </div>
+
+              {/* Section details table */}
+              <div className="bg-white rounded-xl shadow p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Section Details</h3>
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-indigo-700 text-white">
+                      <th className="px-3 py-2 text-left">Section</th>
+                      <th className="px-3 py-2 text-center">Students</th>
+                      <th className="px-3 py-2 text-center">Literacy Avg</th>
+                      <th className="px-3 py-2 text-center">Numeracy Avg</th>
+                      <th className="px-3 py-2 text-center">Overall Avg</th>
+                      <th className="px-3 py-2 text-center">At Risk</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(gradeDash.sections||[]).map((s: any, i: number) => (
+                      <tr key={s.section} className={`${i % 2 === 0 ? "bg-white" : "bg-gray-50"} ${s.section.toLowerCase() === classSection.toLowerCase() ? "ring-2 ring-indigo-400" : ""}`}>
+                        <td className="px-3 py-2 font-semibold text-gray-800">
+                          {s.section} {s.section.toLowerCase() === classSection.toLowerCase() && <span className="text-indigo-600 text-xs ml-1">(My Section)</span>}
+                        </td>
+                        <td className="px-3 py-2 text-center">{s.count}</td>
+                        <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.literacyAvg)}`}>{s.literacyAvg}%</span></td>
+                        <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.numeracyAvg)}`}>{s.numeracyAvg}%</span></td>
+                        <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.overallAvg)}`}>{s.overallAvg}%</span></td>
+                        <td className="px-3 py-2 text-center">
+                          {s.atRisk > 0 ? <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">{s.atRisk} ⚠️</span> : <span className="text-gray-400">0</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">
+              No baseline data for {classGrade}. Enter student baseline data first.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── ALERTS ── */}
+      {!loading && dashTab === "alerts" && (
+        <div className="space-y-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+            <h3 className="text-sm font-bold text-yellow-800 mb-1">⚠️ Consecutive Decline Alert</h3>
+            <p className="text-xs text-yellow-600">Students in your sections whose baseline scores declined consecutively.</p>
+          </div>
+          <div className="bg-white rounded-xl shadow p-4">
+            {alerts.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">No consecutive decline alerts in your sections. 🎉</p>
+            ) : (
+              <div className="space-y-2">
+                {alerts.map((a: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between px-4 py-3 bg-red-50 rounded-lg border border-red-100">
+                    <div>
+                      <p className="text-sm font-bold text-gray-800">{a.entity_name || a.student_name}</p>
+                      <p className="text-xs text-gray-500">{a.grade} · {a.section}</p>
+                      <p className="text-xs text-red-600 mt-0.5">
+                        {(a.scores||[]).map((s: any) => `${s.round}: ${s.overall?.toFixed(1)}%`).join(" → ")}
+                      </p>
+                    </div>
+                    <span className="text-sm font-bold text-red-600">▼ {a.drop?.toFixed(1)}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BaselineEntryTab({ user, mappings, academicYear }: any) {
+  const API = "http://localhost:3000";
+  const LITERACY_DOMAINS2 = ["Listening", "Speaking", "Reading", "Writing"];
+  const NUMERACY_DOMAINS2 = ["Operations", "Base 10", "Measurement", "Geometry"];
+  const GRADE_TO_STAGE2: Record<string, string> = {
+    "Pre-KG": "foundation", "LKG": "foundation", "UKG": "foundation",
+    "Grade 1": "foundation", "Grade 2": "foundation",
+    "Grade 3": "preparatory", "Grade 4": "preparatory", "Grade 5": "preparatory",
+    "Grade 6": "middle", "Grade 7": "middle", "Grade 8": "middle",
+    "Grade 9": "secondary", "Grade 10": "secondary",
+  };
+
+  const classGrade = mappings?.class_grade || (user?.class_teacher_of || "").trim().split(' ').slice(0,-1).join(' ');
+  const classSection = mappings?.class_section || (user?.class_teacher_of || "").trim().split(' ').pop();
+
+  const [sectionData, setSectionData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [localMarks, setLocalMarks] = useState<Record<string, any>>({});
+  const [activeRoundIdx, setActiveRoundIdx] = useState(0);
+  const [newRoundOpen, setNewRoundOpen] = useState(false);
+
+  useEffect(() => { if (classGrade && classSection) fetchRounds(); }, [classGrade, classSection, academicYear]);
+
+  const fetchRounds = async () => {
+    setLoading(true);
+    try {
+      const r = await axios.get(`${API}/baseline/section/rounds?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}&academic_year=${academicYear}`);
+      setSectionData(r.data);
+      setNewRoundOpen(!r.data?.total_rounds);
+      setActiveRoundIdx(Math.max(0, (r.data?.total_rounds || 1) - 1));
+    } catch { setSectionData(null); }
+    setLoading(false);
+  };
+
+  const stage = GRADE_TO_STAGE2[classGrade] || "middle";
+
+  const initMarks = (roundData?: any) => {
+    const m: Record<string, any> = {};
+    (sectionData?.students || []).forEach((s: any) => {
+      if (roundData) {
+        const rnd = s.rounds?.find((r: any) => r.round === roundData.round);
+        if (rnd?.exists) { m[s.student_id] = { literacy: { ...rnd.literacy }, numeracy: { ...rnd.numeracy } }; return; }
+      }
+      m[s.student_id] = { literacy: Object.fromEntries(LITERACY_DOMAINS2.map(d => [d, 0])), numeracy: Object.fromEntries(NUMERACY_DOMAINS2.map(d => [d, 0])) };
+    });
+    setLocalMarks(m);
+  };
+
+  const calcAvg = (marks: Record<string, number>) => { const vals = Object.values(marks).filter(v => v >= 0); return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0; };
+
+  const getLvl = (score: number) => score >= 80 ? { label: "Exceeding", bg: "bg-green-100 text-green-800" } : score >= 60 ? { label: "Meeting", bg: "bg-blue-100 text-blue-800" } : score >= 40 ? { label: "Approaching", bg: "bg-yellow-100 text-yellow-800" } : { label: "Beginning", bg: "bg-red-100 text-red-800" };
+
+  const saveRound = async (roundKey: string) => {
+    setSaving(true);
+    try {
+      const entries = (sectionData?.students || []).map((s: any) => ({ student_id: s.student_id, student_name: s.student_name, literacy: localMarks[s.student_id]?.literacy || {}, numeracy: localMarks[s.student_id]?.numeracy || {} }));
+      await axios.post(`${API}/baseline/section/round`, { grade: classGrade, section: classSection, academic_year: academicYear, round: roundKey, stage, entries });
+      setMsg("✅ Round saved"); fetchRounds(); setNewRoundOpen(false);
+    } catch { setMsg("❌ Error saving"); }
+    setSaving(false); setTimeout(() => setMsg(""), 3000);
+  };
+
+  if (!classGrade || !classSection) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No class assigned. Only class teachers can enter baseline data.</div>;
+  if (loading) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Loading...</div>;
+
+  const rounds = sectionData?.rounds || [];
+  const students = sectionData?.students || [];
+  const nextRound = `baseline_${(rounds.length + 1)}`;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl shadow p-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-bold text-indigo-800">{classGrade} — {classSection}</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Stage: {stage.charAt(0).toUpperCase() + stage.slice(1)} · {students.length} students · {rounds.length} round(s) completed</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => { setNewRoundOpen(true); initMarks(); }} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">+ New Round</button>
+        </div>
+      </div>
+
+      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+
+      {/* Round tabs */}
+      {rounds.length > 0 && (
+        <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
+          {rounds.map((rk: string, i: number) => (
+            <button key={rk} onClick={() => { setActiveRoundIdx(i); setNewRoundOpen(false); initMarks(sectionData?.students?.[0]?.rounds?.find((r: any) => r.round === rk)); }}
+              className={`px-4 py-2 text-sm rounded-lg font-medium border ${activeRoundIdx === i && !newRoundOpen ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300"}`}>
+              Round {i + 1}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* New round entry */}
+      {newRoundOpen && (
+        <div className="bg-white rounded-xl shadow border border-indigo-200 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 bg-indigo-50 border-b border-indigo-200">
+            <h3 className="text-sm font-bold text-indigo-800">+ Entering Round {rounds.length + 1} — {classGrade} {classSection}</h3>
+            <button onClick={() => saveRound(nextRound)} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
+              {saving ? "Saving..." : "💾 Save Round"}
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse" style={{ minWidth: `${400 + (LITERACY_DOMAINS2.length + NUMERACY_DOMAINS2.length) * 70}px` }}>
+              <thead>
+                <tr className="bg-indigo-700 text-white">
+                  <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[180px]">Student</th>
+                  {LITERACY_DOMAINS2.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[70px]">📖 {d.substring(0,5)}</th>)}
+                  <th className="px-2 py-2 text-center border-l border-indigo-500 bg-indigo-800">Lit%</th>
+                  {NUMERACY_DOMAINS2.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[70px]">🔢 {d.substring(0,5)}</th>)}
+                  <th className="px-2 py-2 text-center border-l border-indigo-500 bg-indigo-800">Num%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.map((s: any, i: number) => {
+                  const marks = localMarks[s.student_id] || { literacy: {}, numeracy: {} };
+                  const litAvg = calcAvg(marks.literacy);
+                  const numAvg = calcAvg(marks.numeracy);
+                  return (
+                    <tr key={s.student_id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                      <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
+                      {LITERACY_DOMAINS2.map(d => (
+                        <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
+                          <input type="number" min={0} max={100} value={marks.literacy[d] || 0}
+                            onChange={e => setLocalMarks(prev => ({ ...prev, [s.student_id]: { ...prev[s.student_id], literacy: { ...prev[s.student_id]?.literacy, [d]: +e.target.value } } }))}
+                            className="w-14 text-center border border-gray-200 rounded px-1 py-0.5 text-xs" />
+                        </td>
+                      ))}
+                      <td className="px-2 py-2 text-center border-l border-gray-200">
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(litAvg).bg}`}>{litAvg.toFixed(0)}%</span>
+                      </td>
+                      {NUMERACY_DOMAINS2.map(d => (
+                        <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
+                          <input type="number" min={0} max={100} value={marks.numeracy[d] || 0}
+                            onChange={e => setLocalMarks(prev => ({ ...prev, [s.student_id]: { ...prev[s.student_id], numeracy: { ...prev[s.student_id]?.numeracy, [d]: +e.target.value } } }))}
+                            className="w-14 text-center border border-gray-200 rounded px-1 py-0.5 text-xs" />
+                        </td>
+                      ))}
+                      <td className="px-2 py-2 text-center border-l border-gray-200">
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(numAvg).bg}`}>{numAvg.toFixed(0)}%</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Previous round view */}
+      {!newRoundOpen && rounds.length > 0 && (
+        <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <h3 className="text-sm font-bold text-gray-700">Round {activeRoundIdx + 1} Results</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-indigo-700 text-white">
+                  <th className="px-3 py-2 text-left">Student</th>
+                  {LITERACY_DOMAINS2.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600">{d.substring(0,5)}</th>)}
+                  <th className="px-2 py-2 text-center border-l border-indigo-500">Lit%</th>
+                  {NUMERACY_DOMAINS2.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600">{d.substring(0,5)}</th>)}
+                  <th className="px-2 py-2 text-center border-l border-indigo-500">Num%</th>
+                  <th className="px-2 py-2 text-center border-l border-indigo-500">Level</th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.map((s: any, i: number) => {
+                  const rnd = s.rounds?.find((r: any) => r.round === rounds[activeRoundIdx]);
+                  if (!rnd?.exists) return <tr key={s.student_id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}><td className="px-3 py-2 text-gray-400">{s.student_name}</td><td colSpan={10} className="px-2 py-2 text-gray-300 text-center">No data</td></tr>;
+                  const litAvg = calcAvg(rnd.literacy || {});
+                  const numAvg = calcAvg(rnd.numeracy || {});
+                  const overall = (litAvg + numAvg) / 2;
+                  return (
+                    <tr key={s.student_id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                      <td className="px-3 py-2 font-medium text-gray-800">{s.student_name}</td>
+                      {LITERACY_DOMAINS2.map(d => <td key={d} className="px-2 py-2 text-center border-l border-gray-100">{rnd.literacy?.[d] ?? "—"}</td>)}
+                      <td className="px-2 py-2 text-center border-l border-gray-200"><span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(litAvg).bg}`}>{litAvg.toFixed(0)}%</span></td>
+                      {NUMERACY_DOMAINS2.map(d => <td key={d} className="px-2 py-2 text-center border-l border-gray-100">{rnd.numeracy?.[d] ?? "—"}</td>)}
+                      <td className="px-2 py-2 text-center border-l border-gray-200"><span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(numAvg).bg}`}>{numAvg.toFixed(0)}%</span></td>
+                      <td className="px-2 py-2 text-center border-l border-gray-200"><span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{getLvl(overall).label}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

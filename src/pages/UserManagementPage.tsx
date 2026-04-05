@@ -35,56 +35,58 @@ const SUBJECTS = [
 
 // ── PRE-LOADED TEACHER DATA FROM EXCEL ────────────────────────────────────────
 const EXCEL_TEACHERS = [
-  { name: "Chandana.K", email: "chandanasindhu12@gmail.com", password: "Chandana589", subject: "English", grade: "Grade 8,9", section: "8-Orion, 8-Pegasus, 8-Centaurus, 9-Himalaya", class_teacher: "" },
-  { name: "Deepthi.R.Sahana", email: "deepthi.r.sahana0519@gmail.com", password: "Deepthi878", subject: "Mathematics", grade: "Grade 9, 10", section: "Meru, Himalaya, Vindhya, Bendre, Kuvempu, Karanth", class_teacher: "" },
-  { name: "Monisha N", email: "monishanswamy261998@gmail.com", password: "Monisha122", subject: "Mathematics", grade: "Grade 8", section: "Centaurus, Orion, Pegasus", class_teacher: "Centaurus" },
-  { name: "Bhavani B Karabassi", email: "bhavanimk59@gmail.com", password: "Bhavani451", subject: "English", grade: "Grade 4", section: "Ruby, Diamond, Emerald", class_teacher: "Ruby" },
-  { name: "Geetha H S", email: "geethamilan2018@gmail.com", password: "geetha634", subject: "Kannada", grade: "Grade 3, 4", section: "Edison, Einstein, Kalam, Raman, Ruby", class_teacher: "Grade 3 Kalam" },
-  { name: "Chandana R", email: "chandanar2392002@gmail.com", password: "chandana694", subject: "Science", grade: "Grade 5, 6", section: "Shanthi, Sathya, Vedha, Godavari", class_teacher: "Grade 6 Shanthi" },
-  { name: "Nagashree M S", email: "msnagashree925@gmail.com", password: "Nagashree664", subject: "Kannada", grade: "Grade 9, 10", section: "Vindhya, Himalaya, Meru, Bendre, Kuvempu, Karanth", class_teacher: "Grade 10 Bendre" },
-  { name: "Anna George", email: "", password: "Anna309", subject: "English", grade: "Grade 7", section: "Mercury, Mars, Jupiter, Venus", class_teacher: "Grade 1" },
+  { name: "Chandana.K", email: "chandanasindhu12@gmail.com", password: "Chandana589", subject: "English", grade: "Grade 8, Grade 9", section: "Orion, Pegasus, Centaurus, Himalaya", class_teacher: "" },
+  { name: "Deepthi.R.Sahana", email: "deepthi.r.sahana0519@gmail.com", password: "Deepthi878", subject: "Mathematics", grade: "Grade 9, Grade 10", section: "Meru, Himalaya, Vindhya, Bendre, Kuvempu, Karanth", class_teacher: "" },
+  { name: "Monisha N", email: "monishanswamy261998@gmail.com", password: "Monisha122", subject: "Mathematics", grade: "Grade 8", section: "Centaurus, Orion, Pegasus", class_teacher: "Grade 8 Centaurus" },
+  { name: "Bhavani B Karabassi", email: "bhavanimk59@gmail.com", password: "Bhavani451", subject: "English", grade: "Grade 4", section: "Ruby, Diamond, Emerald", class_teacher: "Grade 4 Ruby" },
+  { name: "Geetha H S", email: "geethamilan2018@gmail.com", password: "geetha634", subject: "Kannada", grade: "Grade 3, Grade 4", section: "Edison, Einstein, Kalam, Raman, Ruby", class_teacher: "Grade 3 Kalam" },
+  { name: "Chandana R", email: "chandanar2392002@gmail.com", password: "chandana694", subject: "Science", grade: "Grade 5, Grade 6", section: "Shanthi, Sathya, Vedha, Godavari", class_teacher: "Grade 6 Shanthi" },
+  { name: "Nagashree M S", email: "msnagashree925@gmail.com", password: "Nagashree664", subject: "Kannada", grade: "Grade 9, Grade 10", section: "Vindhya, Himalaya, Meru, Bendre, Kuvempu, Karanth", class_teacher: "Grade 10 Bendre" },
+  { name: "Anna George", email: "", password: "Anna309", subject: "English", grade: "Grade 7", section: "Mercury, Mars, Jupiter, Venus", class_teacher: "" },
   { name: "Manjula S", email: "manjulagirish434@gmail.com", password: "Manjula990", subject: "Mother Teacher", grade: "Grade 1", section: "Asteroid", class_teacher: "" },
-  { name: "Chandana Rao", email: "raochandana16@gmail.com", password: "Chandana527", subject: "Social", grade: "Grade 7, 8", section: "Mercury, Jupiter, Pegasus, Centaurus", class_teacher: "Grade 7 Mercury" },
-  { name: "Trupti Naik", email: "truptinaik1018@gmail.com", password: "Trupti598", subject: "Hindi", grade: "Grade 1, 2", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo", class_teacher: "" },
-  { name: "Harshitha N M", email: "harshiharshinm@gmail.com", password: "Harshitha981", subject: "Science", grade: "Grade 4, 5", section: "Emerald, Diamond, Ganga, Kaveri", class_teacher: "Grade 4 Emerald" },
-  { name: "Akallya VS", email: "vsakallya7@gmail.com", password: "Akallya469", subject: "Physics", grade: "Grade 8, 9, 10", section: "Orion, Pegasus, Centaurus, Himalaya, Vindhya, Meru", class_teacher: "Grade 9 Himalaya" },
+  { name: "Chandana Rao", email: "raochandana16@gmail.com", password: "Chandana527", subject: "Social", grade: "Grade 7, Grade 8", section: "Mercury, Jupiter, Pegasus, Centaurus", class_teacher: "Grade 7 Mercury" },
+  { name: "Trupti Naik", email: "truptinaik1018@gmail.com", password: "Trupti598", subject: "Hindi", grade: "Grade 1, Grade 2", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo", class_teacher: "" },
+  { name: "Harshitha N M", email: "harshiharshinm@gmail.com", password: "Harshitha981", subject: "Science", grade: "Grade 4, Grade 5", section: "Emerald, Diamond, Ganga, Kaveri", class_teacher: "Grade 4 Emerald" },
+  { name: "Akallya VS", email: "vsakallya7@gmail.com", password: "Akallya469", subject: "Science", grade: "Grade 8, Grade 9, Grade 10", section: "Orion, Pegasus, Centaurus, Himalaya, Vindhya, Meru, Bendre, Karanth, Kuvempu", class_teacher: "Grade 9 Himalaya" },
   { name: "Jayashree", email: "jayaprajwal4422@gmail.com", password: "Jayashree250", subject: "Mother Teacher", grade: "LKG", section: "Tulip", class_teacher: "LKG Tulip" },
   { name: "Priyanka K M", email: "priyankapriya0809@gmail.com", password: "Priyanka785", subject: "Mathematics", grade: "Grade 5", section: "Kaveri, Ganga, Godavari", class_teacher: "Grade 5 Kaveri" },
   { name: "Poornima N", email: "poornimasiri12@gmail.com", password: "Poornima763", subject: "Science", grade: "Grade 7", section: "Mercury, Mars, Venus, Jupiter", class_teacher: "Grade 7 Jupiter" },
   { name: "Nithyashree P", email: "nithyabharath23@gmail.com", password: "Nithyashree100", subject: "Mother Teacher", grade: "Grade 2", section: "Pavo", class_teacher: "Grade 2 Pavo" },
-  { name: "Ranjitha S Naveen", email: "nvnr14@gmail.com", password: "Ranjitha690", subject: "Science (Biology)", grade: "Grade 9, 10", section: "Meru, Vindhya, Himalaya, Kuvempu, Bendre, Karanth", class_teacher: "Grade 10 Karanth" },
-  { name: "Nagendra G P", email: "nagendragp777@gmail.com", password: "Nagendra131", subject: "Mathematics", grade: "Grade 9, 10", section: "Meru, Himalaya, Vindhya, Kuvempu, Bendre, Karanth", class_teacher: "Grade 10 Kuvempu" },
+  { name: "Ranjitha S Naveen", email: "nvnr14@gmail.com", password: "Ranjitha690", subject: "Science (Biology)", grade: "Grade 9, Grade 10", section: "Meru, Vindhya, Himalaya, Kuvempu, Bendre, Karanth", class_teacher: "Grade 10 Karanth" },
+  { name: "Nagendra G P", email: "nagendragp777@gmail.com", password: "Nagendra131", subject: "Mathematics", grade: "Grade 9, Grade 10", section: "Meru, Himalaya, Vindhya, Kuvempu, Bendre, Karanth", class_teacher: "Grade 10 Kuvempu" },
   { name: "Anitha P N", email: "ANITHA.P.NAYAK.14@gmail.com", password: "Anitha659", subject: "Mother Teacher", grade: "Grade 2", section: "Apus", class_teacher: "Grade 2 Apus" },
-  { name: "Gracy V", email: "gracegrace58897@gmail.com", password: "Gracy473", subject: "Social Science", grade: "Grade 8, 9", section: "Orion, Meru, Himalaya, Vindhya", class_teacher: "Grade 8 Orion" },
-  { name: "Bhavya B M", email: "bhavyamunirajubm@gmail.com", password: "Bhavya839", subject: "English, Social Science", grade: "Grade 4, 5", section: "Kaveri, Godavari, Ganga, Ruby", class_teacher: "G5 Kaveri" },
-  { name: "Jyothilakshmi S", email: "jyothilakshminagendra@gmail.com", password: "Jyothilakshmi772", subject: "Kannada", grade: "Grade 4, 5, 6", section: "Diamond, Emerald, Kaveri, Godavari, Ganga, Vedha", class_teacher: "" },
-  { name: "Sunita Koushik", email: "kaushiksunita1988@gmail.com", password: "sunita483", subject: "Hindi", grade: "Grade 5, 6", section: "Ganga, Kaveri, Godavari, Sathya, Vedha, Shanthi", class_teacher: "" },
-  { name: "Mamatha A M", email: "mmamatha383@gmail.com", password: "Mamatha623", subject: "Hindi", grade: "Grade 7, 8", section: "Mercury, Venus, Mars, Jupiter, Pegasus, Centaurus, Orion", class_teacher: "" },
-  { name: "Lalitha H N", email: "saralavathilalitha@gmail.com", password: "Lalitha406", subject: "Hindi", grade: "Grade 3, 4", section: "Kalam, Edison, Einstein, Raman, Emerald, Ruby, Diamond", class_teacher: "" },
+  { name: "Gracy V", email: "gracegrace58897@gmail.com", password: "Gracy473", subject: "Social Science", grade: "Grade 8, Grade 9", section: "Orion, Meru, Himalaya, Vindhya", class_teacher: "Grade 8 Orion" },
+  { name: "Bhavya B M", email: "bhavyamunirajubm@gmail.com", password: "Bhavya839", subject: "English", grade: "Grade 4, Grade 5", section: "Kaveri, Godavari, Ganga, Ruby", class_teacher: "Grade 5 Kaveri" },
+  { name: "Jyothilakshmi S", email: "jyothilakshminagendra@gmail.com", password: "Jyothilakshmi772", subject: "Kannada", grade: "Grade 4, Grade 5, Grade 6", section: "Diamond, Emerald, Kaveri, Godavari, Ganga, Vedha", class_teacher: "" },
+  { name: "Sunita Koushik", email: "kaushiksunita1988@gmail.com", password: "sunita483", subject: "Hindi", grade: "Grade 5, Grade 6", section: "Ganga, Kaveri, Godavari, Sathya, Vedha, Shanthi", class_teacher: "" },
+  { name: "Mamatha A M", email: "mmamatha383@gmail.com", password: "Mamatha623", subject: "Hindi", grade: "Grade 7, Grade 8", section: "Mercury, Venus, Mars, Jupiter, Pegasus, Centaurus, Orion", class_teacher: "" },
+  { name: "Lalitha H N", email: "saralavathilalitha@gmail.com", password: "Lalitha406", subject: "Hindi", grade: "Grade 3, Grade 4", section: "Kalam, Edison, Einstein, Raman, Emerald, Ruby, Diamond", class_teacher: "" },
   { name: "Gagana B", email: "gaganab2107@gmail.com", password: "Gagana248", subject: "English", grade: "Grade 6", section: "Sathya, Shanthi, Vedha", class_teacher: "Grade 6 Sathya" },
   { name: "Sahana Y N", email: "sahanasahanayn@gmail.com", password: "sahana427", subject: "Science", grade: "Grade 3", section: "Edison, Einstein, Kalam, Raman", class_teacher: "Grade 3 Einstein" },
   { name: "Vidya G S", email: "vidyashreebabu28@gmail.com", password: "Vidya841", subject: "English", grade: "Grade 3", section: "Edison, Einstein, Kalam, Raman", class_teacher: "Grade 3 Edison" },
-  { name: "Jyothi S", email: "jyothisjyo01@gmail.com", password: "Jyothi560", subject: "Social", grade: "Grade 4, 5", section: "Ganga, Godavari, Emerald, Diamond", class_teacher: "Grade 5 Ganga" },
-  { name: "Ashwini K N", email: "knashwini248@gmail.com", password: "Ashwini637", subject: "Music", grade: "Grade 1 to 8", section: "All", class_teacher: "" },
-  { name: "Lakshmi L", email: "shashilakshmi88@gmail.com", password: "Lakshmi507", subject: "Social Science", grade: "Grade 6, 7", section: "Sathya, Shanthi, Venus, Mars", class_teacher: "Grade 7 Mars" },
-  { name: "Hema S", email: "hemasuresh3355@gmail.com", password: "Hema521", subject: "Mother Teacher", grade: "Grade 1", section: "Galaxy", class_teacher: "Grade 1" },
-  { name: "Geetha Chandru H S", email: "geethachandu218@gmail.com", password: "Geetha124", subject: "Mother Teacher", grade: "Grade 1", section: "Comet", class_teacher: "Grade 1" },
-  { name: "Hepsiba", email: "kesiahepsir@gmail.com", password: "hepsiba305", subject: "Mathematics", grade: "Grade 4", section: "Diamond, Emerald, Ruby", class_teacher: "Diamond" },
-  { name: "Shruti V Naik", email: "shrutivnaik1302@gmail.com", password: "Shruti777", subject: "Mother Teacher", grade: "Pre-KG", section: "Duke", class_teacher: "Pre-KG" },
-  { name: "Chaithra M", email: "chaithrayashu1@gmail.com", password: "Chaithra157", subject: "Mother Teacher", grade: "LKG", section: "Lotus", class_teacher: "LKG" },
-  { name: "Nayana S", email: "nayanasnns@gmail.com", password: "Nayana333", subject: "Mathematics, English", grade: "Grade 5, 6, 7", section: "All sections", class_teacher: "" },
-  { name: "Kavya S", email: "kavyaraju383@gmail.com", password: "Kavya950", subject: "Mother Teacher", grade: "LKG", section: "Daisy", class_teacher: "LKG" },
+  { name: "Jyothi S", email: "jyothisjyo01@gmail.com", password: "Jyothi560", subject: "Social", grade: "Grade 4, Grade 5", section: "Ganga, Godavari, Emerald, Diamond", class_teacher: "Grade 5 Ganga" },
+  { name: "Ashwini K N", email: "knashwini248@gmail.com", password: "Ashwini637", subject: "Music", grade: "Grade 1, Grade 2, Grade 3, Grade 4, Grade 5, Grade 6, Grade 7, Grade 8", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo, Edison, Einstein, Kalam, Raman, Diamond, Emerald, Ruby, Ganga, Godavari, Kaveri, Sathya, Shanthi, Vedha, Jupiter, Mars, Mercury, Venus, Centaurus, Orion, Pegasus, Himalaya, Meru, Vindhya, Bendre, Karanth, Kuvempu", class_teacher: "" },
+  { name: "Lakshmi L", email: "shashilakshmi88@gmail.com", password: "Lakshmi507", subject: "Social Science", grade: "Grade 6, Grade 7", section: "Sathya, Shanthi, Venus, Mars", class_teacher: "Grade 7 Mars" },
+  { name: "Hema S", email: "hemasuresh3355@gmail.com", password: "Hema521", subject: "Mother Teacher", grade: "Grade 1", section: "Galaxy", class_teacher: "" },
+  { name: "Geetha Chandru H S", email: "geethachandu218@gmail.com", password: "Geetha124", subject: "Mother Teacher", grade: "Grade 1", section: "Comet", class_teacher: "" },
+  { name: "Hepsiba", email: "kesiahepsir@gmail.com", password: "hepsiba305", subject: "Mathematics", grade: "Grade 4", section: "Diamond, Emerald, Ruby", class_teacher: "Grade 4 Diamond" },
+  { name: "Shruti V Naik", email: "shrutivnaik1302@gmail.com", password: "Shruti777", subject: "Mother Teacher", grade: "Pre-KG", section: "Duke", class_teacher: "Pre-KG Duke" },
+  { name: "Chaithra M", email: "chaithrayashu1@gmail.com", password: "Chaithra157", subject: "Mother Teacher", grade: "LKG", section: "Lotus", class_teacher: "LKG Lotus" },
+  { name: "Nayana S", email: "nayanasnns@gmail.com", password: "Nayana333", subject: "Mathematics", grade: "Grade 5, Grade 6, Grade 7", section: "Kaveri, Ganga, Godavari, Sathya, Shanthi, Vedha, Mercury, Mars, Venus, Jupiter", class_teacher: "" },
+  { name: "Kavya S", email: "kavyaraju383@gmail.com", password: "Kavya950", subject: "Mother Teacher", grade: "LKG", section: "Daisy", class_teacher: "LKG Daisy" },
   { name: "Aliya Tabassum", email: "aliyatabassum27@gmail.com", password: "Aliya145", subject: "Mathematics", grade: "Grade 3", section: "Raman, Edison, Einstein, Kalam", class_teacher: "Grade 3 Raman" },
-  { name: "Sulna Gopi", email: "Sulnagopi@gmail.com", password: "Sulna147", subject: "Mother Teacher", grade: "UKG", section: "Skylark", class_teacher: "UKG" },
-  { name: "Renuka", email: "renukaraghu.rrr@gmail.com", password: "Renuka695", subject: "Mother Teacher", grade: "UKG", section: "Robin", class_teacher: "UKG" },
-  { name: "Pallavi", email: "pallaviacharm91@gmail.com", password: "Pallavi844", subject: "Mother Teacher", grade: "UKG", section: "Eagle", class_teacher: "UKG" },
-  { name: "Tanusha", email: "tanupeacock@gmail.com", password: "Tanusha510", subject: "Mother Teacher", grade: "Pre-KG", section: "Popeye", class_teacher: "Pre-KG" },
+  { name: "Sulna Gopi", email: "Sulnagopi@gmail.com", password: "Sulna147", subject: "Mother Teacher", grade: "UKG", section: "Skylark", class_teacher: "UKG Skylark" },
+  { name: "Renuka", email: "renukaraghu.rrr@gmail.com", password: "Renuka695", subject: "Mother Teacher", grade: "UKG", section: "Robin", class_teacher: "UKG Robin" },
+  { name: "Pallavi", email: "pallaviacharm91@gmail.com", password: "Pallavi844", subject: "Mother Teacher", grade: "UKG", section: "Eagle", class_teacher: "UKG Eagle" },
+  { name: "Tanusha", email: "tanupeacock@gmail.com", password: "Tanusha510", subject: "Mother Teacher", grade: "Pre-KG", section: "Popeye", class_teacher: "Pre-KG Popeye" },
   { name: "Lilly Paul", email: "lillypaulpolachan@gmail.com", password: "Lilly355", subject: "Mother Teacher", grade: "Grade 2", section: "Volans", class_teacher: "" },
-  { name: "Kavya M", email: "kavyamuralidhar18@gmail.com", password: "Kavya947", subject: "English", grade: "Grade 9, 10", section: "Meru, Vindhya, Kuvempu, Karanth, Bendre", class_teacher: "Grade 9 Vindhya" },
+  { name: "Kavya M", email: "kavyamuralidhar18@gmail.com", password: "Kavya947", subject: "English", grade: "Grade 9, Grade 10", section: "Meru, Vindhya, Kuvempu, Karanth, Bendre", class_teacher: "Grade 9 Vindhya" },
   { name: "Umadevi P C", email: "pcumadevi3110@gmail.com", password: "Umadevi323", subject: "Social Science", grade: "Grade 10", section: "Bendre, Kuvempu, Karanth", class_teacher: "" },
-  { name: "Sridhar P", email: "sridharpgf@gmail.com", password: "SRIDHAR580", subject: "Biology, Chemistry", grade: "Grade 8, 9, 10", section: "Pegasus, Orion, Centaurus, Vindhya, Himalaya, Meru, Kuvempu, Bendre, Karanth", class_teacher: "Pegasus" },
-  { name: "Sahana D S", email: "sahanasmallesh@gmail.com", password: "Sahana464", subject: "Mathematics", grade: "Grade 6, 7", section: "Shanthi, Sathya, Vedha, Jupiter", class_teacher: "G6 Vedha" },
-  { name: "Pooja K S", email: "", password: "Pooja782", subject: "Mathematics", grade: "Grade 7", section: "Mercury, Venus, Mars", class_teacher: "Venus" },
+  { name: "Sridhar P", email: "sridharpgf@gmail.com", password: "SRIDHAR580", subject: "Biology", grade: "Grade 8, Grade 9, Grade 10", section: "Pegasus, Orion, Centaurus, Himalaya, Meru, Vindhya, Kuvempu, Bendre, Karanth", class_teacher: "Grade 8 Pegasus" },
+  { name: "Sahana D S", email: "sahanasmallesh@gmail.com", password: "Sahana464", subject: "Mathematics", grade: "Grade 6, Grade 7", section: "Shanthi, Sathya, Vedha, Jupiter", class_teacher: "Grade 6 Vedha" },
+  { name: "Pooja K S", email: "", password: "Pooja123", subject: "English", grade: "Grade 7", section: "Mercury, Venus, Mars", class_teacher: "Grade 7 Venus" },
+  { name: "Bi bi Ayesha", email: "", password: "Ayesha123", subject: "English", grade: "Grade 1, Grade 2", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo", class_teacher: "" },
+  { name: "Swetha G", email: "garkaswetha@gmail.com", password: "garka1234", subject: "IT", grade: "Grade 9, Grade 10", section: "Himalaya, Meru, Vindhya, Bendre, Karanth, Kuvempu", class_teacher: "" },
 ];
 
 export default function UserManagementPage() {
@@ -236,8 +238,18 @@ export default function UserManagementPage() {
           password: t.password,
           role: "teacher",
           subjects: t.subject ? t.subject.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
-          assigned_classes: t.grade ? t.grade.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
-          assigned_sections: t.section ? t.section.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
+          assigned_classes: t.grade ? t.grade.split(",").map((s: string) => {
+            const g = s.trim();
+            if (!g) return '';
+            const lower = g.toLowerCase();
+            if (lower.startsWith('grade ') || lower === 'pre-kg' || lower === 'lkg' || lower === 'ukg') return g;
+            if (/^\d+$/.test(g)) return `Grade ${g}`;
+            return g;
+          }).filter(Boolean) : [],
+          assigned_sections: t.section ? t.section.split(",").map((s: string) => {
+            // Strip grade prefix like "8-Orion" → "Orion"
+            return s.trim().replace(/^\d+[-–]\s*/i, '').trim();
+          }).filter(Boolean) : [],
           class_teacher_of: t.class_teacher,
         });
         success++;
@@ -267,14 +279,14 @@ export default function UserManagementPage() {
   );
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       {/* Header */}
       <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-800">User Management</h1>
           <p className="text-sm text-gray-500">Manage teachers and admins</p>
         </div>
-        <div className="flex gap-3 items-end flex-wrap">
+        <div className="flex gap-3 items-end flex-wrap overflow-x-auto pb-1">
           <div>
             <label className="text-xs text-gray-500 block mb-1">Academic Year</label>
             <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}
@@ -319,6 +331,9 @@ export default function UserManagementPage() {
                     <th className="px-2 py-1 text-left">Email</th>
                     <th className="px-2 py-1 text-left">Password</th>
                     <th className="px-2 py-1 text-left">Subject</th>
+                    <th className="px-2 py-1 text-left">Grades</th>
+                    <th className="px-2 py-1 text-left">Sections</th>
+                    <th className="px-2 py-1 text-left">Class Teacher Of</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -331,6 +346,9 @@ export default function UserManagementPage() {
                         <span className="font-mono bg-gray-100 px-1 rounded text-indigo-700">{t.password}</span>
                       </td>
                       <td className="px-2 py-1 text-gray-600">{t.subject}</td>
+                      <td className="px-2 py-1 text-blue-700 text-xs">{t.grade}</td>
+                      <td className="px-2 py-1 text-green-700 text-xs">{t.section}</td>
+                      <td className="px-2 py-1 text-purple-700 text-xs font-medium">{t.class_teacher || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -382,7 +400,7 @@ export default function UserManagementPage() {
             {editUser ? `✏️ Edit — ${editUser.name}` : "➕ Add New Teacher"}
           </h2>
 
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
             {/* Photo */}
             <div className="col-span-3 flex items-center gap-4">
               <div className="relative">

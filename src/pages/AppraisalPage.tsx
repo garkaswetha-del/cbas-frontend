@@ -33,11 +33,15 @@ const Check = ({ value, onChange }: any) => (
   />
 );
 
-const Score = ({ value }: any) => (
-  <td className="px-2 py-1 text-center text-xs font-bold text-indigo-700 bg-indigo-50 border border-gray-200">
-    {value ? (+value).toFixed(2) : "-"}
-  </td>
-);
+const Score = ({ value, max }: any) => {
+  const v = value ? +value : 0;
+  const pct = max ? ((v / max) * 100).toFixed(1) : (v * 100).toFixed(1);
+  return (
+    <td className="px-2 py-1 text-center text-xs font-bold text-indigo-700 bg-indigo-50 border border-gray-200">
+      {value ? pct + "%" : "-"}
+    </td>
+  );
+};
 
 export default function AppraisalPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -124,7 +128,7 @@ export default function AppraisalPage() {
     <div className="p-4">
       {/* Header */}
       <div className="mb-4">
-        <h1 className="text-xl font-bold text-gray-800">Teachers Appraisal — {ACADEMIC_YEAR}</h1>
+        <h1 className="text-lg sm:text-xl font-bold text-gray-800">Teachers Appraisal — {ACADEMIC_YEAR}</h1>
         <p className="text-sm text-gray-500">Principal View · All Teachers · Single Sheet</p>
       </div>
 
@@ -202,7 +206,7 @@ export default function AppraisalPage() {
                   {["pa1","pa2","pa3","pa4","sa1","sa2"].map(f => (
                     <td key={f} className={td}><Num value={a[f]} onChange={(v: any) => update(t.teacher_id, f, v)} /></td>
                   ))}
-                  <Score value={a.exam_score} />
+                  <Score value={a.exam_score} max={0.5} />
 
                   {/* SKILLS */}
                   <td className={td}><Select value={a.workshops} onChange={(v: any) => update(t.teacher_id, "workshops", v)} options={WO} /></td>
@@ -210,7 +214,7 @@ export default function AppraisalPage() {
                   <td className={td}><Select value={a.books_read} onChange={(v: any) => update(t.teacher_id, "books_read", v)} options={BR} /></td>
                   <td className={td}><Select value={a.articles_published} onChange={(v: any) => update(t.teacher_id, "articles_published", v)} options={AR} /></td>
                   <td className={td}><Select value={a.teaching_strategies} onChange={(v: any) => update(t.teacher_id, "teaching_strategies", v)} options={ST} /></td>
-                  <Score value={a.skills_score} />
+                  <Score value={a.skills_score} max={0.1} />
 
                   {/* BEHAVIOUR */}
                   <td className={td}><Select value={a.team_work} onChange={(v: any) => update(t.teacher_id, "team_work", v)} options={TW} /></td>
@@ -218,21 +222,21 @@ export default function AppraisalPage() {
                   <td className={td}><Select value={a.commitment_to_values} onChange={(v: any) => update(t.teacher_id, "commitment_to_values", v)} options={CV} /></td>
                   <td className={td}><Select value={a.adaptability} onChange={(v: any) => update(t.teacher_id, "adaptability", v)} options={AD} /></td>
                   <td className={td}><Select value={a.dressing} onChange={(v: any) => update(t.teacher_id, "dressing", v)} options={DR} /></td>
-                  <Score value={a.behaviour_score} />
+                  <Score value={a.behaviour_score} max={0.1} />
 
                   {/* PARENTS */}
                   <td className={td}><Select value={a.parents_feedback_band} onChange={(v: any) => update(t.teacher_id, "parents_feedback_band", v)} options={FB} /></td>
-                  <Score value={a.parents_feedback_score} />
+                  <Score value={a.parents_feedback_score} max={0.1} />
 
                   {/* CLASSROOM */}
                   {[0,1,2,3].map(i => (
                     <td key={i} className={td}><Select value={obs[i]?.band} onChange={(v: string) => updateObs(t.teacher_id, i, v)} options={CL} /></td>
                   ))}
-                  <Score value={a.classroom_score} />
+                  <Score value={a.classroom_score} max={0.1} />
 
                   {/* ENGLISH */}
                   <td className={td}><Select value={a.english_comm_band} onChange={(v: any) => update(t.teacher_id, "english_comm_band", v)} options={EN} /></td>
-                  <Score value={a.english_comm_score} />
+                  <Score value={a.english_comm_score} max={0.05} />
 
                   {/* RESPONSIBILITIES */}
                   {RESP.map(r => (
@@ -240,7 +244,7 @@ export default function AppraisalPage() {
                       <Check value={a[r.key]} onChange={(v: any) => update(t.teacher_id, r.key, v)} />
                     </td>
                   ))}
-                  <Score value={a.responsibilities_score} />
+                  <Score value={a.responsibilities_score} max={0.05} />
 
                   {/* SUMMARY */}
                   <td className={`${td} text-center font-bold text-indigo-800`}>

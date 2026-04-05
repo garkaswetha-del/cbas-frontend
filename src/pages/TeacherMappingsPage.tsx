@@ -139,7 +139,7 @@ export default function TeacherMappingsPage() {
   );
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-800">Teacher Mappings</h1>
         <p className="text-sm text-gray-500">
@@ -153,7 +153,7 @@ export default function TeacherMappingsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Teacher list */}
         <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
           <div className="p-3 border-b border-gray-200 bg-gray-50">
@@ -227,7 +227,7 @@ export default function TeacherMappingsPage() {
               {/* Add new mapping */}
               <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
                 <h3 className="text-sm font-bold text-gray-700 mb-3">Add New Mapping</h3>
-                <div className="grid grid-cols-5 gap-2 items-end">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Grade</label>
                     <select value={newGrade} onChange={e => setNewGrade(e.target.value)}

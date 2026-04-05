@@ -148,7 +148,7 @@ export default function CompetencyManagementPage() {
   const totalPages = Math.ceil(competencies.length / PAGE_SIZE);
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       {/* Header */}
       <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-800">Competency Registry</h1>
@@ -190,7 +190,7 @@ export default function CompetencyManagementPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-5 overflow-x-auto pb-1 flex-nowrap">
         {[
           { id: "view", label: "📋 View & Manage" },
           { id: "add", label: "➕ Add New" },
@@ -336,7 +336,7 @@ export default function CompetencyManagementPage() {
         <div className="bg-white rounded-xl shadow p-6 max-w-2xl">
           <h2 className="text-sm font-semibold text-gray-700 mb-1">Add New Competency</h2>
           <p className="text-xs text-gray-400 mb-4">You can add competencies for any existing or new subject.</p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-gray-500 block mb-1">Subject <span className="text-red-400">*</span></label>
               <input value={form.subject}
@@ -401,7 +401,7 @@ export default function CompetencyManagementPage() {
           {/* Format guide */}
           <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-5">
             <p className="text-xs font-bold text-indigo-700 mb-2">📋 Required Column Names (row 1 must be headers):</p>
-            <div className="grid grid-cols-3 gap-2 text-xs text-indigo-600">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-indigo-600">
               <div><strong>competency_code</strong><br />e.g. C-1.1</div>
               <div><strong>subject</strong><br />e.g. language</div>
               <div><strong>stage</strong><br />e.g. foundation</div>
@@ -446,8 +446,8 @@ export default function CompetencyManagementPage() {
       {/* ── EDIT MODAL ── */}
       {showEditModal && editItem && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-screen overflow-y-auto">
-            <div className="p-6">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-screen overflow-y-auto mx-2 sm:mx-0">
+            <div className="p-3 sm:p-6">
               <h2 className="text-sm font-semibold text-gray-700 mb-4">Edit Competency</h2>
               <div className="space-y-3">
                 <div>

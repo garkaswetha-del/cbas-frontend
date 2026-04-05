@@ -159,14 +159,14 @@ export default function StudentManagementPage() {
   const uniqueSections = [...new Set(students.map(s => s.section).filter(Boolean))].sort();
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Student Management</h1>
           <p className="text-sm text-gray-500">Total active students: {stats.total}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => fileRef.current?.click()}
             disabled={importing}
@@ -202,7 +202,7 @@ export default function StudentManagementPage() {
       )}
 
       {/* Stats by Grade */}
-      <div className="grid grid-cols-4 gap-3 mb-5 md:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 mb-5 sm:grid-cols-4 md:grid-cols-7">
         {stats.byGrade?.map((g: any) => (
           <div key={g.grade}
             onClick={() => setFilterGrade(filterGrade === g.grade ? "" : g.grade)}
@@ -217,7 +217,7 @@ export default function StudentManagementPage() {
       {showForm && (
         <div className="bg-white rounded-xl shadow border border-gray-200 p-5 mb-6">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">{editId ? "✏️ Edit Student" : "Add New Student"}</h2>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
             {[
               { label: "Full Name *", key: "name", type: "text" },
               { label: "Admission No.", key: "admission_no", type: "text" },
@@ -350,7 +350,7 @@ export default function StudentManagementPage() {
         {totalPages > 1 && (
           <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
             <p className="text-xs text-gray-500">Page {page} of {totalPages}</p>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                 className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">
                 Previous

@@ -291,7 +291,7 @@ export default function ActivitiesPage() {
   // ── RENDER ────────────────────────────────────────────────────
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-800">Activities & Competency Assessment — Module 2</h1>
         <p className="text-sm text-gray-500">Manage activities, enter competency marks and view analysis</p>
@@ -309,7 +309,7 @@ export default function ActivitiesPage() {
       </div>
 
       {/* Main tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1 flex-nowrap">
         {[
           { id: "activities", label: "📋 Activities" },
           { id: "marks", label: "✏️ Marks Entry" },
@@ -768,7 +768,7 @@ export default function ActivitiesPage() {
       {/* ── DASHBOARD TAB ── */}
       {activeTab === "dashboard" && (
         <div>
-          <div className="flex gap-2 mb-4 flex-wrap">
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1 flex-nowrap">
             {[
               { id: "school", label: "🏫 School" },
               { id: "grade", label: "📚 Grade" },
@@ -836,7 +836,7 @@ export default function ActivitiesPage() {
                 <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No coverage data yet. Create activities with competency mappings first.</div>
               ) : (
                 <>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="bg-white rounded-xl shadow p-4 border-l-4 border-indigo-500"><p className="text-xs text-gray-500">Total Competencies</p><p className="text-2xl font-bold text-gray-800">{coverageData.total_competencies}</p></div>
                     <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500"><p className="text-xs text-gray-500">Covered via Activities</p><p className="text-2xl font-bold text-green-700">{coverageData.activity_covered}</p><p className="text-xs text-gray-400">{coverageData.activity_coverage_percent}%</p></div>
                     <div className="bg-white rounded-xl shadow p-4 border-l-4 border-red-400"><p className="text-xs text-gray-500">Not Yet Covered</p><p className="text-2xl font-bold text-red-600">{coverageData.total_competencies - coverageData.activity_covered}</p></div>
@@ -976,7 +976,7 @@ export default function ActivitiesPage() {
           )}
           {dashTab === "school" && schoolDash && (
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { label: "Total Students", value: schoolDash.total_students, color: "border-indigo-500" },
                   { label: "Assessed", value: schoolDash.assessed, color: "border-green-500" },
@@ -990,7 +990,7 @@ export default function ActivitiesPage() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Grade averages */}
                 <div className="bg-white rounded-xl shadow p-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Grade-wise Average (1-4 scale)</h3>
@@ -1049,7 +1049,7 @@ export default function ActivitiesPage() {
               {/* Level distribution */}
               <div className="bg-white rounded-xl shadow p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Level Distribution</h3>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
                     { key: "L4", label: "Level 4 – Exceeding", color: "#10b981", bg: "bg-green-50 border-green-200" },
                     { key: "L3", label: "Level 3 – Meeting", color: "#6366f1", bg: "bg-blue-50 border-blue-200" },
@@ -1089,7 +1089,7 @@ export default function ActivitiesPage() {
           {/* ── GRADE DASHBOARD ── */}
           {dashTab === "grade" && gradeDash && (
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { label: "Total Students", value: gradeDash.total_students, color: "border-indigo-500" },
                   { label: "Assessed", value: gradeDash.total_assessed, color: "border-green-500" },
@@ -1103,7 +1103,7 @@ export default function ActivitiesPage() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-white rounded-xl shadow p-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Section-wise Average</h3>
                   <ResponsiveContainer width="100%" height={200}>
@@ -1194,7 +1194,7 @@ export default function ActivitiesPage() {
           {/* ── SECTION DASHBOARD ── */}
           {dashTab === "section" && sectionDash && (
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { label: "Total Students", value: sectionDash.total_students, color: "border-indigo-500" },
                   { label: "Overall Avg", value: sectionDash.overall_avg?.toFixed(2), color: "border-green-500" },
@@ -1291,7 +1291,7 @@ export default function ActivitiesPage() {
               </div>
 
               {/* Subject summary */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-white rounded-xl shadow p-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject-wise Average</h3>
                   <div className="space-y-2">

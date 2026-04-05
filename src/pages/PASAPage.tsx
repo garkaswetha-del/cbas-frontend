@@ -311,13 +311,13 @@ export default function PASAPage() {
   };
 
   // ── DASHBOARD EFFECTS ─────────────────────────────────────────
-  useEffect(() => { if (dashTab === "school") fetchSchool(); }, [dashTab, dashExam, academicYear]);
-  useEffect(() => { if (dashTab === "grade" && dashGrade) { fetchGrade(); fetchLongitudinal(); } }, [dashTab, dashExam, dashGrade, academicYear]);
-  useEffect(() => { if (dashTab === "section" && dashGrade && dashSection) fetchSection(); }, [dashTab, dashExam, dashGrade, dashSection, academicYear]);
+  useEffect(() => { if (activeTab === "dashboard" && dashTab === "school") fetchSchool(); }, [dashTab, dashExam, academicYear, activeTab]);
+  useEffect(() => { if (activeTab === "dashboard" && dashTab === "grade" && dashGrade) { fetchGrade(); fetchLongitudinal(); } }, [dashTab, dashExam, dashGrade, academicYear, activeTab]);
+  useEffect(() => { if (activeTab === "dashboard" && dashTab === "section" && dashGrade && dashSection) fetchSection(); }, [dashTab, dashExam, dashGrade, dashSection, academicYear, activeTab]);
   useEffect(() => { if ((dashTab === "grade" || dashTab === "section") && dashGrade) fetchDashSections(); }, [dashGrade, dashTab]);
   useEffect(() => { if (dashTab === "student" && studentGrade) fetchStudentSections(); }, [dashTab, studentGrade]);
   useEffect(() => { if (studentGrade && studentSection) fetchSectionStudents(); }, [studentGrade, studentSection]);
-  useEffect(() => { if (dashTab === "alerts") fetchPasaAlerts(); }, [dashTab, academicYear]);
+  useEffect(() => { if (activeTab === "dashboard" && dashTab === "alerts") fetchPasaAlerts(); }, [dashTab, academicYear, activeTab]);
 
   const fetchPasaAlerts = async () => {
     try {
@@ -401,7 +401,7 @@ export default function PASAPage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       <div className="mb-4 flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-800">PA/SA Marks — Module 3</h1>
@@ -416,7 +416,7 @@ export default function PASAPage() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1 flex-nowrap">
         {[{ id: "entry", label: "📝 Marks Entry" }, { id: "dashboard", label: "📊 Dashboard" }].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id as any)}
             className={`px-4 py-2 text-sm rounded-lg font-medium ${activeTab === t.id ? "bg-indigo-600 text-white" : "bg-white text-gray-600 border border-gray-300 hover:bg-indigo-50"}`}>
@@ -472,7 +472,7 @@ export default function PASAPage() {
               <span className="ml-2 text-xs font-normal text-gray-400">(pre-filled from previous config if available)</span>
             </h2>
             {subjects.length > 0 && (
-              <div className="flex gap-2 mb-3 flex-wrap">
+              <div className="flex gap-2 mb-3 overflow-x-auto pb-1 flex-nowrap">
                 {subjects.map((s, i) => (
                   <div key={i} className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5">
                     <span className="text-xs font-bold text-indigo-700">{s.subject}</span>
@@ -676,7 +676,7 @@ export default function PASAPage() {
       {/* ── DASHBOARD ── */}
       {activeTab === "dashboard" && (
         <div>
-          <div className="flex gap-2 mb-4 flex-wrap">
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1 flex-nowrap items-center">
             {[
               { id: "school", label: "🏫 School" },
               { id: "grade", label: "📚 Grade" },
@@ -689,6 +689,14 @@ export default function PASAPage() {
                 {t.label}
               </button>
             ))}
+            <button onClick={() => {
+              if (dashTab==="school") fetchSchool();
+              else if (dashTab==="grade") { fetchGrade(); fetchLongitudinal(); }
+              else if (dashTab==="section") fetchSection();
+              else if (dashTab==="alerts") fetchPasaAlerts();
+            }} className="ml-auto px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-1">
+              🔄 Refresh
+            </button>
           </div>
 
           {dashTab !== "student" && dashTab !== "alerts" && (
@@ -721,7 +729,7 @@ export default function PASAPage() {
           {/* SCHOOL */}
           {dashTab === "school" && (schoolData ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { label: "Total Students", value: schoolData.total_students, color: "border-indigo-500" },
                   { label: "School Avg %", value: fmtPct(n(schoolData.school_avg)), color: "border-green-500" },
@@ -734,7 +742,7 @@ export default function PASAPage() {
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-white rounded-xl shadow p-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Grade-wise Average %</h3>
                   <ResponsiveContainer width="100%" height={260}>
@@ -786,7 +794,7 @@ export default function PASAPage() {
           {/* GRADE */}
           {dashTab === "grade" && (gradeData ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { label: "Sections", value: gradeData.sections?.length, color: "border-indigo-500" },
                   { label: "Subjects", value: gradeData.subjects?.length, color: "border-blue-500" },
@@ -800,7 +808,7 @@ export default function PASAPage() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-white rounded-xl shadow p-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Section-wise Average %</h3>
                   <ResponsiveContainer width="100%" height={220}>
@@ -902,7 +910,7 @@ export default function PASAPage() {
               )}
 {/* Advancing / Retracting — Exam to Exam */}
               {(gradeData.advancing?.length > 0 || gradeData.retracting?.length > 0) && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-white rounded-xl shadow p-4">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">
                       📈 Advancing Students <span className="text-xs font-normal text-gray-400">(vs previous exam)</span>
@@ -958,7 +966,7 @@ export default function PASAPage() {
 
               {/* Year-over-Year Advancing / Retracting */}
               {(gradeData.yoy_advancing?.length > 0 || gradeData.yoy_retracting?.length > 0) && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-white rounded-xl shadow p-4">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">
                       🚀 Year-on-Year Advancing <span className="text-xs font-normal text-gray-400">(vs last year same exam)</span>
@@ -1047,7 +1055,7 @@ export default function PASAPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-white rounded-xl shadow p-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">🏆 Top 10 Students</h3>
                   <div className="space-y-1">
@@ -1086,7 +1094,7 @@ export default function PASAPage() {
           {/* SECTION */}
           {dashTab === "section" && (sectionData ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 {[
                   { label: "Total Students", value: sectionData.total_students, color: "border-indigo-500" },
                   { label: "Section Avg %", value: fmtPct(n(sectionData.section_avg)), color: "border-green-500" },
@@ -1103,7 +1111,7 @@ export default function PASAPage() {
 
               {/* Advancing / Retracting vs previous exam */}
               {(sectionData.advancing?.length > 0 || sectionData.retracting?.length > 0) && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Advancing */}
                   <div className="bg-white rounded-xl shadow p-4 border-t-4 border-green-400">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -1162,7 +1170,7 @@ export default function PASAPage() {
 
               <RankingLineChart students={sectionData.students_ranked || []} title={`Student Rankings — ${sectionData.section} (Top to Bottom by Grand %)`} />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-white rounded-xl shadow p-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject-wise Average %</h3>
                   <ResponsiveContainer width="100%" height={220}>
@@ -1197,7 +1205,7 @@ export default function PASAPage() {
 
               <div className="bg-white rounded-xl shadow p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Grand % vs Subject Comparison</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {sectionData.subjects?.map((sub: string, i: number) => (
                     <GrandVsSubjectChart key={sub} data={sectionData.grand_vs_subject?.[sub] || []} subjectName={sub} color={SUBJECT_COLORS[i % SUBJECT_COLORS.length]} />
                   ))}
@@ -1256,7 +1264,7 @@ export default function PASAPage() {
 
               {/* Advancing / Retracting — Exam to Exam */}
               {(sectionData.advancing?.length > 0 || sectionData.retracting?.length > 0) && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-white rounded-xl shadow p-4">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">
                       📈 Advancing Students <span className="text-xs font-normal text-gray-400">(vs previous exam)</span>
@@ -1306,7 +1314,7 @@ export default function PASAPage() {
 
               {/* Year-on-Year Advancing / Retracting */}
               {(sectionData.yoy_advancing?.length > 0 || sectionData.yoy_retracting?.length > 0) && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-white rounded-xl shadow p-4">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">
                       🚀 Year-on-Year Advancing <span className="text-xs font-normal text-gray-400">(vs last year same exam)</span>
