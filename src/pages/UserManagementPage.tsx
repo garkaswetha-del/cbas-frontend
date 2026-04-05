@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
-const API = "http://localhost:3000";
+const API = "https://cbas-backend-production.up.railway.app";
 
 const ACADEMIC_YEARS = Array.from({ length: 10 }, (_, i) => {
   const y = 2025 + i;

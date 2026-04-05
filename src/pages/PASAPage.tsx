@@ -5,7 +5,7 @@ import {
   Tooltip, Legend, ResponsiveContainer, Cell,
 } from "recharts";
 
-const API = "http://localhost:3000";
+const API = "https://cbas-backend-production.up.railway.app";
 const EXAM_TYPES = ["PA1", "PA2", "SA1", "PA3", "PA4", "SA2", "Custom"];
 
 const ACADEMIC_YEARS = Array.from({ length: 10 }, (_, i) => {

@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, LineChart, Line, Cell,
 } from "recharts";
 
-const API = "http://localhost:3000";
+const API = "https://cbas-backend-production.up.railway.app";
 
 const generateAcademicYears = () => {
   const years = [];

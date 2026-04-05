@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, Cell,
 } from "recharts";
 
-const API = "http://localhost:3000";
+const API = "https://cbas-backend-production.up.railway.app";
 const ACADEMIC_YEAR = "2025-26";
 
 const CRITERIA = [
