@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { path: '/pasa',          label: 'PA/SA Marks',          icon: '📝' },
   { path: '/observation',   label: 'Class Observation',    icon: '👁' },
   { path: '/student-parent',label: 'Student / Parent',     icon: '👨‍👩‍👧' },
-  { path: '/sections',      label: 'Section Management',   icon: '🏫' },
+  { path: '/sections',      label: 'Section Management',   icon: '🏫' },  
 ];
 
 interface MainLayoutProps {
