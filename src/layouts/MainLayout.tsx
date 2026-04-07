@@ -147,3 +147,4 @@ export default function MainLayout({ user, onLogout }: MainLayoutProps) {
     </div>
   );
 }
+
