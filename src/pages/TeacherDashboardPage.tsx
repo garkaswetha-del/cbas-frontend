@@ -5,7 +5,7 @@ import {
   Tooltip, Legend, ResponsiveContainer, Cell,
 } from "recharts";
 
-const API = "http://localhost:3000";
+const API = "https://cbas-backend-production.up.railway.app";
 const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
 
@@ -639,7 +639,7 @@ function StudentsTab({ user, mappings, academicYear }: any) {
 // TAB 3: MY CLASS (class teacher only)
 // ─────────────────────────────────────────────────────────────────
 function ClassTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
+  const API = "https://cbas-backend-production.up.railway.app";
   const [students, setStudents] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<string[]>([]);
   const [sectionData, setSectionData] = useState<any>({});
@@ -1148,7 +1148,7 @@ function BaselineTab({ user, academicYear }: any) {
 // PA/SA TAB — Marks Entry + Full Analysis (teacher's subjects only)
 // ─────────────────────────────────────────────────────────────────
 function PASATab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
+  const API = "https://cbas-backend-production.up.railway.app";
   const nv = (v: any) => +(v ?? 0);
   const fmtP = (v: number) => `${v.toFixed(1)}%`;
   const sBg = (p: number) => p >= 80 ? "bg-green-100 text-green-800" : p >= 60 ? "bg-blue-100 text-blue-800" : p >= 40 ? "bg-yellow-100 text-yellow-800" : p > 0 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-400";
@@ -1573,7 +1573,7 @@ function PASATab({ user, mappings, academicYear }: any) {
 // ACTIVITIES TAB — Create + Marks Entry + Coverage + Analysis
 // ─────────────────────────────────────────────────────────────────
 function ActivitiesTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
+  const API = "https://cbas-backend-production.up.railway.app";
   const ACTIVITY_TYPES = ["Individual","Group","Project","Assessment","Workshop","Other"];
   const CROSS_CURRICULAR = ["arts","vocational_education","interdisciplinary"];
   const CROSS_LABELS: Record<string,string> = { arts: "Arts", vocational_education: "Vocational Education", interdisciplinary: "Interdisciplinary" };
@@ -3176,7 +3176,7 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
 // STUDENT AI TAB — AI homework + assessment for students
 // ─────────────────────────────────────────────────────────────────
 function StudentAITab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
+  const API = "https://cbas-backend-production.up.railway.app";
   const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
   const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
   const LITERACY_DOMAINS = ["Listening", "Speaking", "Reading", "Writing"];
@@ -3804,7 +3804,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
 // PROMOTION TAB — class teacher only
 // ─────────────────────────────────────────────────────────────────
 function AlertsTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
+  const API = "https://cbas-backend-production.up.railway.app";
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -4687,7 +4687,7 @@ function getLevel(score: number) {
 // EXAM CONFIG TAB
 // ─────────────────────────────────────────────────────────────────
 function ExamConfigTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
+  const API = "https://cbas-backend-production.up.railway.app";
   const EXAM_TYPES = ["PA1","PA2","SA1","PA3","PA4","SA2","Custom"];
   const grade = mappings?.class_grade || user?.class_teacher_of?.split(' ').slice(0,-1).join(' ') || "";
 
@@ -4789,7 +4789,7 @@ function ExamConfigTab({ user, mappings, academicYear }: any) {
 // BASELINE ENTRY TAB
 // ─────────────────────────────────────────────────────────────────
 function BaselineDashTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
+  const API = "https://cbas-backend-production.up.railway.app";
   const ROUNDS = [
     { value: "baseline_1", label: "Round 1" },
     { value: "baseline_2", label: "Round 2" },
@@ -5113,7 +5113,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
 }
 
 function BaselineEntryTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
+  const API = "https://cbas-backend-production.up.railway.app";
   const LITERACY_DOMAINS2 = ["Listening", "Speaking", "Reading", "Writing"];
   const NUMERACY_DOMAINS2 = ["Operations", "Base 10", "Measurement", "Geometry"];
   const GRADE_TO_STAGE2: Record<string, string> = {
