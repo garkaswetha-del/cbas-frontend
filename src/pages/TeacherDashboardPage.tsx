@@ -5,7 +5,7 @@ import {
   Tooltip, Legend, ResponsiveContainer, Cell,
 } from "recharts";
 
-const API = "https://cbas-backend-production.up.railway.app";
+const API = "http://localhost:3000";
 const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
 
@@ -26,7 +26,7 @@ interface TeacherDashboardProps {
 
 export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
   const [activeGroup, setActiveGroup] = useState<"class" | "self">("class");
-  const [activeTab, setActiveTab] = useState<"students" | "classview" | "pasa" | "examconfig" | "activities" | "baseline_entry" | "baseline_dash" | "student_ai" | "alerts" | "promotion" | "profile" | "self_baseline" | "appraisal" | "self_ai" | "homework">("students");
+  const [activeTab, setActiveTab] = useState<"students" | "classview" | "pasa" | "examconfig" | "activities" | "baseline_entry" | "baseline_dash" | "student_ai" | "alerts" | "promotion" | "profile" | "self_baseline" | "appraisal" | "self_ai" | "homework" | "portfolio">("students");
   const [academicYear, setAcademicYear] = useState("2025-26");
   const [mappings, setMappings] = useState<any>(null);
 
@@ -53,6 +53,7 @@ export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
     { id: "student_ai",     label: "🤖 Student AI",        show: true },
     { id: "alerts",         label: "⚠️ Alerts",            show: true },
     { id: "promotion",      label: "🎓 Promotion",         show: isClassTeacher },
+    { id: "portfolio",      label: "📁 Student Portfolio",  show: true },
   ];
 
   const SELF_TABS = [
@@ -130,6 +131,7 @@ export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
       {activeTab === "student_ai"     && <StudentAITab user={user} mappings={mappings} academicYear={academicYear} />}
       {activeTab === "alerts"         && <AlertsTab user={user} mappings={mappings} academicYear={academicYear} />}
       {activeTab === "promotion"      && <PromotionTab user={user} mappings={mappings} />}
+      {activeTab === "portfolio"      && <PortfolioTab user={user} mappings={mappings} academicYear={academicYear} />}
 
       {/* Self Management tabs */}
       {activeTab === "profile"        && <ProfileTab user={user} />}
@@ -637,7 +639,7 @@ function StudentsTab({ user, mappings, academicYear }: any) {
 // TAB 3: MY CLASS (class teacher only)
 // ─────────────────────────────────────────────────────────────────
 function ClassTab({ user, mappings, academicYear }: any) {
-  const API = "https://cbas-backend-production.up.railway.app";
+  const API = "http://localhost:3000";
   const [students, setStudents] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<string[]>([]);
   const [sectionData, setSectionData] = useState<any>({});
@@ -1146,7 +1148,7 @@ function BaselineTab({ user, academicYear }: any) {
 // PA/SA TAB — Marks Entry + Full Analysis (teacher's subjects only)
 // ─────────────────────────────────────────────────────────────────
 function PASATab({ user, mappings, academicYear }: any) {
-  const API = "https://cbas-backend-production.up.railway.app";
+  const API = "http://localhost:3000";
   const nv = (v: any) => +(v ?? 0);
   const fmtP = (v: number) => `${v.toFixed(1)}%`;
   const sBg = (p: number) => p >= 80 ? "bg-green-100 text-green-800" : p >= 60 ? "bg-blue-100 text-blue-800" : p >= 40 ? "bg-yellow-100 text-yellow-800" : p > 0 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-400";
@@ -1571,7 +1573,7 @@ function PASATab({ user, mappings, academicYear }: any) {
 // ACTIVITIES TAB — Create + Marks Entry + Coverage + Analysis
 // ─────────────────────────────────────────────────────────────────
 function ActivitiesTab({ user, mappings, academicYear }: any) {
-  const API = "https://cbas-backend-production.up.railway.app";
+  const API = "http://localhost:3000";
   const ACTIVITY_TYPES = ["Individual","Group","Project","Assessment","Workshop","Other"];
   const CROSS_CURRICULAR = ["arts","vocational_education","interdisciplinary"];
   const CROSS_LABELS: Record<string,string> = { arts: "Arts", vocational_education: "Vocational Education", interdisciplinary: "Interdisciplinary" };
@@ -3174,7 +3176,7 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
 // STUDENT AI TAB — AI homework + assessment for students
 // ─────────────────────────────────────────────────────────────────
 function StudentAITab({ user, mappings, academicYear }: any) {
-  const API = "https://cbas-backend-production.up.railway.app";
+  const API = "http://localhost:3000";
   const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
   const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
   const LITERACY_DOMAINS = ["Listening", "Speaking", "Reading", "Writing"];
@@ -3802,7 +3804,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
 // PROMOTION TAB — class teacher only
 // ─────────────────────────────────────────────────────────────────
 function AlertsTab({ user, mappings, academicYear }: any) {
-  const API = "https://cbas-backend-production.up.railway.app";
+  const API = "http://localhost:3000";
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -3870,12 +3872,300 @@ function AlertsTab({ user, mappings, academicYear }: any) {
   );
 }
 
-function PromotionTab({ user, mappings }: any) {
-  const API = "https://cbas-backend-production.up.railway.app";
-  const GRADE_ORDER = ["Pre-KG","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
-  const ALL_SECTIONS = ["Duke","Popeye","Daisy","Lotus","Orchid","Tulip","Eagle","Robin","Skylark","Asteroid","Comet","Galaxy","Apus","Pavo","Volans","Edison","Einstein","Kalam","Raman","Diamond","Emerald","Ruby","Ganga","Godavari","Kaveri","Sathya","Shanthi","Vedha","Jupiter","Mars","Mercury","Venus","Centaurus","Orion","Pegasus","Himalaya","Meru","Vindhya","Bendre","Karanth","Kuvempu"];
 
-  // Derive class teacher info from mappings OR directly from user.class_teacher_of
+function PortfolioTab({ user, mappings, academicYear }: any) {
+  const API = "https://cbas-backend-production.up.railway.app";
+
+  // Determine teacher's subjects and type
+  const isClassTeacher = !!(mappings?.is_class_teacher || user?.class_teacher_of);
+  const teacherSubjects: string[] = mappings?.subjects || user?.subjects || [];
+  const isEnglishTeacher = teacherSubjects.some((s: string) => s.toLowerCase().includes("english") || s.toLowerCase().includes("literacy"));
+  const isMathTeacher = teacherSubjects.some((s: string) => s.toLowerCase().includes("math") || s.toLowerCase().includes("numeracy") || s.toLowerCase().includes("maths"));
+
+  // Students list
+  const [students, setStudents] = useState<any[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [search, setSearch] = useState("");
+
+  // Selected student portfolio
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [portfolio, setPortfolio] = useState<any>(null);
+  const [loadingPortfolio, setLoadingPortfolio] = useState(false);
+  const [portfolioTab, setPortfolioTab] = useState<"pasa"|"baseline"|"activities">("pasa");
+
+  // Load students based on teacher's current assignment
+  useEffect(() => { fetchStudents(); }, [mappings, academicYear]);
+
+  const fetchStudents = async () => {
+    if (!mappings) return;
+    setLoadingStudents(true);
+    try {
+      let allStudents: any[] = [];
+      if (isClassTeacher && mappings.class_grade && mappings.class_section) {
+        const r = await axios.get(`${API}/students?grade=${encodeURIComponent(mappings.class_grade)}&section=${encodeURIComponent(mappings.class_section)}`);
+        allStudents = r.data?.data || r.data || [];
+      } else if (mappings.sections?.length > 0) {
+        // Subject teacher — fetch from all assigned sections
+        for (const sec of mappings.sections) {
+          const r = await axios.get(`${API}/students?grade=${encodeURIComponent(sec.grade)}&section=${encodeURIComponent(sec.section)}`);
+          const list = r.data?.data || r.data || [];
+          allStudents.push(...list);
+        }
+        // Deduplicate
+        const seen = new Set();
+        allStudents = allStudents.filter(s => { if (seen.has(s.id)) return false; seen.add(s.id); return true; });
+      }
+      setStudents(allStudents.filter((s: any) => s.is_active !== false));
+    } catch { }
+    setLoadingStudents(false);
+  };
+
+  const openPortfolio = async (student: any) => {
+    setSelectedStudent(student);
+    setPortfolio(null);
+    setLoadingPortfolio(true);
+    try {
+      const subjectsParam = isClassTeacher ? "" : teacherSubjects.join(",");
+      const [pasaRes, baselineRes, activitiesRes] = await Promise.all([
+        axios.get(`${API}/pasa/portfolio/student/${student.id}${subjectsParam ? `?subjects=${encodeURIComponent(subjectsParam)}` : ""}`),
+        (isClassTeacher || isEnglishTeacher || isMathTeacher)
+          ? axios.get(`${API}/baseline/student/${student.id}/portfolio`)
+          : Promise.resolve({ data: { years: [] } }),
+        axios.get(`${API}/activities/longitudinal/student/${student.id}`),
+      ]);
+      setPortfolio({
+        pasa: pasaRes.data,
+        baseline: baselineRes.data,
+        activities: activitiesRes.data,
+      });
+    } catch { }
+    setLoadingPortfolio(false);
+  };
+
+  const filteredStudents = students.filter(s =>
+    s.name?.toLowerCase().includes(search.toLowerCase()) ||
+    s.admission_no?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // If a student is selected, show their portfolio
+  if (selectedStudent) {
+    return (
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <button onClick={() => { setSelectedStudent(null); setPortfolio(null); }}
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg flex items-center gap-1">
+            ← Back
+          </button>
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">📁 {selectedStudent.name}</h2>
+            <p className="text-xs text-gray-500">{selectedStudent.admission_no} · Full history across all years</p>
+          </div>
+        </div>
+
+        {loadingPortfolio ? (
+          <div className="bg-white rounded-xl shadow p-10 text-center">
+            <div className="inline-block w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+            <p className="text-sm text-gray-400">Loading portfolio...</p>
+          </div>
+        ) : portfolio ? (
+          <div className="space-y-4">
+            {/* Portfolio sub-tabs */}
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={() => setPortfolioTab("pasa")}
+                className={`px-4 py-2 text-sm rounded-lg font-medium ${portfolioTab==="pasa" ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
+                📊 PA/SA Marks
+              </button>
+              {(isClassTeacher || isEnglishTeacher || isMathTeacher) && (
+                <button onClick={() => setPortfolioTab("baseline")}
+                  className={`px-4 py-2 text-sm rounded-lg font-medium ${portfolioTab==="baseline" ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
+                  📈 Baseline
+                </button>
+              )}
+              <button onClick={() => setPortfolioTab("activities")}
+                className={`px-4 py-2 text-sm rounded-lg font-medium ${portfolioTab==="activities" ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
+                🎯 Activities
+              </button>
+            </div>
+
+            {/* PASA Portfolio */}
+            {portfolioTab === "pasa" && (
+              <div className="space-y-4">
+                {!portfolio.pasa?.years?.length ? (
+                  <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">No PA/SA data found for this student.</div>
+                ) : portfolio.pasa.years.map((yr: any) => (
+                  <div key={yr.academic_year} className="bg-white rounded-xl shadow overflow-hidden">
+                    <div className="px-4 py-3 bg-indigo-700 text-white flex items-center justify-between">
+                      <span className="font-bold text-sm">{yr.academic_year}</span>
+                      <span className="text-xs text-indigo-200">{yr.grade}</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200">
+                            <th className="px-3 py-2 text-left text-gray-600">Exam</th>
+                            {yr.subjects?.map((sub: string) => (
+                              <th key={sub} className="px-3 py-2 text-center text-gray-600">{sub}</th>
+                            ))}
+                            <th className="px-3 py-2 text-center text-gray-600 font-bold">Overall %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {yr.exams?.map((exam: any, i: number) => (
+                            <tr key={exam.exam} className={i%2===0?"bg-white":"bg-gray-50"}>
+                              <td className="px-3 py-2 font-medium text-gray-700">{exam.exam}</td>
+                              {yr.subjects?.map((sub: string) => {
+                                const sd = exam.subjects?.[sub];
+                                return (
+                                  <td key={sub} className="px-3 py-2 text-center">
+                                    {sd?.percentage !== null && sd?.percentage !== undefined
+                                      ? <span className={`font-medium ${sd.percentage>=80?"text-green-600":sd.percentage>=60?"text-blue-600":sd.percentage>=40?"text-yellow-600":"text-red-600"}`}>
+                                          {sd.percentage}%
+                                        </span>
+                                      : <span className="text-gray-300">—</span>}
+                                  </td>
+                                );
+                              })}
+                              <td className="px-3 py-2 text-center font-bold">
+                                {exam.grand_percentage !== null
+                                  ? <span className={exam.grand_percentage>=80?"text-green-600":exam.grand_percentage>=60?"text-blue-600":exam.grand_percentage>=40?"text-yellow-600":"text-red-600"}>
+                                      {exam.grand_percentage}%
+                                    </span>
+                                  : "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Baseline Portfolio */}
+            {portfolioTab === "baseline" && (
+              <div className="space-y-4">
+                {!portfolio.baseline?.years?.length ? (
+                  <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">No baseline data found for this student.</div>
+                ) : portfolio.baseline.years.map((yr: any) => (
+                  <div key={yr.academic_year} className="bg-white rounded-xl shadow overflow-hidden">
+                    <div className="px-4 py-3 bg-green-700 text-white flex items-center justify-between">
+                      <span className="font-bold text-sm">{yr.academic_year}</span>
+                      <span className="text-xs text-green-200">{yr.grade} · {yr.rounds} round(s)</span>
+                    </div>
+                    <div className="p-4 grid grid-cols-2 gap-4">
+                      {(isClassTeacher || isEnglishTeacher) && yr.literacy && (
+                        <div className="bg-blue-50 rounded-lg p-3">
+                          <p className="text-xs font-bold text-blue-700 mb-1">📖 Literacy</p>
+                          <p className="text-2xl font-bold text-blue-800">{yr.literacy.avg ?? "—"}<span className="text-sm font-normal text-blue-500">%</span></p>
+                          <p className="text-xs text-blue-600 mt-1">Stage: {yr.literacy.stage || "—"}</p>
+                        </div>
+                      )}
+                      {(isClassTeacher || isMathTeacher) && yr.numeracy && (
+                        <div className="bg-purple-50 rounded-lg p-3">
+                          <p className="text-xs font-bold text-purple-700 mb-1">🔢 Numeracy</p>
+                          <p className="text-2xl font-bold text-purple-800">{yr.numeracy.avg ?? "—"}<span className="text-sm font-normal text-purple-500">%</span></p>
+                          <p className="text-xs text-purple-600 mt-1">Stage: {yr.numeracy.stage || "—"}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Activities Portfolio */}
+            {portfolioTab === "activities" && (
+              <div className="space-y-4">
+                {!portfolio.activities?.timeline?.length ? (
+                  <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">No activities data found for this student.</div>
+                ) : portfolio.activities.timeline.map((yr: any) => {
+                  const subjects = portfolio.activities.subjects || [];
+                  const filteredSubjects = isClassTeacher ? subjects : subjects.filter((sub: string) => teacherSubjects.some((ts: string) => ts.toLowerCase() === sub.toLowerCase()));
+                  return (
+                  <div key={yr.academic_year} className="bg-white rounded-xl shadow overflow-hidden">
+                    <div className="px-4 py-3 bg-orange-700 text-white flex items-center justify-between">
+                      <span className="font-bold text-sm">{yr.academic_year}</span>
+                      <span className="text-xs text-orange-200">{yr.grade}</span>
+                    </div>
+                    <div className="p-4">
+                      <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                        <span className="text-sm font-bold text-gray-700">Overall</span>
+                        <span className={`text-sm font-bold ${yr.overall>=80?"text-green-600":yr.overall>=60?"text-blue-600":yr.overall>=40?"text-yellow-600":"text-red-600"}`}>
+                          {yr.overall?.toFixed(1) ?? "—"}%
+                        </span>
+                      </div>
+                      {filteredSubjects.map((sub: string) => (
+                        <div key={sub} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                          <span className="text-sm text-gray-700">{sub}</span>
+                          <span className={`text-sm font-bold ${yr[sub]>=80?"text-green-600":yr[sub]>=60?"text-blue-600":yr[sub]>=40?"text-yellow-600":"text-red-600"}`}>
+                            {yr[sub]?.toFixed(1) ?? "—"}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );})}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  // Student list view
+  return (
+    <div className="space-y-4">
+      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+        <h2 className="text-sm font-bold text-indigo-800 mb-1">📁 Student Portfolio</h2>
+        <p className="text-xs text-indigo-600">
+          Click any student to view their complete history across all academic years.
+          {isClassTeacher ? " As class teacher you can see all subjects." : ` As subject teacher you can see: ${teacherSubjects.join(", ")}.`}
+        </p>
+      </div>
+
+      <div className="bg-white rounded-xl shadow p-4">
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search student by name or admission no..."
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500" />
+      </div>
+
+      {loadingStudents ? (
+        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">Loading students...</div>
+      ) : filteredStudents.length === 0 ? (
+        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
+          <p className="text-2xl mb-2">📭</p>
+          <p className="text-sm">No students found in your current assignment.</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl shadow overflow-hidden">
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <span className="text-sm font-semibold text-gray-700">{filteredStudents.length} Students</span>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {filteredStudents.map((s: any) => (
+              <button key={s.id} onClick={() => openPortfolio(s)}
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-indigo-50 transition-colors text-left">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{s.name}</p>
+                  <p className="text-xs text-gray-400">{s.admission_no} · {s.current_class} {s.section}</p>
+                </div>
+                <span className="text-xs text-indigo-600 font-medium">View Portfolio →</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PromotionTab({ user, mappings }: any) {
+  const GRADE_ORDER = ["Pre-KG","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
+
+  // Derive class teacher info
   const rawCTO = (mappings?.class_teacher_of || user?.class_teacher_of || "").trim();
   const ctoParts = rawCTO.split(' ').filter(Boolean);
   const rawGrade = mappings?.class_grade || (ctoParts.length >= 3 ? ctoParts.slice(0,-1).join(' ') : ctoParts.length === 2 ? ctoParts[0] : "");
@@ -3886,38 +4176,43 @@ function PromotionTab({ user, mappings }: any) {
 
   const nextGradeIdx = GRADE_ORDER.indexOf(classGrade) + 1;
   const nextGrade = nextGradeIdx < GRADE_ORDER.length ? GRADE_ORDER[nextGradeIdx] : null;
+  const isGrade10 = classGrade === "Grade 10";
 
   const [students, setStudents] = useState<any[]>([]);
-  // Per-student section selection
+  const [nextSections, setNextSections] = useState<string[]>([]);
   const [studentSections, setStudentSections] = useState<Record<string, string>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [defaultSection, setDefaultSection] = useState("");
   const [promoting, setPromoting] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [msg, setMsg] = useState("");
-  const [step, setStep] = useState<"preview" | "confirm" | "done">("preview");
+  const [step, setStep] = useState<"preview"|"confirm"|"done">("preview");
   const [loading, setLoading] = useState(false);
+  const [graduationYear, setGraduationYear] = useState(new Date().getFullYear().toString());
 
+  // Load students and next grade sections
   const loadStudents = async () => {
     setLoading(true);
     try {
-      const r = await axios.get(`${API}/students?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`);
-      const list = (r.data?.data || r.data || []).filter((s: any) => s.is_active !== false);
+      const [studRes, secRes] = await Promise.all([
+        axios.get(`${API}/students?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`),
+        nextGrade ? axios.get(`${API}/students/sections/${encodeURIComponent(nextGrade)}`) : Promise.resolve({ data: { sections: [] } }),
+      ]);
+      const list = (studRes.data?.data || studRes.data || []).filter((s:any) => s.is_active !== false);
       setStudents(list);
-      setSelectedIds(list.map((s: any) => s.id));
-      // Default all students to same section
+      setSelectedIds(list.map((s:any) => s.id));
       const initSections: Record<string,string> = {};
-      list.forEach((s: any) => { initSections[s.id] = ""; });
+      list.forEach((s:any) => { initSections[s.id] = ""; });
       setStudentSections(initSections);
+      setNextSections(secRes.data?.sections || []);
       setStep("confirm");
     } catch { setMsg("❌ Could not load students."); }
     setLoading(false);
   };
 
-  // Apply default section to all selected students
   const applyDefaultSection = (section: string) => {
     setDefaultSection(section);
-    const updated: Record<string,string> = { ...studentSections };
+    const updated = { ...studentSections };
     selectedIds.forEach(id => { updated[id] = section; });
     setStudentSections(updated);
   };
@@ -3927,27 +4222,37 @@ function PromotionTab({ user, mappings }: any) {
     if (missing.length) { setMsg(`❌ Please select a section for all ${missing.length} student(s).`); return; }
     setPromoting(true);
     try {
-      // Group students by their target section and promote each group
       const sectionGroups: Record<string, string[]> = {};
       selectedIds.forEach(id => {
         const sec = studentSections[id];
         if (!sectionGroups[sec]) sectionGroups[sec] = [];
         sectionGroups[sec].push(id);
       });
-
       let totalPromoted = 0;
       for (const [targetSection, ids] of Object.entries(sectionGroups)) {
         const r = await axios.post(`${API}/students/promotion/execute`, {
-          grade: classGrade,
-          section: classSection,
-          new_section: targetSection,
-          student_ids: ids,
+          grade: classGrade, section: classSection,
+          new_section: targetSection, student_ids: ids,
         });
-        totalPromoted += r.data?.promoted || ids.length;
+        totalPromoted += r.data?.promoted_count || ids.length;
       }
-      setResult({ promoted: totalPromoted });
+      setResult({ promoted: totalPromoted, type: "promotion" });
       setStep("done");
     } catch { setMsg("❌ Promotion failed. Try again."); }
+    setPromoting(false);
+  };
+
+  const executeGraduation = async () => {
+    if (!graduationYear) { setMsg("❌ Enter graduation year"); return; }
+    setPromoting(true);
+    try {
+      const r = await axios.post(`${API}/students/graduation/execute`, {
+        grade: classGrade, section: classSection,
+        student_ids: selectedIds, graduation_year: graduationYear,
+      });
+      setResult({ promoted: r.data?.graduated || selectedIds.length, type: "graduation" });
+      setStep("done");
+    } catch { setMsg("❌ Graduation failed. Try again."); }
     setPromoting(false);
   };
 
@@ -3959,51 +4264,70 @@ function PromotionTab({ user, mappings }: any) {
     return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Only class teachers can access the Promotion tab.</div>;
   }
 
-  if (!nextGrade) {
-    return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Grade 10 is the final grade. No further promotion possible.</div>;
-  }
-
   return (
     <div className="space-y-4 w-full max-w-4xl">
-      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-indigo-800 mb-1">🎓 Student Promotion</h3>
-        <p className="text-xs text-indigo-600">
-          Promote students from <strong>{classGrade} · {classSection}</strong> to <strong>{nextGrade}</strong>.
-          You can assign each student to a different section in {nextGrade}.
+      <div className={`border rounded-xl p-4 ${isGrade10 ? "bg-amber-50 border-amber-200" : "bg-indigo-50 border-indigo-200"}`}>
+        <h3 className={`text-sm font-bold mb-1 ${isGrade10 ? "text-amber-800" : "text-indigo-800"}`}>
+          {isGrade10 ? "🎓 Student Graduation" : "🎓 Student Promotion"}
+        </h3>
+        <p className={`text-xs ${isGrade10 ? "text-amber-600" : "text-indigo-600"}`}>
+          {isGrade10
+            ? `Graduate students from ${classGrade} · ${classSection}. They will be marked as alumni and their data preserved.`
+            : `Promote students from ${classGrade} · ${classSection} to ${nextGrade}. Assign each student to their new section.`}
         </p>
       </div>
 
       {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
-      {/* Step 1 — Load */}
       {step === "preview" && (
         <div className="bg-white rounded-xl shadow p-6 text-center">
           <p className="text-sm text-gray-600 mb-1">Your class: <strong>{classGrade} · {classSection}</strong></p>
-          <p className="text-sm text-gray-600 mb-4">Will be promoted to: <strong>{nextGrade}</strong></p>
+          {isGrade10 ? (
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-3">These students will be graduated and marked as alumni.</p>
+              <div className="flex items-center justify-center gap-3">
+                <label className="text-sm text-gray-600">Graduation Year:</label>
+                <input type="text" value={graduationYear} onChange={e => setGraduationYear(e.target.value)}
+                  className="border border-gray-300 rounded px-3 py-1.5 text-sm w-24 text-center" />
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-600 mb-4">Will be promoted to: <strong>{nextGrade}</strong></p>
+          )}
           <button onClick={loadStudents} disabled={loading}
-            className="px-6 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-semibold disabled:opacity-50">
+            className={`px-6 py-2.5 text-white text-sm rounded-lg font-semibold disabled:opacity-50 ${isGrade10 ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"}`}>
             {loading ? "Loading..." : "📋 Load Student List"}
           </button>
         </div>
       )}
 
-      {/* Step 2 — Confirm with per-student section */}
       {step === "confirm" && students.length > 0 && (
         <div className="space-y-4">
-          {/* Default section apply to all */}
-          <div className="bg-white rounded-xl shadow p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">Apply same section to all students</h3>
-            <div className="flex gap-3 items-center">
-              <select value={defaultSection} onChange={e => applyDefaultSection(e.target.value)}
-                className="border border-gray-300 rounded px-3 py-2 text-sm flex-1 max-w-xs">
-                <option value="">-- Select default section for all --</option>
-                {ALL_SECTIONS.map(s => <option key={s} value={s}>{nextGrade} · {s}</option>)}
-              </select>
-              <span className="text-xs text-gray-400">Or assign individually per student below</span>
+          {/* For promotion — section selector */}
+          {!isGrade10 && (
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Apply same section to all students</h3>
+              {nextSections.length > 0 ? (
+                <div className="flex gap-3 items-center flex-wrap">
+                  <select value={defaultSection} onChange={e => applyDefaultSection(e.target.value)}
+                    className="border border-gray-300 rounded px-3 py-2 text-sm flex-1 max-w-xs">
+                    <option value="">-- Select default section for all --</option>
+                    {nextSections.map(s => <option key={s} value={s}>{nextGrade} · {s}</option>)}
+                  </select>
+                  <span className="text-xs text-gray-400">Or assign individually per student below</span>
+                </div>
+              ) : (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-xs text-yellow-700">⚠️ No sections found for {nextGrade}. Please add sections in Section Management first, or sections will be created when students are assigned.</p>
+                  <input type="text" placeholder="Type section name manually (e.g. KARANTHA)"
+                    value={defaultSection} onChange={e => applyDefaultSection(e.target.value.toUpperCase())}
+                    className="mt-2 border border-gray-300 rounded px-3 py-1.5 text-sm w-full" />
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
-          {/* Student list with individual section selection */}
+          {/* Student list */}
           <div className="bg-white rounded-xl shadow overflow-hidden">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-gray-700">
@@ -4018,31 +4342,44 @@ function PromotionTab({ user, mappings }: any) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-indigo-700 text-white text-xs">
+                  <tr className={`text-white text-xs ${isGrade10 ? "bg-amber-700" : "bg-indigo-700"}`}>
                     <th className="px-3 py-2 w-8"></th>
                     <th className="px-3 py-2 text-left">Student Name</th>
                     <th className="px-3 py-2 text-left">Admission No</th>
-                    <th className="px-3 py-2 text-left min-w-[200px]">New Section in {nextGrade} *</th>
+                    {!isGrade10 && <th className="px-3 py-2 text-left min-w-[200px]">New Section in {nextGrade} *</th>}
+                    {isGrade10 && <th className="px-3 py-2 text-center">Status</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {students.map((s: any, i: number) => (
-                    <tr key={s.id} className={`${i % 2 === 0 ? "bg-white" : "bg-gray-50"} ${!selectedIds.includes(s.id) ? "opacity-40" : ""}`}>
+                  {students.map((s:any, i:number) => (
+                    <tr key={s.id} className={`${i%2===0?"bg-white":"bg-gray-50"} ${!selectedIds.includes(s.id)?"opacity-40":""}`}>
                       <td className="px-3 py-2 text-center">
                         <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => toggleStudent(s.id)} className="accent-indigo-600" />
                       </td>
                       <td className="px-3 py-2 font-medium text-gray-800">{s.name}</td>
                       <td className="px-3 py-2 text-gray-400 text-xs">{s.admission_no || "—"}</td>
-                      <td className="px-3 py-2">
-                        <select
-                          value={studentSections[s.id] || ""}
-                          onChange={e => setStudentSections(prev => ({ ...prev, [s.id]: e.target.value }))}
-                          disabled={!selectedIds.includes(s.id)}
-                          className={`border rounded px-2 py-1 text-xs w-full ${!studentSections[s.id] && selectedIds.includes(s.id) ? "border-red-300 bg-red-50" : "border-gray-300"}`}>
-                          <option value="">-- Select section --</option>
-                          {ALL_SECTIONS.map(sec => <option key={sec} value={sec}>{sec}</option>)}
-                        </select>
-                      </td>
+                      {!isGrade10 && (
+                        <td className="px-3 py-2">
+                          {nextSections.length > 0 ? (
+                            <select value={studentSections[s.id] || ""} onChange={e => setStudentSections(prev => ({ ...prev, [s.id]: e.target.value }))}
+                              disabled={!selectedIds.includes(s.id)}
+                              className={`border rounded px-2 py-1 text-xs w-full ${!studentSections[s.id] && selectedIds.includes(s.id) ? "border-red-300 bg-red-50" : "border-gray-300"}`}>
+                              <option value="">-- Select section --</option>
+                              {nextSections.map(sec => <option key={sec} value={sec}>{sec}</option>)}
+                            </select>
+                          ) : (
+                            <input type="text" value={studentSections[s.id] || ""} placeholder="Enter section"
+                              onChange={e => setStudentSections(prev => ({ ...prev, [s.id]: e.target.value.toUpperCase() }))}
+                              disabled={!selectedIds.includes(s.id)}
+                              className="border border-gray-300 rounded px-2 py-1 text-xs w-full" />
+                          )}
+                        </td>
+                      )}
+                      {isGrade10 && (
+                        <td className="px-3 py-2 text-center">
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs">Will Graduate {graduationYear}</span>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -4050,30 +4387,45 @@ function PromotionTab({ user, mappings }: any) {
             </div>
           </div>
 
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-            <p className="text-sm font-bold text-yellow-800 mb-1">⚠️ Important</p>
-            <ul className="text-xs text-yellow-700 space-y-1 list-disc ml-4">
-              <li>Students will be moved to {nextGrade} with their selected sections immediately.</li>
-              <li>All historical PA/SA marks, activities, and competency scores are preserved.</li>
-              <li>Unselected students remain in {classGrade} · {classSection}.</li>
-              <li>This cannot be undone from the teacher dashboard.</li>
+          <div className={`border rounded-xl p-4 ${isGrade10 ? "bg-amber-50 border-amber-200" : "bg-yellow-50 border-yellow-200"}`}>
+            <p className={`text-sm font-bold mb-1 ${isGrade10 ? "text-amber-800" : "text-yellow-800"}`}>⚠️ Important</p>
+            <ul className={`text-xs space-y-1 list-disc ml-4 ${isGrade10 ? "text-amber-700" : "text-yellow-700"}`}>
+              {isGrade10 ? (
+                <>
+                  <li>Selected students will be marked as graduated alumni for {graduationYear}.</li>
+                  <li>All their data (baseline, PASA, activities) is permanently preserved.</li>
+                  <li>They will no longer appear in active class lists.</li>
+                  <li>This cannot be undone from the teacher dashboard.</li>
+                </>
+              ) : (
+                <>
+                  <li>Students will be moved to {nextGrade} with their selected sections immediately.</li>
+                  <li>All historical data (PA/SA marks, activities, baseline) is preserved.</li>
+                  <li>Unselected students remain in {classGrade} · {classSection}.</li>
+                  <li>This cannot be undone from the teacher dashboard.</li>
+                </>
+              )}
             </ul>
           </div>
 
-          <button onClick={executePromotion} disabled={promoting || !selectedIds.length}
-            className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-semibold disabled:opacity-50">
-            {promoting ? "Promoting..." : `✅ Promote ${selectedIds.length} Students to ${nextGrade}`}
+          <button onClick={isGrade10 ? executeGraduation : executePromotion} disabled={promoting || !selectedIds.length}
+            className={`px-6 py-2.5 text-white text-sm rounded-lg font-semibold disabled:opacity-50 ${isGrade10 ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"}`}>
+            {promoting ? "Processing..." : isGrade10
+              ? `🎓 Graduate ${selectedIds.length} Students (${graduationYear})`
+              : `✅ Promote ${selectedIds.length} Students to ${nextGrade}`}
           </button>
         </div>
       )}
 
-      {/* Step 3 — Done */}
       {step === "done" && result && (
         <div className="bg-white rounded-xl shadow p-8 text-center">
-          <div className="text-5xl mb-4">🎉</div>
-          <h3 className="text-xl font-bold text-green-700 mb-2">Promotion Complete!</h3>
-          <p className="text-gray-600">{result.promoted} students promoted to <strong>{nextGrade}</strong></p>
-          <p className="text-sm text-gray-400 mt-1">Each student assigned to their selected section.</p>
+          <div className="text-5xl mb-4">{result.type === "graduation" ? "🎓" : "🎉"}</div>
+          <h3 className="text-xl font-bold text-green-700 mb-2">
+            {result.type === "graduation" ? "Graduation Complete!" : "Promotion Complete!"}
+          </h3>
+          <p className="text-gray-600">
+            {result.promoted} students {result.type === "graduation" ? `graduated (${graduationYear})` : `promoted to ${nextGrade}`}
+          </p>
           <button onClick={() => { setStep("preview"); setStudents([]); setResult(null); setMsg(""); }}
             className="mt-4 px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
             ↩ Back
@@ -4083,6 +4435,7 @@ function PromotionTab({ user, mappings }: any) {
     </div>
   );
 }
+
 function HomeworkTab({ user, mappings, academicYear }: any) {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [gapSource, setGapSource] = useState<"baseline" | "pasa" | "activities">("baseline");
@@ -4334,7 +4687,7 @@ function getLevel(score: number) {
 // EXAM CONFIG TAB
 // ─────────────────────────────────────────────────────────────────
 function ExamConfigTab({ user, mappings, academicYear }: any) {
-  const API = "https://cbas-backend-production.up.railway.app";
+  const API = "http://localhost:3000";
   const EXAM_TYPES = ["PA1","PA2","SA1","PA3","PA4","SA2","Custom"];
   const grade = mappings?.class_grade || user?.class_teacher_of?.split(' ').slice(0,-1).join(' ') || "";
 
@@ -4436,7 +4789,7 @@ function ExamConfigTab({ user, mappings, academicYear }: any) {
 // BASELINE ENTRY TAB
 // ─────────────────────────────────────────────────────────────────
 function BaselineDashTab({ user, mappings, academicYear }: any) {
-  const API = "https://cbas-backend-production.up.railway.app";
+  const API = "http://localhost:3000";
   const ROUNDS = [
     { value: "baseline_1", label: "Round 1" },
     { value: "baseline_2", label: "Round 2" },
@@ -4760,7 +5113,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
 }
 
 function BaselineEntryTab({ user, mappings, academicYear }: any) {
-  const API = "https://cbas-backend-production.up.railway.app";
+  const API = "http://localhost:3000";
   const LITERACY_DOMAINS2 = ["Listening", "Speaking", "Reading", "Writing"];
   const NUMERACY_DOMAINS2 = ["Operations", "Base 10", "Measurement", "Geometry"];
   const GRADE_TO_STAGE2: Record<string, string> = {
