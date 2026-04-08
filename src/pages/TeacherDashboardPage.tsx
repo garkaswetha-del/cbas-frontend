@@ -3854,8 +3854,12 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
   const fetchCompetencies = async () => {
     setLoadingComp(true);
     try {
-      const r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(selectedSubject)}`);
-      setCompetencies(r.data?.competencies || r.data || []);
+      const g = mappings?.class_grade || grade;
+      let url = `${API}/activities/competencies?subject=${encodeURIComponent(selectedSubject)}`;
+      if (g) url += `&grade=${encodeURIComponent(g)}`;
+      const r = await axios.get(url);
+      const data = r.data?.competencies || r.data || [];
+      setCompetencies(Array.isArray(data) ? data : []);
     } catch { }
     setLoadingComp(false);
   };
@@ -4478,14 +4482,24 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
   useEffect(() => { fetchStudents(); }, [mappings, academicYear]);
 
   const fetchStudents = async () => {
-    if (!mappings) return;
     setLoadingStudents(true);
     try {
       let allStudents: any[] = [];
-      if (isClassTeacher && mappings.class_grade && mappings.class_section) {
-        const r = await axios.get(`${API}/students?grade=${encodeURIComponent(mappings.class_grade)}&section=${encodeURIComponent(mappings.class_section)}`);
+      // Try class teacher mapping first
+      const cg = mappings?.class_grade;
+      const cs = mappings?.class_section;
+      // Fallback: parse from user.class_teacher_of
+      let fallbackGrade = cg, fallbackSection = cs;
+      if (!cg && user?.class_teacher_of) {
+        const parts = user.class_teacher_of.trim().split(' ').filter(Boolean);
+        fallbackSection = parts[parts.length - 1];
+        fallbackGrade = parts.slice(0, -1).join(' ');
+        if (/^\d+$/.test(fallbackGrade)) fallbackGrade = `Grade ${fallbackGrade}`;
+      }
+      if (fallbackGrade && fallbackSection) {
+        const r = await axios.get(`${API}/students?grade=${encodeURIComponent(fallbackGrade)}&section=${encodeURIComponent(fallbackSection)}`);
         allStudents = r.data?.data || r.data || [];
-      } else if (mappings.sections?.length > 0) {
+      } else if (mappings?.sections?.length > 0) {
         // Subject teacher — fetch from all assigned sections
         for (const sec of mappings.sections) {
           const r = await axios.get(`${API}/students?grade=${encodeURIComponent(sec.grade)}&section=${encodeURIComponent(sec.section)}`);
