@@ -5151,8 +5151,7 @@ function LearningResourcesTab({ user, academicYear }: any) {
         const d = (c.domain || c.name || "").toLowerCase();
         return d.includes(gap.domain.toLowerCase()) || gap.domain.toLowerCase().includes(d.split(" ")[0]);
       }).slice(0, 5);
-      const compList = filtered.map((c: any) => `- ${c.code || ""}: ${c.name || c.description || ""}`).join("
-");
+      const compList = filtered.map((c: any) => `- ${c.code || ""}: ${c.name || c.description || ""}`).join("\n");
 
       const prompt = `You are an expert educational resource curator for teacher professional development in India.
 
