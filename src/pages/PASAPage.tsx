@@ -1,1734 +1,755 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
-import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, Cell,
-} from "recharts";
 
 const API = "https://cbas-backend-production.up.railway.app";
-const EXAM_TYPES = ["PA1", "PA2", "SA1", "PA3", "PA4", "SA2", "Custom"];
+const EXAM_TYPES = ["FA1", "FA2", "SA1", "FA3", "FA4", "SA2", "Custom"];
+const ACADEMIC_YEARS = ["2025-26", "2024-25", "2026-27"];
 
-const ACADEMIC_YEARS = Array.from({ length: 10 }, (_, i) => {
-  const y = 2025 + i;
-  return `${y}-${String(y + 1).slice(2)}`;
-});
-
-const BAND_COLORS: Record<string, string> = {
-  "A": "#ef4444", "M2": "#f97316", "M1": "#f59e0b",
-  "E2": "#84cc16", "E1": "#10b981", "A+": "#6366f1",
-};
-
-const SUBJECT_COLORS = [
-  "#ef4444", "#f97316", "#10b981", "#8b5cf6",
-  "#06b6d4", "#f59e0b", "#ec4899", "#84cc16", "#14b8a6", "#6366f1",
-];
-
-const fmtPct = (n: number) => `${n.toFixed(1)}%`;
-const scoreBg = (p: number) => p >= 80 ? "bg-green-100 text-green-800" : p >= 60 ? "bg-blue-100 text-blue-800" : p >= 40 ? "bg-yellow-100 text-yellow-800" : p > 0 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-400";
-const scoreColor = (p: number) => p >= 80 ? "text-green-600" : p >= 60 ? "text-blue-600" : p >= 40 ? "text-yellow-600" : p > 0 ? "text-red-500" : "text-gray-400";
-const n = (v: any) => +(v ?? 0);
-
-function RankingLineChart({ students, title }: { students: any[], title: string }) {
-  const data = [...students]
-    .sort((a, b) => n(b.grand_percentage) - n(a.grand_percentage))
-    .map((s, i) => ({
-      name: s.student_name?.split(" ")[0] + (s.student_name?.split(" ")[1] ? " " + s.student_name.split(" ")[1][0] + "." : ""),
-      fullName: s.student_name,
-      rank: i + 1,
-      "Grand Percentage": n(s.grand_percentage),
-      section: s.section,
-    }));
-
-  return (
-    <div className="bg-white rounded-xl shadow p-4">
-      <h3 className="text-sm font-semibold text-gray-700 mb-1">{title}</h3>
-      <p className="text-xs text-gray-400 mb-3">Students sorted high to low by Grand % · X = Student · Y = Grand %</p>
-      <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 80 }}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" tick={{ fontSize: 8 }} angle={-45} textAnchor="end" interval={0} />
-          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} label={{ value: "Grand Percentage", angle: -90, position: "insideLeft", style: { fontSize: 9 } }} />
-          <Tooltip formatter={(v: any, _, props) => [`${n(v).toFixed(1)}% (Rank #${props.payload.rank})`, props.payload.fullName]} />
-          <Line type="monotone" dataKey="Grand Percentage" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 3 }} activeDot={{ r: 6 }} />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  );
+function getBand(pct: number) {
+  if (pct >= 90) return { label: "A+", color: "text-green-700 bg-green-100" };
+  if (pct >= 75) return { label: "A", color: "text-blue-700 bg-blue-100" };
+  if (pct >= 60) return { label: "B", color: "text-indigo-700 bg-indigo-100" };
+  if (pct >= 40) return { label: "C", color: "text-yellow-700 bg-yellow-100" };
+  return { label: "D", color: "text-red-700 bg-red-100" };
 }
 
-function GrandVsSubjectChart({ data, subjectName, color }: { data: any[], subjectName: string, color: string }) {
-  const chartData = [...data]
-    .sort((a, b) => n(b.grand_percentage) - n(a.grand_percentage))
-    .map(s => ({
-      name: s.student_name?.split(" ")[0],
-      fullName: s.student_name,
-      "Grand Percentage": n(s.grand_percentage),
-      [subjectName]: n(s.subject_percentage),
-    }));
-
+function KPICard({ label, value, color }: any) {
   return (
-    <div className="border border-gray-200 rounded-lg p-3">
-      <p className="text-xs font-bold text-gray-700 mb-2">Grand % vs {subjectName}</p>
-      <ResponsiveContainer width="100%" height={220}>
-        <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 60 }}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" tick={{ fontSize: 7 }} angle={-45} textAnchor="end" interval={0} />
-          <YAxis domain={[0, 100]} tick={{ fontSize: 9 }} />
-          <Tooltip formatter={(v: any, name: any, props) => [`${n(v).toFixed(1)}%`, name === "Grand Percentage" ? `Grand % (${props.payload.fullName})` : name]} />
-          <Legend wrapperStyle={{ fontSize: "10px" }} />
-          <Line type="monotone" dataKey="Grand Percentage" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 2 }} activeDot={{ r: 5 }} />
-          <Line type="monotone" dataKey={subjectName} stroke={color} strokeWidth={2} dot={{ fill: color, r: 2 }} activeDot={{ r: 5 }} />
-        </LineChart>
-      </ResponsiveContainer>
+    <div className={`bg-white rounded-xl shadow p-4 border-l-4 ${color}`}>
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-2xl font-bold text-gray-800">{value ?? "—"}</p>
     </div>
   );
 }
 
 export default function PASAPage() {
-  const [activeTab, setActiveTab] = useState<"entry" | "dashboard">("entry");
+  const [activeTab, setActiveTab] = useState<"config" | "entry" | "dashboard" | "clear">("config");
   const [academicYear, setAcademicYear] = useState("2025-26");
-
-  // Entry
-  const [grades, setGrades] = useState<string[]>([]);
-  const [entryGrade, setEntryGrade] = useState("");
-  const [entryExam, setEntryExam] = useState("PA1");
-  const [customExam, setCustomExam] = useState("");
-  const [entrySections, setEntrySections] = useState<string[]>([]);
-  const [entrySection, setEntrySection] = useState("");
-  const [subjects, setSubjects] = useState<{ subject: string; max_marks: number }[]>([]);
-  const [newSubject, setNewSubject] = useState("");
-  const [newMax, setNewMax] = useState(100);
-  const [marksTable, setMarksTable] = useState<any>(null);
-  const [marks, setMarks] = useState<Record<string, Record<string, any>>>({});
-  const [saving, setSaving] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [message, setMessage] = useState("");
-  const [configSaved, setConfigSaved] = useState(false);
-  const [sortCol, setSortCol] = useState("grand_percentage");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  // Dashboard
-  const [dashTab, setDashTab] = useState<"school" | "grade" | "section" | "student" | "alerts">("school");
-  const [dashExam, setDashExam] = useState("PA1");
-  const [dashGrade, setDashGrade] = useState("");
-  const [dashSection, setDashSection] = useState("");
-  const [dashSections, setDashSections] = useState<string[]>([]);
-  const [schoolData, setSchoolData] = useState<any>(null);
-  const [gradeData, setGradeData] = useState<any>(null);
-  const [sectionData, setSectionData] = useState<any>(null);
-  const [studentData, setStudentData] = useState<any>(null);
-  const [longData, setLongData] = useState<any>(null);
-  const [studentSearch, setStudentSearch] = useState("");
-  const [studentResults, setStudentResults] = useState<any[]>([]);
-  const [studentGrade, setStudentGrade] = useState("");
-  const [studentSection, setStudentSection] = useState("");
-  const [studentSections, setStudentSections] = useState<string[]>([]);
-  const [sectionStudents, setSectionStudents] = useState<string[]>([]);
-  const [dashSortCol, setDashSortCol] = useState("grand_percentage");
-  const [dashSortDir, setDashSortDir] = useState<"asc" | "desc">("desc");
-  const [pasaAlerts, setPasaAlerts] = useState<any[]>([]);
-  const [alertGrade, setAlertGrade] = useState("");
-  const [alertSection, setAlertSection] = useState("");
-  const [alertSections, setAlertSections] = useState<string[]>([]);
-
-  const effectiveExam = entryExam === "Custom" ? customExam : entryExam;
-
-  // ── LOAD GRADES ───────────────────────────────────────────────
-  useEffect(() => { fetchGrades(); }, []);
-
-  const fetchGrades = async () => {
-    try {
-      const res = await axios.get(`${API}/students?limit=2000`);
-      const students = res.data?.data || res.data || [];
-      const gradeSet = [...new Set(students.map((s: any) => s.current_class).filter(Boolean))] as string[];
-      const sorted = gradeSet.sort((a, b) => {
-        const na = parseInt(a.replace(/\D/g, "")) || 0;
-        const nb = parseInt(b.replace(/\D/g, "")) || 0;
-        return na - nb;
-      });
-      setGrades(sorted);
-      if (sorted.length) {
-        setEntryGrade(sorted[0]);
-        setDashGrade(sorted[0]);
-        setStudentGrade(sorted[0]);
-      }
-    } catch { }
-  };
-
-  // ── ENTRY EFFECTS ─────────────────────────────────────────────
-  useEffect(() => { if (entryGrade) fetchEntrySections(); }, [entryGrade]);
-  useEffect(() => { if (entryGrade && effectiveExam) fetchConfig(); }, [entryGrade, effectiveExam, academicYear]);
-  useEffect(() => {
-    if (entryGrade && entrySection && effectiveExam && configSaved) fetchMarksTable();
-  }, [entryGrade, entrySection, effectiveExam, configSaved, academicYear]);
-
-  const fetchEntrySections = async () => {
-    try {
-      let secs: string[] = [];
-      const r = await axios.get(`${API}/pasa/sections?academic_year=${academicYear}&grade=${encodeURIComponent(entryGrade)}`);
-      secs = r.data || [];
-      if (!secs.length) {
-        const sr = await axios.get(`${API}/students?limit=2000`);
-        const st = sr.data?.data || sr.data || [];
-        secs = ([...new Set(st.filter((s: any) => s.current_class === entryGrade).map((s: any) => s.section).filter(Boolean))] as string[]).sort();
-      }
-      setEntrySections(secs);
-      setEntrySection(secs[0] || "");
-    } catch { }
-  };
-
-  const fetchConfig = async () => {
-    try {
-      const r = await axios.get(`${API}/pasa/config?academic_year=${academicYear}&exam_type=${effectiveExam}&grade=${encodeURIComponent(entryGrade)}`);
-      if (r.data?.length) {
-        setSubjects(r.data.map((c: any) => ({ subject: c.subject, max_marks: n(c.max_marks) })));
-        setConfigSaved(true);
-      } else {
-        try {
-          const pr = await axios.get(`${API}/pasa/subjects?academic_year=${academicYear}&exam_type=PA1&grade=${encodeURIComponent(entryGrade)}`);
-          if (pr.data?.length) setSubjects(pr.data.map((s: string) => ({ subject: s, max_marks: 100 })));
-          else setSubjects([]);
-        } catch { setSubjects([]); }
-        setConfigSaved(false);
-      }
-    } catch { }
-  };
-
-  const fetchMarksTable = async () => {
-    try {
-      const r = await axios.get(`${API}/pasa/marks/table?academic_year=${academicYear}&exam_type=${effectiveExam}&grade=${encodeURIComponent(entryGrade)}&section=${encodeURIComponent(entrySection)}`);
-      setMarksTable(r.data);
-      const m: Record<string, Record<string, any>> = {};
-      (r.data?.students || []).forEach((s: any) => {
-        m[s.student_name] = {};
-        Object.keys(s.subjects).forEach(sub => {
-          m[s.student_name][sub] = {
-            marks: s.subjects[sub].marks !== null && s.subjects[sub].marks !== undefined ? String(s.subjects[sub].marks) : "",
-            is_absent: s.subjects[sub].is_absent || false,
-          };
-        });
-      });
-      setMarks(m);
-    } catch { }
-  };
-
-  const saveConfig = async () => {
-    if (!subjects.length) { setMessage("❌ Add at least one subject"); setTimeout(() => setMessage(""), 3000); return; }
-    if (!effectiveExam) { setMessage("❌ Enter exam name"); setTimeout(() => setMessage(""), 3000); return; }
-    try {
-      await axios.post(`${API}/pasa/config`, { academic_year: academicYear, exam_type: effectiveExam, grade: entryGrade, subjects });
-      setConfigSaved(true);
-      setMessage("✅ Config saved");
-      if (entrySection) fetchMarksTable();
-    } catch { setMessage("❌ Error saving config"); }
-    setTimeout(() => setMessage(""), 3000);
-  };
-
-  const addSubject = () => {
-    if (!newSubject.trim()) return;
-    if (subjects.find(s => s.subject === newSubject.trim().toUpperCase())) return;
-    setSubjects(prev => [...prev, { subject: newSubject.trim().toUpperCase(), max_marks: newMax }]);
-    setNewSubject(""); setNewMax(100);
-  };
-
-  const updateMark = (name: string, sub: string, val: string) => {
-    setMarks(prev => ({ ...prev, [name]: { ...(prev[name] || {}), [sub]: { ...((prev[name] || {})[sub] || {}), marks: val } } }));
-  };
-
-  const toggleAbsent = (name: string, sub: string) => {
-    setMarks(prev => {
-      const current = prev[name]?.[sub]?.is_absent || false;
-      return { ...prev, [name]: { ...(prev[name] || {}), [sub]: { marks: "", is_absent: !current } } };
-    });
-  };
-
-  const saveMarks = async () => {
-    if (!marksTable) return;
-    setSaving(true);
-    try {
-      const entries: any[] = [];
-      marksTable.students.forEach((student: any) => {
-        marksTable.subjects.forEach((sub: string) => {
-          const config = marksTable.configs?.find((c: any) => c.subject === sub);
-          const md = marks[student.student_name]?.[sub];
-          const maxMarks = n(config?.max_marks) || 100;
-          const marksObtained = md?.is_absent ? null : (md?.marks === "" || md?.marks === undefined ? null : parseFloat(String(md.marks)));
-          entries.push({
-            student_id: student.student_id, student_name: student.student_name,
-            roll_number: student.roll_number, subject: sub,
-            marks_obtained: isNaN(marksObtained as number) ? null : marksObtained,
-            max_marks: maxMarks, is_absent: md?.is_absent || false,
-          });
-        });
-      });
-      await axios.post(`${API}/pasa/marks`, { academic_year: academicYear, exam_type: effectiveExam, grade: entryGrade, section: entrySection, entries });
-      setMessage("✅ Marks saved successfully");
-      fetchMarksTable();
-    } catch { setMessage("❌ Error saving marks"); }
-    setSaving(false);
-    setTimeout(() => setMessage(""), 3000);
-  };
-
-  const importExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    const fd = new FormData();
-    fd.append("file", file); fd.append("academic_year", academicYear); fd.append("exam_type", effectiveExam || "PA3");
-    try {
-      const r = await axios.post(`${API}/pasa/import`, fd, { headers: { "Content-Type": "multipart/form-data" } });
-      setMessage(`✅ Imported: ${r.data.sheets_processed} sheets, ${r.data.marks_saved} marks`);
-      setConfigSaved(true);
-      await fetchConfig();
-      if (entrySection) fetchMarksTable();
-    } catch { setMessage("❌ Import failed"); }
-    setImporting(false);
-    setTimeout(() => setMessage(""), 5000);
-    if (fileRef.current) fileRef.current.value = "";
-  };
-
-  const sortedStudents = marksTable ? [...(marksTable.students || [])].map((s: any) => {
-    let to = 0, tm = 0;
-    (marksTable?.subjects || []).forEach((sub: string) => {
-      const cfg = marksTable?.configs?.find((c: any) => c.subject === sub);
-      const md = marks[s.student_name]?.[sub];
-      if (!md?.is_absent && md?.marks !== "" && md?.marks !== null && md?.marks !== undefined) {
-        const m = parseFloat(String(md.marks));
-        if (!isNaN(m)) { to += m; tm += n(cfg?.max_marks) || 100; }
-      }
-    });
-    return { ...s, _total: to, _max: tm, _pct: tm > 0 ? (to / tm) * 100 : 0 };
-  }).sort((a, b) => {
-    const va = sortCol === "grand_percentage" ? a._pct : n(a.subjects[sortCol]?.percentage);
-    const vb = sortCol === "grand_percentage" ? b._pct : n(b.subjects[sortCol]?.percentage);
-    return sortDir === "desc" ? vb - va : va - vb;
-  }) : [];
-
-  const toggleSort = (col: string) => {
-    if (sortCol === col) setSortDir(d => d === "desc" ? "asc" : "desc");
-    else { setSortCol(col); setSortDir("desc"); }
-  };
-
-  // ── DASHBOARD EFFECTS ─────────────────────────────────────────
-  useEffect(() => { if (activeTab === "dashboard" && dashTab === "school") fetchSchool(); }, [dashTab, dashExam, academicYear, activeTab]);
-  useEffect(() => { if (activeTab === "dashboard" && dashTab === "grade" && dashGrade) { fetchGrade(); fetchLongitudinal(); } }, [dashTab, dashExam, dashGrade, academicYear, activeTab]);
-  useEffect(() => { if (activeTab === "dashboard" && dashTab === "section" && dashGrade && dashSection) fetchSection(); }, [dashTab, dashExam, dashGrade, dashSection, academicYear, activeTab]);
-  useEffect(() => { if ((dashTab === "grade" || dashTab === "section") && dashGrade) fetchDashSections(); }, [dashGrade, dashTab]);
-  useEffect(() => { if (dashTab === "student" && studentGrade) fetchStudentSections(); }, [dashTab, studentGrade]);
-  useEffect(() => { if (studentGrade && studentSection) fetchSectionStudents(); }, [studentGrade, studentSection]);
-  useEffect(() => { if (activeTab === "dashboard" && dashTab === "alerts") fetchPasaAlerts(); }, [dashTab, academicYear, activeTab]);
-
-  const fetchPasaAlerts = async () => {
-    try {
-      const r = await axios.get(`${API}/pasa/alerts/decline?academic_year=${academicYear}`);
-      setPasaAlerts(r.data || []);
-    } catch { }
-  };
-
-  const fetchSchool = async () => {
-    try { const r = await axios.get(`${API}/pasa/analysis/school?academic_year=${academicYear}&exam_type=${dashExam}`); setSchoolData(r.data); } catch { }
-  };
-  const fetchGrade = async () => {
-    try { const r = await axios.get(`${API}/pasa/analysis/grade?academic_year=${academicYear}&exam_type=${dashExam}&grade=${encodeURIComponent(dashGrade)}`); setGradeData(r.data); } catch { }
-  };
-  const fetchSection = async () => {
-    try { const r = await axios.get(`${API}/pasa/analysis/section?academic_year=${academicYear}&exam_type=${dashExam}&grade=${encodeURIComponent(dashGrade)}&section=${encodeURIComponent(dashSection)}`); setSectionData(r.data); } catch { }
-  };
-  const fetchLongitudinal = async (sec?: string) => {
-    try {
-      const url = `${API}/pasa/analysis/longitudinal?academic_year=${academicYear}&grade=${encodeURIComponent(dashGrade)}${sec ? `&section=${encodeURIComponent(sec)}` : ""}`;
-      const r = await axios.get(url); setLongData(r.data);
-    } catch { }
-  };
-  const fetchDashSections = async () => {
-    try {
-      let secs: string[] = [];
-      const r = await axios.get(`${API}/pasa/sections?academic_year=${academicYear}&grade=${encodeURIComponent(dashGrade)}`);
-      secs = r.data || [];
-      if (!secs.length) {
-        const sr = await axios.get(`${API}/students?limit=2000`);
-        const st = sr.data?.data || sr.data || [];
-        secs = ([...new Set(st.filter((s: any) => s.current_class === dashGrade).map((s: any) => s.section).filter(Boolean))] as string[]).sort();
-      }
-      setDashSections(secs);
-      if (secs.length) setDashSection(secs[0]);
-    } catch { }
-  };
-  const fetchStudentSections = async () => {
-    try {
-      let secs: string[] = [];
-      const r = await axios.get(`${API}/pasa/sections?academic_year=${academicYear}&grade=${encodeURIComponent(studentGrade)}`);
-      secs = r.data || [];
-      if (!secs.length) {
-        const sr = await axios.get(`${API}/students?limit=2000`);
-        const st = sr.data?.data || sr.data || [];
-        secs = ([...new Set(st.filter((s: any) => s.current_class === studentGrade).map((s: any) => s.section).filter(Boolean))] as string[]).sort();
-      }
-      setStudentSections(secs);
-      if (secs.length) setStudentSection(secs[0]);
-    } catch { }
-  };
-  const fetchSectionStudents = async () => {
-    try {
-      const sr = await axios.get(`${API}/students?limit=2000`);
-      const st = sr.data?.data || sr.data || [];
-      const names = st
-        .filter((s: any) => s.current_class === studentGrade && s.section === studentSection)
-        .map((s: any) => s.name)
-        .filter(Boolean)
-        .sort();
-      setSectionStudents(names);
-    } catch { }
-  };
-  const searchStudent = async (q: string) => {
-    setStudentSearch(q);
-    if (q.length < 2) { setStudentResults([]); return; }
-    try { const r = await axios.get(`${API}/pasa/search/students?academic_year=${academicYear}&q=${encodeURIComponent(q)}`); setStudentResults(r.data || []); } catch { }
-  };
-  const fetchStudentData = async (name: string) => {
-    setStudentSearch(name); setStudentResults([]); setStudentData(null);
-    try { const r = await axios.get(`${API}/pasa/analysis/student?academic_year=${academicYear}&student_name=${encodeURIComponent(name)}`); setStudentData(r.data); } catch { }
-  };
-  const dashSortedStudents = (students: any[]) => [...students].sort((a, b) => {
-    const va = dashSortCol === "grand_percentage" ? n(a.grand_percentage) : n(a.subjects?.[dashSortCol]?.percentage);
-    const vb = dashSortCol === "grand_percentage" ? n(b.grand_percentage) : n(b.subjects?.[dashSortCol]?.percentage);
-    return dashSortDir === "desc" ? vb - va : va - vb;
-  });
-  const toggleDashSort = (col: string) => {
-    if (dashSortCol === col) setDashSortDir(d => d === "desc" ? "asc" : "desc");
-    else { setDashSortCol(col); setDashSortDir("desc"); }
-  };
-
   return (
     <div className="p-3 sm:p-6">
       <div className="mb-4 flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">PA/SA Marks — Module 3</h1>
-          <p className="text-sm text-gray-500">Periodic and Summative Assessment marks entry and analysis</p>
+          <h1 className="text-xl font-bold text-gray-800">📝 PA/SA Marks</h1>
+          <p className="text-xs text-gray-500">Competency-mapped exam system</p>
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Academic Year</label>
-          <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+          <select value={academicYear} onChange={e => setAcademicYear(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
             {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
       </div>
-
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-1 flex-nowrap">
-        {[{ id: "entry", label: "📝 Marks Entry" }, { id: "dashboard", label: "📊 Dashboard" }].map(t => (
+      <div className="flex gap-2 mb-5 overflow-x-auto pb-1 flex-nowrap">
+        {[{id:"config",label:"⚙️ Exam Configuration"},{id:"entry",label:"✏️ Marks Entry"},{id:"dashboard",label:"📊 Dashboard"},{id:"clear",label:"🗑️ Clear Data"}].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id as any)}
-            className={`px-4 py-2 text-sm rounded-lg font-medium ${activeTab === t.id ? "bg-indigo-600 text-white" : "bg-white text-gray-600 border border-gray-300 hover:bg-indigo-50"}`}>
+            className={`px-4 py-2 text-sm rounded-lg font-medium whitespace-nowrap ${activeTab === t.id ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
             {t.label}
           </button>
         ))}
       </div>
+      {activeTab === "config" && <ExamConfigTab academicYear={academicYear} />}
+      {activeTab === "entry" && <MarksEntryTab academicYear={academicYear} />}
+      {activeTab === "dashboard" && <PASADashboardTab academicYear={academicYear} />}
+      {activeTab === "clear" && <ClearDataTab />}
+    </div>
+  );
+}
 
-      {message && (
-        <div className={`mb-4 px-4 py-2 rounded text-sm border ${message.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>
-          {message}
-        </div>
-      )}
+function ExamConfigTab({ academicYear }: any) {
+  const [configs, setConfigs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ teacher_name:"", teacher_id:"", subject:"", grade:"", section:"", exam_type:"FA1", exam_date:"", description:"" });
+  const [competencies, setCompetencies] = useState<any[]>([]);
+  const [loadingComps, setLoadingComps] = useState(false);
+  const [selectedComps, setSelectedComps] = useState<any[]>([]);
+  const [grades, setGrades] = useState<string[]>([]);
+  const [filterGrade, setFilterGrade] = useState("");
 
-      {/* ── MARKS ENTRY ── */}
-      {activeTab === "entry" && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
-            <h2 className="text-sm font-bold text-gray-700 mb-3">Step 1 — Select Exam, Grade and Section</h2>
-            <div className="grid grid-cols-4 gap-3 mb-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Exam Type</label>
-                <select value={entryExam} onChange={e => { setEntryExam(e.target.value); setConfigSaved(false); setMarksTable(null); }}
-                  className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                  {EXAM_TYPES.map(e => <option key={e} value={e}>{e}</option>)}
-                </select>
+  useEffect(() => { fetchConfigs(); fetchGrades(); }, [academicYear]);
+
+  const fetchGrades = async () => {
+    try {
+      const r = await axios.get(`${API}/students/stats`);
+      setGrades((r.data?.byGrade||[]).map((g:any)=>g.grade).sort());
+    } catch {}
+  };
+
+  const fetchConfigs = async () => {
+    setLoading(true);
+    try {
+      const r = await axios.get(`${API}/pasa/config/section?grade=&section=&academic_year=${academicYear}`);
+      setConfigs(r.data?.configs||[]);
+    } catch {}
+    setLoading(false);
+  };
+
+  const fetchCompetencies = async () => {
+    if (!form.subject) return;
+    setLoadingComps(true);
+    try {
+      const r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(form.subject)}&grade=${encodeURIComponent(form.grade)}`);
+      const data = r.data?.competencies||r.data||[];
+      setCompetencies(Array.isArray(data)?data:[]);
+    } catch {}
+    setLoadingComps(false);
+  };
+
+  const toggleComp = (comp: any) => {
+    setSelectedComps(prev => {
+      const exists = prev.find((c:any)=>c.competency_id===comp.id);
+      if (exists) return prev.filter((c:any)=>c.competency_id!==comp.id);
+      return [...prev,{competency_id:comp.id,competency_code:comp.code,competency_name:comp.name,max_marks:10}];
+    });
+  };
+
+  const updateMaxMarks = (cid: string, mm: number) => setSelectedComps(p=>p.map((c:any)=>c.competency_id===cid?{...c,max_marks:mm}:c));
+  const totalMarks = selectedComps.reduce((s:number,c:any)=>s+(+c.max_marks||0),0);
+
+  const saveConfig = async () => {
+    if (!form.teacher_name||!form.subject||!form.grade||!form.section||!form.exam_type){setMsg("❌ Fill all required fields");return;}
+    if (!selectedComps.length){setMsg("❌ Select at least one competency");return;}
+    setSaving(true);
+    try {
+      const r = await axios.post(`${API}/pasa/config`,{...form,academic_year:academicYear,competencies:selectedComps});
+      if (r.data?.success){setMsg("✅ Saved!");setShowForm(false);setSelectedComps([]);fetchConfigs();}
+    } catch {setMsg("❌ Save failed");}
+    setSaving(false); setTimeout(()=>setMsg(""),3000);
+  };
+
+  const deleteConfig = async (id:string) => {
+    if (!confirm("Delete?")) return;
+    await axios.delete(`${API}/pasa/config/${id}`);
+    fetchConfigs();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <select value={filterGrade} onChange={e=>setFilterGrade(e.target.value)} className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+          <option value="">All Grades</option>
+          {grades.map(g=><option key={g} value={g}>{g}</option>)}
+        </select>
+        <button onClick={()=>setShowForm(!showForm)} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
+          {showForm?"✕ Cancel":"+ New Exam Config"}
+        </button>
+      </div>
+      {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+      {showForm&&(
+        <div className="bg-white rounded-xl shadow border border-gray-200 p-5 space-y-4">
+          <h3 className="text-sm font-bold text-gray-700">New Exam Configuration</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[{k:"teacher_name",l:"Teacher Name *",p:"Teacher name"},{k:"teacher_id",l:"Teacher ID *",p:"Teacher ID"},{k:"subject",l:"Subject *",p:"e.g. Science"},{k:"section",l:"Section *",p:"e.g. Himalaya"},{k:"exam_date",l:"Exam Date",t:"date"},{k:"description",l:"Description",p:"Optional"}].map(f=>(
+              <div key={f.k}>
+                <label className="text-xs text-gray-500 block mb-1">{f.l}</label>
+                <input type={f.t||"text"} value={(form as any)[f.k]} placeholder={f.p}
+                  onChange={e=>setForm((p:any)=>({...p,[f.k]:e.target.value}))}
+                  className="border border-gray-300 rounded px-3 py-1.5 text-sm w-full" />
               </div>
-              {entryExam === "Custom" && (
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Custom Exam Name</label>
-                  <input value={customExam} onChange={e => { setCustomExam(e.target.value); setConfigSaved(false); }}
-                    placeholder="e.g. Unit Test 1" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
-                </div>
-              )}
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Grade</label>
-                <select value={entryGrade} onChange={e => { setEntryGrade(e.target.value); setConfigSaved(false); setMarksTable(null); }}
-                  className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                  {grades.map(g => <option key={g} value={g}>{g}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Section</label>
-                <select value={entrySection} onChange={e => setEntrySection(e.target.value)}
-                  className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                  {entrySections.length ? entrySections.map(s => <option key={s} value={s}>{s}</option>) : <option value="">No sections found</option>}
-                </select>
-              </div>
+            ))}
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Grade *</label>
+              <select value={form.grade} onChange={e=>setForm((p:any)=>({...p,grade:e.target.value}))} className="border border-gray-300 rounded px-3 py-1.5 text-sm w-full">
+                <option value="">Select</option>
+                {grades.map(g=><option key={g} value={g}>{g}</option>)}
+              </select>
             </div>
-
-            <h2 className="text-sm font-bold text-gray-700 mb-2">
-              Step 2 — Subjects and Max Marks
-              <span className="ml-2 text-xs font-normal text-gray-400">(pre-filled from previous config if available)</span>
-            </h2>
-            {subjects.length > 0 && (
-              <div className="flex gap-2 mb-3 overflow-x-auto pb-1 flex-nowrap">
-                {subjects.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5">
-                    <span className="text-xs font-bold text-indigo-700">{s.subject}</span>
-                    <span className="text-xs text-gray-400">Max:</span>
-                    <input type="number" value={s.max_marks}
-                      onChange={e => setSubjects(prev => prev.map((x, j) => j === i ? { ...x, max_marks: +e.target.value } : x))}
-                      className="w-16 text-xs border border-indigo-300 rounded px-1 py-0.5 text-center font-bold text-indigo-700" />
-                    <button onClick={() => setSubjects(prev => prev.filter((_, j) => j !== i))}
-                      className="text-red-400 hover:text-red-600 text-xs font-bold">✕</button>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Exam Type *</label>
+              <select value={form.exam_type} onChange={e=>setForm((p:any)=>({...p,exam_type:e.target.value}))} className="border border-gray-300 rounded px-3 py-1.5 text-sm w-full">
+                {EXAM_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="border-t border-gray-200 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold text-gray-700">Select Competencies</h4>
+              <button onClick={fetchCompetencies} disabled={!form.subject||loadingComps}
+                className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-xs rounded-lg hover:bg-indigo-200 disabled:opacity-50">
+                {loadingComps?"Loading...":"🔍 Load Competencies"}
+              </button>
+            </div>
+            {competencies.length>0&&(
+              <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                {competencies.map((comp:any)=>{
+                  const sel=selectedComps.find((c:any)=>c.competency_id===comp.id);
+                  return (
+                    <div key={comp.id} className={`px-3 py-2 flex items-center gap-3 ${sel?"bg-indigo-50":""}`}>
+                      <input type="checkbox" checked={!!sel} onChange={()=>toggleComp(comp)} className="accent-indigo-600" />
+                      <div className="flex-1">
+                        <span className="text-xs font-medium text-indigo-700">[{comp.code}]</span>
+                        <span className="text-xs text-gray-700 ml-2">{comp.name?.slice(0,80)}</span>
+                      </div>
+                      {sel&&(
+                        <div className="flex items-center gap-1">
+                          <label className="text-xs text-gray-500">Marks:</label>
+                          <input type="number" value={sel.max_marks} min={1} max={100}
+                            onChange={e=>updateMaxMarks(comp.id,+e.target.value)}
+                            className="border border-gray-300 rounded px-2 py-0.5 text-xs w-16 text-center" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {selectedComps.length>0&&(
+              <div className="mt-3 bg-indigo-50 rounded-lg p-3">
+                <p className="text-xs font-bold text-indigo-800 mb-2">{selectedComps.length} competencies · Total: {totalMarks} marks</p>
+                {selectedComps.map((c:any)=>(
+                  <div key={c.competency_id} className="flex items-center justify-between text-xs py-0.5">
+                    <span className="text-indigo-700">[{c.competency_code}] {c.competency_name?.slice(0,50)}</span>
+                    <span className="font-bold text-indigo-800">{c.max_marks} marks</span>
                   </div>
                 ))}
               </div>
             )}
-            <div className="flex gap-2 items-end mb-3 flex-wrap">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Add Subject</label>
-                <input value={newSubject} onChange={e => setNewSubject(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && addSubject()}
-                  placeholder="e.g. MATHEMATICS" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-44" />
+          </div>
+          <button onClick={saveConfig} disabled={saving} className="px-5 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+            {saving?"Saving...":"💾 Save Exam Config"}
+          </button>
+        </div>
+      )}
+      {loading?(
+        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">Loading...</div>
+      ):configs.filter((c:any)=>!filterGrade||c.grade===filterGrade).length===0?(
+        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400"><p className="text-2xl mb-2">📭</p><p className="text-sm">No configurations yet.</p></div>
+      ):(
+        <div className="bg-white rounded-xl shadow overflow-hidden">
+          <div className="px-4 py-3 bg-gray-50 border-b"><span className="text-sm font-semibold text-gray-700">{configs.filter((c:any)=>!filterGrade||c.grade===filterGrade).length} Configurations</span></div>
+          <div className="divide-y divide-gray-100">
+            {configs.filter((c:any)=>!filterGrade||c.grade===filterGrade).map((c:any)=>(
+              <div key={c.id} className="px-4 py-3 flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">{c.exam_type}</span>
+                    <span className="text-sm font-medium text-gray-800">{c.subject}</span>
+                    <span className="text-xs text-gray-500">· {c.grade} {c.section} · {c.teacher_name}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">{(c.competencies as any[])?.length||0} competencies · Total: {c.total_marks} marks{c.exam_date?` · ${c.exam_date}`:""}</p>
+                </div>
+                <button onClick={()=>deleteConfig(c.id)} className="text-xs text-red-500 hover:text-red-700 ml-3">Delete</button>
               </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Max Marks</label>
-                <input type="number" value={newMax} onChange={e => setNewMax(+e.target.value)}
-                  className="border border-gray-300 rounded px-2 py-1.5 text-sm w-24" />
-              </div>
-              <button onClick={addSubject} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-200">+ Add Subject</button>
-              <button onClick={saveConfig} className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">💾 Save Config & Load Table</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MarksEntryTab({ academicYear }: any) {
+  const [grade,setGrade]=useState("");
+  const [section,setSection]=useState("");
+  const [subject,setSubject]=useState("");
+  const [examType,setExamType]=useState("FA1");
+  const [grades,setGrades]=useState<string[]>([]);
+  const [sections,setSections]=useState<string[]>([]);
+  const [config,setConfig]=useState<any>(null);
+  const [students,setStudents]=useState<any[]>([]);
+  const [marks,setMarks]=useState<Record<string,Record<string,number|null>>>({});
+  const [absent,setAbsent]=useState<Record<string,boolean>>({});
+  const [loading,setLoading]=useState(false);
+  const [saving,setSaving]=useState(false);
+  const [msg,setMsg]=useState("");
+
+  useEffect(()=>{fetchGrades();},[]);
+  useEffect(()=>{if(grade)fetchSections();},[grade]);
+
+  const fetchGrades=async()=>{try{const r=await axios.get(`${API}/students/stats`);setGrades((r.data?.byGrade||[]).map((g:any)=>g.grade).sort());}catch{}};
+  const fetchSections=async()=>{try{const r=await axios.get(`${API}/students/sections/${encodeURIComponent(grade)}`);setSections(r.data?.sections||[]);}catch{}};
+
+  const loadConfig=async()=>{
+    if(!grade||!section||!subject||!examType){setMsg("❌ Fill all fields");return;}
+    setLoading(true);setConfig(null);setStudents([]);
+    try{
+      const cr=await axios.get(`${API}/pasa/config/entry?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}&subject=${encodeURIComponent(subject)}&exam_type=${examType}&academic_year=${academicYear}`);
+      const cfg=cr.data;
+      if(!cfg?.id){setMsg("❌ No config found. Create in Exam Configuration tab first.");setLoading(false);return;}
+      setConfig(cfg);
+      const sr=await axios.get(`${API}/pasa/marks/entry?exam_config_id=${cfg.id}&grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}`);
+      const sl=sr.data?.students||[];
+      setStudents(sl);
+      const im:Record<string,Record<string,number|null>>={};
+      const ia:Record<string,boolean>={};
+      sl.forEach((s:any)=>{
+        im[s.student_id]={};
+        ia[s.student_id]=s.existing_marks?.is_absent||false;
+        const cs=s.existing_marks?.competency_scores||[];
+        (cfg.competencies as any[]).forEach((c:any)=>{
+          const ex=cs.find((x:any)=>x.competency_id===c.competency_id);
+          im[s.student_id][c.competency_id]=ex?.marks_obtained??null;
+        });
+      });
+      setMarks(im);setAbsent(ia);
+    }catch{setMsg("❌ Failed to load.");}
+    setLoading(false);
+  };
+
+  const calcTotal=(sid:string)=>{
+    if(absent[sid]||!config)return{total:0,pct:0};
+    let total=0;
+    (config.competencies as any[]).forEach((c:any)=>{total+=+(marks[sid]?.[c.competency_id]||0);});
+    return{total,pct:config.total_marks>0?+((total/config.total_marks)*100).toFixed(1):0};
+  };
+
+  const saveMarks=async()=>{
+    if(!config||!students.length)return;
+    setSaving(true);
+    try{
+      const entries=students.map((s:any)=>({
+        student_id:s.student_id,student_name:s.student_name,is_absent:absent[s.student_id]||false,
+        competency_scores:(config.competencies as any[]).map((c:any)=>({
+          competency_id:c.competency_id,competency_code:c.competency_code,competency_name:c.competency_name,
+          marks_obtained:absent[s.student_id]?null:(marks[s.student_id]?.[c.competency_id]??null),
+          max_marks:c.max_marks,
+        })),
+      }));
+      await axios.post(`${API}/pasa/marks`,{exam_config_id:config.id,grade,section,subject,exam_type:examType,academic_year:academicYear,teacher_id:config.teacher_id,entries});
+      setMsg("✅ Marks saved!");
+    }catch{setMsg("❌ Save failed.");}
+    setSaving(false);setTimeout(()=>setMsg(""),3000);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl shadow p-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div><label className="text-xs text-gray-500 block mb-1">Grade</label>
+          <select value={grade} onChange={e=>setGrade(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+            <option value="">Select</option>{grades.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
+        <div><label className="text-xs text-gray-500 block mb-1">Section</label>
+          <select value={section} onChange={e=>setSection(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+            <option value="">Select</option>{sections.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+        <div><label className="text-xs text-gray-500 block mb-1">Subject</label>
+          <input type="text" value={subject} onChange={e=>setSubject(e.target.value)} placeholder="e.g. Science" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
+        <div><label className="text-xs text-gray-500 block mb-1">Exam Type</label>
+          <select value={examType} onChange={e=>setExamType(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+            {EXAM_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+        <div className="flex items-end">
+          <button onClick={loadConfig} disabled={loading} className="w-full px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
+            {loading?"Loading...":"Load"}</button></div>
+      </div>
+      {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+      {config&&students.length>0&&(
+        <div className="space-y-3">
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="text-sm font-bold text-indigo-800">{config.exam_type} — {config.subject} · {grade} {section}</p>
+              <p className="text-xs text-indigo-600">{(config.competencies as any[]).length} competencies · Total: {config.total_marks} marks</p>
             </div>
-            <div className="flex gap-3 items-center pt-3 border-t border-gray-100 flex-wrap">
-              <p className="text-xs text-gray-500 font-medium">Import from Excel:</p>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={importExcel} className="hidden" />
-              <button onClick={() => fileRef.current?.click()} disabled={importing}
-                className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
-                {importing ? "Importing..." : "📥 Import Excel"}
-              </button>
-              <p className="text-xs text-gray-400">Select exam type first — file auto-detects grades and sections</p>
+            <button onClick={saveMarks} disabled={saving} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+              {saving?"Saving...":"💾 Save All Marks"}</button>
+          </div>
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-indigo-700 text-white">
+                    <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 z-10 min-w-[160px]">Student</th>
+                    <th className="px-2 py-2 text-center w-16">Absent</th>
+                    {(config.competencies as any[]).map((c:any)=>(
+                      <th key={c.competency_id} className="px-2 py-2 text-center min-w-[80px]">
+                        <div className="text-xs font-medium">{c.competency_code}</div>
+                        <div className="text-xs text-indigo-200">/{c.max_marks}</div>
+                      </th>
+                    ))}
+                    <th className="px-2 py-2 text-center min-w-[60px]">Total/{config.total_marks}</th>
+                    <th className="px-2 py-2 text-center min-w-[50px]">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((s:any,i:number)=>{
+                    const {total,pct}=calcTotal(s.student_id);
+                    const isAbs=absent[s.student_id];
+                    const band=pct>0?getBand(pct):null;
+                    return (
+                      <tr key={s.student_id} className={i%2===0?"bg-white":"bg-gray-50"}>
+                        <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
+                        <td className="px-2 py-2 text-center">
+                          <input type="checkbox" checked={isAbs} onChange={e=>setAbsent(p=>({...p,[s.student_id]:e.target.checked}))} className="accent-red-500" /></td>
+                        {(config.competencies as any[]).map((c:any)=>(
+                          <td key={c.competency_id} className="px-2 py-2 text-center">
+                            <input type="number" min={0} max={c.max_marks}
+                              value={marks[s.student_id]?.[c.competency_id]??""}
+                              disabled={isAbs}
+                              onChange={e=>{
+                                const v=e.target.value===""?null:Math.min(+e.target.value,c.max_marks);
+                                setMarks(p=>({...p,[s.student_id]:{...p[s.student_id],[c.competency_id]:v}}));
+                              }}
+                              className="border border-gray-300 rounded px-1 py-0.5 w-14 text-center text-xs disabled:bg-gray-100" />
+                          </td>
+                        ))}
+                        <td className="px-2 py-2 text-center font-bold text-gray-700">
+                          {isAbs?<span className="text-red-500 text-xs">Absent</span>:total}</td>
+                        <td className="px-2 py-2 text-center">
+                          {!isAbs&&pct>0&&band&&<span className={`px-1.5 py-0.5 rounded text-xs font-bold ${band.color}`}>{pct}%</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
+          <button onClick={saveMarks} disabled={saving} className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+            {saving?"Saving...":"💾 Save All Marks"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
 
-          {configSaved && marksTable && (
-            <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
-                <div>
-                  <h2 className="text-sm font-bold text-gray-700">
-                    Step 3 — Enter Marks: {entryGrade} — {entrySection} — {effectiveExam}
-                  </h2>
-                  <p className="text-xs text-gray-500 mt-0.5">{sortedStudents.length} students · Click headers to sort · AB = Mark as Absent</p>
+function PASADashboardTab({ academicYear }: any) {
+  const [dashTab,setDashTab]=useState<"school"|"grade"|"section"|"student"|"alerts">("school");
+  const [grade,setGrade]=useState("");
+  const [section,setSection]=useState("");
+  const [examType,setExamType]=useState("");
+  const [grades,setGrades]=useState<string[]>([]);
+  const [sections,setSections]=useState<string[]>([]);
+  const [data,setData]=useState<any>(null);
+  const [loading,setLoading]=useState(false);
+
+  useEffect(()=>{fetchGrades();},[]);
+  useEffect(()=>{if(grade)fetchSections();},[grade]);
+  useEffect(()=>{fetchData();},[dashTab,academicYear,grade,section,examType]);
+
+  const fetchGrades=async()=>{try{const r=await axios.get(`${API}/students/stats`);setGrades((r.data?.byGrade||[]).map((g:any)=>g.grade).sort());}catch{}};
+  const fetchSections=async()=>{try{const r=await axios.get(`${API}/students/sections/${encodeURIComponent(grade)}`);setSections(r.data?.sections||[]);}catch{}};
+
+  const fetchData=async()=>{
+    setLoading(true);setData(null);
+    try{
+      const et=examType?`&exam_type=${examType}`:"";
+      if(dashTab==="school"){const r=await axios.get(`${API}/pasa/dashboard/school?academic_year=${academicYear}${et}`);setData(r.data);}
+      else if(dashTab==="grade"&&grade){const r=await axios.get(`${API}/pasa/dashboard/grade/${encodeURIComponent(grade)}?academic_year=${academicYear}${et}`);setData(r.data);}
+      else if(dashTab==="section"&&grade&&section){const r=await axios.get(`${API}/pasa/dashboard/section?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}&academic_year=${academicYear}${et}`);setData(r.data);}
+      else if(dashTab==="student"){} // handled by StudentDashboard component
+      else if(dashTab==="alerts"){const r=await axios.get(`${API}/pasa/alerts/decline?academic_year=${academicYear}${grade?`&grade=${encodeURIComponent(grade)}`:""}${section?`&section=${encodeURIComponent(section)}`:""}`);setData(r.data);}
+    }catch{}
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 overflow-x-auto pb-1 flex-nowrap items-center">
+        {[{id:"school",label:"🏫 School"},{id:"grade",label:"📚 Grade"},{id:"section",label:"🏛 Section"},{id:"student",label:"👤 Student"},{id:"alerts",label:"⚠️ Alerts"}].map(t=>(
+          <button key={t.id} onClick={()=>setDashTab(t.id as any)}
+            className={`px-4 py-2 text-sm rounded-lg font-medium whitespace-nowrap ${dashTab===t.id?"bg-indigo-600 text-white":"bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
+            {t.label}</button>
+        ))}
+        <button onClick={fetchData} className="ml-auto px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">🔄 Refresh</button>
+      </div>
+      <div className="bg-white rounded-xl shadow p-3 flex gap-3 flex-wrap items-end">
+        <div><label className="text-xs text-gray-500 block mb-1">Exam Type</label>
+          <select value={examType} onChange={e=>setExamType(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+            <option value="">All</option>{EXAM_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+        {(dashTab==="grade"||dashTab==="section"||dashTab==="alerts"||dashTab==="student")&&(
+          <div><label className="text-xs text-gray-500 block mb-1">Grade</label>
+            <select value={grade} onChange={e=>setGrade(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+              <option value="">Select</option>{grades.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
+        )}
+        {(dashTab==="section"||dashTab==="alerts"||dashTab==="student")&&grade&&(
+          <div><label className="text-xs text-gray-500 block mb-1">Section</label>
+            <select value={section} onChange={e=>setSection(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+              <option value="">All</option>{sections.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+        )}
+      </div>
+      {loading&&<div className="bg-white rounded-xl shadow p-8 text-center"><div className="inline-block w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-2"></div><p className="text-sm text-gray-400">Loading...</p></div>}
+      {!loading&&dashTab==="school"&&data&&(
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <KPICard label="Total Entries" value={data.total_entries} color="border-indigo-500" />
+            <KPICard label="Grades" value={data.gradeSummary?.length} color="border-blue-500" />
+            <KPICard label="Subjects" value={data.subjectSummary?.length} color="border-green-500" />
+            <KPICard label="Weak Competencies" value={data.weakCompetencies?.length} color="border-red-500" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="text-sm font-bold text-gray-700 mb-3">Grade-wise Performance</h3>
+              {data.gradeSummary?.map((g:any)=>(
+                <div key={g.grade} className="flex items-center gap-3 mb-2">
+                  <span className="text-xs text-gray-600 w-20">{g.grade}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-2"><div className="bg-indigo-500 h-2 rounded-full" style={{width:`${g.avg}%`}}></div></div>
+                  <span className="text-xs font-bold text-gray-700 w-12 text-right">{g.avg?.toFixed(1)}%</span>
                 </div>
-                <button onClick={saveMarks} disabled={saving}
-                  className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold">
-                  {saving ? "Saving..." : "💾 Save All Marks"}
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse" style={{ minWidth: `${440 + (marksTable.subjects?.length || 0) * 155}px` }}>
-                  <thead>
-                    <tr className="bg-indigo-700 text-white">
-                      <th className="px-3 py-2 text-left sticky left-0 z-20 bg-indigo-700 border-r border-indigo-600 min-w-[40px]">#</th>
-                      <th className="px-3 py-2 text-left sticky left-[40px] z-20 bg-indigo-700 border-r border-indigo-600 min-w-[180px]">Student Name</th>
-                      <th className="px-3 py-2 text-center min-w-[70px]">Roll No</th>
-                      {marksTable.subjects?.map((sub: string) => {
-                        const cfg = marksTable.configs?.find((c: any) => c.subject === sub);
-                        return (
-                          <th key={sub} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[155px]">
-                            <button onClick={() => toggleSort(sub)} className="hover:underline w-full">
-                              <div>{sub}</div>
-                              <div className="text-indigo-300 text-xs font-normal">Max: {n(cfg?.max_marks) || 100}{sortCol === sub ? (sortDir === "desc" ? " ▼" : " ▲") : ""}</div>
-                            </button>
-                          </th>
-                        );
-                      })}
-                      <th className="px-3 py-2 text-center sticky right-[100px] z-20 bg-indigo-700 border-l border-indigo-600 min-w-[90px]">Total</th>
-                      <th className="px-3 py-2 text-center sticky right-0 z-20 bg-indigo-700 border-l border-indigo-600 min-w-[100px]">
-                        <button onClick={() => toggleSort("grand_percentage")} className="hover:underline">
-                          Grand % {sortCol === "grand_percentage" ? (sortDir === "desc" ? "▼" : "▲") : ""}
-                        </button>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedStudents.map((student: any, idx: number) => {
-                      const studentMarks = marks[student.student_name] || {};
-                      const bg = idx % 2 === 0 ? "bg-white" : "bg-gray-50";
-                      let liveTotal = 0, liveMax = 0;
-                      marksTable.subjects?.forEach((sub: string) => {
-                        const cfg = marksTable.configs?.find((c: any) => c.subject === sub);
-                        const md = studentMarks[sub];
-                        if (!md?.is_absent && md?.marks !== "" && md?.marks !== null && md?.marks !== undefined) {
-                          const m = parseFloat(String(md.marks));
-                          if (!isNaN(m)) { liveTotal += m; liveMax += n(cfg?.max_marks) || 100; }
-                        }
-                      });
-                      const livePct = liveMax > 0 ? (liveTotal / liveMax) * 100 : 0;
-                      return (
-                        <tr key={student.student_name} className={`border-b border-gray-100 ${bg}`}>
-                          <td className={`px-3 py-1.5 text-gray-400 sticky left-0 z-10 border-r border-gray-200 ${bg}`}>{idx + 1}</td>
-                          <td className={`px-3 py-1.5 font-medium text-gray-800 sticky left-[40px] z-10 border-r border-gray-200 ${bg}`}>{student.student_name}</td>
-                          <td className="px-3 py-1.5 text-center text-gray-500">{student.roll_number || "—"}</td>
-                          {marksTable.subjects?.map((sub: string) => {
-                            const cfg = marksTable.configs?.find((c: any) => c.subject === sub);
-                            const md = studentMarks[sub] || {};
-                            const maxMarks = n(cfg?.max_marks) || 100;
-                            const markVal = parseFloat(String(md.marks));
-                            const subPct = !md.is_absent && !isNaN(markVal) && md.marks !== "" ? (markVal / maxMarks) * 100 : null;
-                            return (
-                              <td key={sub} className={`px-1 py-1 text-center border-l border-gray-100 ${bg}`}>
-                                {md.is_absent ? (
-                                  <div className="flex items-center gap-1 justify-center">
-                                    <span className="text-xs text-red-500 font-bold bg-red-50 px-2 py-0.5 rounded">ABSENT</span>
-                                    <button onClick={() => toggleAbsent(student.student_name, sub)} className="text-xs text-gray-400 hover:text-gray-600 ml-1">✕</button>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1 justify-center">
-                                    <input type="number" value={md.marks ?? ""} min={0} max={maxMarks} step={0.25}
-                                      onChange={e => updateMark(student.student_name, sub, e.target.value)}
-                                      className={`w-16 text-center border rounded px-1 py-0.5 text-xs font-medium ${subPct !== null
-                                        ? subPct >= 80 ? "border-green-300 bg-green-50 text-green-800"
-                                          : subPct >= 60 ? "border-blue-300 bg-blue-50 text-blue-800"
-                                          : subPct >= 33 ? "border-yellow-300 bg-yellow-50 text-yellow-800"
-                                          : "border-red-300 bg-red-50 text-red-800"
-                                        : "border-gray-300"}`} />
-                                    {subPct !== null && <span className={`text-xs font-bold ${scoreColor(subPct)}`}>{subPct.toFixed(0)}%</span>}
-                                    <button onClick={() => toggleAbsent(student.student_name, sub)}
-                                      className="text-xs text-gray-300 hover:text-red-500 font-bold ml-0.5" title="Mark absent">AB</button>
-                                  </div>
-                                )}
-                              </td>
-                            );
-                          })}
-                          <td className={`px-3 py-1.5 text-center sticky right-[100px] z-10 border-l border-gray-200 ${bg}`}>
-                            <span className={`font-bold text-xs ${scoreColor(livePct)}`}>{liveTotal.toFixed(1)}/{liveMax}</span>
-                          </td>
-                          <td className={`px-3 py-1.5 text-center sticky right-0 z-10 border-l border-gray-200 ${bg}`}>
-                            {liveMax > 0 ? <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(livePct)}`}>{fmtPct(livePct)}</span> : <span className="text-gray-300">—</span>}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {sortedStudents.length > 0 && (
-                      <tr className="bg-indigo-50 border-t-2 border-indigo-300 font-bold">
-                        <td className="px-3 py-2 sticky left-0 bg-indigo-50 border-r border-gray-200" />
-                        <td className="px-3 py-2 text-indigo-700 text-xs sticky left-[40px] bg-indigo-50 border-r border-gray-200">Class Average ({sortedStudents.length})</td>
-                        <td />
-                        {marksTable.subjects?.map((sub: string) => {
-                          const cfg = marksTable.configs?.find((c: any) => c.subject === sub);
-                          const maxMarks = n(cfg?.max_marks) || 100;
-                          const vals = sortedStudents.filter((s: any) => {
-                            const md = marks[s.student_name]?.[sub];
-                            return !md?.is_absent && md?.marks !== "" && md?.marks !== null && md?.marks !== undefined;
-                          }).map((s: any) => parseFloat(String(marks[s.student_name][sub].marks)) || 0);
-                          const avgMark = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-                          const avgPct = (avgMark / maxMarks) * 100;
-                          return (
-                            <td key={sub} className="px-2 py-2 text-center border-l border-indigo-200">
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${scoreBg(avgPct)}`}>
-                                {avgMark.toFixed(1)} ({avgPct.toFixed(1)}%)
-                              </span>
-                            </td>
-                          );
-                        })}
-                        {(() => {
-                          const totalPcts = sortedStudents.map(s => {
-                            let to = 0, tm = 0;
-                            marksTable.subjects?.forEach((sub: string) => {
-                              const cfg = marksTable.configs?.find((c: any) => c.subject === sub);
-                              const md = marks[s.student_name]?.[sub];
-                              if (!md?.is_absent && md?.marks !== "" && md?.marks !== null && md?.marks !== undefined) {
-                                const m = parseFloat(String(md.marks));
-                                if (!isNaN(m)) { to += m; tm += n(cfg?.max_marks) || 100; }
-                              }
-                            });
-                            return tm > 0 ? (to / tm) * 100 : 0;
-                          });
-                          const classAvgPct = totalPcts.length ? totalPcts.reduce((a, b) => a + b, 0) / totalPcts.length : 0;
-                          return (
-                            <>
-                              <td className="px-3 py-2 text-center sticky right-[100px] bg-indigo-50 border-l border-gray-200"><span className="text-xs font-bold text-indigo-700">Avg</span></td>
-                              <td className="px-3 py-2 text-center sticky right-0 bg-indigo-50 border-l border-gray-200">
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(classAvgPct)}`}>{fmtPct(classAvgPct)}</span>
-                              </td>
-                            </>
-                          );
-                        })()}
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              ))}
             </div>
-          )}
-
-          {!configSaved && entryGrade && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
-              <p className="text-sm text-yellow-800 font-medium">Configure subjects and max marks above, then click <strong>Save Config & Load Table</strong></p>
-              <p className="text-xs text-yellow-600 mt-1">Or import an Excel file directly</p>
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="text-sm font-bold text-gray-700 mb-3">Subject-wise Performance</h3>
+              {data.subjectSummary?.map((s:any)=>(
+                <div key={s.subject} className="flex items-center gap-3 mb-2">
+                  <span className="text-xs text-gray-600 w-20 truncate">{s.subject}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-2"><div className="bg-green-500 h-2 rounded-full" style={{width:`${s.avg}%`}}></div></div>
+                  <span className="text-xs font-bold text-gray-700 w-12 text-right">{s.avg?.toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {data.weakCompetencies?.length>0&&(
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="text-sm font-bold text-gray-700 mb-3">⚠️ Weakest Competencies School-wide</h3>
+              <table className="w-full text-xs">
+                <thead><tr className="bg-gray-50 border-b"><th className="px-3 py-2 text-left">Code</th><th className="px-3 py-2 text-left">Subject</th><th className="px-3 py-2 text-center">Avg %</th></tr></thead>
+                <tbody>{data.weakCompetencies.map((c:any,i:number)=>(
+                  <tr key={i} className={i%2===0?"bg-white":"bg-gray-50"}>
+                    <td className="px-3 py-2 font-medium text-red-700">{c.code}</td>
+                    <td className="px-3 py-2 text-gray-600">{c.subject}</td>
+                    <td className="px-3 py-2 text-center"><span className="px-2 py-0.5 bg-red-100 text-red-700 rounded font-bold">{c.avg?.toFixed(1)}%</span></td>
+                  </tr>
+                ))}</tbody>
+              </table>
             </div>
           )}
         </div>
       )}
+      {!loading&&dashTab==="grade"&&data&&(
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="bg-white rounded-xl shadow p-4">
+            <h3 className="text-sm font-bold text-gray-700 mb-3">Section Performance</h3>
+            {data.sectionSummary?.map((s:any)=>(
+              <div key={s.section} className="flex items-center gap-3 mb-2">
+                <span className="text-xs text-gray-600 w-24">{s.section}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-2"><div className="bg-indigo-500 h-2 rounded-full" style={{width:`${s.avg}%`}}></div></div>
+                <span className="text-xs font-bold text-gray-700 w-12 text-right">{s.avg?.toFixed(1)}%</span>
+              </div>
+            ))}
+          </div>
+          <div className="bg-white rounded-xl shadow p-4">
+            <h3 className="text-sm font-bold text-gray-700 mb-3">Subject Performance</h3>
+            {data.subjectSummary?.map((s:any)=>(
+              <div key={s.subject} className="flex items-center gap-3 mb-2">
+                <span className="text-xs text-gray-600 w-24 truncate">{s.subject}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-2"><div className="bg-green-500 h-2 rounded-full" style={{width:`${s.avg}%`}}></div></div>
+                <span className="text-xs font-bold text-gray-700 w-12 text-right">{s.avg?.toFixed(1)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {!loading&&dashTab==="section"&&data&&(
+        <div className="bg-white rounded-xl shadow p-4">
+          <h3 className="text-sm font-bold text-gray-700 mb-3">Subject & Competency Overview</h3>
+          {data.subjectSummary?.map((s:any)=>(
+            <div key={s.subject} className="mb-4">
+              <div className="flex items-center gap-3 mb-1">
+                <span className="text-xs font-medium text-gray-700 w-24 truncate">{s.subject}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-2"><div className="bg-indigo-500 h-2 rounded-full" style={{width:`${s.avg_percentage}%`}}></div></div>
+                <span className="text-xs font-bold text-gray-700 w-20 text-right">{s.avg_percentage?.toFixed(1)}% ({s.assessed}/{s.total_students})</span>
+              </div>
+              {s.competency_avgs?.length>0&&(
+                <div className="ml-28 flex gap-2 flex-wrap">
+                  {s.competency_avgs.map((c:any)=>(
+                    <span key={c.code} className={`px-1.5 py-0.5 rounded text-xs ${c.avg<60?"bg-red-100 text-red-700":"bg-green-100 text-green-700"}`}>{c.code}: {c.avg?.toFixed(0)}%</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {!loading&&dashTab==="student"&&(
+        <StudentDashTab grade={grade} section={section} academicYear={academicYear} />
+      )}
+      {!loading&&dashTab==="alerts"&&data&&(
+        <div className="space-y-3">
+          {data.alerts?.length===0?(
+            <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400"><p className="text-2xl mb-2">✅</p><p className="text-sm">No consecutive decline alerts.</p></div>
+          ):(
+            <>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <p className="text-sm font-bold text-amber-800">⚠️ {data.alerts.length} students showing consecutive decline</p>
+                <p className="text-xs text-amber-600">Students who scored lower in 2 consecutive exams for the same competency.</p>
+              </div>
+              <div className="bg-white rounded-xl shadow overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead><tr className="bg-gray-50 border-b">
+                      <th className="px-3 py-2 text-left">Student</th>
+                      <th className="px-3 py-2 text-left">Subject</th>
+                      <th className="px-3 py-2 text-left">Competency</th>
+                      <th className="px-3 py-2 text-left">Exam Scores</th>
+                      <th className="px-3 py-2 text-center">Drop</th>
+                    </tr></thead>
+                    <tbody>
+                      {data.alerts.map((a:any,i:number)=>(
+                        <tr key={i} className={i%2===0?"bg-white":"bg-gray-50"}>
+                          <td className="px-3 py-2 font-medium text-gray-800">{a.student_name}</td>
+                          <td className="px-3 py-2 text-gray-600">{a.subject}</td>
+                          <td className="px-3 py-2 font-medium text-indigo-700">{a.competency_code}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1">
+                              {a.exam_scores?.map((e:any,j:number)=>(
+                                <span key={j} className={`px-1.5 py-0.5 rounded text-xs ${j>0&&e.pct<a.exam_scores[j-1]?.pct?"bg-red-100 text-red-700":"bg-gray-100 text-gray-700"}`}>
+                                  {e.exam_type}: {e.pct?.toFixed(0)}%</span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-center"><span className="px-2 py-0.5 bg-red-100 text-red-700 rounded font-bold">-{a.drop?.toFixed(1)}%</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
-      {/* ── DASHBOARD ── */}
-      {activeTab === "dashboard" && (
+function StudentDashTab({ grade, section, academicYear }: any) {
+  const API = "https://cbas-backend-production.up.railway.app";
+  const [students, setStudents] = useState<any[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => { if (grade && section) fetchStudents(); }, [grade, section]);
+
+  const fetchStudents = async () => {
+    try {
+      const r = await axios.get(`${API}/students?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}`);
+      setStudents((r.data?.data || r.data || []).filter((s: any) => s.is_active !== false));
+    } catch {}
+  };
+
+  const loadAnalysis = async (student: any) => {
+    setSelectedStudent(student); setAnalysis(null); setLoading(true);
+    try {
+      const r = await axios.get(`${API}/pasa/student/${student.id}/analysis?academic_year=${academicYear}`);
+      setAnalysis(r.data);
+    } catch {}
+    setLoading(false);
+  };
+
+  const filtered = students.filter(s => s.name?.toLowerCase().includes(search.toLowerCase()));
+
+  if (!grade || !section) return (
+    <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Select a grade and section to view students.</div>
+  );
+
+  if (selectedStudent) return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <button onClick={() => { setSelectedStudent(null); setAnalysis(null); }}
+          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg">← Back</button>
         <div>
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-1 flex-nowrap items-center">
-            {[
-              { id: "school", label: "🏫 School" },
-              { id: "grade", label: "📚 Grade" },
-              { id: "section", label: "🏛 Section" },
-              { id: "student", label: "👤 Student" },
-              { id: "alerts", label: "⚠️ Alerts" },
-            ].map(t => (
-              <button key={t.id} onClick={() => setDashTab(t.id as any)}
-                className={`px-4 py-2 text-sm rounded-lg font-medium ${dashTab === t.id ? "bg-indigo-600 text-white" : "bg-white text-gray-600 border border-gray-300 hover:bg-indigo-50"}`}>
-                {t.label}
+          <h2 className="text-sm font-bold text-gray-800">👤 {selectedStudent.name}</h2>
+          <p className="text-xs text-gray-500">{grade} · {section} · {academicYear}</p>
+        </div>
+      </div>
+      {loading && <div className="bg-white rounded-xl shadow p-8 text-center"><div className="inline-block w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>}
+      {!loading && !analysis && <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No PA/SA data for this student yet.</div>}
+      {!loading && analysis && (
+        <div className="space-y-4">
+          {/* Exam summary table */}
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="px-4 py-3 bg-indigo-700 text-white"><p className="text-sm font-bold">Exam Performance</p></div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead><tr className="bg-gray-50 border-b">
+                  <th className="px-3 py-2 text-left">Exam</th>
+                  {analysis.subjects?.map((s: string) => <th key={s} className="px-3 py-2 text-center">{s}</th>)}
+                  <th className="px-3 py-2 text-center font-bold">Overall</th>
+                  <th className="px-3 py-2 text-center">Band</th>
+                </tr></thead>
+                <tbody>
+                  {analysis.examSummary?.map((exam: any, i: number) => (
+                    <tr key={exam.exam} className={i%2===0?"bg-white":"bg-gray-50"}>
+                      <td className="px-3 py-2 font-medium text-gray-700">{exam.exam}</td>
+                      {analysis.subjects?.map((s: string) => {
+                        const sd = exam.subjects?.[s];
+                        return <td key={s} className="px-3 py-2 text-center">
+                          {sd?.percentage != null ? <span className={`font-medium ${sd.percentage>=80?"text-green-600":sd.percentage>=60?"text-blue-600":sd.percentage>=40?"text-yellow-600":"text-red-600"}`}>{sd.percentage}%</span> : <span className="text-gray-300">—</span>}
+                        </td>;
+                      })}
+                      <td className="px-3 py-2 text-center font-bold">
+                        {exam.grand_percentage != null ? <span className={exam.grand_percentage>=80?"text-green-600":exam.grand_percentage>=60?"text-blue-600":exam.grand_percentage>=40?"text-yellow-600":"text-red-600"}>{exam.grand_percentage}%</span> : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {exam.band && <span className={`px-2 py-0.5 rounded text-xs font-bold ${exam.band==="A+"?"bg-green-100 text-green-700":exam.band==="A"?"bg-blue-100 text-blue-700":exam.band==="B"?"bg-indigo-100 text-indigo-700":exam.band==="C"?"bg-yellow-100 text-yellow-700":"bg-red-100 text-red-700"}`}>{exam.band}</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {/* Competency profile */}
+          {analysis.competencyProfile?.length > 0 && (
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="text-sm font-bold text-gray-700 mb-3">Competency Profile (avg across all exams)</h3>
+              <div className="space-y-1.5">
+                {analysis.competencyProfile.slice(0, 15).map((c: any) => (
+                  <div key={c.code} className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 w-16 flex-shrink-0">{c.code}</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-2">
+                      <div className={`h-2 rounded-full ${c.avg>=80?"bg-green-500":c.avg>=60?"bg-blue-500":c.avg>=40?"bg-yellow-500":"bg-red-500"}`} style={{width:`${c.avg}%`}}></div>
+                    </div>
+                    <span className="text-xs font-bold text-gray-700 w-10 text-right">{c.avg?.toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl shadow p-3">
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search student..." className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" />
+      </div>
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No students found.</div>
+      ) : (
+        <div className="bg-white rounded-xl shadow overflow-hidden">
+          <div className="px-4 py-3 bg-gray-50 border-b"><span className="text-sm font-semibold text-gray-700">{filtered.length} Students</span></div>
+          <div className="divide-y divide-gray-100">
+            {filtered.map((s: any) => (
+              <button key={s.id} onClick={() => loadAnalysis(s)}
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-indigo-50 text-left">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{s.name}</p>
+                  <p className="text-xs text-gray-400">{s.admission_no}</p>
+                </div>
+                <span className="text-xs text-indigo-600">View →</span>
               </button>
             ))}
-            <button onClick={() => {
-              if (dashTab==="school") fetchSchool();
-              else if (dashTab==="grade") { fetchGrade(); fetchLongitudinal(); }
-              else if (dashTab==="section") fetchSection();
-              else if (dashTab==="alerts") fetchPasaAlerts();
-            }} className="ml-auto px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-1">
-              🔄 Refresh
-            </button>
           </div>
-
-          {dashTab !== "student" && dashTab !== "alerts" && (
-            <div className="flex gap-3 mb-4 items-end flex-wrap">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Exam</label>
-                <select value={dashExam} onChange={e => setDashExam(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                  {EXAM_TYPES.filter(e => e !== "Custom").map(e => <option key={e} value={e}>{e}</option>)}
-                </select>
-              </div>
-              {(dashTab === "grade" || dashTab === "section") && (
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Grade</label>
-                  <select value={dashGrade} onChange={e => setDashGrade(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                    {grades.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
-                </div>
-              )}
-              {dashTab === "section" && (
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Section</label>
-                  <select value={dashSection} onChange={e => setDashSection(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                    {dashSections.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* SCHOOL */}
-          {dashTab === "school" && (schoolData ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: "Total Students", value: schoolData.total_students, color: "border-indigo-500" },
-                  { label: "School Avg %", value: fmtPct(n(schoolData.school_avg)), color: "border-green-500" },
-                  { label: "Total Grades", value: schoolData.grades?.length, color: "border-blue-500" },
-                  { label: "Exam", value: schoolData.exam_type, color: "border-orange-500" },
-                ].map(s => (
-                  <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
-                    <p className="text-xs text-gray-500">{s.label}</p>
-                    <p className="text-2xl font-bold text-gray-800">{s.value}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Grade-wise Average %</h3>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={Object.entries(schoolData.grade_averages || {}).map(([g, v]) => ({ name: g.replace("Grade ", "G"), avg: n(v), full: g }))}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                      <Tooltip formatter={(v: any, _, p) => [`${v}%`, p.payload.full]} />
-                      <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
-                        {Object.entries(schoolData.grade_averages || {}).map(([_, v], i) => (
-                          <Cell key={i} fill={n(v) >= 80 ? "#10b981" : n(v) >= 60 ? "#6366f1" : n(v) >= 40 ? "#f59e0b" : "#ef4444"} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject-wise School Average %</h3>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={Object.entries(schoolData.subject_averages || {}).map(([s, v]) => ({ name: s, avg: n(v) }))} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={110} />
-                      <Tooltip formatter={(v: any) => [`${v}%`, "Avg"]} />
-                      <Bar dataKey="avg" radius={[0, 4, 4, 0]}>
-                        {Object.entries(schoolData.subject_averages || {}).map((_, i) => <Cell key={i} fill={SUBJECT_COLORS[i % SUBJECT_COLORS.length]} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">School Grade Band Distribution</h3>
-                <div className="flex gap-3 flex-wrap">
-                  {Object.entries(schoolData.overall_band_distribution || {}).map(([band, data]: [string, any]) => (
-                    <div key={band} className="flex-1 min-w-[100px] rounded-lg p-3 text-center border"
-                      style={{ backgroundColor: BAND_COLORS[band] + "15", borderColor: BAND_COLORS[band] }}>
-                      <p className="text-xs font-bold" style={{ color: BAND_COLORS[band] }}>{schoolData.grade_bands?.find((b: any) => b.key === band)?.label || band}</p>
-                      <p className="text-xl font-bold text-gray-800">{data.count}</p>
-                      <p className="text-xs text-gray-500">{data.percentage}%</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : <div className="bg-white rounded-xl shadow p-12 text-center text-gray-400"><p className="text-sm">No data for {dashExam}. Import or enter marks first.</p></div>
-          )}
-
-          {/* GRADE */}
-          {dashTab === "grade" && (gradeData ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: "Sections", value: gradeData.sections?.length, color: "border-indigo-500" },
-                  { label: "Subjects", value: gradeData.subjects?.length, color: "border-blue-500" },
-                  { label: "Top Student", value: gradeData.top10?.[0]?.student_name?.split(" ")[0] || "—", color: "border-green-500" },
-                  { label: "Exam", value: gradeData.exam_type, color: "border-orange-500" },
-                ].map(s => (
-                  <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
-                    <p className="text-xs text-gray-500">{s.label}</p>
-                    <p className="text-lg font-bold text-gray-800">{s.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Section-wise Average %</h3>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={Object.entries(gradeData.section_averages || {}).map(([s, v]) => ({ name: s, avg: n(v) }))}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                      <Tooltip formatter={(v: any) => [`${v}%`, "Avg"]} />
-                      <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
-                        {Object.entries(gradeData.section_averages || {}).map((_, i) => <Cell key={i} fill={SUBJECT_COLORS[i % SUBJECT_COLORS.length]} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject-wise Average %</h3>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={Object.entries(gradeData.subject_averages || {}).map(([s, v]) => ({ name: s, avg: n(v) }))} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={110} />
-                      <Tooltip formatter={(v: any) => [`${v}%`, "Avg"]} />
-                      <Bar dataKey="avg" radius={[0, 4, 4, 0]}>
-                        {Object.entries(gradeData.subject_averages || {}).map((_, i) => <Cell key={i} fill={SUBJECT_COLORS[i % SUBJECT_COLORS.length]} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Grade Band Distribution per Subject — NEW */}
-              {gradeData.band_distribution && Object.keys(gradeData.band_distribution).length > 0 && (
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Grade Band Distribution per Subject</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="px-3 py-2 text-left border border-gray-200 min-w-[120px]">Subject</th>
-                          {gradeData.grade_bands?.map((b: any) => (
-                            <th key={b.key} className="px-3 py-2 text-center border border-gray-200 min-w-[100px]"
-                              style={{ color: b.color }}>{b.label}</th>
-                          ))}
-                          <th className="px-3 py-2 text-center border border-gray-200 font-bold">Avg %</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {gradeData.subjects?.map((sub: string, i: number) => (
-                          <tr key={sub} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                            <td className="px-3 py-2 border border-gray-200 font-semibold text-gray-700">{sub}</td>
-                            {gradeData.grade_bands?.map((b: any) => {
-                              const dist = gradeData.band_distribution?.[sub]?.[b.key];
-                              return (
-                                <td key={b.key} className="px-3 py-2 text-center border border-gray-200">
-                                  {dist?.count > 0 ? (
-                                    <div>
-                                      <span className="font-bold text-sm" style={{ color: b.color }}>{dist.count}</span>
-                                      <span className="text-gray-400 text-xs ml-1">({dist.percentage}%)</span>
-                                    </div>
-                                  ) : <span className="text-gray-300">—</span>}
-                                </td>
-                              );
-                            })}
-                            <td className="px-3 py-2 text-center border border-gray-200">
-                              <span className={`font-bold text-xs px-2 py-0.5 rounded-full ${scoreBg(n(gradeData.subject_averages?.[sub]))}`}>
-                                {fmtPct(n(gradeData.subject_averages?.[sub]))}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                        {/* Overall row */}
-                        {gradeData.overall_band_distribution && (
-                          <tr className="bg-indigo-50 border-t-2 border-indigo-300 font-bold">
-                            <td className="px-3 py-2 border border-gray-200 text-indigo-700">Overall</td>
-                            {gradeData.grade_bands?.map((b: any) => {
-                              const dist = gradeData.overall_band_distribution?.[b.key];
-                              return (
-                                <td key={b.key} className="px-3 py-2 text-center border border-gray-200">
-                                  {dist?.count > 0 ? (
-                                    <div>
-                                      <span className="font-bold text-sm" style={{ color: b.color }}>{dist.count}</span>
-                                      <span className="text-gray-400 text-xs ml-1">({dist.percentage}%)</span>
-                                    </div>
-                                  ) : <span className="text-gray-300">—</span>}
-                                </td>
-                              );
-                            })}
-                            <td className="px-3 py-2 text-center border border-gray-200">
-                              <span className={`font-bold text-xs px-2 py-0.5 rounded-full ${scoreBg(n(gradeData.grade_avg))}`}>
-                                {fmtPct(n(gradeData.grade_avg))}
-                              </span>
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-{/* Advancing / Retracting — Exam to Exam */}
-              {(gradeData.advancing?.length > 0 || gradeData.retracting?.length > 0) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-white rounded-xl shadow p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                      📈 Advancing Students <span className="text-xs font-normal text-gray-400">(vs previous exam)</span>
-                    </h3>
-                    {gradeData.advancing?.length === 0 ? (
-                      <p className="text-xs text-gray-400 text-center py-3">No advancing students</p>
-                    ) : (
-                      <div className="space-y-1 max-h-48 overflow-y-auto">
-                        {gradeData.advancing?.map((s: any, i: number) => (
-                          <div key={i} className="flex items-center justify-between p-2 bg-green-50 rounded border border-green-100">
-                            <div>
-                              <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
-                              <span className="text-xs text-gray-400 ml-1">{s.section}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
-                              <span className="text-xs text-green-600">→</span>
-                              <span className="text-xs font-bold text-green-700">{s.grand_percentage?.toFixed(1)}%</span>
-                              <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">+{s.change?.toFixed(1)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="bg-white rounded-xl shadow p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                      📉 Retracting Students <span className="text-xs font-normal text-gray-400">(vs previous exam)</span>
-                    </h3>
-                    {gradeData.retracting?.length === 0 ? (
-                      <p className="text-xs text-gray-400 text-center py-3">No retracting students</p>
-                    ) : (
-                      <div className="space-y-1 max-h-48 overflow-y-auto">
-                        {gradeData.retracting?.map((s: any, i: number) => (
-                          <div key={i} className="flex items-center justify-between p-2 bg-red-50 rounded border border-red-100">
-                            <div>
-                              <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
-                              <span className="text-xs text-gray-400 ml-1">{s.section}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
-                              <span className="text-xs text-red-400">→</span>
-                              <span className="text-xs font-bold text-red-700">{s.grand_percentage?.toFixed(1)}%</span>
-                              <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">{s.change?.toFixed(1)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Year-over-Year Advancing / Retracting */}
-              {(gradeData.yoy_advancing?.length > 0 || gradeData.yoy_retracting?.length > 0) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-white rounded-xl shadow p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                      🚀 Year-on-Year Advancing <span className="text-xs font-normal text-gray-400">(vs last year same exam)</span>
-                    </h3>
-                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                      {gradeData.yoy_advancing?.map((s: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between p-2 bg-emerald-50 rounded border border-emerald-100">
-                          <div>
-                            <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
-                            <span className="text-xs text-gray-400 ml-1">{s.section}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
-                            <span className="text-xs text-emerald-600">→</span>
-                            <span className="text-xs font-bold text-emerald-700">{s.grand_percentage?.toFixed(1)}%</span>
-                            <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">+{s.change?.toFixed(1)}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-xl shadow p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                      ⚠️ Year-on-Year Retracting <span className="text-xs font-normal text-gray-400">(vs last year same exam)</span>
-                    </h3>
-                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                      {gradeData.yoy_retracting?.map((s: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between p-2 bg-orange-50 rounded border border-orange-100">
-                          <div>
-                            <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
-                            <span className="text-xs text-gray-400 ml-1">{s.section}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
-                            <span className="text-xs text-orange-400">→</span>
-                            <span className="text-xs font-bold text-orange-700">{s.grand_percentage?.toFixed(1)}%</span>
-                            <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-bold">{s.change?.toFixed(1)}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Longitudinal within year */}
-              {gradeData.longitudinal?.length > 0 && (
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-1">📈 Longitudinal — All Exams This Year</h3>
-                  <p className="text-xs text-gray-400 mb-3">X = Exam · Y = Avg % · Each line = one subject · Dashed = Overall</p>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={gradeData.longitudinal} margin={{ top: 5, right: 20, left: 0, bottom: 60 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="exam" tick={{ fontSize: 11 }} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                      <Tooltip formatter={(v: any, name: any) => [`${v}%`, name]} />
-                      <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }} />
-                      {gradeData.subjects?.map((sub: string, i: number) => (
-                        <Line key={sub} type="monotone" dataKey={sub} stroke={SUBJECT_COLORS[i % SUBJECT_COLORS.length]}
-                          strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls={false} />
-                      ))}
-                      <Line type="monotone" dataKey="overall" stroke="#374151" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 5 }} activeDot={{ r: 7 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-              {/* Longitudinal */}
-              {longData?.data?.length > 0 && (
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-1">📈 Longitudinal — Subject Average across Exams (only conducted exams)</h3>
-                  <p className="text-xs text-gray-400 mb-3">X = Exam · Y = Avg % · Each line = one subject · Dashed = Overall</p>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={longData.data} margin={{ top: 5, right: 20, left: 0, bottom: 60 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="exam" tick={{ fontSize: 11 }} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                      <Tooltip formatter={(v: any, name: any) => [`${v}%`, name]} />
-                      <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }} />
-                      {gradeData.subjects?.map((sub: string, i: number) => (
-                        <Line key={sub} type="monotone" dataKey={sub} stroke={SUBJECT_COLORS[i % SUBJECT_COLORS.length]}
-                          strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls={false} />
-                      ))}
-                      <Line type="monotone" dataKey="Overall" stroke="#374151" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 5 }} activeDot={{ r: 7 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">🏆 Top 10 Students</h3>
-                  <div className="space-y-1">
-                    {gradeData.top10?.map((s: any, i: number) => (
-                      <div key={s.student_name} className="flex items-center justify-between p-2 bg-green-50 rounded border border-green-100">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-green-700 w-5">{i + 1}.</span>
-                          <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
-                          <span className="text-xs text-gray-400">{s.section}</span>
-                        </div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(n(s.grand_percentage))}`}>{fmtPct(n(s.grand_percentage))}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">📉 Bottom 10 Students</h3>
-                  <div className="space-y-1">
-                    {gradeData.bottom10?.map((s: any, i: number) => (
-                      <div key={s.student_name} className="flex items-center justify-between p-2 bg-red-50 rounded border border-red-100">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-red-700 w-5">{i + 1}.</span>
-                          <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
-                          <span className="text-xs text-gray-400">{s.section}</span>
-                        </div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(n(s.grand_percentage))}`}>{fmtPct(n(s.grand_percentage))}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : <div className="bg-white rounded-xl shadow p-12 text-center text-gray-400"><p className="text-sm">No data for {dashGrade} — {dashExam}.</p></div>
-          )}
-
-          {/* SECTION */}
-          {dashTab === "section" && (sectionData ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                {[
-                  { label: "Total Students", value: sectionData.total_students, color: "border-indigo-500" },
-                  { label: "Section Avg %", value: fmtPct(n(sectionData.section_avg)), color: "border-green-500" },
-                  { label: "Subjects", value: sectionData.subjects?.length, color: "border-blue-500" },
-                  { label: "Grade", value: sectionData.grade, color: "border-purple-500" },
-                  { label: "Section", value: sectionData.section, color: "border-orange-500" },
-                ].map(s => (
-                  <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
-                    <p className="text-xs text-gray-500">{s.label}</p>
-                    <p className="text-lg font-bold text-gray-800">{s.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Advancing / Retracting vs previous exam */}
-              {(sectionData.advancing?.length > 0 || sectionData.retracting?.length > 0) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Advancing */}
-                  <div className="bg-white rounded-xl shadow p-4 border-t-4 border-green-400">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                      <span className="text-green-500 text-base">📈</span>
-                      Advancing Students
-                      <span className="text-xs font-normal text-gray-400">(vs previous exam, &gt;2% gain)</span>
-                      <span className="ml-auto bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">{sectionData.advancing?.length}</span>
-                    </h3>
-                    {sectionData.advancing?.length === 0 ? (
-                      <p className="text-xs text-gray-400 text-center py-4">No advancing students</p>
-                    ) : (
-                      <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-                        {sectionData.advancing.map((s: any, i: number) => (
-                          <div key={i} className="flex items-center justify-between px-3 py-2 bg-green-50 rounded-lg border border-green-100">
-                            <span className="text-xs font-medium text-gray-800 truncate max-w-[140px]">{s.student_name}</span>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="text-xs text-gray-400">{n(s.prev_percentage).toFixed(1)}%</span>
-                              <span className="text-green-500 text-xs">→</span>
-                              <span className="text-xs font-bold text-green-700">{n(s.grand_percentage).toFixed(1)}%</span>
-                              <span className="text-xs bg-green-200 text-green-800 px-1.5 py-0.5 rounded-full font-bold">▲+{n(s.change).toFixed(1)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Retracting */}
-                  <div className="bg-white rounded-xl shadow p-4 border-t-4 border-red-400">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                      <span className="text-red-500 text-base">📉</span>
-                      Retracting Students
-                      <span className="text-xs font-normal text-gray-400">(vs previous exam, &gt;2% drop)</span>
-                      <span className="ml-auto bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">{sectionData.retracting?.length}</span>
-                    </h3>
-                    {sectionData.retracting?.length === 0 ? (
-                      <p className="text-xs text-gray-400 text-center py-4">No retracting students</p>
-                    ) : (
-                      <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-                        {sectionData.retracting.map((s: any, i: number) => (
-                          <div key={i} className="flex items-center justify-between px-3 py-2 bg-red-50 rounded-lg border border-red-100">
-                            <span className="text-xs font-medium text-gray-800 truncate max-w-[140px]">{s.student_name}</span>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="text-xs text-gray-400">{n(s.prev_percentage).toFixed(1)}%</span>
-                              <span className="text-red-400 text-xs">→</span>
-                              <span className="text-xs font-bold text-red-700">{n(s.grand_percentage).toFixed(1)}%</span>
-                              <span className="text-xs bg-red-200 text-red-800 px-1.5 py-0.5 rounded-full font-bold">▼{n(s.change).toFixed(1)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <RankingLineChart students={sectionData.students_ranked || []} title={`Student Rankings — ${sectionData.section} (Top to Bottom by Grand %)`} />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject-wise Average %</h3>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={Object.entries(sectionData.subject_averages || {}).map(([s, v]) => ({ name: s, avg: n(v) }))} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={110} />
-                      <Tooltip formatter={(v: any) => [`${v}%`, "Avg"]} />
-                      <Bar dataKey="avg" radius={[0, 4, 4, 0]}>
-                        {Object.entries(sectionData.subject_averages || {}).map((_, i) => <Cell key={i} fill={SUBJECT_COLORS[i % SUBJECT_COLORS.length]} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Pass/Fail per Subject (pass = 33%+)</h3>
-                  <div className="space-y-2 mt-2">
-                    {Object.entries(sectionData.pass_fail || {}).map(([sub, data]: [string, any]) => (
-                      <div key={sub} className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-gray-700 w-28 truncate">{sub}</span>
-                        <div className="flex-1 bg-gray-200 rounded-full h-5 overflow-hidden flex">
-                          <div className="bg-green-500 h-full flex items-center justify-center text-white text-xs font-bold" style={{ width: `${data.pass_pct}%` }}>{data.pass_pct > 15 ? data.pass : ""}</div>
-                          <div className="bg-red-400 h-full flex items-center justify-center text-white text-xs font-bold" style={{ width: `${100 - data.pass_pct}%` }}>{(100 - data.pass_pct) > 15 ? data.fail : ""}</div>
-                        </div>
-                        <span className="text-xs text-green-700 font-bold w-14 text-right">{data.pass_pct}% pass</span>
-                        {data.absent > 0 && <span className="text-xs text-gray-400">{data.absent} AB</span>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Grand % vs Subject Comparison</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {sectionData.subjects?.map((sub: string, i: number) => (
-                    <GrandVsSubjectChart key={sub} data={sectionData.grand_vs_subject?.[sub] || []} subjectName={sub} color={SUBJECT_COLORS[i % SUBJECT_COLORS.length]} />
-                  ))}
-                </div>
-              </div>
-
-              {/* Band table */}
-              <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Grade Band Distribution per Subject</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="px-3 py-2 text-left border border-gray-200 min-w-[120px]">Subject</th>
-                        {sectionData.grade_bands?.map((b: any) => (
-                          <th key={b.key} className="px-3 py-2 text-center border border-gray-200 min-w-[100px]" style={{ color: b.color }}>{b.label}</th>
-                        ))}
-                        <th className="px-3 py-2 text-center border border-gray-200 font-bold">Avg %</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sectionData.subjects?.map((sub: string, i: number) => (
-                        <tr key={sub} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                          <td className="px-3 py-2 border border-gray-200 font-semibold text-gray-700">{sub}</td>
-                          {sectionData.grade_bands?.map((b: any) => {
-                            const dist = sectionData.band_distribution?.[sub]?.[b.key];
-                            return (
-                              <td key={b.key} className="px-3 py-2 text-center border border-gray-200">
-                                {dist?.count > 0 ? <div><span className="font-bold text-sm" style={{ color: b.color }}>{dist.count}</span><span className="text-gray-400 text-xs ml-1">({dist.percentage}%)</span></div> : <span className="text-gray-300">—</span>}
-                              </td>
-                            );
-                          })}
-                          <td className="px-3 py-2 text-center border border-gray-200">
-                            <span className={`font-bold text-xs px-2 py-0.5 rounded-full ${scoreBg(n(sectionData.subject_averages?.[sub]))}`}>{fmtPct(n(sectionData.subject_averages?.[sub]))}</span>
-                          </td>
-                        </tr>
-                      ))}
-                      <tr className="bg-indigo-50 border-t-2 border-indigo-300 font-bold">
-                        <td className="px-3 py-2 border border-gray-200 text-indigo-700">Overall</td>
-                        {sectionData.grade_bands?.map((b: any) => {
-                          const dist = sectionData.overall_band_distribution?.[b.key];
-                          return (
-                            <td key={b.key} className="px-3 py-2 text-center border border-gray-200">
-                              {dist?.count > 0 ? <div><span className="font-bold text-sm" style={{ color: b.color }}>{dist.count}</span><span className="text-gray-400 text-xs ml-1">({dist.percentage}%)</span></div> : <span className="text-gray-300">—</span>}
-                            </td>
-                          );
-                        })}
-                        <td className="px-3 py-2 text-center border border-gray-200">
-                          <span className={`font-bold text-xs px-2 py-0.5 rounded-full ${scoreBg(n(sectionData.section_avg))}`}>{fmtPct(n(sectionData.section_avg))}</span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Advancing / Retracting — Exam to Exam */}
-              {(sectionData.advancing?.length > 0 || sectionData.retracting?.length > 0) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-white rounded-xl shadow p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                      📈 Advancing Students <span className="text-xs font-normal text-gray-400">(vs previous exam)</span>
-                    </h3>
-                    {sectionData.advancing?.length === 0 ? (
-                      <p className="text-xs text-gray-400 text-center py-3">No advancing students</p>
-                    ) : (
-                      <div className="space-y-1 max-h-48 overflow-y-auto">
-                        {sectionData.advancing?.map((s: any, i: number) => (
-                          <div key={i} className="flex items-center justify-between p-2 bg-green-50 rounded border border-green-100">
-                            <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
-                              <span className="text-xs text-green-600">→</span>
-                              <span className="text-xs font-bold text-green-700">{s.grand_percentage?.toFixed(1)}%</span>
-                              <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">+{s.change?.toFixed(1)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="bg-white rounded-xl shadow p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                      📉 Retracting Students <span className="text-xs font-normal text-gray-400">(vs previous exam)</span>
-                    </h3>
-                    {sectionData.retracting?.length === 0 ? (
-                      <p className="text-xs text-gray-400 text-center py-3">No retracting students</p>
-                    ) : (
-                      <div className="space-y-1 max-h-48 overflow-y-auto">
-                        {sectionData.retracting?.map((s: any, i: number) => (
-                          <div key={i} className="flex items-center justify-between p-2 bg-red-50 rounded border border-red-100">
-                            <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
-                              <span className="text-xs text-red-400">→</span>
-                              <span className="text-xs font-bold text-red-700">{s.grand_percentage?.toFixed(1)}%</span>
-                              <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">{s.change?.toFixed(1)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Year-on-Year Advancing / Retracting */}
-              {(sectionData.yoy_advancing?.length > 0 || sectionData.yoy_retracting?.length > 0) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-white rounded-xl shadow p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                      🚀 Year-on-Year Advancing <span className="text-xs font-normal text-gray-400">(vs last year same exam)</span>
-                    </h3>
-                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                      {sectionData.yoy_advancing?.map((s: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between p-2 bg-emerald-50 rounded border border-emerald-100">
-                          <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
-                            <span className="text-xs text-emerald-600">→</span>
-                            <span className="text-xs font-bold text-emerald-700">{s.grand_percentage?.toFixed(1)}%</span>
-                            <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">+{s.change?.toFixed(1)}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-xl shadow p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                      ⚠️ Year-on-Year Retracting <span className="text-xs font-normal text-gray-400">(vs last year same exam)</span>
-                    </h3>
-                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                      {sectionData.yoy_retracting?.map((s: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between p-2 bg-orange-50 rounded border border-orange-100">
-                          <span className="text-xs font-medium text-gray-800">{s.student_name}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">{s.prev_percentage?.toFixed(1)}%</span>
-                            <span className="text-xs text-orange-400">→</span>
-                            <span className="text-xs font-bold text-orange-700">{s.grand_percentage?.toFixed(1)}%</span>
-                            <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-bold">{s.change?.toFixed(1)}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Longitudinal within year */}
-              {sectionData.longitudinal?.length > 0 && (
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-1">📈 Longitudinal — All Exams This Year ({sectionData.section})</h3>
-                  <p className="text-xs text-gray-400 mb-3">X = Exam · Y = Avg % · Each line = one subject · Dashed = Overall</p>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={sectionData.longitudinal} margin={{ top: 5, right: 20, left: 0, bottom: 60 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="exam" tick={{ fontSize: 11 }} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                      <Tooltip formatter={(v: any, name: any) => [`${v}%`, name]} />
-                      <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }} />
-                      {sectionData.subjects?.map((sub: string, i: number) => (
-                        <Line key={sub} type="monotone" dataKey={sub} stroke={SUBJECT_COLORS[i % SUBJECT_COLORS.length]}
-                          strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls={false} />
-                      ))}
-                      <Line type="monotone" dataKey="overall" stroke="#374151" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 5 }} activeDot={{ r: 7 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              {/* Student rankings */}
-              <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                  Student Rankings — {sectionData.section} ({sectionData.total_students} students)
-                  <span className="ml-2 text-xs font-normal text-gray-400">Click headers to sort</span>
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse" style={{ minWidth: `${400 + (sectionData.subjects?.length || 0) * 110}px` }}>
-                    <thead>
-                      <tr className="bg-indigo-700 text-white">
-                        <th className="px-3 py-2 text-center sticky left-0 bg-indigo-700 border-r border-indigo-600 min-w-[50px]">Rank</th>
-                        <th className="px-3 py-2 text-left sticky left-[50px] bg-indigo-700 border-r border-indigo-600 min-w-[160px]">Student</th>
-                        {sectionData.subjects?.map((sub: string) => (
-                          <th key={sub} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[100px]">
-                            <button onClick={() => toggleDashSort(sub)} className="hover:underline w-full">
-                              {sub} {dashSortCol === sub ? (dashSortDir === "desc" ? "▼" : "▲") : ""}
-                            </button>
-                          </th>
-                        ))}
-                        <th className="px-3 py-2 text-center border-l border-indigo-600 min-w-[80px]">
-                          <button onClick={() => toggleDashSort("grand_percentage")} className="hover:underline">
-                            Grand % {dashSortCol === "grand_percentage" ? (dashSortDir === "desc" ? "▼" : "▲") : ""}
-                          </button>
-                        </th>
-                        <th className="px-3 py-2 text-center min-w-[60px]">Band</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dashSortedStudents(sectionData.students_ranked || []).map((s: any, i: number) => {
-                        const isAdv = sectionData.advancing?.some((a: any) => a.student_name === s.student_name);
-                        const isRet = sectionData.retracting?.some((r: any) => r.student_name === s.student_name);
-                        return (
-                        <tr key={s.student_name} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                          <td className="px-3 py-2 text-center font-bold text-gray-400 sticky left-0 bg-inherit border-r border-gray-200">{s.rank}</td>
-                          <td className="px-3 py-2 font-medium text-gray-800 sticky left-[50px] bg-inherit border-r border-gray-200">
-                            <span>{s.student_name}</span>
-                            {isAdv && <span className="ml-1 text-green-500 text-xs font-bold" title="Advancing">▲</span>}
-                            {isRet && <span className="ml-1 text-red-500 text-xs font-bold" title="Retracting">▼</span>}
-                          </td>
-                          {sectionData.subjects?.map((sub: string) => {
-                            const sd = s.subjects?.[sub];
-                            return (
-                              <td key={sub} className="px-2 py-2 text-center border-l border-gray-100">
-                                {sd?.is_absent ? <span className="text-red-400 text-xs font-bold">AB</span>
-                                  : sd?.percentage !== null && sd?.percentage !== undefined ? (
-                                    <div><span className="font-bold">{sd.marks}</span><br /><span className={`text-xs px-1 py-0.5 rounded ${scoreBg(n(sd.percentage))}`}>{n(sd.percentage).toFixed(1)}%</span></div>
-                                  ) : <span className="text-gray-300">—</span>}
-                              </td>
-                            );
-                          })}
-                          <td className="px-3 py-2 text-center border-l border-gray-100">
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(n(s.grand_percentage))}`}>
-                              {s.grand_percentage ? fmtPct(n(s.grand_percentage)) : "—"}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            {s.band && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: BAND_COLORS[s.band] + "20", color: BAND_COLORS[s.band] }}>{s.band}</span>}
-                          </td>
-                        </tr>
-                        );
-                      })}
-                      <tr className="bg-indigo-50 border-t-2 border-indigo-300 font-bold">
-                        <td colSpan={2} className="px-3 py-2 text-indigo-700 text-xs sticky left-0 bg-indigo-50">Subject Average</td>
-                        {sectionData.subjects?.map((sub: string) => (
-                          <td key={sub} className="px-2 py-2 text-center border-l border-indigo-200">
-                            <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${scoreBg(n(sectionData.subject_averages?.[sub]))}`}>{fmtPct(n(sectionData.subject_averages?.[sub]))}</span>
-                          </td>
-                        ))}
-                        <td className="px-3 py-2 text-center border-l border-indigo-200">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${scoreBg(n(sectionData.section_avg))}`}>{fmtPct(n(sectionData.section_avg))}</span>
-                        </td>
-                        <td />
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          ) : <div className="bg-white rounded-xl shadow p-12 text-center text-gray-400"><p className="text-sm">No data for {dashGrade} — {dashSection} — {dashExam}.</p></div>
-          )}
-
-          {/* STUDENT */}
-          {dashTab === "student" && (
-            <div className="space-y-4">
-              <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Find Student</h3>
-                <div className="flex gap-3 items-end flex-wrap mb-3">
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Grade</label>
-                    <select value={studentGrade} onChange={e => setStudentGrade(e.target.value)}
-                      className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                      {grades.map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Section</label>
-                    <select value={studentSection} onChange={e => setStudentSection(e.target.value)}
-                      className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                      {studentSections.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div className="flex-1 min-w-[200px]">
-                    <label className="text-xs text-gray-500 block mb-1">Select Student</label>
-                    <select onChange={e => e.target.value && fetchStudentData(e.target.value)}
-                      className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                      <option value="">-- Select student --</option>
-                      {sectionStudents.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div className="text-gray-400 text-xs self-center">or</div>
-                  <div className="relative flex-1 min-w-[200px]">
-                    <label className="text-xs text-gray-500 block mb-1">Search by Name</label>
-                    <input value={studentSearch} onChange={e => searchStudent(e.target.value)}
-                      placeholder="Type name to search..." className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-full" />
-                    {studentResults.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-20 mt-1 max-h-60 overflow-y-auto">
-                        {studentResults.map((s: any) => (
-                          <button key={s.student_name} onClick={() => fetchStudentData(s.student_name)}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 flex items-center gap-2 border-b border-gray-100">
-                            <span className="font-medium text-gray-800">{s.student_name}</span>
-                            <span className="text-xs text-gray-400">{s.grade} — {s.section}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {studentData && (
-                <div className="space-y-4">
-                  <div className="bg-white rounded-xl shadow p-4 border-l-4 border-indigo-500">
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div>
-                        <p className="text-lg font-bold text-gray-800">{studentData.student_name}</p>
-                        <p className="text-sm text-gray-500">{studentData.grade} — {studentData.section}</p>
-                      </div>
-                      {studentData.exam_summary?.map((e: any, idx: number) => {
-                        const prev = studentData.exam_summary[idx - 1];
-                        const diff = prev ? n(e.grand_percentage) - n(prev.grand_percentage) : null;
-                        return (
-                        <div key={e.exam} className="text-center border border-gray-200 rounded-lg px-3 py-2 min-w-[70px]">
-                          <p className="text-xs font-bold text-gray-500">{e.exam}</p>
-                          <p className={`text-sm font-bold ${scoreColor(n(e.grand_percentage))}`}>{e.grand_percentage ? fmtPct(n(e.grand_percentage)) : "—"}</p>
-                          {diff !== null && (
-                            <p className={`text-xs font-bold ${diff > 0 ? "text-green-600" : diff < 0 ? "text-red-500" : "text-gray-400"}`}>
-                              {diff > 0 ? `▲+${diff.toFixed(1)}` : diff < 0 ? `▼${diff.toFixed(1)}` : "→"}
-                            </p>
-                          )}
-                          {e.band && <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ backgroundColor: BAND_COLORS[e.band] + "20", color: BAND_COLORS[e.band] }}>{e.band}</span>}
-                          {studentData.rank_per_exam?.[e.exam] && <p className="text-xs text-indigo-600 font-bold mt-0.5">#{studentData.rank_per_exam[e.exam]}</p>}
-                        </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {studentData.subject_trend?.length > 1 && (
-                    <div className="bg-white rounded-xl shadow p-4">
-                      <h3 className="text-sm font-semibold text-gray-700 mb-1">📈 Longitudinal — Subject Performance Across Exams</h3>
-                      <p className="text-xs text-gray-400 mb-3">X = Exam · Y = % · Each line = one subject · Only conducted exams shown</p>
-                      <ResponsiveContainer width="100%" height={320}>
-                        <LineChart data={studentData.subject_trend} margin={{ top: 5, right: 20, left: 0, bottom: 80 }}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="exam" tick={{ fontSize: 11 }} />
-                          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                          <Tooltip formatter={(v: any, name: any) => [v !== null ? `${v}%` : "Not taken", name]} />
-                          <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }} />
-                          {studentData.subjects?.map((sub: string, i: number) => (
-                            <Line key={sub} type="monotone" dataKey={sub} stroke={SUBJECT_COLORS[i % SUBJECT_COLORS.length]}
-                              strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls={false} />
-                          ))}
-                          <Line type="monotone" dataKey="Overall" stroke="#374151" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 5 }} activeDot={{ r: 7 }} connectNulls={false} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-
-                  <div className="bg-white rounded-xl shadow p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">All Exams × All Subjects</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs border-collapse" style={{ minWidth: `${300 + (studentData.subjects?.length || 0) * 130}px` }}>
-                        <thead>
-                          <tr className="bg-indigo-700 text-white">
-                            <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 border-r border-indigo-600 min-w-[70px]">Exam</th>
-                            {studentData.subjects?.map((sub: string) => (
-                              <th key={sub} className="px-3 py-2 text-center border-l border-indigo-600 min-w-[120px]">{sub}</th>
-                            ))}
-                            <th className="px-3 py-2 text-center border-l border-indigo-600 min-w-[80px]">Grand %</th>
-                            <th className="px-3 py-2 text-center min-w-[60px]">Band</th>
-                            <th className="px-3 py-2 text-center min-w-[60px]">Rank</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {studentData.exam_summary?.map((e: any, i: number) => (
-                            <tr key={e.exam} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                              <td className="px-3 py-2 font-bold text-indigo-700 sticky left-0 bg-inherit border-r border-gray-200">{e.exam}</td>
-                              {studentData.subjects?.map((sub: string) => {
-                                const sd = e.subjects?.[sub];
-                                return (
-                                  <td key={sub} className="px-3 py-2 text-center border-l border-gray-100">
-                                    {sd?.is_absent ? <span className="text-red-400 font-bold text-xs">ABSENT</span>
-                                      : sd?.marks !== null && sd?.marks !== undefined ? (
-                                        <div><span className="font-bold">{sd.marks}</span><span className="text-gray-400 text-xs">/{sd.max_marks}</span><br />
-                                          <span className={`text-xs px-1.5 py-0.5 rounded ${scoreBg(n(sd.percentage))}`}>{n(sd.percentage).toFixed(1)}%</span></div>
-                                      ) : <span className="text-gray-300">—</span>}
-                                  </td>
-                                );
-                              })}
-                              <td className="px-3 py-2 text-center border-l border-gray-100">
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(n(e.grand_percentage))}`}>
-                                  {e.grand_percentage ? fmtPct(n(e.grand_percentage)) : "—"}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                {e.band && <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ backgroundColor: BAND_COLORS[e.band] + "20", color: BAND_COLORS[e.band] }}>{e.band}</span>}
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                {studentData.rank_per_exam?.[e.exam] ? <span className="font-bold text-indigo-700">#{studentData.rank_per_exam[e.exam]}</span> : "—"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!studentData && (
-                <div className="bg-white rounded-xl shadow p-12 text-center text-gray-400">
-                  <p className="text-sm">Select a grade, section and student above to view their complete analysis</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ALERTS */}
-          {dashTab === "alerts" && (() => {
-            const filteredAlerts = pasaAlerts.filter(s => {
-              if (alertGrade && s.grade !== alertGrade) return false;
-              if (alertSection && s.section !== alertSection) return false;
-              return true;
-            });
-            return (
-            <div className="space-y-4">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-                <h3 className="text-sm font-bold text-yellow-800 mb-1">⚠️ Consecutive Score Decline Alert</h3>
-                <p className="text-xs text-yellow-600">
-                  Students whose overall grand % has dropped across 3 consecutive exams — needs immediate attention.
-                </p>
-              </div>
-
-              {/* Filter bar */}
-              <div className="bg-white rounded-xl shadow p-4">
-                <div className="flex items-center gap-4 flex-wrap">
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">View</label>
-                    <div className="flex gap-2">
-                      {[
-                        { label: "🏫 School-wide", grade: "", section: "" },
-                      ].map(opt => (
-                        <button key="school" onClick={() => { setAlertGrade(""); setAlertSection(""); setAlertSections([]); }}
-                          className={`px-3 py-1.5 text-xs rounded-lg font-medium border ${!alertGrade ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
-                          🏫 School-wide ({pasaAlerts.length})
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Filter by Grade</label>
-                    <select value={alertGrade} onChange={e => {
-                      setAlertGrade(e.target.value);
-                      setAlertSection("");
-                      if (e.target.value) {
-                        const secs = [...new Set(pasaAlerts.filter(s => s.grade === e.target.value).map(s => s.section))].sort();
-                        setAlertSections(secs as string[]);
-                      } else setAlertSections([]);
-                    }} className="border border-gray-300 rounded px-2 py-1.5 text-xs">
-                      <option value="">All Grades</option>
-                      {[...new Set(pasaAlerts.map(s => s.grade))].sort().map(g => (
-                        <option key={g} value={g}>{g} ({pasaAlerts.filter(s => s.grade === g).length})</option>
-                      ))}
-                    </select>
-                  </div>
-                  {alertGrade && (
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">Filter by Section</label>
-                      <select value={alertSection} onChange={e => setAlertSection(e.target.value)}
-                        className="border border-gray-300 rounded px-2 py-1.5 text-xs">
-                        <option value="">All Sections</option>
-                        {alertSections.map(s => (
-                          <option key={s} value={s}>{s} ({pasaAlerts.filter(st => st.grade === alertGrade && st.section === s).length})</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  <div className="ml-auto">
-                    <span className="text-sm font-bold text-red-700 bg-red-100 px-3 py-1.5 rounded-lg">
-                      {filteredAlerts.length} student{filteredAlerts.length !== 1 ? "s" : ""} at risk
-                      {alertGrade ? ` in ${alertGrade}${alertSection ? ` — ${alertSection}` : ""}` : " school-wide"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                  Students with 3+ Consecutive Exam Declines
-                  {alertGrade && <span className="ml-2 text-indigo-600 font-normal">· {alertGrade}{alertSection ? ` — ${alertSection}` : ""}</span>}
-                </h3>
-                {filteredAlerts.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-6">
-                    No students with 3 consecutive exam declines found{alertGrade ? ` in ${alertGrade}${alertSection ? ` — ${alertSection}` : ""}` : ""}.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {filteredAlerts.map((s: any, i: number) => (
-                      <div key={i} className="bg-red-50 border border-red-200 rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                          <div>
-                            <span className="text-sm font-bold text-red-800">{s.student_name}</span>
-                            <span className="text-xs text-gray-500 ml-2">{s.grade} — {s.section}</span>
-                          </div>
-                          <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
-                            Drop: {s.decline_from}% → {s.decline_to}% (-{s.drop}%)
-                          </span>
-                        </div>
-                        <div className="flex gap-2 flex-wrap">
-                          {s.exam_scores.map((sc: any, j: number) => (
-                            <div key={j} className={`text-center rounded-lg px-3 py-2 text-xs border min-w-[70px] ${
-                              j > 0 && sc.pct < s.exam_scores[j - 1].pct ? "bg-red-100 border-red-300" : "bg-gray-50 border-gray-200"
-                            }`}>
-                              <p className={`font-bold text-sm ${j > 0 && sc.pct < s.exam_scores[j - 1].pct ? "text-red-700" : "text-gray-800"}`}>{sc.pct}%</p>
-                              <p className="text-gray-600 font-medium">{sc.exam}</p>
-                              {j > 0 && (
-                                <p className={`text-xs font-bold ${sc.pct < s.exam_scores[j-1].pct ? "text-red-500" : "text-green-600"}`}>
-                                  {sc.pct < s.exam_scores[j-1].pct ? `▼${(s.exam_scores[j-1].pct - sc.pct).toFixed(1)}` : `▲${(sc.pct - s.exam_scores[j-1].pct).toFixed(1)}`}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            );
-          })()}
         </div>
       )}
+    </div>
+  );
+}
+
+function ClearDataTab() {
+  const [clearing,setClearing]=useState(false);
+  const [msg,setMsg]=useState("");
+  const clearData=async()=>{
+    if(!confirm("⚠️ Delete ALL PA/SA data? Cannot be undone."))return;
+    if(!confirm("Confirm again?"))return;
+    setClearing(true);
+    try{await axios.delete(`${API}/pasa/clear-all`);setMsg("✅ All PA/SA data cleared.");}
+    catch{setMsg("❌ Clear failed.");}
+    setClearing(false);
+  };
+  return (
+    <div className="space-y-4 max-w-lg">
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+        <h3 className="text-sm font-bold text-red-800 mb-2">⚠️ Clear All PA/SA Data</h3>
+        <p className="text-xs text-red-700">Permanently deletes all exam configurations and marks. Use to reset for the new competency-mapped system.</p>
+      </div>
+      {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+      <button onClick={clearData} disabled={clearing} className="px-5 py-2.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium">
+        {clearing?"Clearing...":"🗑️ Clear All PASA Data"}</button>
     </div>
   );
 }

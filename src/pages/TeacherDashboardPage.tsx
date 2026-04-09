@@ -5,7 +5,7 @@ import {
   Tooltip, Legend, ResponsiveContainer, Cell,
 } from "recharts";
 
-const API = "http://localhost:3000";
+const API = "https://cbas-backend-production.up.railway.app";
 const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
 
@@ -45,7 +45,6 @@ export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
   const CLASS_TABS = [
     { id: "students",       label: "👥 My Students",      show: true },
     { id: "classview",      label: "🏛 My Class",         show: isClassTeacher },
-    { id: "examconfig",     label: "⚙️ Exam Config",       show: isClassTeacher },
     { id: "pasa",           label: "✏️ PA/SA Marks",       show: true },
     { id: "baseline_entry", label: "📊 Baseline Entry",    show: isClassTeacher },
     { id: "baseline_dash",  label: "📈 Baseline Dashboard", show: true },
@@ -61,6 +60,7 @@ export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
     { id: "self_baseline",  label: "📈 My Baseline",      show: true },
     { id: "appraisal",      label: "📋 My Appraisal",     show: true },
     { id: "self_ai",        label: "🤖 AI Learning",      show: true },
+    { id: "learning_res",   label: "📚 Learning Resources", show: true },
   ];
 
   const activeTabs = activeGroup === "class" ? CLASS_TABS : SELF_TABS;
@@ -122,7 +122,6 @@ export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
       {/* Class Management tabs */}
       {activeTab === "students"       && <StudentsTab user={user} mappings={mappings} academicYear={academicYear} />}
       {activeTab === "classview"      && <ClassTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "examconfig"     && <ExamConfigTab user={user} mappings={mappings} academicYear={academicYear} />}
       {activeTab === "pasa"           && <PASATab user={user} mappings={mappings} academicYear={academicYear} />}
       {activeTab === "baseline_entry" && <BaselineEntryTab user={user} mappings={mappings} academicYear={academicYear} />}
       {activeTab === "baseline_dash"  && <BaselineDashTab user={user} mappings={mappings} academicYear={academicYear} />}
@@ -137,6 +136,7 @@ export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
       {activeTab === "self_baseline"  && <BaselineTab user={user} academicYear={academicYear} />}
       {activeTab === "appraisal"      && <AppraisalTab user={user} academicYear={academicYear} />}
       {activeTab === "self_ai"        && <SelfAITab user={user} academicYear={academicYear} />}
+      {activeTab === "learning_res"   && <LearningResourcesTab user={user} academicYear={academicYear} />}
       {activeTab === "homework"       && <HomeworkTab user={user} mappings={mappings} academicYear={academicYear} />}
     </div>
   );
@@ -638,7 +638,7 @@ function StudentsTab({ user, mappings, academicYear }: any) {
 // TAB 3: MY CLASS (class teacher only)
 // ─────────────────────────────────────────────────────────────────
 function ClassTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
+  const API = "https://cbas-backend-production.up.railway.app";
   const [students, setStudents] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<string[]>([]);
   const [sectionData, setSectionData] = useState<any>({});
@@ -1147,420 +1147,384 @@ function BaselineTab({ user, academicYear }: any) {
 // PA/SA TAB — Marks Entry + Full Analysis (teacher's subjects only)
 // ─────────────────────────────────────────────────────────────────
 function PASATab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
-  const nv = (v: any) => +(v ?? 0);
-  const fmtP = (v: number) => `${v.toFixed(1)}%`;
-  const sBg = (p: number) => p >= 80 ? "bg-green-100 text-green-800" : p >= 60 ? "bg-blue-100 text-blue-800" : p >= 40 ? "bg-yellow-100 text-yellow-800" : p > 0 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-400";
-  const sColor = (p: number) => p >= 80 ? "text-green-600" : p >= 60 ? "text-blue-600" : p >= 40 ? "text-yellow-600" : p > 0 ? "text-red-500" : "text-gray-400";
-  const inputBg = (p: number | null) => p === null ? "border-gray-300" : p >= 80 ? "border-green-300 bg-green-50 text-green-800" : p >= 60 ? "border-blue-300 bg-blue-50 text-blue-800" : p >= 33 ? "border-yellow-300 bg-yellow-50 text-yellow-800" : "border-red-300 bg-red-50 text-red-800";
+  const API = "https://cbas-backend-production.up.railway.app";
+  const EXAM_TYPES = ["FA1","FA2","SA1","FA3","FA4","SA2","Custom"];
 
-  const [subTab, setSubTab] = useState<"entry" | "analysis">("entry");
-  const [selectedCombo, setSelectedCombo] = useState<any>(null);
-  const [selectedExam, setSelectedExam] = useState("PA1");
-  const [marksTable, setMarksTable] = useState<any>(null);
-  const [marks, setMarks] = useState<Record<string, Record<string, any>>>({});
-  const [saving, setSaving] = useState(false);
+  const teacherSubjects: string[] = mappings?.subjects || user?.subjects || [];
+  const isClassTeacher = !!(mappings?.is_class_teacher || user?.class_teacher_of);
+  const classGrade = mappings?.class_grade || "";
+  const classSection = mappings?.class_section || "";
+
+  const [subTab, setSubTab] = useState<"config"|"entry"|"dashboard">("config");
+
+  // Config state
+  const [configs, setConfigs] = useState<any[]>([]);
+  const [showConfigForm, setShowConfigForm] = useState(false);
+  const [configForm, setConfigForm] = useState({ subject: teacherSubjects[0]||"", exam_type:"FA1", exam_date:"", description:"" });
+  const [competencies, setCompetencies] = useState<any[]>([]);
+  const [loadingComps, setLoadingComps] = useState(false);
+  const [selectedComps, setSelectedComps] = useState<any[]>([]);
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  // Entry state
+  const [selectedConfig, setSelectedConfig] = useState<any>(null);
+  const [entryStudents, setEntryStudents] = useState<any[]>([]);
+  const [marks, setMarks] = useState<Record<string,Record<string,number|null>>>({});
+  const [absent, setAbsent] = useState<Record<string,boolean>>({});
+  const [loadingEntry, setLoadingEntry] = useState(false);
+  const [savingMarks, setSavingMarks] = useState(false);
+
+  // Dashboard state
+  const [dashData, setDashData] = useState<any>(null);
+  const [dashExam, setDashExam] = useState("");
+  const [loadingDash, setLoadingDash] = useState(false);
+
   const [msg, setMsg] = useState("");
-  const [sectionData, setSectionData] = useState<any>(null);
-  const [longData, setLongData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
 
-  // Build combos from mappings
-  const combos: { grade: string; section: string; subject: string }[] = [];
-  if (mappings?.mappings) {
-    const seen = new Set<string>();
-    mappings.mappings.forEach((m: any) => {
-      if (!m.subject) return;
-      const key = `${m.grade}||${m.section}||${m.subject}`;
-      if (!seen.has(key)) { seen.add(key); combos.push({ grade: m.grade, section: m.section, subject: m.subject }); }
-    });
-  }
+  useEffect(() => { fetchConfigs(); }, [academicYear, mappings]);
+  useEffect(() => { if (subTab==="dashboard") fetchDashboard(); }, [subTab, dashExam, academicYear]);
 
-  useEffect(() => { if (combos.length && !selectedCombo) setSelectedCombo(combos[0]); }, [mappings]);
-  useEffect(() => { if (selectedCombo && selectedExam) { fetchMarksTable(); if (subTab === "analysis") fetchAnalysis(); } }, [selectedCombo, selectedExam, academicYear]);
-  useEffect(() => { if (subTab === "analysis" && selectedCombo) { fetchAnalysis(); fetchLong(); } }, [subTab]);
-
-  const fetchMarksTable = async () => {
-    if (!selectedCombo) return;
+  const fetchConfigs = async () => {
+    if (!classGrade || !classSection) return;
     try {
-      const r = await axios.get(`${API}/pasa/marks/table?academic_year=${academicYear}&exam_type=${selectedExam}&grade=${encodeURIComponent(selectedCombo.grade)}&section=${encodeURIComponent(selectedCombo.section)}`);
-      let data = r.data;
+      const r = await axios.get(`${API}/pasa/config/section?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}&academic_year=${academicYear}`);
+      setConfigs(r.data?.configs||[]);
+    } catch {}
+  };
 
-      // Only show marks table if exam config actually exists for this grade
-      // Do NOT inject default 100 marks - teacher must configure exam first
-      if (!data?.configs?.length) {
-        setMarksTable({ no_config: true, grade: selectedCombo.grade, exam_type: selectedExam });
-        setMarks({});
-        return;
-      }
+  const fetchCompetencies = async () => {
+    setLoadingComps(true);
+    try {
+      const r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(configForm.subject)}&grade=${encodeURIComponent(classGrade)}`);
+      const data = r.data?.competencies||r.data||[];
+      setCompetencies(Array.isArray(data)?data:[]);
+    } catch {}
+    setLoadingComps(false);
+  };
 
-      // Filter configs to only show teacher's subject
-      if (data?.configs?.length) {
-        data = {
-          ...data,
-          configs: data.configs.filter((c: any) => c.subject === selectedCombo.subject),
-          subjects: (data.subjects || []).filter((s: any) => s === selectedCombo.subject),
-          students: data.students.map((s: any) => ({
-            ...s,
-            subjects: Object.fromEntries(
-              Object.entries(s.subjects || {}).filter(([k]) => k === selectedCombo.subject)
-            ),
-          })),
-        };
-      }
+  const toggleComp = (comp: any) => {
+    setSelectedComps(prev => {
+      const exists = prev.find((c:any)=>c.competency_id===comp.id);
+      if (exists) return prev.filter((c:any)=>c.competency_id!==comp.id);
+      return [...prev,{competency_id:comp.id,competency_code:comp.code,competency_name:comp.name,max_marks:10}];
+    });
+  };
 
-      setMarksTable(data);
-      const m: Record<string, Record<string, any>> = {};
-      (data?.students || []).forEach((s: any) => {
-        m[s.student_name] = {};
-        Object.keys(s.subjects || {}).forEach(sub => {
-          m[s.student_name][sub] = { marks: s.subjects[sub].marks != null ? String(s.subjects[sub].marks) : "", is_absent: s.subjects[sub].is_absent || false };
+  const updateMaxMarks = (cid:string, mm:number) => setSelectedComps(p=>p.map((c:any)=>c.competency_id===cid?{...c,max_marks:mm}:c));
+  const totalMarks = selectedComps.reduce((s:number,c:any)=>s+(+c.max_marks||0),0);
+
+  const saveConfig = async () => {
+    if (!configForm.subject||!configForm.exam_type||!selectedComps.length){setMsg("❌ Fill all fields and select competencies");return;}
+    setSavingConfig(true);
+    try {
+      const r = await axios.post(`${API}/pasa/config`,{
+        teacher_id:user.id, teacher_name:user.name,
+        subject:configForm.subject, grade:classGrade, section:classSection,
+        exam_type:configForm.exam_type, exam_date:configForm.exam_date,
+        description:configForm.description, academic_year:academicYear,
+        competencies:selectedComps,
+      });
+      if(r.data?.success){setMsg("✅ Config saved!");setShowConfigForm(false);setSelectedComps([]);fetchConfigs();}
+    } catch {setMsg("❌ Save failed");}
+    setSavingConfig(false);setTimeout(()=>setMsg(""),3000);
+  };
+
+  const loadEntryStudents = async (config:any) => {
+    setSelectedConfig(config);setLoadingEntry(true);setEntryStudents([]);
+    try {
+      const r = await axios.get(`${API}/pasa/marks/entry?exam_config_id=${config.id}&grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`);
+      const sl = r.data?.students||[];
+      setEntryStudents(sl);
+      const im:Record<string,Record<string,number|null>>={};
+      const ia:Record<string,boolean>={};
+      sl.forEach((s:any)=>{
+        im[s.student_id]={};
+        ia[s.student_id]=s.existing_marks?.is_absent||false;
+        const cs=s.existing_marks?.competency_scores||[];
+        (config.competencies as any[]).forEach((c:any)=>{
+          const ex=cs.find((x:any)=>x.competency_id===c.competency_id);
+          im[s.student_id][c.competency_id]=ex?.marks_obtained??null;
         });
       });
-      setMarks(m);
-    } catch (e) {
-      setMarksTable({ no_config: true, grade: selectedCombo.grade, exam_type: selectedExam });
-      setMarks({});
-    }
+      setMarks(im);setAbsent(ia);
+      setSubTab("entry");
+    } catch {setMsg("❌ Failed to load students.");}
+    setLoadingEntry(false);
   };
 
-  const fetchAnalysis = async () => {
-    if (!selectedCombo) return;
-    setLoading(true);
-    try {
-      const r = await axios.get(`${API}/pasa/analysis/section?academic_year=${academicYear}&exam_type=${selectedExam}&grade=${encodeURIComponent(selectedCombo.grade)}&section=${encodeURIComponent(selectedCombo.section)}`);
-      setSectionData(r.data);
-    } catch { setSectionData(null); }
-    setLoading(false);
-  };
-
-  const fetchLong = async () => {
-    if (!selectedCombo) return;
-    try {
-      const r = await axios.get(`${API}/pasa/analysis/longitudinal?academic_year=${academicYear}&grade=${encodeURIComponent(selectedCombo.grade)}&section=${encodeURIComponent(selectedCombo.section)}`);
-      setLongData(r.data);
-    } catch { }
-  };
-
-  const updateMark = (name: string, sub: string, val: string) => {
-    setMarks(prev => ({ ...prev, [name]: { ...(prev[name] || {}), [sub]: { ...((prev[name] || {})[sub] || {}), marks: val } } }));
-  };
-
-  const toggleAbsent = (name: string, sub: string) => {
-    setMarks(prev => { const cur = prev[name]?.[sub]?.is_absent || false; return { ...prev, [name]: { ...(prev[name] || {}), [sub]: { marks: "", is_absent: !cur } } }; });
+  const calcTotal = (sid:string) => {
+    if(absent[sid]||!selectedConfig)return{total:0,pct:0};
+    let total=0;
+    (selectedConfig.competencies as any[]).forEach((c:any)=>{total+=+(marks[sid]?.[c.competency_id]||0);});
+    return{total,pct:selectedConfig.total_marks>0?+((total/selectedConfig.total_marks)*100).toFixed(1):0};
   };
 
   const saveMarks = async () => {
-    if (!marksTable || !selectedCombo) return;
-    setSaving(true);
+    if(!selectedConfig||!entryStudents.length)return;
+    setSavingMarks(true);
     try {
-      const entries: any[] = [];
-      marksTable.students.forEach((student: any) => {
-        // Only save for teacher's own subject
-        const sub = selectedCombo.subject;
-        const cfg = marksTable.configs?.find((c: any) => c.subject === sub);
-        const md = marks[student.student_name]?.[sub];
-        const maxMarks = nv(cfg?.max_marks) || 100;
-        const marksObtained = md?.is_absent ? null : (md?.marks === "" || md?.marks === undefined ? null : parseFloat(String(md.marks)));
-        entries.push({ student_id: student.student_id, student_name: student.student_name, roll_number: student.roll_number, subject: sub, marks_obtained: isNaN(marksObtained as number) ? null : marksObtained, max_marks: maxMarks, is_absent: md?.is_absent || false });
+      const entries = entryStudents.map((s:any)=>({
+        student_id:s.student_id, student_name:s.student_name,
+        is_absent:absent[s.student_id]||false,
+        competency_scores:(selectedConfig.competencies as any[]).map((c:any)=>({
+          competency_id:c.competency_id, competency_code:c.competency_code,
+          competency_name:c.competency_name,
+          marks_obtained:absent[s.student_id]?null:(marks[s.student_id]?.[c.competency_id]??null),
+          max_marks:c.max_marks,
+        })),
+      }));
+      await axios.post(`${API}/pasa/marks`,{
+        exam_config_id:selectedConfig.id, grade:classGrade, section:classSection,
+        subject:selectedConfig.subject, exam_type:selectedConfig.exam_type,
+        academic_year:academicYear, teacher_id:user.id, entries,
       });
-      await axios.post(`${API}/pasa/marks`, { academic_year: academicYear, exam_type: selectedExam, grade: selectedCombo.grade, section: selectedCombo.section, entries });
-      setMsg("✅ Marks saved successfully");
-      fetchMarksTable();
-    } catch { setMsg("❌ Error saving marks"); }
-    setSaving(false);
-    setTimeout(() => setMsg(""), 3000);
+      setMsg("✅ Marks saved!");
+    } catch {setMsg("❌ Save failed.");}
+    setSavingMarks(false);setTimeout(()=>setMsg(""),3000);
   };
 
-  if (!combos.length) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No subject assignments found. Contact admin.</div>;
+  const fetchDashboard = async () => {
+    setLoadingDash(true);setDashData(null);
+    try {
+      const et = dashExam?`&exam_type=${dashExam}`:"";
+      const r = await axios.get(`${API}/pasa/dashboard/section?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}&academic_year=${academicYear}${et}`);
+      setDashData(r.data);
+    } catch {}
+    setLoadingDash(false);
+  };
+
+  if (!classGrade||!classSection) {
+    return (
+      <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
+        <p className="text-sm">PA/SA marks are available for class teachers and subject teachers with assigned sections.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      {/* Sub-tab + exam selector */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex gap-2">
-          {[{ id: "entry", label: "✏️ Marks Entry" }, { id: "analysis", label: "📊 Analysis" }].map(t => (
-            <button key={t.id} onClick={() => setSubTab(t.id as any)}
-              className={`px-4 py-2 text-sm rounded-lg font-medium border ${subTab === t.id ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>{t.label}</button>
-          ))}
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 mr-1">Exam:</label>
-          <select value={selectedExam} onChange={e => setSelectedExam(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-            {["PA1","PA2","SA1","PA3","PA4","SA2"].map(e => <option key={e} value={e}>{e}</option>)}
-          </select>
-        </div>
+      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
+        <p className="text-sm font-bold text-indigo-800">📝 PA/SA Marks — {classGrade} · {classSection}</p>
+        <p className="text-xs text-indigo-600">Competency-mapped exam system · {academicYear}</p>
       </div>
 
-      {/* Section selector */}
-      <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
-        {combos.map(c => (
-          <button key={`${c.grade}-${c.section}-${c.subject}`}
-            onClick={() => setSelectedCombo(c)}
-            className={`px-3 py-2 text-xs rounded-lg font-medium border ${selectedCombo?.grade === c.grade && selectedCombo?.section === c.section && selectedCombo?.subject === c.subject ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
-            {c.grade} · {c.section} · {c.subject}
+      <div className="flex gap-2 flex-wrap">
+        {[{id:"config",label:"⚙️ Exam Config"},{id:"entry",label:"✏️ Marks Entry"},{id:"dashboard",label:"📊 Dashboard"}].map(t=>(
+          <button key={t.id} onClick={()=>setSubTab(t.id as any)}
+            className={`px-4 py-2 text-sm rounded-lg font-medium ${subTab===t.id?"bg-indigo-600 text-white":"bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
+            {t.label}
           </button>
         ))}
       </div>
 
-      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+      {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
-      {/* MARKS ENTRY */}
-      {subTab === "entry" && (
-        <div>
-          {!marksTable ? (
-            <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Loading...</div>
-          ) : marksTable.no_config ? (
-            <div className="bg-white rounded-xl shadow p-10 text-center">
-              <p className="text-gray-500 text-sm font-medium">⚠️ No exam configuration found for {marksTable.grade} — {marksTable.exam_type}</p>
-              <p className="text-gray-400 text-xs mt-2">Admin needs to configure the exam for this grade first via Exam Config tab.</p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+      {/* CONFIG TAB */}
+      {subTab==="config"&&(
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <p className="text-xs text-gray-500">{configs.length} configurations for {classGrade} · {classSection}</p>
+            <button onClick={()=>setShowConfigForm(!showConfigForm)} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
+              {showConfigForm?"✕ Cancel":"+ New Config"}
+            </button>
+          </div>
+
+          {showConfigForm&&(
+            <div className="bg-white rounded-xl shadow border p-4 space-y-4">
+              <h3 className="text-sm font-bold text-gray-700">New Exam Config for {classGrade} · {classSection}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <h2 className="text-sm font-bold text-gray-700">{selectedCombo?.grade} — {selectedCombo?.section} — {selectedExam} — {selectedCombo?.subject}</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">{marksTable.students?.length} students · You can only enter marks for your subject</p>
+                  <label className="text-xs text-gray-500 block mb-1">Subject *</label>
+                  {teacherSubjects.length>0?(
+                    <select value={configForm.subject} onChange={e=>setConfigForm(p=>({...p,subject:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                      {teacherSubjects.map((s:string)=><option key={s} value={s}>{s}</option>)}
+                    </select>
+                  ):(
+                    <input type="text" value={configForm.subject} onChange={e=>setConfigForm(p=>({...p,subject:e.target.value}))} placeholder="Subject" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
+                  )}
                 </div>
-                <button onClick={saveMarks} disabled={saving} className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold">
-                  {saving ? "Saving..." : "💾 Save Marks"}
-                </button>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Exam Type *</label>
+                  <select value={configForm.exam_type} onChange={e=>setConfigForm(p=>({...p,exam_type:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                    {EXAM_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Exam Date</label>
+                  <input type="date" value={configForm.exam_date} onChange={e=>setConfigForm(p=>({...p,exam_date:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
+                </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-indigo-700 text-white">
-                      <th className="px-3 py-2 text-center w-10">#</th>
-                      <th className="px-3 py-2 text-left min-w-[180px]">Student</th>
-                      <th className="px-3 py-2 text-center">Roll No</th>
-                      <th className="px-3 py-2 text-center min-w-[150px]">{selectedCombo?.subject} (Max: {marksTable.configs?.find((c: any) => c.subject === selectedCombo?.subject)?.max_marks || 100})</th>
-                      <th className="px-3 py-2 text-center">%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {marksTable.students?.map((student: any, idx: number) => {
-                      const sub = selectedCombo?.subject;
-                      const cfg = marksTable.configs?.find((c: any) => c.subject === sub);
-                      const md = marks[student.student_name]?.[sub] || {};
-                      const maxMarks = nv(cfg?.max_marks) || 100;
-                      const markVal = parseFloat(String(md.marks));
-                      const subPct = !md.is_absent && !isNaN(markVal) && md.marks !== "" ? (markVal / maxMarks) * 100 : null;
-                      const bg = idx % 2 === 0 ? "bg-white" : "bg-gray-50";
-                      return (
-                        <tr key={student.student_name} className={`border-b border-gray-100 ${bg}`}>
-                          <td className={`px-3 py-2 text-center text-gray-400 ${bg}`}>{idx + 1}</td>
-                          <td className={`px-3 py-2 font-medium text-gray-800 ${bg}`}>{student.student_name}</td>
-                          <td className="px-3 py-2 text-center text-gray-500">{student.roll_number || "—"}</td>
-                          <td className={`px-2 py-1.5 text-center ${bg}`}>
-                            {md.is_absent ? (
-                              <div className="flex items-center gap-1 justify-center">
-                                <span className="text-xs text-red-500 font-bold bg-red-50 px-2 py-0.5 rounded">ABSENT</span>
-                                <button onClick={() => toggleAbsent(student.student_name, sub)} className="text-xs text-gray-400 hover:text-gray-600">✕</button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2 justify-center">
-                                <input type="number" value={md.marks ?? ""} min={0} max={maxMarks} step={0.25}
-                                  onChange={e => updateMark(student.student_name, sub, e.target.value)}
-                                  className={`w-20 text-center border rounded px-1 py-0.5 text-xs font-medium ${inputBg(subPct)}`} />
-                                <button onClick={() => toggleAbsent(student.student_name, sub)} className="text-xs text-gray-300 hover:text-red-500 font-bold" title="Mark absent">AB</button>
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            {subPct !== null ? <span className={`text-xs font-bold ${sColor(subPct)}`}>{subPct.toFixed(1)}%</span> : <span className="text-gray-300">—</span>}
-                          </td>
-                        </tr>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-gray-700">Select Competencies</label>
+                  <button onClick={fetchCompetencies} disabled={!configForm.subject||loadingComps}
+                    className="px-3 py-1 bg-indigo-100 text-indigo-700 text-xs rounded hover:bg-indigo-200 disabled:opacity-50">
+                    {loadingComps?"Loading...":"🔍 Load"}
+                  </button>
+                </div>
+                {competencies.length>0&&(
+                  <div className="max-h-48 overflow-y-auto border border-gray-200 rounded divide-y">
+                    {competencies.map((c:any)=>{
+                      const sel=selectedComps.find((x:any)=>x.competency_id===c.id);
+                      return(
+                        <div key={c.id} className={`px-3 py-2 flex items-center gap-2 ${sel?"bg-indigo-50":""}`}>
+                          <input type="checkbox" checked={!!sel} onChange={()=>toggleComp(c)} className="accent-indigo-600" />
+                          <span className="text-xs text-indigo-600 font-medium">[{c.code}]</span>
+                          <span className="text-xs text-gray-700 flex-1">{c.name?.slice(0,60)}</span>
+                          {sel&&<input type="number" value={sel.max_marks} min={1} max={100} onChange={e=>updateMaxMarks(c.id,+e.target.value)} className="border rounded px-1 py-0.5 text-xs w-14 text-center" />}
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                )}
+                {selectedComps.length>0&&(
+                  <div className="mt-2 bg-indigo-50 rounded p-2 text-xs">
+                    <span className="font-bold text-indigo-800">{selectedComps.length} selected · Total: {totalMarks} marks</span>
+                  </div>
+                )}
+              </div>
+              <button onClick={saveConfig} disabled={savingConfig} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+                {savingConfig?"Saving...":"💾 Save Config"}
+              </button>
+            </div>
+          )}
+
+          {configs.length===0?(
+            <div className="bg-white rounded-xl shadow p-6 text-center text-gray-400 text-sm">No configs yet. Create one above.</div>
+          ):(
+            <div className="bg-white rounded-xl shadow overflow-hidden">
+              <div className="divide-y divide-gray-100">
+                {configs.map((c:any)=>(
+                  <div key={c.id} className="px-4 py-3 flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">{c.exam_type}</span>
+                        <span className="text-sm font-medium text-gray-800">{c.subject}</span>
+                        <span className="text-xs text-gray-500">· {(c.competencies as any[])?.length||0} comps · {c.total_marks} marks</span>
+                      </div>
+                    </div>
+                    <button onClick={()=>loadEntryStudents(c)} disabled={loadingEntry}
+                      className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50">
+                      {loadingEntry?"Loading...":"✏️ Enter Marks"}
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* ANALYSIS */}
-      {subTab === "analysis" && (
-        <div className="space-y-4">
-          {loading ? <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Loading...</div> :
-          !sectionData ? <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No analysis data for {selectedCombo?.grade} · {selectedCombo?.section} · {selectedExam}.</div> : (
-            <>
-              {/* Stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: "Total Students", value: sectionData.total_students, color: "border-indigo-500" },
-                  { label: "Section Avg", value: fmtP(nv(sectionData.section_avg)), color: "border-green-500" },
-                  { label: "Subjects", value: sectionData.subjects?.length, color: "border-blue-500" },
-                  { label: "Exam", value: selectedExam, color: "border-orange-500" },
-                ].map(s => (
-                  <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
-                    <p className="text-xs text-gray-500">{s.label}</p>
-                    <p className="text-lg font-bold text-gray-800">{s.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Advancing / Retracting */}
-              {(sectionData.advancing?.length > 0 || sectionData.retracting?.length > 0) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-white rounded-xl shadow p-4 border-t-4 border-green-400">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">📈 Advancing <span className="ml-auto bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">{sectionData.advancing?.length}</span></h3>
-                    <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {sectionData.advancing?.map((s: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between px-2 py-1.5 bg-green-50 rounded text-xs border border-green-100">
-                          <span className="font-medium">{s.student_name}</span>
-                          <span className="text-green-700 font-bold">{nv(s.prev_percentage).toFixed(1)}% → {nv(s.grand_percentage).toFixed(1)}% ▲+{nv(s.change).toFixed(1)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-xl shadow p-4 border-t-4 border-red-400">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">📉 Retracting <span className="ml-auto bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">{sectionData.retracting?.length}</span></h3>
-                    <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {sectionData.retracting?.map((s: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between px-2 py-1.5 bg-red-50 rounded text-xs border border-red-100">
-                          <span className="font-medium">{s.student_name}</span>
-                          <span className="text-red-700 font-bold">{nv(s.prev_percentage).toFixed(1)}% → {nv(s.grand_percentage).toFixed(1)}% ▼{Math.abs(nv(s.change)).toFixed(1)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Student rankings */}
-              <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Student Rankings · ▲ Advancing · ▼ Retracting</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse" style={{ minWidth: `${350 + (sectionData.subjects?.length || 0) * 100}px` }}>
-                    <thead>
-                      <tr className="bg-indigo-700 text-white">
-                        <th className="px-3 py-2 text-center sticky left-0 bg-indigo-700 w-10">Rank</th>
-                        <th className="px-3 py-2 text-left sticky left-[40px] bg-indigo-700 min-w-[160px]">Student</th>
-                        {sectionData.subjects?.map((sub: string) => <th key={sub} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[90px]">{sub}</th>)}
-                        <th className="px-3 py-2 text-center border-l border-indigo-600">Grand %</th>
-                        <th className="px-3 py-2 text-center">Band</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...(sectionData.students_ranked || [])].sort((a, b) => nv(b.grand_percentage) - nv(a.grand_percentage)).map((s: any, i: number) => {
-                        const isAdv = sectionData.advancing?.some((a: any) => a.student_name === s.student_name);
-                        const isRet = sectionData.retracting?.some((r: any) => r.student_name === s.student_name);
-                        return (
-                          <tr key={s.student_name} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                            <td className="px-3 py-2 text-center font-bold text-gray-400 sticky left-0 bg-inherit">{s.rank || i+1}</td>
-                            <td className="px-3 py-2 sticky left-[40px] bg-inherit font-medium text-gray-800">
-                              {s.student_name}
-                              {isAdv && <span className="ml-1 text-green-500 font-bold">▲</span>}
-                              {isRet && <span className="ml-1 text-red-500 font-bold">▼</span>}
-                            </td>
-                            {sectionData.subjects?.map((sub: string) => {
-                              const sd = s.subjects?.[sub];
-                              return (
-                                <td key={sub} className="px-2 py-2 text-center border-l border-gray-100">
-                                  {sd?.is_absent ? <span className="text-red-400 font-bold">AB</span>
-                                    : sd?.percentage != null ? <div><span className="font-bold">{sd.marks}</span><br/><span className={`text-xs px-1 rounded ${sBg(nv(sd.percentage))}`}>{nv(sd.percentage).toFixed(0)}%</span></div>
-                                    : <span className="text-gray-300">—</span>}
-                                </td>
-                              );
-                            })}
-                            <td className="px-3 py-2 text-center border-l border-gray-100">
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${sBg(nv(s.grand_percentage))}`}>{s.grand_percentage ? fmtP(nv(s.grand_percentage)) : "—"}</span>
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              {s.band && <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ backgroundColor: (BAND_COLORS[s.band]||"#999") + "20", color: BAND_COLORS[s.band]||"#999" }}>{s.band}</span>}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Subject avg chart */}
-              <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject-wise Average %</h3>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={Object.entries(sectionData.subject_averages || {}).map(([s, v]) => ({ name: s, avg: nv(v) }))} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={110} />
-                    <Tooltip formatter={(v: any) => [`${v}%`, "Avg"]} />
-                    <Bar dataKey="avg" radius={[0, 4, 4, 0]}>
-                      {Object.entries(sectionData.subject_averages || {}).map((_, i) => <Cell key={i} fill={SUBJECT_COLORS[i % SUBJECT_COLORS.length]} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Pass/Fail per subject */}
-              {sectionData.pass_fail && Object.keys(sectionData.pass_fail).length > 0 && (
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Pass/Fail per Subject (pass = 33%+)</h3>
-                  <div className="space-y-2">
-                    {Object.entries(sectionData.pass_fail).map(([sub, data]: [string, any]) => (
-                      <div key={sub} className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-gray-700 w-28 truncate">{sub}</span>
-                        <div className="flex-1 bg-gray-200 rounded-full h-5 overflow-hidden flex">
-                          <div className="bg-green-500 h-full flex items-center justify-center text-white text-xs font-bold" style={{ width: `${data.pass_pct}%` }}>{data.pass_pct > 15 ? data.pass : ""}</div>
-                          <div className="bg-red-400 h-full flex items-center justify-center text-white text-xs font-bold" style={{ width: `${100 - data.pass_pct}%` }}>{(100-data.pass_pct) > 15 ? data.fail : ""}</div>
-                        </div>
-                        <span className="text-xs text-green-700 font-bold w-16 text-right">{data.pass_pct}% pass</span>
-                      </div>
+      {/* ENTRY TAB */}
+      {subTab==="entry"&&selectedConfig&&entryStudents.length>0&&(
+        <div className="space-y-3">
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="text-sm font-bold text-indigo-800">{selectedConfig.exam_type} — {selectedConfig.subject}</p>
+              <p className="text-xs text-indigo-600">{(selectedConfig.competencies as any[]).length} competencies · {selectedConfig.total_marks} total marks</p>
+            </div>
+            <button onClick={saveMarks} disabled={savingMarks} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+              {savingMarks?"Saving...":"💾 Save Marks"}
+            </button>
+          </div>
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-indigo-700 text-white">
+                    <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[150px]">Student</th>
+                    <th className="px-2 py-2 text-center w-14">Absent</th>
+                    {(selectedConfig.competencies as any[]).map((c:any)=>(
+                      <th key={c.competency_id} className="px-2 py-2 text-center min-w-[70px]">
+                        <div>{c.competency_code}</div>
+                        <div className="text-indigo-200">/{c.max_marks}</div>
+                      </th>
                     ))}
+                    <th className="px-2 py-2 text-center min-w-[55px]">Total</th>
+                    <th className="px-2 py-2 text-center min-w-[45px]">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entryStudents.map((s:any,i:number)=>{
+                    const {total,pct}=calcTotal(s.student_id);
+                    const isAbs=absent[s.student_id];
+                    return(
+                      <tr key={s.student_id} className={i%2===0?"bg-white":"bg-gray-50"}>
+                        <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
+                        <td className="px-2 py-2 text-center">
+                          <input type="checkbox" checked={isAbs} onChange={e=>setAbsent(p=>({...p,[s.student_id]:e.target.checked}))} className="accent-red-500" /></td>
+                        {(selectedConfig.competencies as any[]).map((c:any)=>(
+                          <td key={c.competency_id} className="px-2 py-1 text-center">
+                            <input type="number" min={0} max={c.max_marks}
+                              value={marks[s.student_id]?.[c.competency_id]??""}
+                              disabled={isAbs}
+                              onChange={e=>{
+                                const v=e.target.value===""?null:Math.min(+e.target.value,c.max_marks);
+                                setMarks(p=>({...p,[s.student_id]:{...p[s.student_id],[c.competency_id]:v}}));
+                              }}
+                              className="border border-gray-300 rounded px-1 py-0.5 w-12 text-center disabled:bg-gray-100" />
+                          </td>
+                        ))}
+                        <td className="px-2 py-2 text-center font-bold">
+                          {isAbs?<span className="text-red-500">Absent</span>:total}</td>
+                        <td className="px-2 py-2 text-center">
+                          {!isAbs&&pct>0&&<span className={`px-1 py-0.5 rounded text-xs font-bold ${pct>=80?"bg-green-100 text-green-700":pct>=60?"bg-blue-100 text-blue-700":pct>=40?"bg-yellow-100 text-yellow-700":"bg-red-100 text-red-700"}`}>{pct}%</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <button onClick={saveMarks} disabled={savingMarks} className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+            {savingMarks?"Saving...":"💾 Save Marks"}
+          </button>
+        </div>
+      )}
+      {subTab==="entry"&&!selectedConfig&&(
+        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Select an exam config from the Config tab and click "Enter Marks".</div>
+      )}
+
+      {/* DASHBOARD TAB */}
+      {subTab==="dashboard"&&(
+        <div className="space-y-4">
+          <div className="flex gap-3 items-end flex-wrap">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Exam Type</label>
+              <select value={dashExam} onChange={e=>setDashExam(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+                <option value="">All Exams</option>
+                {EXAM_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <button onClick={fetchDashboard} className="px-3 py-1.5 bg-white border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">🔄 Refresh</button>
+          </div>
+          {loadingDash?(
+            <div className="bg-white rounded-xl shadow p-8 text-center"><div className="inline-block w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>
+          ):dashData&&(
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="text-sm font-bold text-gray-700 mb-3">Subject & Competency Overview</h3>
+              {dashData.subjectSummary?.length===0?(
+                <p className="text-xs text-gray-400">No data yet. Enter marks first.</p>
+              ):dashData.subjectSummary?.map((s:any)=>(
+                <div key={s.subject} className="mb-4">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-xs font-medium text-gray-700 w-24 truncate">{s.subject}</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-2">
+                      <div className="bg-indigo-500 h-2 rounded-full" style={{width:`${s.avg_percentage}%`}}></div>
+                    </div>
+                    <span className="text-xs font-bold text-gray-700 w-20 text-right">{s.avg_percentage?.toFixed(1)}%</span>
                   </div>
-                </div>
-              )}
-
-              {/* Longitudinal */}
-              {longData?.data?.length > 0 && (
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-1">📈 Longitudinal — Subject Average across Exams</h3>
-                  <p className="text-xs text-gray-400 mb-3">X = Exam · Y = Avg % · Each line = one subject · Dashed = Overall</p>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <LineChart data={longData.data} margin={{ top: 5, right: 20, left: 0, bottom: 60 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="exam" tick={{ fontSize: 11 }} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                      <Tooltip formatter={(v: any, name: any) => [`${v}%`, name]} />
-                      <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }} />
-                      {sectionData.subjects?.map((sub: string, i: number) => (
-                        <Line key={sub} type="monotone" dataKey={sub} stroke={SUBJECT_COLORS[i % SUBJECT_COLORS.length]} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls={false} />
-                      ))}
-                      <Line type="monotone" dataKey="Overall" stroke="#374151" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 5 }} activeDot={{ r: 7 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              {/* YoY panels */}
-              {(sectionData.yoy_advancing?.length > 0 || sectionData.yoy_retracting?.length > 0) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-white rounded-xl shadow p-4 border-t-4 border-emerald-400">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">🚀 Year-on-Year Advancing <span className="text-xs font-normal text-gray-400">(vs last year)</span></h3>
-                    <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {sectionData.yoy_advancing?.map((s: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between px-2 py-1.5 bg-emerald-50 rounded text-xs border border-emerald-100">
-                          <span>{s.student_name}</span><span className="text-emerald-700 font-bold">▲+{nv(s.change).toFixed(1)}</span>
-                        </div>
+                  {s.competency_avgs?.length>0&&(
+                    <div className="ml-28 flex gap-2 flex-wrap">
+                      {s.competency_avgs.map((c:any)=>(
+                        <span key={c.code} className={`px-1.5 py-0.5 rounded text-xs ${c.avg<60?"bg-red-100 text-red-700":"bg-green-100 text-green-700"}`}>{c.code}: {c.avg?.toFixed(0)}%</span>
                       ))}
                     </div>
-                  </div>
-                  <div className="bg-white rounded-xl shadow p-4 border-t-4 border-orange-400">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">⚠️ Year-on-Year Retracting <span className="text-xs font-normal text-gray-400">(vs last year)</span></h3>
-                    <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {sectionData.yoy_retracting?.map((s: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between px-2 py-1.5 bg-orange-50 rounded text-xs border border-orange-100">
-                          <span>{s.student_name}</span><span className="text-orange-700 font-bold">▼{nv(s.change).toFixed(1)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  )}
                 </div>
-              )}
-            </>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -1572,7 +1536,7 @@ function PASATab({ user, mappings, academicYear }: any) {
 // ACTIVITIES TAB — Create + Marks Entry + Coverage + Analysis
 // ─────────────────────────────────────────────────────────────────
 function ActivitiesTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
+  const API = "https://cbas-backend-production.up.railway.app";
   const ACTIVITY_TYPES = ["Individual","Group","Project","Assessment","Workshop","Other"];
   const CROSS_CURRICULAR = ["arts","vocational_education","interdisciplinary"];
   const CROSS_LABELS: Record<string,string> = { arts: "Arts", vocational_education: "Vocational Education", interdisciplinary: "Interdisciplinary" };
@@ -3175,226 +3139,292 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
 // STUDENT AI TAB — AI homework + assessment for students
 // ─────────────────────────────────────────────────────────────────
 function StudentAITab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
-  const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
+  const API = "https://cbas-backend-production.up.railway.app";
   const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
-  const LITERACY_DOMAINS = ["Listening", "Speaking", "Reading", "Writing"];
-  const NUMERACY_DOMAINS = ["Operations", "Base 10", "Measurement", "Geometry"];
 
-  const combos: { grade: string; section: string }[] = [];
-  if (mappings?.mappings) {
-    const seen = new Set<string>();
-    mappings.mappings.forEach((m: any) => {
-      const key = `${m.grade}||${m.section}`;
-      if (!seen.has(key)) { seen.add(key); combos.push({ grade: m.grade, section: m.section }); }
-    });
-  }
+  const teacherSubjects: string[] = mappings?.subjects || user?.subjects || [];
+  const classGrade = mappings?.class_grade || "";
+  const classSection = mappings?.class_section || "";
 
-  const [selectedCombo, setSelectedCombo] = useState(combos[0] || null);
   const [students, setStudents] = useState<any[]>([]);
-  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
-  const [mode, setMode] = useState<"homework" | "assessment">("homework");
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [gapSource, setGapSource] = useState<"baseline"|"pasa">("pasa");
+  const [subject, setSubject] = useState(teacherSubjects[0] || "");
+  const [examType, setExamType] = useState("");
+  const [gaps, setGaps] = useState<any[]>([]);
+  const [loadingGaps, setLoadingGaps] = useState(false);
   const [numQ, setNumQ] = useState(10);
-  const [qTypes, setQTypes] = useState("Mixed");
+  const [difficulty, setDifficulty] = useState("Mixed");
+  const [qTypes, setQTypes] = useState<string[]>(["Multiple Choice (MCQ)","Short Answer","Case-Based Short Answer"]);
   const [generating, setGenerating] = useState(false);
   const [output, setOutput] = useState("");
   const [msg, setMsg] = useState("");
+  const [examTypes, setExamTypes] = useState<string[]>([]);
 
-  useEffect(() => { if (selectedCombo) fetchStudents(); }, [selectedCombo, academicYear]);
+  useEffect(() => { if (classGrade && classSection) fetchStudents(); }, [mappings, academicYear]);
+  useEffect(() => { if (selectedStudent) fetchGaps(); }, [selectedStudent, gapSource, subject, examType]);
+  useEffect(() => { fetchExamTypes(); }, [academicYear, classGrade]);
 
   const fetchStudents = async () => {
     try {
-      const r = await axios.get(`${API}/baseline/section/rounds?grade=${encodeURIComponent(selectedCombo!.grade)}&section=${encodeURIComponent(selectedCombo!.section)}&academic_year=${academicYear}`);
-      setStudents(r.data.students || []);
-    } catch { }
+      const r = await axios.get(`${API}/students?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`);
+      setStudents((r.data?.data || r.data || []).filter((s: any) => s.is_active !== false));
+    } catch {}
   };
 
-  const getStudentGaps = (student: any) => {
-    const rounds = student.rounds.filter((r: any) => r.exists);
-    if (!rounds.length) return { literacy: [], numeracy: [] };
-    const last = rounds[rounds.length - 1];
-    const litGaps = LITERACY_DOMAINS.filter(d => (last.literacy[d] || 0) < 60);
-    const numGaps = NUMERACY_DOMAINS.filter(d => (last.numeracy[d] || 0) < 60);
-    return { literacy: litGaps, numeracy: numGaps };
-  };
-
-  const generate = async () => {
-    if (!selectedStudents.length) { setMsg("Select at least one student"); return; }
-    setGenerating(true); setOutput(""); setMsg("");
-    const selStudents = students.filter(s => selectedStudents.includes(s.student_id));
-
-    const studentContext = selStudents.map(s => {
-      const rounds = s.rounds.filter((r: any) => r.exists);
-      const gaps = getStudentGaps(s);
-      const last = rounds[rounds.length - 1];
-      return `Student: ${s.student_name}
-Overall: ${last ? last.overall.toFixed(1) + "%" : "Not assessed"}
-Literacy gaps: ${gaps.literacy.join(", ") || "None"}
-Numeracy gaps: ${gaps.numeracy.join(", ") || "None"}`;
-    }).join("\n\n");
-
-    const prompt = mode === "homework"
-      ? `You are an expert school teacher creating a weekly homework plan for ${selectedCombo?.grade} students.
-
-STUDENTS:
-${studentContext}
-
-Create a 5-day (Monday-Friday) homework plan addressing their gaps.
-Each day must have minimum 3 questions per subject (Literacy and Numeracy).
-Friday must have 5 check questions with answers.
-
-FORMAT:
-📖 LITERACY HOMEWORK
-**MONDAY** — [Topic + competency code]
-1. [task]
-2. [task]
-3. [task]
-...
-**FRIDAY — Mini Check**
-1-5 questions + Answers
-
-🔢 NUMERACY HOMEWORK
-[Same format]
-
-📝 Parent Note: [Brief note for each student]`
-      : `You are an expert teacher creating a ${numQ}-question ${qTypes} assessment for ${selectedCombo?.grade} students.
-
-STUDENTS AND GAPS:
-${studentContext}
-
-Create ${numQ} ${qTypes} questions targeting their specific gaps.
-Include answer key at the end.
-Questions must be appropriate for ${selectedCombo?.grade} level.`;
-
+  const fetchExamTypes = async () => {
     try {
-      const res = await fetch(GROQ_API, {
+      const r = await axios.get(`${API}/pasa/exam-types?academic_year=${academicYear}&grade=${encodeURIComponent(classGrade)}`);
+      setExamTypes(r.data?.examTypes || []);
+    } catch {}
+  };
+
+  const fetchGaps = async () => {
+    if (!selectedStudent) return;
+    setLoadingGaps(true); setGaps([]);
+    try {
+      if (gapSource === "pasa") {
+        const r = await axios.get(`${API}/pasa/student/${selectedStudent.id}/analysis?academic_year=${academicYear}`);
+        if (!r.data) { setGaps([]); setLoadingGaps(false); return; }
+        // Find weak competencies from competency profile (below 60%)
+        const weakComps = (r.data.competencyProfile || []).filter((c: any) => c.avg < 60);
+        // Filter by selected subject if set
+        const subjectGaps: any[] = [];
+        (r.data.examSummary || []).forEach((exam: any) => {
+          if (examType && exam.exam !== examType) return;
+          Object.entries(exam.subjects || {}).forEach(([sub, sd]: [string, any]) => {
+            if (subject && sub !== subject) return;
+            (sd.competency_scores || []).forEach((cs: any) => {
+              if (cs.marks_obtained !== null && cs.max_marks > 0) {
+                const pct = (cs.marks_obtained / cs.max_marks) * 100;
+                if (pct < 60) {
+                  subjectGaps.push({
+                    subject: sub, competency_code: cs.competency_code,
+                    competency_name: cs.competency_name, score: pct,
+                    exam: exam.exam,
+                  });
+                }
+              }
+            });
+          });
+        });
+        setGaps(subjectGaps.length ? subjectGaps : weakComps.map((c: any) => ({ competency_code: c.code, competency_name: c.name, score: c.avg, subject })));
+      } else {
+        // Baseline gaps
+        const r = await axios.get(`${API}/baseline/student/${selectedStudent.id}/portfolio`);
+        const baselineGaps: any[] = [];
+        (r.data?.years || []).slice(-1).forEach((yr: any) => {
+          if (yr.literacy) {
+            ["listening","speaking","reading","writing"].forEach((d: string) => {
+              if ((yr.literacy[d] || 0) < 60) baselineGaps.push({ subject: "literacy", domain: d, score: yr.literacy[d] || 0 });
+            });
+          }
+          if (yr.numeracy) {
+            ["operations","base10","measurement","geometry"].forEach((d: string) => {
+              if ((yr.numeracy[d] || 0) < 60) baselineGaps.push({ subject: "numeracy", domain: d, score: yr.numeracy[d] || 0 });
+            });
+          }
+        });
+        setGaps(baselineGaps);
+      }
+    } catch {}
+    setLoadingGaps(false);
+  };
+
+  const generatePractice = async () => {
+    if (!selectedStudent || !gaps.length) { setMsg("❌ Select a student with gap data first"); return; }
+    setGenerating(true); setOutput(""); setMsg("");
+    try {
+      const gapBlock = gaps.slice(0, 8).map((g: any) =>
+        `- ${g.subject || ""} ${g.competency_code || g.domain || ""}: ${g.competency_name || g.domain || ""} (Score: ${g.score?.toFixed(0)}%)`
+      ).join("
+");
+
+      const diffNote: Record<string, string> = {
+        Easy: "Keep all questions straightforward — recall and basic application only.",
+        Moderate: "Mix of recall, application and simple analysis.",
+        Challenging: "Prioritise analysis, evaluation and synthesis questions.",
+        Mixed: "Mix 40% easy, 40% moderate, 20% challenging.",
+      };
+
+      const prompt = `You are an expert educational assessor for students in India.
+
+Create a PRACTICE PAPER for student: ${selectedStudent.name}
+Grade: ${classGrade} | Section: ${classSection}
+${subject ? `Subject focus: ${subject}` : ""}
+${examType ? `Based on: ${examType} gaps` : ""}
+
+STUDENT GAP AREAS (below 60%):
+${gapBlock}
+
+PAPER REQUIREMENTS:
+- Exactly ${numQ} questions
+- Question types: ${qTypes.join(", ")}
+- Difficulty: ${difficulty} — ${diffNote[difficulty]}
+- Tag every question with its competency code [CODE] where available
+- Include complete Answer Key with brief explanations
+- Age-appropriate language for ${classGrade} students
+
+QUESTION FORMAT:
+[MCQ] — 4 options A/B/C/D, mark correct with ✓, include 1-line reason
+[SA] — Short Answer: model answer 2–3 sentences
+[LA] — Long Answer: model answer 5–8 sentences
+[TF] — True/False: answer + 1-sentence explanation
+[FIB] — Fill in the Blank: answer below
+[CBSA] — Case-Based Short Answer: 3-4 line scenario + question + 2–3 sentence answer
+
+Title: Practice Paper — ${selectedStudent.name} — ${subject || "Mixed"} — ${new Date().toLocaleDateString()}`;
+
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }], max_tokens: 2000 }),
+        body: JSON.stringify({ model: "llama3-8b-8192", messages: [{ role: "user", content: prompt }], max_tokens: 3000, temperature: 0.7 }),
       });
       const data = await res.json();
-      setOutput(data.choices?.[0]?.message?.content || "No response from AI");
-    } catch (e) { setMsg("❌ AI generation failed"); }
+      setOutput(data.choices?.[0]?.message?.content || "Generation failed.");
+    } catch { setMsg("❌ Generation failed. Check API key."); }
     setGenerating(false);
   };
 
-  const download = () => {
-    const blob = new Blob([output], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${mode === "homework" ? "Homework" : "Assessment"}_${selectedCombo?.grade}_${selectedCombo?.section}_${new Date().toISOString().split("T")[0]}.txt`;
-    a.click(); URL.revokeObjectURL(url);
+  const printOutput = () => {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(`<html><head><title>Practice Paper — ${selectedStudent?.name}</title><style>body{font-family:Arial;padding:20px;max-width:800px;margin:0 auto;}pre{white-space:pre-wrap;font-family:Arial;}</style></head><body><pre>${output}</pre></body></html>`);
+    w.document.close(); w.print();
   };
 
-  if (!combos.length) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No sections assigned.</div>;
+  const Q_TYPES = ["Multiple Choice (MCQ)","Short Answer","Long Answer","True/False","Fill in the Blank","Case-Based Short Answer","Case-Based Long Answer"];
 
   return (
-    <div className="space-y-4 w-full max-w-4xl">
-      <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-purple-800 mb-1">🤖 AI Learning Module — Students</h3>
-        <p className="text-xs text-purple-600">Generate personalized homework or assessment based on each student's baseline gaps.</p>
+    <div className="space-y-4">
+      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+        <h2 className="text-sm font-bold text-indigo-800 mb-1">🎯 Student Gap-Based Practice Paper</h2>
+        <p className="text-xs text-indigo-600">Select a student → load their gaps from PA/SA or Baseline → generate a personalized practice paper targeting their weak competencies.</p>
       </div>
 
-      {/* Section selector */}
-      <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
-        {combos.map(c => (
-          <button key={`${c.grade}-${c.section}`} onClick={() => setSelectedCombo(c)}
-            className={`px-3 py-2 text-xs rounded-lg font-medium border ${selectedCombo?.grade === c.grade && selectedCombo?.section === c.section ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-600 border-gray-300"}`}>
-            {c.grade} · {c.section}
-          </button>
-        ))}
-      </div>
+      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
-      {msg && <div className="px-4 py-2 bg-red-50 border border-red-300 rounded text-sm text-red-700">{msg}</div>}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Config */}
-        <div className="bg-white rounded-xl shadow p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-gray-700">Configuration</h3>
+      {/* Step 1: Select student + gap source */}
+      <div className="bg-white rounded-xl shadow p-4 space-y-3">
+        <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wide">Step 1 — Select Student & Gap Source</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Mode</label>
-            <div className="flex gap-2">
-              {[{ id: "homework", label: "📝 Weekly Homework" }, { id: "assessment", label: "📋 Assessment Paper" }].map(m => (
-                <button key={m.id} onClick={() => setMode(m.id as any)}
-                  className={`flex-1 text-xs py-1.5 rounded-lg border font-medium ${mode === m.id ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-600 border-gray-300"}`}>
-                  {m.label}
-                </button>
-              ))}
-            </div>
+            <label className="text-xs text-gray-500 block mb-1">Student *</label>
+            <select value={selectedStudent?.id || ""} onChange={e => setSelectedStudent(students.find(s => s.id === e.target.value) || null)}
+              className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+              <option value="">-- Select student --</option>
+              {students.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
           </div>
-          {mode === "assessment" && (
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Gap Source</label>
+            <select value={gapSource} onChange={e => setGapSource(e.target.value as any)}
+              className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+              <option value="pasa">PA/SA Competency Gaps</option>
+              <option value="baseline">Baseline Gaps</option>
+            </select>
+          </div>
+          {gapSource === "pasa" && (
             <>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Questions: {numQ}</label>
-                <input type="range" min={5} max={30} step={5} value={numQ} onChange={e => setNumQ(+e.target.value)} className="w-full accent-purple-600" />
+                <label className="text-xs text-gray-500 block mb-1">Subject Filter</label>
+                <select value={subject} onChange={e => setSubject(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                  <option value="">All Subjects</option>
+                  {teacherSubjects.map((s: string) => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Type</label>
-                <div className="flex gap-1 flex-wrap">
-                  {["MCQ","Short","Fill","Mixed"].map(t => (
-                    <button key={t} onClick={() => setQTypes(t)}
-                      className={`px-3 py-1 text-xs rounded-lg border font-medium ${qTypes === t ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-600 border-gray-300"}`}>{t}</button>
-                  ))}
-                </div>
+                <label className="text-xs text-gray-500 block mb-1">Exam Filter</label>
+                <select value={examType} onChange={e => setExamType(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                  <option value="">All Exams</option>
+                  {examTypes.map((t: string) => <option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
             </>
           )}
         </div>
-
-        {/* Student selector */}
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">
-            Select Students
-            <button onClick={() => setSelectedStudents(students.map(s => s.student_id))} className="ml-2 text-xs text-purple-600 hover:underline">All</button>
-            <button onClick={() => setSelectedStudents([])} className="ml-2 text-xs text-gray-400 hover:underline">Clear</button>
-            <span className="ml-2 text-xs text-gray-400">({selectedStudents.length} selected)</span>
-          </h3>
-          <div className="space-y-1 max-h-52 overflow-y-auto">
-            {students.map(s => {
-              const gaps = getStudentGaps(s);
-              const hasGaps = gaps.literacy.length + gaps.numeracy.length > 0;
-              return (
-                <label key={s.student_id} className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 ${selectedStudents.includes(s.student_id) ? "bg-purple-50" : ""}`}>
-                  <input type="checkbox" checked={selectedStudents.includes(s.student_id)}
-                    onChange={() => setSelectedStudents(prev => prev.includes(s.student_id) ? prev.filter(x => x !== s.student_id) : [...prev, s.student_id])}
-                    className="accent-purple-600" />
-                  <span className="text-xs text-gray-700">{s.student_name}</span>
-                  {hasGaps && <span className="ml-auto text-xs text-red-500">⚠️ {gaps.literacy.length + gaps.numeracy.length} gaps</span>}
-                </label>
-              );
-            })}
-            {!students.length && <p className="text-xs text-gray-400 text-center py-4">No students assessed yet. Enter baseline marks first.</p>}
-          </div>
-        </div>
       </div>
 
-      <button onClick={generate} disabled={generating}
-        className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold rounded-xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50">
-        {generating ? "🤖 Generating..." : `✨ Generate ${mode === "homework" ? "Homework Plan" : "Assessment Paper"}`}
-      </button>
+      {/* Gap display */}
+      {selectedStudent && (
+        <div className="bg-white rounded-xl shadow p-4">
+          <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-3">
+            Gap Areas for {selectedStudent.name}
+            {loadingGaps && <span className="ml-2 text-indigo-500 font-normal normal-case">Loading...</span>}
+          </h3>
+          {!loadingGaps && gaps.length === 0 && (
+            <p className="text-xs text-gray-400">No gap areas found below 60%. Student is performing well, or no data available yet.</p>
+          )}
+          {!loadingGaps && gaps.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {gaps.slice(0, 10).map((g: any, i: number) => (
+                <span key={i} className="px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                  {g.competency_code || g.domain || ""} {g.subject ? `(${g.subject})` : ""} — {g.score?.toFixed(0)}%
+                </span>
+              ))}
+              {gaps.length > 10 && <span className="text-xs text-gray-400">+{gaps.length - 10} more</span>}
+            </div>
+          )}
+        </div>
+      )}
 
+      {/* Step 2: Paper settings */}
+      {selectedStudent && gaps.length > 0 && (
+        <div className="bg-white rounded-xl shadow p-4 space-y-3">
+          <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wide">Step 2 — Paper Settings</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Number of Questions</label>
+              <select value={numQ} onChange={e => setNumQ(+e.target.value)}
+                className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                {[5,10,15,20].map(n => <option key={n} value={n}>{n} questions</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Difficulty</label>
+              <select value={difficulty} onChange={e => setDifficulty(e.target.value)}
+                className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                {["Easy","Moderate","Challenging","Mixed"].map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-2">Question Types</label>
+            <div className="flex flex-wrap gap-2">
+              {Q_TYPES.map(qt => (
+                <label key={qt} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                  <input type="checkbox" checked={qTypes.includes(qt)}
+                    onChange={e => setQTypes(p => e.target.checked ? [...p, qt] : p.filter(q => q !== qt))}
+                    className="accent-indigo-600" />
+                  {qt}
+                </label>
+              ))}
+            </div>
+          </div>
+          <button onClick={generatePractice} disabled={generating || !qTypes.length}
+            className="px-5 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
+            {generating ? "Generating..." : "⚡ Generate Practice Paper"}
+          </button>
+        </div>
+      )}
+
+      {/* Output */}
       {output && (
         <div className="bg-white rounded-xl shadow p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-700">Generated Output</h3>
-            <div className="flex gap-2">
-              <button onClick={() => navigator.clipboard.writeText(output)} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium">📋 Copy</button>
-              <button onClick={download} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">⬇️ Download</button>
-            </div>
+            <h3 className="text-sm font-bold text-gray-700">Practice Paper — {selectedStudent?.name}</h3>
+            <button onClick={printOutput} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-xs rounded hover:bg-indigo-200">🖨 Print</button>
           </div>
-          <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto border border-gray-200">
-            {output}
-          </div>
+          <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{output}</pre>
         </div>
       )}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// SELF AI TAB — AI learning module for teacher's own baseline gaps
-// ─────────────────────────────────────────────────────────────────
+
 function SelfAITab({ user, academicYear }: any) {
   const GROQ_API2 = "https://api.groq.com/openai/v1/chat/completions";
   const GROQ_KEY2 = import.meta.env.VITE_GROQ_API_KEY || "";
@@ -4256,7 +4286,7 @@ Write a warm, encouraging message (150-200 words) that:
 }
 
 function AlertsTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
+  const API = "https://cbas-backend-production.up.railway.app";
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -5047,6 +5077,216 @@ function PromotionTab({ user, mappings }: any) {
   );
 }
 
+
+// ─────────────────────────────────────────────────────────────────
+// LEARNING RESOURCES TAB — AI resources mapped to teacher's baseline gaps
+// ─────────────────────────────────────────────────────────────────
+function LearningResourcesTab({ user, academicYear }: any) {
+  const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
+  const API = "https://cbas-backend-production.up.railway.app";
+
+  const RESOURCE_GRADE: Record<string,string> = {
+    foundation:"Grade 2", preparatory:"Grade 5", middle:"Grade 8", secondary:"Grade 10",
+  };
+  const LIT_DOMAINS = ["Listening","Speaking","Reading","Writing"];
+  const NUM_DOMAINS = ["Operations","Base 10","Measurement","Geometry"];
+
+  const [baselineData, setBaselineData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedRound, setSelectedRound] = useState(0);
+  const [resources, setResources] = useState<Record<string,string>>({});
+  const [generating, setGenerating] = useState<Record<string,boolean>>({});
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => { fetchBaseline(); }, [academicYear]);
+
+  const fetchBaseline = async () => {
+    setLoading(true);
+    try {
+      const r = await axios.get(`${API}/baseline/teacher/${user.id}?academic_year=${academicYear}`);
+      setBaselineData(r.data);
+    } catch {}
+    setLoading(false);
+  };
+
+  const getRoundGaps = (roundIdx: number) => {
+    if (!baselineData?.assessments?.length) return [];
+    const rounds: Record<number, any[]> = {};
+    baselineData.assessments.forEach((a: any) => {
+      const rn = a.round_number || 1;
+      if (!rounds[rn]) rounds[rn] = [];
+      rounds[rn].push(a);
+    });
+    const roundNums = Object.keys(rounds).map(Number).sort();
+    const rn = roundNums[roundIdx];
+    if (!rn) return [];
+    const roundAssessments = rounds[rn];
+    const gaps: any[] = [];
+    roundAssessments.forEach((a: any) => {
+      const subj = a.subject;
+      const stage = a.stage || "foundation";
+      const grade = RESOURCE_GRADE[stage] || "Grade 2";
+      const domains = subj === "literacy" ? LIT_DOMAINS : NUM_DOMAINS;
+      const keys = subj === "literacy"
+        ? ["listening_score","speaking_score","reading_score","writing_score"]
+        : ["operations_score","base10_score","measurement_score","geometry_score"];
+      const scores = keys.map((k: string) => +(a[k] || 0));
+      const subAvg = scores.reduce((s: number, v: number) => s + v, 0) / scores.length;
+      domains.forEach((domain: string, i: number) => {
+        if (scores[i] < subAvg) {
+          gaps.push({ subject: subj, domain, score: scores[i], stage, grade, round: rn });
+        }
+      });
+    });
+    return gaps;
+  };
+
+  const generateResources = async (gap: any) => {
+    const key = `${gap.subject}_${gap.domain}_${selectedRound}`;
+    if (resources[key]) return; // already cached
+    setGenerating(p => ({ ...p, [key]: true }));
+    try {
+      const compRes = await axios.get(`${API}/activities/competencies?subject=${gap.subject}&grade=${encodeURIComponent(gap.grade)}`);
+      const allComps = compRes.data?.competencies || compRes.data || [];
+      const filtered = allComps.filter((c: any) => {
+        const d = (c.domain || c.name || "").toLowerCase();
+        return d.includes(gap.domain.toLowerCase()) || gap.domain.toLowerCase().includes(d.split(" ")[0]);
+      }).slice(0, 5);
+      const compList = filtered.map((c: any) => `- ${c.code || ""}: ${c.name || c.description || ""}`).join("
+");
+
+      const prompt = `You are an expert educational resource curator for teacher professional development in India.
+
+Teacher gap area:
+- Subject: ${gap.subject} — ${gap.domain}
+- Stage: ${gap.stage} | Target Grade: ${gap.grade}
+- Current Score: ${gap.score.toFixed(0)}%
+
+Competencies in this area:
+${compList || "General competencies for " + gap.domain}
+
+For EACH competency provide:
+1. ONE TEXT resource (article/guide) — Title, real URL, 1-sentence relevance
+2. ONE VIDEO resource (YouTube/Khan Academy) — Title, real URL, 1-sentence relevance
+
+Use sources: readingrockets.org, edutopia.org, ncert.nic.in, khanacademy.org, mathigon.org, nrich.maths.org
+
+Format exactly:
+## [COMPETENCY_CODE or SHORT_NAME]
+📄 TEXT: [Title] — [URL]
+   ↳ [How it helps the teacher]
+🎥 VIDEO: [Title] — [URL]
+   ↳ [How it helps]`;
+
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
+        body: JSON.stringify({ model: "llama3-8b-8192", messages: [{ role: "user", content: prompt }], max_tokens: 1500, temperature: 0.5 }),
+      });
+      const data = await res.json();
+      const result = data.choices?.[0]?.message?.content || "Could not generate resources.";
+      setResources(p => ({ ...p, [key]: result }));
+    } catch { setResources(p => ({ ...p, [key]: "⚠️ Generation failed. Check API key." })); }
+    setGenerating(p => ({ ...p, [key]: false }));
+  };
+
+  const downloadResource = (content: string, domain: string) => {
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `Resources_${domain.replace(" ","_")}_${new Date().toISOString().slice(0,10)}.txt`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  if (loading) return <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">Loading baseline data...</div>;
+
+  if (!baselineData?.assessments?.length) {
+    return (
+      <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
+        <p className="text-2xl mb-2">📊</p>
+        <p className="text-sm">No baseline assessment found for {academicYear}. Your assessment needs to be completed first.</p>
+      </div>
+    );
+  }
+
+  // Get available rounds
+  const roundNums = [...new Set(baselineData.assessments.map((a: any) => a.round_number || 1))].sort() as number[];
+  const gaps = getRoundGaps(selectedRound);
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+        <h2 className="text-sm font-bold text-purple-800 mb-1">📚 Learning Resources</h2>
+        <p className="text-xs text-purple-600">AI-generated resources mapped to your baseline gap competencies. Resources are cached once generated.</p>
+      </div>
+
+      {/* Round selector */}
+      <div className="bg-white rounded-xl shadow p-3 flex gap-3 items-center flex-wrap">
+        <label className="text-xs text-gray-500">Assessment Round:</label>
+        {roundNums.map((rn, i) => (
+          <button key={rn} onClick={() => setSelectedRound(i)}
+            className={`px-3 py-1.5 text-xs rounded-lg font-medium ${selectedRound === i ? "bg-purple-600 text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-purple-50"}`}>
+            Round {rn}
+          </button>
+        ))}
+      </div>
+
+      {gaps.length === 0 ? (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+          <p className="text-2xl mb-2">🎉</p>
+          <p className="text-sm font-medium text-green-700">No gap areas in this round! All domains above average.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="bg-white rounded-xl shadow p-3">
+            <p className="text-xs font-bold text-gray-700">{gaps.length} Gap Areas in Round {roundNums[selectedRound]}</p>
+            <p className="text-xs text-gray-500 mt-0.5">Domains where you scored below your subject average. Click "Generate Resources" to load AI-curated materials.</p>
+          </div>
+          {gaps.map((gap: any) => {
+            const key = `${gap.subject}_${gap.domain}_${selectedRound}`;
+            const isGenerating = generating[key];
+            const result = resources[key];
+            const isLit = gap.subject === "literacy";
+            return (
+              <div key={key} className="bg-white rounded-xl shadow overflow-hidden">
+                <div className={`px-4 py-3 flex items-center justify-between flex-wrap gap-2 ${isLit ? "bg-blue-700" : "bg-purple-700"} text-white`}>
+                  <div>
+                    <span className="text-sm font-bold">{isLit ? "📖" : "🔢"} {gap.subject === "literacy" ? "Literacy" : "Numeracy"} — {gap.domain}</span>
+                    <span className="text-xs ml-2 opacity-75">Score: {gap.score.toFixed(0)}% · {gap.stage} · {gap.grade}</span>
+                  </div>
+                  {!result && (
+                    <button onClick={() => generateResources(gap)} disabled={isGenerating}
+                      className="px-3 py-1.5 bg-white text-indigo-700 text-xs rounded font-medium hover:bg-indigo-50 disabled:opacity-50">
+                      {isGenerating ? "Loading..." : "🔍 Generate Resources"}
+                    </button>
+                  )}
+                  {result && !result.startsWith("⚠️") && (
+                    <button onClick={() => downloadResource(result, gap.domain)}
+                      className="px-3 py-1.5 bg-white text-indigo-700 text-xs rounded font-medium hover:bg-indigo-50">
+                      📥 Download
+                    </button>
+                  )}
+                </div>
+                {result && (
+                  <div className="p-4">
+                    <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{result}</pre>
+                  </div>
+                )}
+                {isGenerating && (
+                  <div className="p-4 text-center">
+                    <div className="inline-block w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mb-1"></div>
+                    <p className="text-xs text-gray-400">Loading resources for {gap.domain}...</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HomeworkTab({ user, mappings, academicYear }: any) {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [gapSource, setGapSource] = useState<"baseline" | "pasa" | "activities">("baseline");
@@ -5297,110 +5537,9 @@ function getLevel(score: number) {
 // ─────────────────────────────────────────────────────────────────
 // EXAM CONFIG TAB
 // ─────────────────────────────────────────────────────────────────
-function ExamConfigTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
-  const EXAM_TYPES = ["PA1","PA2","SA1","PA3","PA4","SA2","Custom"];
-  const grade = mappings?.class_grade || user?.class_teacher_of?.split(' ').slice(0,-1).join(' ') || "";
 
-  const [examType, setExamType] = useState("PA1");
-  const [customExam, setCustomExam] = useState("");
-  const [subjects, setSubjects] = useState<{subject:string;max_marks:number}[]>([]);
-  const [newSubject, setNewSubject] = useState("");
-  const [newMax, setNewMax] = useState(100);
-  const [examDate, setExamDate] = useState("");
-  const [msg, setMsg] = useState("");
-  const [saved, setSaved] = useState(false);
-
-  const effectiveExam = examType === "Custom" ? customExam : examType;
-
-  useEffect(() => { if (grade && effectiveExam) loadConfig(); }, [grade, effectiveExam, academicYear]);
-
-  const loadConfig = async () => {
-    try {
-      const r = await axios.get(`${API}/pasa/config?academic_year=${academicYear}&exam_type=${effectiveExam}&grade=${encodeURIComponent(grade)}`);
-      if (r.data?.length) {
-        setSubjects(r.data.map((c: any) => ({ subject: c.subject, max_marks: +c.max_marks })));
-        setExamDate(r.data[0]?.exam_date || "");
-      } else { setSubjects([]); }
-    } catch {}
-  };
-
-  const saveConfig = async () => {
-    if (!grade) { setMsg("❌ No class assigned."); return; }
-    if (!effectiveExam) { setMsg("❌ Enter exam name."); return; }
-    if (!subjects.length) { setMsg("❌ Add at least one subject."); return; }
-    try {
-      await axios.post(`${API}/pasa/config`, { academic_year: academicYear, exam_type: effectiveExam, grade, subjects, exam_date: examDate || undefined });
-      setMsg("✅ Config saved — visible in admin login");
-      setSaved(true);
-    } catch { setMsg("❌ Error saving"); }
-    setTimeout(() => setMsg(""), 4000);
-  };
-
-  const addSubject = () => {
-    if (!newSubject.trim()) return;
-    setSubjects(prev => [...prev, { subject: newSubject.trim().toUpperCase(), max_marks: newMax }]);
-    setNewSubject(""); setNewMax(100); setSaved(false);
-  };
-
-  const isClassTeacher = !!(mappings?.class_grade || user?.class_teacher_of);
-  if (!isClassTeacher) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Only class teachers can configure exams.</div>;
-
-  return (
-    <div className="space-y-4 w-full max-w-2xl">
-      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-indigo-800">⚙️ Exam Configuration — {grade}</h3>
-        <p className="text-xs text-indigo-600 mt-0.5">Configure subjects and max marks. Changes reflect in admin login.</p>
-      </div>
-      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
-      <div className="bg-white rounded-xl shadow p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Exam Type</label>
-            <select value={examType} onChange={e => { setExamType(e.target.value); setSaved(false); }} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-              {EXAM_TYPES.map(e => <option key={e} value={e}>{e}</option>)}
-            </select>
-          </div>
-          {examType === "Custom" && (
-            <div><label className="text-xs text-gray-500 block mb-1">Custom Name</label>
-              <input value={customExam} onChange={e => setCustomExam(e.target.value)} placeholder="e.g. Unit Test 1" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
-          )}
-          <div><label className="text-xs text-gray-500 block mb-1">Exam Date</label>
-            <input type="date" value={examDate} onChange={e => setExamDate(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
-        </div>
-        {subjects.length > 0 && (
-          <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
-            {subjects.map((s, i) => (
-              <div key={i} className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5">
-                <span className="text-xs font-bold text-indigo-700">{s.subject}</span>
-                <span className="text-xs text-gray-400">Max:</span>
-                <input type="number" value={s.max_marks}
-                  onChange={e => setSubjects(prev => prev.map((x, j) => j === i ? { ...x, max_marks: +e.target.value } : x))}
-                  className="w-16 text-xs border border-indigo-300 rounded px-1 py-0.5 text-center font-bold text-indigo-700" />
-                <button onClick={() => setSubjects(prev => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-xs font-bold">✕</button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="flex gap-2 items-end flex-wrap">
-          <div><label className="text-xs text-gray-500 block mb-1">Add Subject</label>
-            <input value={newSubject} onChange={e => setNewSubject(e.target.value)} onKeyDown={e => e.key === "Enter" && addSubject()} placeholder="e.g. MATHEMATICS" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-44" /></div>
-          <div><label className="text-xs text-gray-500 block mb-1">Max Marks</label>
-            <input type="number" value={newMax} onChange={e => setNewMax(+e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-24" /></div>
-          <button onClick={addSubject} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-200">+ Add</button>
-          <button onClick={saveConfig} className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">💾 Save Config</button>
-        </div>
-        {saved && <p className="text-xs text-green-600">✅ Saved for {grade} · {effectiveExam} · {academicYear}</p>}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────
-// BASELINE ENTRY TAB
-// ─────────────────────────────────────────────────────────────────
 function BaselineDashTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
+  const API = "https://cbas-backend-production.up.railway.app";
   const ROUNDS = [
     { value: "baseline_1", label: "Round 1" },
     { value: "baseline_2", label: "Round 2" },
@@ -5724,7 +5863,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
 }
 
 function BaselineEntryTab({ user, mappings, academicYear }: any) {
-  const API = "http://localhost:3000";
+  const API = "https://cbas-backend-production.up.railway.app";
   const LITERACY_DOMAINS2 = ["Listening", "Speaking", "Reading", "Writing"];
   const NUMERACY_DOMAINS2 = ["Operations", "Base 10", "Measurement", "Geometry"];
   const GRADE_TO_STAGE2: Record<string, string> = {
