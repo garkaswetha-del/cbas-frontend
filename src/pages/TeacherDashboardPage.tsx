@@ -3237,8 +3237,7 @@ function StudentAITab({ user, mappings, academicYear }: any) {
     try {
       const gapBlock = gaps.slice(0, 8).map((g: any) =>
         `- ${g.subject || ""} ${g.competency_code || g.domain || ""}: ${g.competency_name || g.domain || ""} (Score: ${g.score?.toFixed(0)}%)`
-      ).join("
-");
+      ).join("\n");
 
       const diffNote: Record<string, string> = {
         Easy: "Keep all questions straightforward — recall and basic application only.",
