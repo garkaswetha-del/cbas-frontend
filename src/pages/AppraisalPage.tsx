@@ -5,20 +5,21 @@ const API = "https://cbas-backend-production.up.railway.app";
 const ACADEMIC_YEAR = "2025-26";
 
 const GRADE_ORDER = ["Nursery","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
-const GRADE_CAPS: Record<string,{qual:string,cap:number}> = {
-  "Nursery":  {qual:"NTT / NST",      cap:17000},
-  "LKG":      {qual:"NTT / NST",      cap:17000},
-  "UKG":      {qual:"NTT / NST",      cap:17000},
-  "Grade 1":  {qual:"NST / BED / DED",cap:19000},
-  "Grade 2":  {qual:"NST / BED / DED",cap:19000},
-  "Grade 3":  {qual:"NST / BED / DED",cap:19000},
-  "Grade 4":  {qual:"BED / DED",      cap:21000},
-  "Grade 5":  {qual:"BED / DED",      cap:21000},
-  "Grade 6":  {qual:"Technical / Graduation with BED",cap:23000},
-  "Grade 7":  {qual:"Technical / Graduation with BED",cap:23000},
-  "Grade 8":  {qual:"Post Graduation with BED",cap:26000},
-  "Grade 9":  {qual:"Post Graduation with BED",cap:26000},
-  "Grade 10": {qual:"Post Graduation with BED",cap:26000},
+// Accepted qualifications per grade — exact match against dropdown values
+const GRADE_CAPS: Record<string,{quals:string[],cap:number}> = {
+  "Nursery":  {quals:["NTT","NST"],                                                    cap:17000},
+  "LKG":      {quals:["NTT","NST"],                                                    cap:17000},
+  "UKG":      {quals:["NTT","NST"],                                                    cap:17000},
+  "Grade 1":  {quals:["NST","BED","DED"],                                              cap:19000},
+  "Grade 2":  {quals:["NST","BED","DED"],                                              cap:19000},
+  "Grade 3":  {quals:["NST","BED","DED"],                                              cap:19000},
+  "Grade 4":  {quals:["BED","DED"],                                                    cap:21000},
+  "Grade 5":  {quals:["BED","DED"],                                                    cap:21000},
+  "Grade 6":  {quals:["BED","Graduation with BED"],                                    cap:23000},
+  "Grade 7":  {quals:["BED","Graduation with BED"],                                    cap:23000},
+  "Grade 8":  {quals:["Post Graduation with BED","Post Graduation"],                   cap:26000},
+  "Grade 9":  {quals:["Post Graduation with BED","Post Graduation"],                   cap:26000},
+  "Grade 10": {quals:["Post Graduation with BED","Post Graduation"],                   cap:26000},
 };
 
 function calcIncrement(overallPct: number, respCount: number, salary: number|null, highestGrade: string|null, qualification: string|null) {
@@ -36,9 +37,9 @@ function calcIncrement(overallPct: number, respCount: number, salary: number|nul
   const extra = respCount > 0 ? respCount * 7 : 0;
 
   // Qualification penalty — null means not yet entered, no penalty applied
-  const requiredQual = highestGrade ? GRADE_CAPS[highestGrade]?.qual : null;
-  const hasQualPenalty = qualification !== null && requiredQual !== null && respCount > 0
-    && !qualification.toLowerCase().includes(requiredQual.split("/")[0].trim().toLowerCase());
+  const acceptedQuals = highestGrade ? (GRADE_CAPS[highestGrade]?.quals || []) : [];
+  const hasQualPenalty = qualification !== null && acceptedQuals.length > 0 && respCount > 0
+    && !acceptedQuals.includes(qualification);
   const penalty = hasQualPenalty ? 2 : 0;
 
   const total = base + extra - penalty;

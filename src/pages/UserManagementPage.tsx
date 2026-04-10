@@ -464,9 +464,17 @@ export default function UserManagementPage() {
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Qualification</label>
-              <input value={form.qualification} onChange={e => setForm(p => ({ ...p, qualification: e.target.value }))}
-                placeholder="e.g. B.Ed, M.Sc"
-                className="border border-gray-300 rounded px-3 py-1.5 text-sm w-full" />
+              <select value={form.qualification} onChange={e => setForm(p => ({ ...p, qualification: e.target.value }))}
+                className="border border-gray-300 rounded px-3 py-1.5 text-sm w-full">
+                <option value="">-- Select Qualification --</option>
+                <option value="NTT">NTT</option>
+                <option value="NST">NST</option>
+                <option value="DED">DED</option>
+                <option value="BED">BED</option>
+                <option value="Graduation with BED">Graduation with BED</option>
+                <option value="Post Graduation with BED">Post Graduation with BED</option>
+                <option value="Post Graduation">Post Graduation</option>
+              </select>
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Experience (years)</label>
