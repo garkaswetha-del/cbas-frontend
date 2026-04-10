@@ -4023,10 +4023,7 @@ Make each question clear, age-appropriate, directly testing the competency.`;
         Mixed:"Mix 40% easy, 40% moderate, 20% challenging.",
       };
       const qCount = type === "Practice" ? numQ : 15;
-      const marksNote = type === "Assessment"
-        ? "
-- Assign marks: 10 MCQ × 1 mark, 3 Short Answer × 4 marks, 2 Long Answer × 5 marks (Total 32 marks)"
-        : "";
+      const marksNote = type === "Assessment" ? "\n- Assign marks: 10 MCQ × 1 mark, 3 Short Answer × 4 marks, 2 Long Answer × 5 marks (Total 32 marks)" : "";
       const prompt = `You are an expert educational assessor creating a ${type} Paper for a student in India.
 
 Student: ${selectedStudent.name} | Grade: ${classGrade} | Subject: ${selectedSubject||"Mixed"}
