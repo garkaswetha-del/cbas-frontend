@@ -242,34 +242,39 @@ function ExamConfigTab({ academicYear }: any) {
 function MarksEntryTab({ academicYear }: any) {
   const [grade,setGrade]=useState("");
   const [section,setSection]=useState("");
-  const [subject,setSubject]=useState("");
-  const [examType,setExamType]=useState("FA1");
   const [grades,setGrades]=useState<string[]>([]);
   const [sections,setSections]=useState<string[]>([]);
-  const [config,setConfig]=useState<any>(null);
+  const [configs,setConfigs]=useState<any[]>([]);
+  const [selectedConfig,setSelectedConfig]=useState<any>(null);
   const [students,setStudents]=useState<any[]>([]);
   const [marks,setMarks]=useState<Record<string,Record<string,number|null>>>({});
   const [absent,setAbsent]=useState<Record<string,boolean>>({});
-  const [loading,setLoading]=useState(false);
+  const [loadingConfigs,setLoadingConfigs]=useState(false);
+  const [loadingStudents,setLoadingStudents]=useState(false);
   const [saving,setSaving]=useState(false);
   const [msg,setMsg]=useState("");
 
   useEffect(()=>{fetchGrades();},[]);
-  useEffect(()=>{if(grade)fetchSections();},[grade]);
+  useEffect(()=>{if(grade){fetchSections();setSection("");setConfigs([]);setSelectedConfig(null);setStudents([]);}},[grade]);
+  useEffect(()=>{if(grade&&section)fetchConfigs();},[grade,section,academicYear]);
 
   const fetchGrades=async()=>{try{const r=await axios.get(`${API}/students/stats`);setGrades((r.data?.byGrade||[]).map((g:any)=>g.grade).sort());}catch{}};
   const fetchSections=async()=>{try{const r=await axios.get(`${API}/students/sections/${encodeURIComponent(grade)}`);setSections(r.data?.sections||[]);}catch{}};
 
-  const loadConfig=async()=>{
-    if(!grade||!section||!subject||!examType){setMsg("❌ Fill all fields");return;}
-    setLoading(true);setConfig(null);setStudents([]);
+  const fetchConfigs=async()=>{
+    setLoadingConfigs(true);setConfigs([]);setSelectedConfig(null);setStudents([]);
     try{
-      const cr=await axios.get(`${API}/pasa/config/entry?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}&subject=${encodeURIComponent(subject)}&exam_type=${examType}&academic_year=${academicYear}`);
-      const cfg=cr.data;
-      if(!cfg?.id){setMsg("❌ No config found. Create in Exam Configuration tab first.");setLoading(false);return;}
-      setConfig(cfg);
-      const sr=await axios.get(`${API}/pasa/marks/entry?exam_config_id=${cfg.id}&grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}`);
-      const sl=sr.data?.students||[];
+      const r=await axios.get(`${API}/pasa/config/section?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}&academic_year=${academicYear}`);
+      setConfigs(r.data?.configs||[]);
+    }catch{}
+    setLoadingConfigs(false);
+  };
+
+  const selectConfig=async(cfg:any)=>{
+    setSelectedConfig(cfg);setLoadingStudents(true);setStudents([]);
+    try{
+      const r=await axios.get(`${API}/pasa/marks/entry?exam_config_id=${cfg.id}&grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}`);
+      const sl=r.data?.students||[];
       setStudents(sl);
       const im:Record<string,Record<string,number|null>>={};
       const ia:Record<string,boolean>={};
@@ -283,60 +288,104 @@ function MarksEntryTab({ academicYear }: any) {
         });
       });
       setMarks(im);setAbsent(ia);
-    }catch{setMsg("❌ Failed to load.");}
-    setLoading(false);
+    }catch{setMsg("❌ Failed to load students.");}
+    setLoadingStudents(false);
   };
 
   const calcTotal=(sid:string)=>{
-    if(absent[sid]||!config)return{total:0,pct:0};
+    if(absent[sid]||!selectedConfig)return{total:0,pct:0};
     let total=0;
-    (config.competencies as any[]).forEach((c:any)=>{total+=+(marks[sid]?.[c.competency_id]||0);});
-    return{total,pct:config.total_marks>0?+((total/config.total_marks)*100).toFixed(1):0};
+    (selectedConfig.competencies as any[]).forEach((c:any)=>{total+=+(marks[sid]?.[c.competency_id]||0);});
+    return{total,pct:selectedConfig.total_marks>0?+((total/selectedConfig.total_marks)*100).toFixed(1):0};
   };
 
   const saveMarks=async()=>{
-    if(!config||!students.length)return;
+    if(!selectedConfig||!students.length)return;
     setSaving(true);
     try{
       const entries=students.map((s:any)=>({
         student_id:s.student_id,student_name:s.student_name,is_absent:absent[s.student_id]||false,
-        competency_scores:(config.competencies as any[]).map((c:any)=>({
+        competency_scores:(selectedConfig.competencies as any[]).map((c:any)=>({
           competency_id:c.competency_id,competency_code:c.competency_code,competency_name:c.competency_name,
           marks_obtained:absent[s.student_id]?null:(marks[s.student_id]?.[c.competency_id]??null),
           max_marks:c.max_marks,
         })),
       }));
-      await axios.post(`${API}/pasa/marks`,{exam_config_id:config.id,grade,section,subject,exam_type:examType,academic_year:academicYear,teacher_id:config.teacher_id,entries});
+      await axios.post(`${API}/pasa/marks`,{
+        exam_config_id:selectedConfig.id,grade,section,
+        subject:selectedConfig.subject,exam_type:selectedConfig.exam_type,
+        academic_year:academicYear,teacher_id:selectedConfig.teacher_id,entries,
+      });
       setMsg("✅ Marks saved!");
     }catch{setMsg("❌ Save failed.");}
     setSaving(false);setTimeout(()=>setMsg(""),3000);
   };
 
+  // Group configs by exam type
+  const grouped = configs.reduce((acc:any,c:any)=>{
+    const key=c.exam_type;
+    if(!acc[key])acc[key]=[];
+    acc[key].push(c);
+    return acc;
+  },{});
+
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow p-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
+      {/* Step 1: Grade + Section */}
+      <div className="bg-white rounded-xl shadow p-4 grid grid-cols-2 gap-3">
         <div><label className="text-xs text-gray-500 block mb-1">Grade</label>
           <select value={grade} onChange={e=>setGrade(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-            <option value="">Select</option>{grades.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
+            <option value="">Select grade</option>{grades.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
         <div><label className="text-xs text-gray-500 block mb-1">Section</label>
           <select value={section} onChange={e=>setSection(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-            <option value="">Select</option>{sections.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
-        <div><label className="text-xs text-gray-500 block mb-1">Subject</label>
-          <input type="text" value={subject} onChange={e=>setSubject(e.target.value)} placeholder="e.g. Science" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
-        <div><label className="text-xs text-gray-500 block mb-1">Exam Type</label>
-          <select value={examType} onChange={e=>setExamType(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-            {EXAM_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
-        <div className="flex items-end">
-          <button onClick={loadConfig} disabled={loading} className="w-full px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-            {loading?"Loading...":"Load"}</button></div>
+            <option value="">Select section</option>{sections.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
       </div>
+
       {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
-      {config&&students.length>0&&(
+
+      {/* Step 2: Exam config list grouped by exam type */}
+      {grade&&section&&(
+        <div className="bg-white rounded-xl shadow overflow-hidden">
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">Select Exam — {grade} · {section}</p>
+            {loadingConfigs&&<span className="text-xs text-indigo-500 animate-pulse">Loading...</span>}
+          </div>
+          {!loadingConfigs&&configs.length===0&&(
+            <div className="p-6 text-center text-gray-400 text-sm">No exam configs found. Teachers must create them first in Exam Configuration tab.</div>
+          )}
+          {!loadingConfigs&&configs.length>0&&(
+            <div className="divide-y divide-gray-100">
+              {Object.entries(grouped).map(([examType,cfgList]:any)=>(
+                <div key={examType}>
+                  <div className="px-4 py-2 bg-indigo-50">
+                    <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">{examType}</span>
+                  </div>
+                  {cfgList.map((c:any)=>(
+                    <button key={c.id} onClick={()=>selectConfig(c)}
+                      className={`w-full px-4 py-3 flex items-center justify-between hover:bg-blue-50 text-left transition-colors ${selectedConfig?.id===c.id?"bg-blue-50 border-l-4 border-blue-500":""}`}>
+                      <div>
+                        <span className="text-sm font-medium text-gray-800">{c.subject}</span>
+                        <span className="text-xs text-gray-500 ml-2">· {(c.competencies as any[])?.length||0} competencies · {c.total_marks} marks · by {c.teacher_name}</span>
+                      </div>
+                      {loadingStudents&&selectedConfig?.id===c.id
+                        ?<span className="text-xs text-indigo-400 animate-pulse">Loading students...</span>
+                        :<span className="text-xs text-indigo-600">Enter Marks →</span>}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Step 3: Marks entry table */}
+      {selectedConfig&&students.length>0&&(
         <div className="space-y-3">
           <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2">
             <div>
-              <p className="text-sm font-bold text-indigo-800">{config.exam_type} — {config.subject} · {grade} {section}</p>
-              <p className="text-xs text-indigo-600">{(config.competencies as any[]).length} competencies · Total: {config.total_marks} marks</p>
+              <p className="text-sm font-bold text-indigo-800">{selectedConfig.exam_type} — {selectedConfig.subject} · {grade} {section}</p>
+              <p className="text-xs text-indigo-600">{(selectedConfig.competencies as any[]).length} competencies · Total: {selectedConfig.total_marks} marks · {students.length} students</p>
             </div>
             <button onClick={saveMarks} disabled={saving} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
               {saving?"Saving...":"💾 Save All Marks"}</button>
@@ -348,13 +397,13 @@ function MarksEntryTab({ academicYear }: any) {
                   <tr className="bg-indigo-700 text-white">
                     <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 z-10 min-w-[160px]">Student</th>
                     <th className="px-2 py-2 text-center w-16">Absent</th>
-                    {(config.competencies as any[]).map((c:any)=>(
+                    {(selectedConfig.competencies as any[]).map((c:any)=>(
                       <th key={c.competency_id} className="px-2 py-2 text-center min-w-[80px]">
                         <div className="text-xs font-medium">{c.competency_code}</div>
                         <div className="text-xs text-indigo-200">/{c.max_marks}</div>
                       </th>
                     ))}
-                    <th className="px-2 py-2 text-center min-w-[60px]">Total/{config.total_marks}</th>
+                    <th className="px-2 py-2 text-center min-w-[60px]">Total/{selectedConfig.total_marks}</th>
                     <th className="px-2 py-2 text-center min-w-[50px]">%</th>
                   </tr>
                 </thead>
@@ -368,7 +417,7 @@ function MarksEntryTab({ academicYear }: any) {
                         <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
                         <td className="px-2 py-2 text-center">
                           <input type="checkbox" checked={isAbs} onChange={e=>setAbsent(p=>({...p,[s.student_id]:e.target.checked}))} className="accent-red-500" /></td>
-                        {(config.competencies as any[]).map((c:any)=>(
+                        {(selectedConfig.competencies as any[]).map((c:any)=>(
                           <td key={c.competency_id} className="px-2 py-2 text-center">
                             <input type="number" min={0} max={c.max_marks}
                               value={marks[s.student_id]?.[c.competency_id]??""}
