@@ -1208,9 +1208,16 @@ function PASATab({ user, mappings, academicYear }: any) {
     if (!s) return;
     setLoadingComps(true);
     try {
-      const r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(s)}&grade=${encodeURIComponent(classGrade)}`);
-      const data = r.data?.competencies||r.data||[];
-      setCompetencies(Array.isArray(data)?data:[]);
+      let url = `${API}/activities/competencies?subject=${encodeURIComponent(s)}`;
+      if (classGrade) url += `&grade=${encodeURIComponent(classGrade)}`;
+      let r = await axios.get(url);
+      let data = r.data?.competencies || [];
+      // Fallback: try without grade if no results
+      if (data.length === 0 && classGrade) {
+        r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(s)}`);
+        data = r.data?.competencies || [];
+      }
+      setCompetencies(Array.isArray(data) ? data : []);
     } catch {}
     setLoadingComps(false);
   };
