@@ -3838,11 +3838,14 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
   const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
 
-  const teacherSubjects: string[] = mappings?.subjects || user?.subjects || [];
-  const classGrade = mappings?.class_grade || mappings?.sections?.[0]?.grade || "";
-  const classSection = mappings?.class_section || mappings?.sections?.[0]?.section || "";
+  // Correctly extract from mappings structure
+  const allMappings: any[] = mappings?.mappings || [];
+  const teacherSubjects: string[] = [...new Set(allMappings.map((m:any) => m.subject).filter(Boolean))] as string[];
+  const classGrade = mappings?.class_grade || allMappings[0]?.grade || "";
+  const classSection = mappings?.class_section || allMappings[0]?.section || "";
+  const isClassTeacher = !!(mappings?.is_class_teacher);
 
-  const [subTab, setSubTab] = useState<"ame"|"practice"|"assessment"|"weekly"|"parent"|"history">("ame");
+  const [subTab, setSubTab] = useState<"ame"|"practice"|"assessment"|"parent"|"history">("ame");
   const [selectedSubject, setSelectedSubject] = useState(teacherSubjects[0] || "");
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -3885,26 +3888,76 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
   const [expandedRecord, setExpandedRecord] = useState<string|null>(null);
 
   // Auto-loads
-  useEffect(() => { if (selectedSubject && classGrade) fetchCompetencies(); }, [selectedSubject, classGrade]);
-  useEffect(() => { if (classGrade && classSection) fetchStudents(); }, [classGrade, classSection]);
+  useEffect(() => { if (selectedSubject) fetchCompetencies(); }, [selectedSubject, classGrade]);
+  useEffect(() => { if (allMappings.length > 0) fetchStudents(); }, [mappings]);
   useEffect(() => { if (classGrade) fetchExamTypes(); }, [classGrade, academicYear]);
   useEffect(() => { if ((subTab==="practice"||subTab==="assessment") && selectedStudent) fetchStudentGaps(); }, [selectedStudent, gapSource, selectedExam, selectedSubject]);
-  useEffect(() => { if (subTab==="weekly" && classGrade && classSection) fetchClassGaps(); }, [subTab, classGrade, classSection, selectedSubject, academicYear]);
   useEffect(() => { if (subTab==="history") fetchHistory(); }, [subTab, historyFilter]);
+  useEffect(() => { if (subTab==="parent" && selectedParentStudent) fetchActivityGaps(selectedParentStudent.id); }, [selectedParentStudent]);
 
   const fetchCompetencies = async () => {
+    if (!selectedSubject) return;
     setLoadingComp(true);
     try {
-      const r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(selectedSubject)}&grade=${encodeURIComponent(classGrade)}`);
-      setCompetencies(r.data?.competencies || []);
+      // Try with grade first, fallback to subject only
+      let url = `${API}/activities/competencies?subject=${encodeURIComponent(selectedSubject)}`;
+      if (classGrade) url += `&grade=${encodeURIComponent(classGrade)}`;
+      let r = await axios.get(url);
+      let comps = r.data?.competencies || [];
+      // If no results with grade, try without grade filter
+      if (comps.length === 0 && classGrade) {
+        r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(selectedSubject)}`);
+        comps = r.data?.competencies || [];
+      }
+      setCompetencies(comps);
     } catch {}
     setLoadingComp(false);
   };
 
+  // Fetch activity gaps for a student - for parent suggestions
+  const [activityGaps, setActivityGaps] = useState<any[]>([]);
+  const [loadingActivityGaps, setLoadingActivityGaps] = useState(false);
+
+  const fetchActivityGaps = async (studentId: string) => {
+    setLoadingActivityGaps(true);
+    setActivityGaps([]);
+    try {
+      const r = await axios.get(`${API}/activities/longitudinal/student/${studentId}`);
+      const gaps: any[] = [];
+      (r.data?.longitudinal || []).forEach((yr: any) => {
+        (yr.subjects || []).forEach((sub: any) => {
+          (sub.competencies || []).forEach((c: any) => {
+            if (c.avg_score !== null && c.avg_score < 60) {
+              gaps.push({ subject: sub.subject, competency_code: c.competency_code, competency_name: c.competency_name, avg_score: c.avg_score });
+            }
+          });
+        });
+      });
+      setActivityGaps(gaps);
+    } catch {}
+    setLoadingActivityGaps(false);
+  };
+
   const fetchStudents = async () => {
     try {
-      const r = await axios.get(`${API}/students?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`);
-      setStudents((r.data?.data || r.data || []).filter((s:any) => s.is_active !== false));
+      let allStudents: any[] = [];
+      if (classGrade && classSection) {
+        // Class teacher - fetch from own class
+        const r = await axios.get(`${API}/students?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`);
+        allStudents = r.data?.data || r.data || [];
+      } else {
+        // Subject teacher - fetch from all assigned sections
+        const seen = new Set<string>();
+        for (const m of allMappings) {
+          if (!m.grade || !m.section) continue;
+          const key = `${m.grade}__${m.section}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const r = await axios.get(`${API}/students?grade=${encodeURIComponent(m.grade)}&section=${encodeURIComponent(m.section)}`);
+          allStudents.push(...(r.data?.data || r.data || []));
+        }
+      }
+      setStudents(allStudents.filter((s:any) => s.is_active !== false));
     } catch {}
   };
 
@@ -4104,17 +4157,23 @@ Format exactly as:
     if (!selectedParentStudent) { setMsg("❌ Select a student first"); return; }
     setGenerating(true); setParentOutput(""); setMsg("");
     try {
+      const gapBlock = activityGaps.length > 0
+        ? activityGaps.slice(0,6).map((g:any) =>
+            `- ${g.subject}: [${g.competency_code}] ${g.competency_name} (avg: ${g.avg_score?.toFixed(0)}%)`
+          ).join("\n")
+        : parentContext || "general improvement needed";
+
       const prompt = `Write a warm, constructive message to the parent of ${selectedParentStudent.name} (Grade ${classGrade}).
-Subject: ${selectedSubject}
-${parentContext ? `Context: ${parentContext}` : "The student needs improvement in this subject."}
+${activityGaps.length > 0 ? `The child is struggling with these specific activity-based competencies:\n${gapBlock}` : `Context: ${gapBlock}`}
 
-Write a friendly, encouraging message (150-200 words) that:
-1. Acknowledges the child's efforts warmly
-2. Gently explains the specific areas to work on
-3. Gives 3 simple practical activities parents can do at home
-4. Ends with encouragement and positivity
+Write a friendly, encouraging message (180-220 words) that:
+1. Warmly acknowledges the child's efforts and strengths
+2. Gently explains the specific competency areas where the child needs support (mention them by name)
+3. Gives 3-4 simple, practical activities parents can do at home to strengthen these exact areas
+4. Suggests how to make it fun and low-pressure at home
+5. Ends with encouragement and confidence in the child's progress
 
-Keep tone warm, professional and supportive — never alarming.`;
+Keep tone warm, professional and supportive — never alarming or critical.`;
       setParentOutput(await callGroq(prompt));
     } catch { setMsg("❌ Generation failed."); }
     setGenerating(false);
@@ -4162,10 +4221,9 @@ Keep tone warm, professional and supportive — never alarming.`;
 
   const SUB_TABS = [
     {id:"ame", label:"📚 AME Homework", desc:"Select competency → generate 3 differentiated sets (Above/Medium/Emerging) for the whole class"},
-    {id:"practice", label:"📝 Practice Paper", desc:"Select student → loads their gap areas from PA/SA or Baseline → generates targeted practice questions"},
-    {id:"assessment", label:"📋 Assessment Paper", desc:"Select student → loads their gap areas → generates formal assessment with marks allocation"},
-    {id:"weekly", label:"📖 Weekly Homework", desc:"Auto-detects class weak areas from PA/SA → generates 5-day remedial or enrichment plan"},
-    {id:"parent", label:"👨‍👩‍👧 Parent Suggestions", desc:"Select student → AI generates a warm message for parents on how to support at home"},
+    {id:"practice", label:"📝 Practice Paper", desc:"Select student → loads their PA/SA or Baseline gaps → generates targeted practice questions"},
+    {id:"assessment", label:"📋 Assessment Paper", desc:"Select student → loads their gaps → generates formal assessment with marks allocation"},
+    {id:"parent", label:"👨‍👩‍👧 Parent Suggestions", desc:"Select student → auto-loads their activity learning gaps → generates targeted home support suggestions for parents"},
     {id:"history", label:"🕒 History", desc:"All AI-generated records for this year — view, print, delete"},
   ];
 
@@ -4344,83 +4402,10 @@ Keep tone warm, professional and supportive — never alarming.`;
         </div>
       )}
 
-      {/* ── WEEKLY HOMEWORK ── */}
-      {subTab==="weekly" && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Subject</label>
-              <select value={selectedSubject} onChange={e=>setSelectedSubject(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                <option value="">All Subjects</option>
-                {teacherSubjects.map((s:string)=><option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Exam Filter (PA/SA)</label>
-              <select value={selectedExam} onChange={e=>setSelectedExam(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                <option value="">All Exams</option>
-                {examTypes.map(t=><option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">This Week's Topic (optional)</label>
-              <input type="text" value={weeklyTopic} onChange={e=>setWeeklyTopic(e.target.value)}
-                placeholder="e.g. Fractions, Photosynthesis..."
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
-            </div>
-          </div>
-          {/* Class gap summary */}
-          <div className="bg-white rounded-xl shadow p-4">
-            <p className="text-xs font-bold text-gray-600 mb-2">
-              Class Weak Areas ({classGrade} · {classSection})
-              {loadingClassGaps && <span className="ml-2 text-indigo-400 font-normal animate-pulse">Loading...</span>}
-              <button onClick={fetchClassGaps} className="ml-3 text-indigo-500 hover:underline font-normal">🔄 Refresh</button>
-            </p>
-            {!loadingClassGaps && classGaps.length===0 && (
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-1 bg-green-50 border border-green-200 rounded text-xs text-green-700">✅ No weak areas below 60% — Enrichment mode will be used</span>
-              </div>
-            )}
-            {!loadingClassGaps && classGaps.length>0 && (
-              <div className="flex flex-wrap gap-2">
-                {classGaps.slice(0,8).map((g:any,i:number)=>(
-                  <span key={i} className="px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                    [{g.code}] {g.subject} — {g.avg?.toFixed(0)}%
-                  </span>
-                ))}
-                {classGaps.length>8 && <span className="text-xs text-gray-400">+{classGaps.length-8} more</span>}
-              </div>
-            )}
-          </div>
-          <button onClick={generateWeekly} disabled={generating}
-            className="px-5 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-            {generating?"Generating 5-day plan...":"⚡ Generate Weekly Homework"}
-          </button>
-          {weeklyOutput && (
-            <div className="bg-white rounded-xl shadow p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-gray-700">Weekly Homework — {classGrade} · {classSection}</h3>
-                <div className="flex gap-2">
-                  <button onClick={()=>printContent(weeklyOutput,`Weekly Homework — ${classGrade} ${classSection}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
-                  <button onClick={()=>saveRecord("Weekly",{content:weeklyOutput})} disabled={saving} className="text-xs text-green-600 hover:underline">{saving?"Saving...":"💾 Save"}</button>
-                </div>
-              </div>
-              <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{weeklyOutput}</pre>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ── PARENT SUGGESTIONS ── */}
       {subTab==="parent" && (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Subject</label>
-              <select value={selectedSubject} onChange={e=>setSelectedSubject(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                {teacherSubjects.map((s:string)=><option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
+          <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-gray-500 block mb-1">Student *</label>
               <select value={selectedParentStudent?.id||""} onChange={e=>setSelectedParentStudent(students.find(s=>s.id===e.target.value)||null)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
@@ -4429,12 +4414,33 @@ Keep tone warm, professional and supportive — never alarming.`;
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Context (optional)</label>
+              <label className="text-xs text-gray-500 block mb-1">Additional Context (optional)</label>
               <input type="text" value={parentContext} onChange={e=>setParentContext(e.target.value)}
-                placeholder="e.g. weak in fractions, struggles with reading..."
+                placeholder="Any extra notes about the student..."
                 className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
             </div>
           </div>
+          {/* Show activity gaps */}
+          {selectedParentStudent && (
+            <div className="bg-white rounded-xl shadow p-4">
+              <p className="text-xs font-bold text-gray-600 mb-2">
+                Activity Learning Gaps for {selectedParentStudent.name}
+                {loadingActivityGaps && <span className="ml-2 text-indigo-400 font-normal animate-pulse">Loading...</span>}
+              </p>
+              {!loadingActivityGaps && activityGaps.length === 0 && (
+                <p className="text-xs text-green-600">✅ No significant gaps found in activities. Suggestion will focus on general enrichment.</p>
+              )}
+              {!loadingActivityGaps && activityGaps.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {activityGaps.slice(0,8).map((g:any,i:number)=>(
+                    <span key={i} className="px-2 py-1 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700">
+                      [{g.competency_code}] {g.subject} — {g.avg_score?.toFixed(0)}%
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <button onClick={generateParent} disabled={generating||!selectedParentStudent}
             className="px-5 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
             {generating?"Generating...":"⚡ Generate Parent Suggestion"}
