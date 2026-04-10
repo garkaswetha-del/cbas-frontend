@@ -90,12 +90,16 @@ function ExamConfigTab({ academicYear }: any) {
     if (!form.subject) return;
     setLoadingComps(true);
     try {
-      const r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(form.subject)}&grade=${encodeURIComponent(form.grade)}`);
+      const params = new URLSearchParams({ subject: form.subject });
+      if (form.grade) params.append('grade', form.grade);
+      const r = await axios.get(`${API}/activities/competencies?${params}`);
       const data = r.data?.competencies||r.data||[];
       setCompetencies(Array.isArray(data)?data:[]);
     } catch {}
     setLoadingComps(false);
   };
+
+  useEffect(() => { if (form.subject) fetchCompetencies(); }, [form.subject, form.grade]);
 
   const toggleComp = (comp: any) => {
     setSelectedComps(prev => {
@@ -132,12 +136,10 @@ function ExamConfigTab({ academicYear }: any) {
           <option value="">All Grades</option>
           {grades.map(g=><option key={g} value={g}>{g}</option>)}
         </select>
-        <button onClick={()=>setShowForm(!showForm)} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
-          {showForm?"✕ Cancel":"+ New Exam Config"}
-        </button>
+        <span className="px-3 py-1.5 bg-gray-100 text-gray-500 text-xs rounded-lg">Exams are created by teachers in their login</span>
       </div>
       {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
-      {showForm&&(
+      {false&&(
         <div className="bg-white rounded-xl shadow border border-gray-200 p-5 space-y-4">
           <h3 className="text-sm font-bold text-gray-700">New Exam Configuration</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -166,10 +168,7 @@ function ExamConfigTab({ academicYear }: any) {
           <div className="border-t border-gray-200 pt-4">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-sm font-semibold text-gray-700">Select Competencies</h4>
-              <button onClick={fetchCompetencies} disabled={!form.subject||loadingComps}
-                className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-xs rounded-lg hover:bg-indigo-200 disabled:opacity-50">
-                {loadingComps?"Loading...":"🔍 Load Competencies"}
-              </button>
+{loadingComps && <span className="text-xs text-indigo-500 animate-pulse">Loading competencies...</span>}
             </div>
             {competencies.length>0&&(
               <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">

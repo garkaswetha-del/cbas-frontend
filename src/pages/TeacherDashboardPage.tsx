@@ -1192,15 +1192,20 @@ function PASATab({ user, mappings, academicYear }: any) {
     } catch {}
   };
 
-  const fetchCompetencies = async () => {
+  const fetchCompetencies = async (subj?: string) => {
+    const s = subj || configForm.subject;
+    if (!s) return;
     setLoadingComps(true);
     try {
-      const r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(configForm.subject)}&grade=${encodeURIComponent(classGrade)}`);
+      const r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(s)}&grade=${encodeURIComponent(classGrade)}`);
       const data = r.data?.competencies||r.data||[];
       setCompetencies(Array.isArray(data)?data:[]);
     } catch {}
     setLoadingComps(false);
   };
+
+  // Auto-load competencies when subject changes
+  useEffect(() => { if (configForm.subject && classGrade) fetchCompetencies(); }, [configForm.subject, classGrade]);
 
   const toggleComp = (comp: any) => {
     setSelectedComps(prev => {
@@ -1357,10 +1362,7 @@ function PASATab({ user, mappings, academicYear }: any) {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-semibold text-gray-700">Select Competencies</label>
-                  <button onClick={fetchCompetencies} disabled={!configForm.subject||loadingComps}
-                    className="px-3 py-1 bg-indigo-100 text-indigo-700 text-xs rounded hover:bg-indigo-200 disabled:opacity-50">
-                    {loadingComps?"Loading...":"🔍 Load"}
-                  </button>
+                  {loadingComps && <span className="text-xs text-indigo-500 animate-pulse">Loading competencies...</span>}
                 </div>
                 {competencies.length>0&&(
                   <div className="max-h-48 overflow-y-auto border border-gray-200 rounded divide-y">
@@ -3834,36 +3836,47 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
 
 function AIToolsTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
-  const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+  const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
 
   const teacherSubjects: string[] = mappings?.subjects || user?.subjects || [];
-  const isClassTeacher = !!(mappings?.is_class_teacher || user?.class_teacher_of);
+  const classGrade = mappings?.class_grade || mappings?.sections?.[0]?.grade || "";
+  const classSection = mappings?.class_section || mappings?.sections?.[0]?.section || "";
 
-  // Sub-tab
   const [subTab, setSubTab] = useState<"ame"|"practice"|"assessment"|"weekly"|"parent"|"history">("ame");
-
-  // Common state
   const [selectedSubject, setSelectedSubject] = useState(teacherSubjects[0] || "");
-  const [grade, setGrade] = useState(mappings?.class_grade || mappings?.sections?.[0]?.grade || "");
-  const [section, setSection] = useState(mappings?.class_section || mappings?.sections?.[0]?.section || "");
-  const [topic, setTopic] = useState("");
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
-  // Competency selection
+  // AME
   const [competencies, setCompetencies] = useState<any[]>([]);
   const [selectedCompetency, setSelectedCompetency] = useState<any>(null);
   const [loadingComp, setLoadingComp] = useState(false);
-
-  // Generated content
   const [generatedAME, setGeneratedAME] = useState<{a:string;m:string;e:string}|null>(null);
-  const [generatedContent, setGeneratedContent] = useState("");
 
-  // Students (for parent suggestions)
+  // Practice / Assessment — individual student gap-based
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
-  const [studentContext, setStudentContext] = useState("");
+  const [gapSource, setGapSource] = useState<"pasa"|"baseline">("pasa");
+  const [examTypes, setExamTypes] = useState<string[]>([]);
+  const [selectedExam, setSelectedExam] = useState("");
+  const [studentGaps, setStudentGaps] = useState<any[]>([]);
+  const [loadingGaps, setLoadingGaps] = useState(false);
+  const [numQ, setNumQ] = useState(10);
+  const [difficulty, setDifficulty] = useState("Mixed");
+  const [qTypes, setQTypes] = useState<string[]>(["Multiple Choice (MCQ)","Short Answer","Case-Based Short Answer"]);
+  const [paperOutput, setPaperOutput] = useState("");
+
+  // Weekly — class-level gap-aware
+  const [weeklyTopic, setWeeklyTopic] = useState("");
+  const [classGaps, setClassGaps] = useState<any[]>([]);
+  const [loadingClassGaps, setLoadingClassGaps] = useState(false);
+  const [weeklyOutput, setWeeklyOutput] = useState("");
+
+  // Parent suggestions
+  const [selectedParentStudent, setSelectedParentStudent] = useState<any>(null);
+  const [parentContext, setParentContext] = useState("");
+  const [parentOutput, setParentOutput] = useState("");
 
   // History
   const [history, setHistory] = useState<any[]>([]);
@@ -3871,122 +3884,243 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [expandedRecord, setExpandedRecord] = useState<string|null>(null);
 
-  useEffect(() => {
-    if (selectedSubject && grade) fetchCompetencies();
-  }, [selectedSubject, grade]);
-
-  useEffect(() => {
-    if (subTab === "history") fetchHistory();
-    if (subTab === "parent") fetchStudents();
-  }, [subTab]);
+  // Auto-loads
+  useEffect(() => { if (selectedSubject && classGrade) fetchCompetencies(); }, [selectedSubject, classGrade]);
+  useEffect(() => { if (classGrade && classSection) fetchStudents(); }, [classGrade, classSection]);
+  useEffect(() => { if (classGrade) fetchExamTypes(); }, [classGrade, academicYear]);
+  useEffect(() => { if ((subTab==="practice"||subTab==="assessment") && selectedStudent) fetchStudentGaps(); }, [selectedStudent, gapSource, selectedExam, selectedSubject]);
+  useEffect(() => { if (subTab==="weekly" && classGrade && classSection) fetchClassGaps(); }, [subTab, classGrade, classSection, selectedSubject, academicYear]);
+  useEffect(() => { if (subTab==="history") fetchHistory(); }, [subTab, historyFilter]);
 
   const fetchCompetencies = async () => {
     setLoadingComp(true);
     try {
-      const g = mappings?.class_grade || grade;
-      let url = `${API}/activities/competencies?subject=${encodeURIComponent(selectedSubject)}`;
-      if (g) url += `&grade=${encodeURIComponent(g)}`;
-      const r = await axios.get(url);
-      const data = r.data?.competencies || r.data || [];
-      setCompetencies(Array.isArray(data) ? data : []);
-    } catch { }
+      const r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(selectedSubject)}&grade=${encodeURIComponent(classGrade)}`);
+      setCompetencies(r.data?.competencies || []);
+    } catch {}
     setLoadingComp(false);
   };
 
   const fetchStudents = async () => {
     try {
-      const g = mappings?.class_grade || grade;
-      const s = mappings?.class_section || section;
-      if (!g || !s) return;
-      const r = await axios.get(`${API}/students?grade=${encodeURIComponent(g)}&section=${encodeURIComponent(s)}`);
+      const r = await axios.get(`${API}/students?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`);
       setStudents((r.data?.data || r.data || []).filter((s:any) => s.is_active !== false));
-    } catch { }
+    } catch {}
   };
 
-  const fetchHistory = async () => {
-    setLoadingHistory(true);
+  const fetchExamTypes = async () => {
     try {
-      const r = await axios.get(`${API}/homework/teacher/${user.id}?academic_year=${academicYear}${historyFilter !== "all" ? `&type=${historyFilter}` : ""}`);
-      setHistory(r.data?.records || []);
-    } catch { }
-    setLoadingHistory(false);
+      const r = await axios.get(`${API}/pasa/exam-types?academic_year=${academicYear}&grade=${encodeURIComponent(classGrade)}`);
+      setExamTypes(r.data?.examTypes || []);
+    } catch {}
   };
 
-  const callGroq = async (prompt: string): Promise<string> => {
+  const fetchStudentGaps = async () => {
+    if (!selectedStudent) return;
+    setLoadingGaps(true); setStudentGaps([]);
+    try {
+      if (gapSource === "pasa") {
+        const r = await axios.get(`${API}/pasa/student/${selectedStudent.id}/analysis?academic_year=${academicYear}`);
+        if (!r.data) { setLoadingGaps(false); return; }
+        const gaps: any[] = [];
+        (r.data.examSummary || []).forEach((exam: any) => {
+          if (selectedExam && exam.exam !== selectedExam) return;
+          Object.entries(exam.subjects || {}).forEach(([sub, sd]: [string, any]) => {
+            if (selectedSubject && sub !== selectedSubject) return;
+            (sd.competency_scores || []).forEach((cs: any) => {
+              if (cs.marks_obtained !== null && cs.max_marks > 0 && (cs.marks_obtained / cs.max_marks) * 100 < 60) {
+                gaps.push({ subject: sub, code: cs.competency_code, name: cs.competency_name, score: +((cs.marks_obtained/cs.max_marks)*100).toFixed(0), exam: exam.exam });
+              }
+            });
+          });
+        });
+        setStudentGaps(gaps);
+      } else {
+        const r = await axios.get(`${API}/baseline/student/${selectedStudent.id}/portfolio`);
+        const gaps: any[] = [];
+        (r.data?.years || []).slice(-1).forEach((yr: any) => {
+          ["literacy","numeracy"].forEach((subj: string) => {
+            if (!yr[subj]) return;
+            Object.entries(yr[subj]).forEach(([domain, score]: [string, any]) => {
+              if (!["avg","stage"].includes(domain) && +score < 60)
+                gaps.push({ subject: subj, domain, score: +score });
+            });
+          });
+        });
+        setStudentGaps(gaps);
+      }
+    } catch {}
+    setLoadingGaps(false);
+  };
+
+  const fetchClassGaps = async () => {
+    if (!classGrade || !classSection) return;
+    setLoadingClassGaps(true); setClassGaps([]);
+    try {
+      const et = selectedExam ? `&exam_type=${selectedExam}` : "";
+      const r = await axios.get(`${API}/pasa/dashboard/section?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}&academic_year=${academicYear}${et}`);
+      const weakComps: any[] = [];
+      (r.data?.subjectSummary || []).forEach((s: any) => {
+        if (selectedSubject && s.subject !== selectedSubject) return;
+        (s.competency_avgs || []).forEach((c: any) => {
+          if (c.avg < 60) weakComps.push({ subject: s.subject, code: c.code, avg: c.avg });
+        });
+      });
+      setClassGaps(weakComps.sort((a,b) => a.avg - b.avg));
+    } catch {}
+    setLoadingClassGaps(false);
+  };
+
+  const callGroq = async (prompt: string, maxTokens = 2500): Promise<string> => {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_API_KEY}` },
-      body: JSON.stringify({
-        model: "llama3-8b-8192",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 2000,
-        temperature: 0.7,
-      }),
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
+      body: JSON.stringify({ model: "llama3-8b-8192", messages: [{ role: "user", content: prompt }], max_tokens: maxTokens, temperature: 0.7 }),
     });
     const data = await res.json();
     return data.choices?.[0]?.message?.content || "";
   };
 
+  // Generate AME homework
   const generateAME = async () => {
-    if (!selectedCompetency) { setMsg("❌ Please select a competency first"); return; }
+    if (!selectedCompetency) { setMsg("❌ Select a competency first"); return; }
     setGenerating(true); setGeneratedAME(null); setMsg("");
     try {
-      const basePrompt = `You are an experienced teacher creating differentiated homework for ${selectedSubject}, Grade ${grade}.
-Competency: ${selectedCompetency.name || selectedCompetency.code}
-${topic ? `Topic: ${topic}` : ""}
+      const prompt = `You are an experienced teacher creating differentiated homework for ${selectedSubject}, Grade ${classGrade}.
+Competency: [${selectedCompetency.code || ""}] ${selectedCompetency.name}
 
-Create 3 sets of homework questions (5 questions each) for different learning levels.
-Format your response EXACTLY as:
+Create 3 sets of homework (5 questions each) for different learning levels.
+Format EXACTLY as:
 ===A===
-[5 challenging/extension questions for above-average students]
+[5 challenging/extension questions for ABOVE AVERAGE students]
 ===M===
-[5 standard questions for average students]
+[5 standard questions for AVERAGE students]
 ===E===
-[5 simple/foundational questions for emerging students]`;
+[5 simple/foundational questions for EMERGING students]
 
-      const raw = await callGroq(basePrompt);
+Make each question clear, age-appropriate, directly testing the competency.`;
+      const raw = await callGroq(prompt);
       const aMatch = raw.match(/===A===([\s\S]*?)===M===/);
       const mMatch = raw.match(/===M===([\s\S]*?)===E===/);
-      const eMatch = raw.match(/===E===([\s\S]*?)$/);
-      setGeneratedAME({
-        a: aMatch?.[1]?.trim() || raw,
-        m: mMatch?.[1]?.trim() || "",
-        e: eMatch?.[1]?.trim() || "",
-      });
-    } catch { setMsg("❌ Generation failed. Check your API key."); }
+      const eMatch = raw.match(/===E===([\s\S]*)$/);
+      setGeneratedAME({ a: aMatch?.[1]?.trim()||raw, m: mMatch?.[1]?.trim()||"", e: eMatch?.[1]?.trim()||"" });
+    } catch { setMsg("❌ Generation failed. Check API key."); }
     setGenerating(false);
   };
 
-  const generateSingle = async (type: "Practice"|"Assessment"|"Weekly") => {
-    if (!topic && type !== "Weekly") { setMsg("❌ Please enter a topic"); return; }
-    setGenerating(true); setGeneratedContent(""); setMsg("");
+  // Generate Practice or Assessment paper
+  const generatePaper = async (type: "Practice"|"Assessment") => {
+    if (!selectedStudent || !studentGaps.length) { setMsg("❌ Select a student with gap data first"); return; }
+    setGenerating(true); setPaperOutput(""); setMsg("");
     try {
-      const prompts: Record<string, string> = {
-        Practice: `Create a practice worksheet for ${selectedSubject} Grade ${grade}. Topic: ${topic}. Include 10 practice questions with answers.`,
-        Assessment: `Create a formal assessment paper for ${selectedSubject} Grade ${grade}. Topic: ${topic}. Include 15 questions (MCQ, short answer, long answer) with marks allocation.`,
-        Weekly: `Create a weekly homework assignment for ${selectedSubject} Grade ${grade}${topic ? `. Focus: ${topic}` : ""}. Include 5-7 varied questions covering the week's topics.`,
+      const gapBlock = studentGaps.slice(0,8).map((g:any) =>
+        `- ${g.subject||""} [${g.code||g.domain||""}] ${g.name||g.domain||""} — Score: ${g.score}%`
+      ).join("
+");
+      const diffNote: Record<string,string> = {
+        Easy:"All questions: recall and basic application only.",
+        Moderate:"Mix of recall, application and simple analysis.",
+        Challenging:"Focus on analysis, evaluation and synthesis.",
+        Mixed:"Mix 40% easy, 40% moderate, 20% challenging.",
       };
-      const result = await callGroq(prompts[type]);
-      setGeneratedContent(result);
-    } catch { setMsg("❌ Generation failed. Check your API key."); }
+      const qCount = type === "Practice" ? numQ : 15;
+      const marksNote = type === "Assessment"
+        ? "
+- Assign marks: 10 MCQ × 1 mark, 3 Short Answer × 4 marks, 2 Long Answer × 5 marks (Total 32 marks)"
+        : "";
+      const prompt = `You are an expert educational assessor creating a ${type} Paper for a student in India.
+
+Student: ${selectedStudent.name} | Grade: ${classGrade} | Subject: ${selectedSubject||"Mixed"}
+Gap source: ${gapSource==="pasa"?"PA/SA Assessment":"Baseline Assessment"}
+${selectedExam?`Exam filter: ${selectedExam}`:""}
+
+STUDENT GAP AREAS (below 60%):
+${gapBlock}
+
+REQUIREMENTS:
+- Exactly ${qCount} questions
+- Question types: ${type==="Practice"?qTypes.join(", "):"MCQ, Short Answer, Long Answer"}
+- Difficulty: ${difficulty} — ${diffNote[difficulty]}
+- Tag each question with competency code [CODE]
+- Include complete Answer Key with explanations${marksNote}
+- Age-appropriate language for Grade ${classGrade}
+
+FORMATS:
+[MCQ] 4 options A/B/C/D, correct marked ✓, 1-line reason
+[SA] Short Answer: model answer 2–3 sentences
+[LA] Long Answer: model answer 5–8 sentences
+[FIB] Fill in the Blank with answer
+[CBSA] 3-4 line classroom scenario + question + 2–3 sentence answer
+
+Title: ${type} Paper — ${selectedStudent.name} — ${selectedSubject||"Mixed"} — ${new Date().toLocaleDateString()}`;
+      setPaperOutput(await callGroq(prompt, 3000));
+    } catch { setMsg("❌ Generation failed. Check API key."); }
     setGenerating(false);
   };
 
-  const generateParentSuggestion = async () => {
-    if (!selectedStudent) { setMsg("❌ Please select a student"); return; }
-    setGenerating(true); setGeneratedContent(""); setMsg("");
+  // Generate gap-aware weekly homework
+  const generateWeekly = async () => {
+    setGenerating(true); setWeeklyOutput(""); setMsg("");
     try {
-      const prompt = `Write a friendly, constructive message to a parent about their child ${selectedStudent.name} in Grade ${grade}.
-Subject: ${selectedSubject}
-${studentContext ? `Context about the student: ${studentContext}` : "The student needs improvement in this subject."}
+      const hasGaps = classGaps.length > 0;
+      const gapBlock = classGaps.slice(0,6).map((g:any) =>
+        `- [${g.code}] ${g.subject} — Class avg: ${g.avg?.toFixed(0)}%`
+      ).join("
+");
+      const prompt = `You are an experienced teacher creating a 5-day weekly homework plan for ${selectedSubject||"general subjects"}, Grade ${classGrade}.
+${weeklyTopic ? `This week's topic: ${weeklyTopic}` : ""}
+Mode: ${hasGaps ? "REMEDIAL — class has weak areas to address" : "ENRICHMENT — class is performing well"}
+${hasGaps ? `
+Class weak competencies (below 60%):
+${gapBlock}` : ""}
 
-Write a warm, encouraging message (150-200 words) that:
-1. Acknowledges the child's efforts
-2. Explains the specific areas to work on
-3. Gives 3 practical activities parents can do at home to help
-4. Ends with encouragement`;
-      const result = await callGroq(prompt);
-      setGeneratedContent(result);
+Create a structured Monday-to-Friday homework plan:
+- ${hasGaps ? "Focus questions on the weak competency areas above" : "Enrichment and extension activities"}
+- Each day: 3-4 questions or activities, varied types
+- Progressively build across the week (easy → challenging)
+- Friday: 5-question mini-review with answer key
+- End with a Parent Note: what to observe and how to support
+
+Format exactly as:
+📅 MONDAY — [Day theme]
+[Questions/activities]
+
+📅 TUESDAY — [Day theme]
+[Questions/activities]
+
+📅 WEDNESDAY — [Day theme]
+[Questions/activities]
+
+📅 THURSDAY — [Day theme]
+[Questions/activities]
+
+📅 FRIDAY — MINI REVIEW
+[5 review questions + answers]
+
+👨‍👩‍👧 PARENT NOTE
+[Practical guidance for parents — what to look for, how to help at home]`;
+      setWeeklyOutput(await callGroq(prompt, 3000));
+    } catch { setMsg("❌ Generation failed. Check API key."); }
+    setGenerating(false);
+  };
+
+  // Generate parent suggestion
+  const generateParent = async () => {
+    if (!selectedParentStudent) { setMsg("❌ Select a student first"); return; }
+    setGenerating(true); setParentOutput(""); setMsg("");
+    try {
+      const prompt = `Write a warm, constructive message to the parent of ${selectedParentStudent.name} (Grade ${classGrade}).
+Subject: ${selectedSubject}
+${parentContext ? `Context: ${parentContext}` : "The student needs improvement in this subject."}
+
+Write a friendly, encouraging message (150-200 words) that:
+1. Acknowledges the child's efforts warmly
+2. Gently explains the specific areas to work on
+3. Gives 3 simple practical activities parents can do at home
+4. Ends with encouragement and positivity
+
+Keep tone warm, professional and supportive — never alarming.`;
+      setParentOutput(await callGroq(prompt));
     } catch { setMsg("❌ Generation failed."); }
     setGenerating(false);
   };
@@ -3994,25 +4128,28 @@ Write a warm, encouraging message (150-200 words) that:
   const saveRecord = async (type: string, extraData: any = {}) => {
     setSaving(true);
     try {
-      const g = mappings?.class_grade || grade;
-      const s = mappings?.class_section || section;
       await axios.post(`${API}/homework/save`, {
-        teacher_id: user.id,
-        teacher_name: user.name,
-        grade: g,
-        section: s,
-        subject: selectedSubject,
-        academic_year: academicYear,
-        type,
-        competency_id: selectedCompetency?.id || null,
-        competency_name: selectedCompetency?.name || null,
-        topic: topic || null,
+        teacher_id: user.id, teacher_name: user.name,
+        grade: classGrade, section: classSection,
+        subject: selectedSubject, academic_year: academicYear,
+        type, competency_id: selectedCompetency?.id||null,
+        competency_name: selectedCompetency?.name||null,
         ...extraData,
       });
-      setMsg("✅ Saved to homework records!");
+      setMsg("✅ Saved!");
     } catch { setMsg("❌ Save failed."); }
     setSaving(false);
-    setTimeout(() => setMsg(""), 3000);
+    setTimeout(()=>setMsg(""), 3000);
+  };
+
+  const fetchHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const tf = historyFilter !== "all" ? `&type=${historyFilter}` : "";
+      const r = await axios.get(`${API}/homework/teacher/${user.id}?academic_year=${academicYear}${tf}`);
+      setHistory(r.data?.records || []);
+    } catch {}
+    setLoadingHistory(false);
   };
 
   const deleteRecord = async (id: string) => {
@@ -4021,185 +4158,312 @@ Write a warm, encouraging message (150-200 words) that:
     fetchHistory();
   };
 
-  const printContent = (content: string, title: string) => {
-    const w = window.open("", "_blank");
+  const printContent = (text: string, title: string) => {
+    const w = window.open("","_blank");
     if (!w) return;
-    w.document.write(`<html><head><title>${title}</title><style>body{font-family:Arial;padding:20px;max-width:800px;margin:0 auto;}h1{color:#333;}pre{white-space:pre-wrap;font-family:Arial;}</style></head><body><h1>${title}</h1><pre>${content}</pre></body></html>`);
-    w.document.close();
-    w.print();
+    w.document.write(`<html><head><title>${title}</title><style>body{font-family:Arial;padding:20px;max-width:800px;margin:0 auto;}pre{white-space:pre-wrap;font-family:Arial;line-height:1.6;}</style></head><body><h2>${title}</h2><pre>${text}</pre></body></html>`);
+    w.document.close(); w.print();
   };
 
   const SUB_TABS = [
-    { id: "ame", label: "📚 AME Homework", desc: "Differentiated homework by learning level" },
-    { id: "practice", label: "📝 Practice Paper", desc: "Practice questions for classroom use" },
-    { id: "assessment", label: "📋 Assessment Paper", desc: "Formal assessment with marks" },
-    { id: "weekly", label: "📖 Weekly Homework", desc: "Weekly assignment for students" },
-    { id: "parent", label: "👨‍👩‍👧 Parent Suggestions", desc: "AI-generated parent communication" },
-    { id: "history", label: "🕒 Homework History", desc: "All records generated this year" },
+    {id:"ame", label:"📚 AME Homework", desc:"Select competency → generate 3 differentiated sets (Above/Medium/Emerging) for the whole class"},
+    {id:"practice", label:"📝 Practice Paper", desc:"Select student → loads their gap areas from PA/SA or Baseline → generates targeted practice questions"},
+    {id:"assessment", label:"📋 Assessment Paper", desc:"Select student → loads their gap areas → generates formal assessment with marks allocation"},
+    {id:"weekly", label:"📖 Weekly Homework", desc:"Auto-detects class weak areas from PA/SA → generates 5-day remedial or enrichment plan"},
+    {id:"parent", label:"👨‍👩‍👧 Parent Suggestions", desc:"Select student → AI generates a warm message for parents on how to support at home"},
+    {id:"history", label:"🕒 History", desc:"All AI-generated records for this year — view, print, delete"},
   ];
+
+  const Q_TYPE_OPTIONS = ["Multiple Choice (MCQ)","Short Answer","Long Answer","True/False","Fill in the Blank","Case-Based Short Answer"];
 
   return (
     <div className="space-y-4">
       <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
         <h2 className="text-sm font-bold text-indigo-800 mb-1">🤖 AI Tools</h2>
-        <p className="text-xs text-indigo-600">Generate differentiated homework, practice papers, assessments, and parent suggestions. All generated content is automatically saved.</p>
+        <p className="text-xs text-indigo-600">All generated content is automatically saved to records and accessible in Student Portfolio.</p>
       </div>
 
-      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
       {/* Sub-tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1 flex-nowrap">
         {SUB_TABS.map(t => (
           <button key={t.id} onClick={() => setSubTab(t.id as any)}
-            className={`px-3 py-2 text-xs rounded-lg font-medium whitespace-nowrap flex-shrink-0 ${subTab === t.id ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
+            className={`px-3 py-2 text-xs rounded-lg font-medium whitespace-nowrap flex-shrink-0 ${subTab===t.id?"bg-indigo-600 text-white":"bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
             {t.label}
           </button>
         ))}
       </div>
-
-      {/* Description */}
-      <div className="bg-gray-50 rounded-lg px-4 py-2 text-xs text-gray-500">
+      <div className="bg-gray-50 rounded-lg px-4 py-2 text-xs text-gray-500 italic">
         {SUB_TABS.find(t => t.id === subTab)?.desc}
       </div>
-
-      {/* Common controls */}
-      {subTab !== "history" && subTab !== "parent" && (
-        <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Subject</label>
-            <select value={selectedSubject} onChange={e => { setSelectedSubject(e.target.value); setSelectedCompetency(null); }}
-              className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-              {teacherSubjects.map((s:string) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Topic (optional)</label>
-            <input type="text" value={topic} onChange={e => setTopic(e.target.value)}
-              placeholder="e.g. Photosynthesis"
-              className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
-          </div>
-          {subTab === "ame" && (
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Competency *</label>
-              <select value={selectedCompetency?.id || ""} onChange={e => setSelectedCompetency(competencies.find(c => c.id === e.target.value) || null)}
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                <option value="">-- Select competency --</option>
-                {loadingComp ? <option disabled>Loading...</option> : competencies.map((c:any) => (
-                  <option key={c.id} value={c.id}>{c.code ? `[${c.code}] ` : ""}{c.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ── AME HOMEWORK ── */}
       {subTab === "ame" && (
         <div className="space-y-4">
-          <button onClick={generateAME} disabled={generating || !selectedCompetency}
+          <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Subject</label>
+              <select value={selectedSubject} onChange={e=>{setSelectedSubject(e.target.value);setSelectedCompetency(null);}}
+                className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                {teacherSubjects.map((s:string)=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Competency * {loadingComp && <span className="text-indigo-400">Loading...</span>}</label>
+              <select value={selectedCompetency?.id||""} onChange={e=>setSelectedCompetency(competencies.find(c=>c.id===e.target.value)||null)}
+                className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                <option value="">-- Select competency --</option>
+                {competencies.map((c:any)=><option key={c.id} value={c.id}>[{c.code}] {c.name?.slice(0,60)}</option>)}
+              </select>
+            </div>
+          </div>
+          {selectedCompetency && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2 text-xs text-indigo-700">
+              Selected: <strong>[{selectedCompetency.code}]</strong> {selectedCompetency.name}
+            </div>
+          )}
+          <button onClick={generateAME} disabled={generating||!selectedCompetency}
             className="px-5 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-            {generating ? "Generating 3 sets..." : "⚡ Generate AME Homework"}
+            {generating?"Generating 3 sets...":"⚡ Generate AME Homework"}
           </button>
           {generatedAME && (
             <div className="space-y-3">
-              {[
-                { key: "a", label: "🌟 A — Above Average", color: "border-green-500 bg-green-50" },
-                { key: "m", label: "📘 M — Medium / Average", color: "border-blue-500 bg-blue-50" },
-                { key: "e", label: "🌱 E — Emerging", color: "border-orange-500 bg-orange-50" },
-              ].map(({ key, label, color }) => (
+              {[{key:"a",label:"🌟 A — Above Average",color:"border-green-500 bg-green-50"},
+                {key:"m",label:"📘 M — Medium / Average",color:"border-blue-500 bg-blue-50"},
+                {key:"e",label:"🌱 E — Emerging",color:"border-orange-500 bg-orange-50"}].map(({key,label,color})=>(
                 <div key={key} className={`rounded-xl border-l-4 ${color} p-4`}>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-bold text-gray-700">{label}</h3>
-                    <button onClick={() => printContent(generatedAME[key as "a"|"m"|"e"], label)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
+                    <button onClick={()=>printContent(generatedAME[key as "a"|"m"|"e"],label)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
                   </div>
-                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans">{generatedAME[key as "a"|"m"|"e"]}</pre>
+                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{generatedAME[key as "a"|"m"|"e"]}</pre>
                 </div>
               ))}
-              <button onClick={() => saveRecord("AME", { content_a: generatedAME.a, content_m: generatedAME.m, content_e: generatedAME.e })} disabled={saving}
+              <button onClick={()=>saveRecord("AME",{content_a:generatedAME.a,content_m:generatedAME.m,content_e:generatedAME.e})} disabled={saving}
                 className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50">
-                {saving ? "Saving..." : "💾 Save to Records"}
+                {saving?"Saving...":"💾 Save to Records"}
               </button>
             </div>
           )}
         </div>
       )}
 
-      {/* ── PRACTICE / ASSESSMENT / WEEKLY ── */}
-      {(subTab === "practice" || subTab === "assessment" || subTab === "weekly") && (
+      {/* ── PRACTICE / ASSESSMENT ── */}
+      {(subTab==="practice"||subTab==="assessment") && (
         <div className="space-y-4">
-          <button onClick={() => generateSingle(subTab === "practice" ? "Practice" : subTab === "assessment" ? "Assessment" : "Weekly")}
-            disabled={generating}
+          <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Subject Filter</label>
+              <select value={selectedSubject} onChange={e=>setSelectedSubject(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                <option value="">All Subjects</option>
+                {teacherSubjects.map((s:string)=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Gap Source</label>
+              <select value={gapSource} onChange={e=>setGapSource(e.target.value as any)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                <option value="pasa">PA/SA Competency Gaps</option>
+                <option value="baseline">Baseline Gaps</option>
+              </select>
+            </div>
+            {gapSource==="pasa" && (
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Exam Filter</label>
+                <select value={selectedExam} onChange={e=>setSelectedExam(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                  <option value="">All Exams</option>
+                  {examTypes.map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Student *</label>
+              <select value={selectedStudent?.id||""} onChange={e=>setSelectedStudent(students.find(s=>s.id===e.target.value)||null)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                <option value="">-- Select student --</option>
+                {students.map((s:any)=><option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">No. of Questions</label>
+              <select value={numQ} onChange={e=>setNumQ(+e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                {[5,10,15,20].map(n=><option key={n} value={n}>{n} questions</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Difficulty</label>
+              <select value={difficulty} onChange={e=>setDifficulty(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                {["Easy","Moderate","Challenging","Mixed"].map(d=><option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+          {subTab==="practice" && (
+            <div className="bg-white rounded-xl shadow p-4">
+              <label className="text-xs text-gray-500 block mb-2">Question Types</label>
+              <div className="flex flex-wrap gap-2">
+                {Q_TYPE_OPTIONS.map(qt=>(
+                  <label key={qt} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                    <input type="checkbox" checked={qTypes.includes(qt)} onChange={e=>setQTypes(p=>e.target.checked?[...p,qt]:p.filter(q=>q!==qt))} className="accent-indigo-600" />
+                    {qt}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Gap display */}
+          {selectedStudent && (
+            <div className="bg-white rounded-xl shadow p-4">
+              <p className="text-xs font-bold text-gray-600 mb-2">
+                Gaps for {selectedStudent.name}
+                {loadingGaps && <span className="ml-2 text-indigo-400 font-normal animate-pulse">Loading...</span>}
+              </p>
+              {!loadingGaps && studentGaps.length===0 && <p className="text-xs text-gray-400">No gaps below 60% found. Try a different source or exam.</p>}
+              {!loadingGaps && studentGaps.length>0 && (
+                <div className="flex flex-wrap gap-2">
+                  {studentGaps.slice(0,10).map((g:any,i:number)=>(
+                    <span key={i} className="px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                      [{g.code||g.domain}] {g.score}%
+                    </span>
+                  ))}
+                  {studentGaps.length>10 && <span className="text-xs text-gray-400">+{studentGaps.length-10} more</span>}
+                </div>
+              )}
+            </div>
+          )}
+          <button onClick={()=>generatePaper(subTab==="practice"?"Practice":"Assessment")}
+            disabled={generating||!selectedStudent||studentGaps.length===0}
             className="px-5 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-            {generating ? "Generating..." : `⚡ Generate ${subTab === "practice" ? "Practice Paper" : subTab === "assessment" ? "Assessment Paper" : "Weekly Homework"}`}
+            {generating?"Generating...":"⚡ Generate "+( subTab==="practice"?"Practice Paper":"Assessment Paper")}
           </button>
-          {generatedContent && (
+          {paperOutput && (
             <div className="bg-white rounded-xl shadow p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-gray-700">Generated Content</h3>
+                <h3 className="text-sm font-bold text-gray-700">{subTab==="practice"?"Practice":"Assessment"} Paper — {selectedStudent?.name}</h3>
                 <div className="flex gap-2">
-                  <button onClick={() => printContent(generatedContent, `${selectedSubject} - ${subTab}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
-                  <button onClick={() => saveRecord(subTab === "practice" ? "Practice" : subTab === "assessment" ? "Assessment" : "Weekly", { content: generatedContent })} disabled={saving}
-                    className="text-xs text-green-600 hover:underline">{saving ? "Saving..." : "💾 Save"}</button>
+                  <button onClick={()=>printContent(paperOutput,`${subTab==="practice"?"Practice":"Assessment"} Paper — ${selectedStudent?.name}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
+                  <button onClick={()=>saveRecord(subTab==="practice"?"Practice":"Assessment",{content:paperOutput,student_id:selectedStudent?.id,student_name:selectedStudent?.name})} disabled={saving} className="text-xs text-green-600 hover:underline">{saving?"Saving...":"💾 Save"}</button>
                 </div>
               </div>
-              <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans">{generatedContent}</pre>
+              <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{paperOutput}</pre>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── WEEKLY HOMEWORK ── */}
+      {subTab==="weekly" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Subject</label>
+              <select value={selectedSubject} onChange={e=>setSelectedSubject(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                <option value="">All Subjects</option>
+                {teacherSubjects.map((s:string)=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Exam Filter (PA/SA)</label>
+              <select value={selectedExam} onChange={e=>setSelectedExam(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                <option value="">All Exams</option>
+                {examTypes.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">This Week's Topic (optional)</label>
+              <input type="text" value={weeklyTopic} onChange={e=>setWeeklyTopic(e.target.value)}
+                placeholder="e.g. Fractions, Photosynthesis..."
+                className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
+            </div>
+          </div>
+          {/* Class gap summary */}
+          <div className="bg-white rounded-xl shadow p-4">
+            <p className="text-xs font-bold text-gray-600 mb-2">
+              Class Weak Areas ({classGrade} · {classSection})
+              {loadingClassGaps && <span className="ml-2 text-indigo-400 font-normal animate-pulse">Loading...</span>}
+              <button onClick={fetchClassGaps} className="ml-3 text-indigo-500 hover:underline font-normal">🔄 Refresh</button>
+            </p>
+            {!loadingClassGaps && classGaps.length===0 && (
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-1 bg-green-50 border border-green-200 rounded text-xs text-green-700">✅ No weak areas below 60% — Enrichment mode will be used</span>
+              </div>
+            )}
+            {!loadingClassGaps && classGaps.length>0 && (
+              <div className="flex flex-wrap gap-2">
+                {classGaps.slice(0,8).map((g:any,i:number)=>(
+                  <span key={i} className="px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                    [{g.code}] {g.subject} — {g.avg?.toFixed(0)}%
+                  </span>
+                ))}
+                {classGaps.length>8 && <span className="text-xs text-gray-400">+{classGaps.length-8} more</span>}
+              </div>
+            )}
+          </div>
+          <button onClick={generateWeekly} disabled={generating}
+            className="px-5 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
+            {generating?"Generating 5-day plan...":"⚡ Generate Weekly Homework"}
+          </button>
+          {weeklyOutput && (
+            <div className="bg-white rounded-xl shadow p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-gray-700">Weekly Homework — {classGrade} · {classSection}</h3>
+                <div className="flex gap-2">
+                  <button onClick={()=>printContent(weeklyOutput,`Weekly Homework — ${classGrade} ${classSection}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
+                  <button onClick={()=>saveRecord("Weekly",{content:weeklyOutput})} disabled={saving} className="text-xs text-green-600 hover:underline">{saving?"Saving...":"💾 Save"}</button>
+                </div>
+              </div>
+              <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{weeklyOutput}</pre>
             </div>
           )}
         </div>
       )}
 
       {/* ── PARENT SUGGESTIONS ── */}
-      {subTab === "parent" && (
+      {subTab==="parent" && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-xs text-gray-500 block mb-1">Subject</label>
-              <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)}
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                {teacherSubjects.map((s:string) => <option key={s} value={s}>{s}</option>)}
+              <select value={selectedSubject} onChange={e=>setSelectedSubject(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                {teacherSubjects.map((s:string)=><option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Student *</label>
-              <select value={selectedStudent?.id || ""} onChange={e => setSelectedStudent(students.find(s => s.id === e.target.value) || null)}
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+              <select value={selectedParentStudent?.id||""} onChange={e=>setSelectedParentStudent(students.find(s=>s.id===e.target.value)||null)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
                 <option value="">-- Select student --</option>
-                {students.map((s:any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {students.map((s:any)=><option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Context (optional)</label>
-              <input type="text" value={studentContext} onChange={e => setStudentContext(e.target.value)}
-                placeholder="e.g. weak in fractions"
+              <input type="text" value={parentContext} onChange={e=>setParentContext(e.target.value)}
+                placeholder="e.g. weak in fractions, struggles with reading..."
                 className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
             </div>
           </div>
-          <button onClick={generateParentSuggestion} disabled={generating || !selectedStudent}
+          <button onClick={generateParent} disabled={generating||!selectedParentStudent}
             className="px-5 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-            {generating ? "Generating..." : "⚡ Generate Parent Suggestion"}
+            {generating?"Generating...":"⚡ Generate Parent Suggestion"}
           </button>
-          {generatedContent && (
+          {parentOutput && (
             <div className="bg-white rounded-xl shadow p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-gray-700">Parent Suggestion for {selectedStudent?.name}</h3>
+                <h3 className="text-sm font-bold text-gray-700">Parent Suggestion — {selectedParentStudent?.name}</h3>
                 <div className="flex gap-2">
-                  <button onClick={() => printContent(generatedContent, `Parent Suggestion — ${selectedStudent?.name}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
-                  <button onClick={() => saveRecord("ParentSuggestion", { content: generatedContent, student_id: selectedStudent?.id, student_name: selectedStudent?.name })} disabled={saving}
-                    className="text-xs text-green-600 hover:underline">{saving ? "Saving..." : "💾 Save"}</button>
+                  <button onClick={()=>printContent(parentOutput,`Parent Suggestion — ${selectedParentStudent?.name}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
+                  <button onClick={()=>saveRecord("ParentSuggestion",{content:parentOutput,student_id:selectedParentStudent?.id,student_name:selectedParentStudent?.name})} disabled={saving} className="text-xs text-green-600 hover:underline">{saving?"Saving...":"💾 Save"}</button>
                 </div>
               </div>
-              <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans">{generatedContent}</pre>
+              <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{parentOutput}</pre>
             </div>
           )}
         </div>
       )}
 
       {/* ── HISTORY ── */}
-      {subTab === "history" && (
+      {subTab==="history" && (
         <div className="space-y-4">
           <div className="flex gap-3 items-center flex-wrap">
-            <select value={historyFilter} onChange={e => { setHistoryFilter(e.target.value); setTimeout(fetchHistory, 100); }}
-              className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+            <select value={historyFilter} onChange={e=>{setHistoryFilter(e.target.value);setTimeout(fetchHistory,100);}} className="border border-gray-300 rounded px-3 py-1.5 text-sm">
               <option value="all">All Types</option>
               <option value="AME">AME Homework</option>
               <option value="Practice">Practice Paper</option>
@@ -4210,53 +4474,44 @@ Write a warm, encouraging message (150-200 words) that:
             <button onClick={fetchHistory} className="px-3 py-1.5 bg-white border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">🔄 Refresh</button>
           </div>
           {loadingHistory ? (
-            <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">Loading history...</div>
-          ) : history.length === 0 ? (
+            <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">Loading...</div>
+          ) : history.length===0 ? (
             <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
               <p className="text-2xl mb-2">📭</p>
-              <p className="text-sm">No records found. Generate some homework to see them here.</p>
+              <p className="text-sm">No records yet. Generate content to see it here.</p>
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow overflow-hidden">
-              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+              <div className="px-4 py-3 bg-gray-50 border-b">
                 <span className="text-sm font-semibold text-gray-700">{history.length} Records</span>
               </div>
               <div className="divide-y divide-gray-100">
-                {history.map((r:any) => (
+                {history.map((r:any)=>(
                   <div key={r.id} className="p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            r.type==="AME" ? "bg-green-100 text-green-700" :
-                            r.type==="Practice" ? "bg-blue-100 text-blue-700" :
-                            r.type==="Assessment" ? "bg-purple-100 text-purple-700" :
-                            r.type==="Weekly" ? "bg-orange-100 text-orange-700" :
-                            "bg-pink-100 text-pink-700"
-                          }`}>{r.type}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.type==="AME"?"bg-green-100 text-green-700":r.type==="Practice"?"bg-blue-100 text-blue-700":r.type==="Assessment"?"bg-purple-100 text-purple-700":r.type==="Weekly"?"bg-orange-100 text-orange-700":"bg-pink-100 text-pink-700"}`}>{r.type}</span>
                           <span className="text-sm font-medium text-gray-800">{r.subject}</span>
                           {r.competency_name && <span className="text-xs text-gray-500">· {r.competency_name}</span>}
                           {r.student_name && <span className="text-xs text-gray-500">· {r.student_name}</span>}
-                          {r.topic && <span className="text-xs text-gray-500">· {r.topic}</span>}
                         </div>
                         <p className="text-xs text-gray-400 mt-1">{new Date(r.created_at).toLocaleDateString()} · {r.grade} {r.section}</p>
                       </div>
                       <div className="flex gap-2 ml-3">
-                        <button onClick={() => setExpandedRecord(expandedRecord === r.id ? null : r.id)} className="text-xs text-indigo-600 hover:underline">
-                          {expandedRecord === r.id ? "Hide" : "View"}
-                        </button>
-                        <button onClick={() => deleteRecord(r.id)} className="text-xs text-red-500 hover:underline">Delete</button>
+                        <button onClick={()=>setExpandedRecord(expandedRecord===r.id?null:r.id)} className="text-xs text-indigo-600 hover:underline">{expandedRecord===r.id?"Hide":"View"}</button>
+                        <button onClick={()=>deleteRecord(r.id)} className="text-xs text-red-500 hover:underline">Delete</button>
                       </div>
                     </div>
-                    {expandedRecord === r.id && (
+                    {expandedRecord===r.id && (
                       <div className="mt-3 space-y-2">
-                        {r.type === "AME" ? (
+                        {r.type==="AME" ? (
                           <>
-                            {[{key:"content_a",label:"🌟 Above Average"},{key:"content_m",label:"📘 Medium"},{key:"content_e",label:"🌱 Emerging"}].map(({key,label}) => r[key] && (
+                            {[{key:"content_a",label:"🌟 Above Average"},{key:"content_m",label:"📘 Medium"},{key:"content_e",label:"🌱 Emerging"}].map(({key,label})=>r[key]&&(
                               <div key={key} className="bg-gray-50 rounded-lg p-3">
                                 <div className="flex items-center justify-between mb-1">
                                   <p className="text-xs font-bold text-gray-600">{label}</p>
-                                  <button onClick={() => printContent(r[key], label)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
+                                  <button onClick={()=>printContent(r[key],label)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
                                 </div>
                                 <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans">{r[key]}</pre>
                               </div>
@@ -4266,7 +4521,7 @@ Write a warm, encouraging message (150-200 words) that:
                           <div className="bg-gray-50 rounded-lg p-3">
                             <div className="flex items-center justify-between mb-1">
                               <p className="text-xs font-bold text-gray-600">Content</p>
-                              <button onClick={() => printContent(r.content, `${r.type} — ${r.subject}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
+                              <button onClick={()=>printContent(r.content,`${r.type} — ${r.subject}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
                             </div>
                             <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans">{r.content}</pre>
                           </div>
@@ -4283,6 +4538,7 @@ Write a warm, encouraging message (150-200 words) that:
     </div>
   );
 }
+
 
 function AlertsTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
