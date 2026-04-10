@@ -4015,8 +4015,7 @@ Make each question clear, age-appropriate, directly testing the competency.`;
     try {
       const gapBlock = studentGaps.slice(0,8).map((g:any) =>
         `- ${g.subject||""} [${g.code||g.domain||""}] ${g.name||g.domain||""} — Score: ${g.score}%`
-      ).join("
-");
+      ).join("\n");
       const diffNote: Record<string,string> = {
         Easy:"All questions: recall and basic application only.",
         Moderate:"Mix of recall, application and simple analysis.",
@@ -4065,8 +4064,7 @@ Title: ${type} Paper — ${selectedStudent.name} — ${selectedSubject||"Mixed"}
       const hasGaps = classGaps.length > 0;
       const gapBlock = classGaps.slice(0,6).map((g:any) =>
         `- [${g.code}] ${g.subject} — Class avg: ${g.avg?.toFixed(0)}%`
-      ).join("
-");
+      ).join("\n");
       const prompt = `You are an experienced teacher creating a 5-day weekly homework plan for ${selectedSubject||"general subjects"}, Grade ${classGrade}.
 ${weeklyTopic ? `This week's topic: ${weeklyTopic}` : ""}
 Mode: ${hasGaps ? "REMEDIAL — class has weak areas to address" : "ENRICHMENT — class is performing well"}
