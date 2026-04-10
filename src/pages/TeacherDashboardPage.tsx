@@ -1150,7 +1150,8 @@ function PASATab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
   const EXAM_TYPES = ["FA1","FA2","SA1","FA3","FA4","SA2","Custom"];
 
-  const teacherSubjects: string[] = mappings?.subjects || user?.subjects || [];
+  const allMappingsPasa: any[] = mappings?.mappings || [];
+  const teacherSubjects: string[] = [...new Set(allMappingsPasa.map((m:any) => m.subject).filter(Boolean))] as string[];
   const isClassTeacher = !!(mappings?.is_class_teacher || user?.class_teacher_of);
   const classGrade = mappings?.class_grade || "";
   const classSection = mappings?.class_section || "";
@@ -1185,10 +1186,20 @@ function PASATab({ user, mappings, academicYear }: any) {
   useEffect(() => { if (subTab==="dashboard") fetchDashboard(); }, [subTab, dashExam, academicYear]);
 
   const fetchConfigs = async () => {
-    if (!classGrade || !classSection) return;
     try {
-      const r = await axios.get(`${API}/pasa/config/section?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}&academic_year=${academicYear}`);
-      setConfigs(r.data?.configs||[]);
+      // Fetch configs for this teacher across all their assigned sections
+      const allMappingsLocal: any[] = mappings?.mappings || [];
+      const sections = classGrade && classSection
+        ? [{ grade: classGrade, section: classSection }]
+        : [...new Map(allMappingsLocal.map((m:any) => [`${m.grade}__${m.section}`, { grade: m.grade, section: m.section }])).values()];
+
+      let allConfigs: any[] = [];
+      for (const sec of sections) {
+        if (!sec.grade || !sec.section) continue;
+        const r = await axios.get(`${API}/pasa/config/section?grade=${encodeURIComponent(sec.grade)}&section=${encodeURIComponent(sec.section)}&academic_year=${academicYear}`);
+        allConfigs.push(...(r.data?.configs || []));
+      }
+      setConfigs(allConfigs);
     } catch {}
   };
 
@@ -1237,7 +1248,10 @@ function PASATab({ user, mappings, academicYear }: any) {
   const loadEntryStudents = async (config:any) => {
     setSelectedConfig(config);setLoadingEntry(true);setEntryStudents([]);
     try {
-      const r = await axios.get(`${API}/pasa/marks/entry?exam_config_id=${config.id}&grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`);
+      // Use grade/section from config itself — works for both class and subject teachers
+      const entryGrade = config.grade || classGrade;
+      const entrySection = config.section || classSection;
+      const r = await axios.get(`${API}/pasa/marks/entry?exam_config_id=${config.id}&grade=${encodeURIComponent(entryGrade)}&section=${encodeURIComponent(entrySection)}`);
       const sl = r.data?.students||[];
       setEntryStudents(sl);
       const im:Record<string,Record<string,number|null>>={};
@@ -1279,7 +1293,9 @@ function PASATab({ user, mappings, academicYear }: any) {
         })),
       }));
       await axios.post(`${API}/pasa/marks`,{
-        exam_config_id:selectedConfig.id, grade:classGrade, section:classSection,
+        exam_config_id:selectedConfig.id,
+        grade:selectedConfig.grade||classGrade,
+        section:selectedConfig.section||classSection,
         subject:selectedConfig.subject, exam_type:selectedConfig.exam_type,
         academic_year:academicYear, teacher_id:user.id, entries,
       });
