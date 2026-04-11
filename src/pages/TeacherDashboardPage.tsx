@@ -2316,19 +2316,17 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
             </div>
             {coverage&&(
               <div>
-                {(() => {
-                  // Filter bySubject to only teacher's mapped subjects
-                  const teacherSubjects = allSubjects.map((s:string)=>s.toLowerCase().replace(/\s+/g,'_').replace(/[()]/g,''));
-                  const filteredBySubject = (coverage.bySubject||[]).filter((s:any)=>
-                    teacherSubjects.length===0 || teacherSubjects.includes((s.subject||'').toLowerCase().replace(/\s+/g,'_').replace(/[()]/g,''))
-                  );
-                  const totalComp = filteredBySubject.reduce((sum:number,s:any)=>sum+s.total,0);
-                  const coveredComp = filteredBySubject.reduce((sum:number,s:any)=>sum+s.covered,0);
-                  const covPct = totalComp>0?+((coveredComp/totalComp)*100).toFixed(1):0;
-                  return (
-                <div>
+                {(()=>{
+                  const tSubs=allSubjects.map((s:string)=>normalizeSubject(s));
+                  const fByS=(coverage.bySubject||[]).filter((s:any)=>tSubs.length===0||tSubs.includes(normalizeSubject(s.subject||'')));
+                  const tot=fByS.reduce((a:number,s:any)=>a+s.total,0);
+                  const cov=fByS.reduce((a:number,s:any)=>a+s.covered,0);
+                  const pct=tot>0?+((cov/tot)*100).toFixed(1):0;
+                  const covComps=fByS.flatMap((s:any)=>s.covered_competencies||[]);
+                  const uncovComps=fByS.flatMap((s:any)=>s.uncovered_competencies||[]);
+                  return <>
                 <div className="grid grid-cols-4 gap-3 mb-4">
-                  {[{label:"Total",value:totalComp,color:"text-gray-700"},{label:"Covered",value:coveredComp,color:"text-green-700"},{label:"Pending",value:totalComp-coveredComp,color:"text-red-600"},{label:"Coverage %",value:`${covPct}%`,color:covPct>=80?"text-green-700":covPct>=50?"text-yellow-600":"text-red-600"}].map(k=>(
+                  {[{label:"Total",value:tot,color:"text-gray-700"},{label:"Covered",value:cov,color:"text-green-700"},{label:"Pending",value:tot-cov,color:"text-red-600"},{label:"Coverage %",value:pct+"%",color:pct>=80?"text-green-700":pct>=50?"text-yellow-600":"text-red-600"}].map(k=>(
                     <div key={k.label} className="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
                       <div className={`text-2xl font-bold ${k.color}`}>{k.value}</div>
                       <div className="text-xs text-gray-500 mt-0.5">{k.label}</div>
@@ -2336,13 +2334,13 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                   ))}
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
-                  <div className={`h-3 rounded-full ${covPct>=80?"bg-green-500":covPct>=50?"bg-yellow-500":"bg-red-500"}`} style={{width:`${covPct}%`}} />
+                  <div className={`h-3 rounded-full ${pct>=80?"bg-green-500":pct>=50?"bg-yellow-500":"bg-red-500"}`} style={{width:pct+"%"}} />
                 </div>
-                {filteredBySubject.length>0&&(
+                {covComps.length>0&&(
                   <div className="mb-3">
-                    <div className="text-xs font-semibold text-green-700 mb-2">✅ Covered ({filteredBySubject.flatMap((s:any)=>s.covered_competencies||[]).length})</div>
+                    <div className="text-xs font-semibold text-green-700 mb-2">✅ Covered ({covComps.length})</div>
                     <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {filteredBySubject.flatMap((s:any)=>s.covered_competencies||[]).map((c:any)=>(
+                      {covComps.map((c:any)=>(
                         <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
                           <span className="font-mono text-green-700 font-semibold">{c.competency_code}</span>
                           <span className="text-gray-600">{c.description}</span>
@@ -2351,11 +2349,11 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                     </div>
                   </div>
                 )}
-                {filteredBySubject.some((s:any)=>(s.uncovered_competencies||[]).length>0)&&(
+                {uncovComps.length>0&&(
                   <div>
-                    <div className="text-xs font-semibold text-red-600 mb-2">⏳ Pending ({filteredBySubject.flatMap((s:any)=>s.uncovered_competencies||[]).length})</div>
+                    <div className="text-xs font-semibold text-red-600 mb-2">⏳ Pending ({uncovComps.length})</div>
                     <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {filteredBySubject.flatMap((s:any)=>s.uncovered_competencies||[]).map((c:any)=>(
+                      {uncovComps.map((c:any)=>(
                         <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs">
                           <span className="font-mono text-red-600 font-semibold">{c.competency_code}</span>
                           <span className="text-gray-600">{c.description}</span>
@@ -2364,9 +2362,9 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                     </div>
                   </div>
                 )}
-              </div>
-                  </div>);
+                  </>;
                 })()}
+              </div>
             )}
           </div>
         </div>
