@@ -334,14 +334,14 @@ export default function AppraisalPage() {
                   <Score value={a.responsibilities_score} max={0.05} />
 
                   {/* COMMITTEE */}
-                  <td className={td}>
+                  <CellWithComment tid={t.teacher_id} field="committee_role" comment={a["committee_role_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <Select value={a.committee_role} onChange={(v:any)=>update(t.teacher_id,"committee_role",v)} options={COMM} />
-                  </td>
-                  <td className={td}>
+                  </CellWithComment>
+                  <CellWithComment tid={t.teacher_id} field="committee_name" comment={a["committee_name_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <input type="text" value={a.committee_name||""} onChange={e=>update(t.teacher_id,"committee_name",e.target.value)}
                       placeholder="Committee name..."
                       className="w-full text-xs border border-gray-300 rounded px-1 py-0.5 min-w-[140px]" />
-                  </td>
+                  </CellWithComment>
 
                   {/* SUMMARY */}
                   <td className={`${td} text-center font-bold text-indigo-800`}>
