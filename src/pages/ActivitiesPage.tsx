@@ -49,7 +49,13 @@ const DOMAIN_COLORS = [
 ];
 
 export default function ActivitiesPage() {
-  const [activeTab, setActiveTab] = useState<"activities" | "marks" | "dashboard">("activities");
+  const [activeTab, setActiveTab] = useState<"activities" | "marks" | "report" | "dashboard">("activities");
+  const [reportGrade, setReportGrade] = useState("");
+  const [reportSection, setReportSection] = useState("");
+  const [reportSections, setReportSections] = useState<string[]>([]);
+  const [reportData, setReportData] = useState<any>(null);
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [expandedActivity, setExpandedActivity] = useState<string|null>(null);
   const [academicYear, setAcademicYear] = useState("2025-26");
 
   // Activities tab
@@ -111,6 +117,8 @@ export default function ActivitiesPage() {
   useEffect(() => { if (marksGrade) fetchSections(marksGrade, setMarksSections); }, [marksGrade]);
   useEffect(() => { if (marksGrade) { axios.get(`${API}/activities/subjects-for-grade/${encodeURIComponent(marksGrade)}`).then(r => setMarksSubjects(r.data || [])).catch(() => {}); } }, [marksGrade]);
   useEffect(() => { if (marksGrade && marksSection && marksSubject) fetchCombinedMarks(); }, [marksGrade, marksSection, marksSubject, academicYear]);
+  useEffect(() => { if (reportGrade) { axios.get(`${API}/students/sections/${encodeURIComponent(reportGrade)}`).then(r=>setReportSections(r.data?.sections||[])).catch(()=>{}); } }, [reportGrade]);
+  useEffect(() => { if (activeTab==="report" && reportGrade && reportSection) fetchReport(); }, [activeTab, reportGrade, reportSection, academicYear]);
   useEffect(() => { fetchCompetencies(); }, [form.grade, form.subject]);
   useEffect(() => {
     if (dashTab === "school") fetchSchoolDash();
@@ -224,6 +232,16 @@ export default function ActivitiesPage() {
   };
 
   // ── ACTIVITY CRUD ─────────────────────────────────────────────
+
+  const fetchReport = async () => {
+    if (!reportGrade || !reportSection) return;
+    setLoadingReport(true); setReportData(null);
+    try {
+      const r = await axios.get(`${API}/activities/report/subject-wise/${encodeURIComponent(reportGrade)}/${encodeURIComponent(reportSection)}?academic_year=${academicYear}`);
+      setReportData(r.data);
+    } catch {}
+    setLoadingReport(false);
+  };
 
   const saveActivity = async () => {
     if (!form.name || !form.grade || !form.subject || !form.sections.length) {
@@ -345,6 +363,7 @@ export default function ActivitiesPage() {
         {[
           { id: "activities", label: "📋 Activities" },
           { id: "marks", label: "✏️ Marks Entry" },
+          { id: "report", label: "📑 Subject Report" },
           { id: "dashboard", label: "📊 Dashboard" },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id as any)}
@@ -559,184 +578,269 @@ export default function ActivitiesPage() {
               </div>
             </div>
           )}
-          {/* Activities list */}
+                    {/* Activities list — grouped by subject */}
           <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
               <h2 className="text-sm font-bold text-gray-700">Activities ({activities.length})</h2>
+              <span className="text-xs text-gray-400">{[...new Set(activities.map((a:any)=>a.grade))].filter(Boolean).join(" · ")}</span>
             </div>
             {activities.length === 0 ? (
               <div className="p-8 text-center text-gray-400 text-sm">No activities found. Create one above.</div>
-            ) : (
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
-                    <th className="px-4 py-2 text-left">Name</th>
-                    <th className="px-3 py-2 text-left">Grade</th>
-                    <th className="px-3 py-2 text-left">Section</th>
-                    <th className="px-3 py-2 text-left">Subject</th>
-                    <th className="px-3 py-2 text-left">Type</th>
-                    <th className="px-3 py-2 text-left">Date</th>
-                    <th className="px-3 py-2 text-center">Competencies</th>
-                    <th className="px-3 py-2 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activities.map((act: any, i: number) => (
-                    <tr key={act.id} className={i % 2 === 0 ? "bg-white border-b border-gray-100" : "bg-gray-50 border-b border-gray-100"}>
-                      <td className="px-4 py-2.5 font-medium text-gray-800">{act.name}</td>
-                      <td className="px-3 py-2.5 text-gray-600">{act.grade}</td>
-                      <td className="px-3 py-2.5 text-gray-600">{act.section}</td>
-                      <td className="px-3 py-2.5">
-                        <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-medium">{act.subject}</span>
-                      </td>
-                      <td className="px-3 py-2.5 text-gray-500">{act.activity_type}</td>
-                      <td className="px-3 py-2.5 text-gray-500">{act.activity_date}</td>
-                      <td className="px-3 py-2.5 text-center">
-                        <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">
-                          {(act.competency_mappings || []).length} mapped
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
-                        <div className="flex gap-1 justify-center">
-                          <button onClick={() => {
-                            setEditActivity(act);
-                            setForm({ ...act, competency_mappings: act.competency_mappings || [], apply_to_all_sections: false });
-                            setShowAddForm(true);
-                          }} className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 text-xs">✏️</button>
-                          <button onClick={() => deleteActivity(act.id)}
-                            className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs">🗑️</button>
+            ) : (() => {
+                const bySubject: Record<string,any[]> = {};
+                activities.forEach((a:any) => {
+                  const sub = a.subject||"General";
+                  if (!bySubject[sub]) bySubject[sub] = [];
+                  bySubject[sub].push(a);
+                });
+                return (
+                  <div>
+                    {Object.entries(bySubject).map(([subject, acts]:[string,any[]])=>(
+                      <div key={subject}>
+                        <div className="px-4 py-2 bg-indigo-50 border-y border-indigo-100 flex items-center justify-between">
+                          <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">{subject}</span>
+                          <span className="text-xs text-indigo-500">{acts.length} activities · {acts.reduce((s,a)=>(a.rubrics||[]).length+s,0)} competency mappings</span>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                        <table className="w-full text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50 text-gray-500 border-b border-gray-100">
+                              <th className="px-4 py-2 text-left font-medium">Activity Name</th>
+                              <th className="px-3 py-2 text-left font-medium">Grade · Section</th>
+                              <th className="px-3 py-2 text-left font-medium">Type</th>
+                              <th className="px-3 py-2 text-left font-medium">Date</th>
+                              <th className="px-3 py-2 text-left font-medium">Competencies</th>
+                              <th className="px-3 py-2 text-center font-medium">Max Marks</th>
+                              <th className="px-3 py-2 text-center font-medium">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {acts.map((a:any, idx:number)=>(
+                              <tr key={a.id} className={`border-b border-gray-50 ${idx%2===0?"bg-white":"bg-gray-50"} hover:bg-indigo-50 transition-colors`}>
+                                <td className="px-4 py-2.5 font-medium text-gray-800">{a.name}</td>
+                                <td className="px-3 py-2.5 text-gray-500">{a.grade} · {a.section}</td>
+                                <td className="px-3 py-2.5">
+                                  <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{a.activity_type}</span>
+                                </td>
+                                <td className="px-3 py-2.5 text-gray-500">{a.activity_date||"-"}</td>
+                                <td className="px-3 py-2.5">
+                                  <div className="flex flex-wrap gap-1">
+                                    {((a.rubrics||[]) as any[]).slice(0,3).map((r:any)=>(
+                                      <span key={r.competency_id} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded border border-indigo-100">{r.competency_code}</span>
+                                    ))}
+                                    {(a.rubrics||[]).length>3&&<span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">+{(a.rubrics||[]).length-3}</span>}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5 text-center font-bold text-indigo-700">{a.total_max_marks||0}</td>
+                                <td className="px-3 py-2.5 text-center">
+                                  <div className="flex gap-1 justify-center">
+                                    <button onClick={()=>{ setShowAddForm(true); setEditActivity(a); setSelectedComps((a.rubrics||[]).map((r:any)=>r.competency_id)); setRubrics(Object.fromEntries((a.rubrics||[]).map((r:any)=>[r.competency_id,{items:r.rubric_items||[]}]))); setForm({...a, sections: a.section?[a.section]:[]}); }}
+                                      className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">✏️</button>
+                                    <button onClick={()=>deleteActivity(a.id)}
+                                      className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">🗑️</button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()
+            }
           </div>
-        </div>
-      )}
-
-      {/* ── MARKS ENTRY TAB ── */}
-      {activeTab === "marks" && (
+      
+      {activeTab === "report" && (
         <div className="space-y-4">
-          {/* Filters */}
-          <div className="bg-white rounded-xl shadow p-4 flex gap-3 flex-wrap items-end">
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Grade</label>
-              <select value={marksGrade} onChange={e=>{setMarksGrade(e.target.value);setMarksSection("");setMarksSubject("");setCombinedMarks(null);}}
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+          <div className="bg-white rounded-xl shadow p-4 flex gap-4 flex-wrap items-end">
+            <div><label className="text-xs text-gray-500 block mb-1">Grade</label>
+              <select value={reportGrade} onChange={e=>{setReportGrade(e.target.value);setReportSection("");setReportData(null);}} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
                 <option value="">Select Grade</option>
                 {CLASSES.map(g=><option key={g} value={g}>{g}</option>)}
               </select>
             </div>
-            {marksGrade && (
+            {reportGrade&&(<div><label className="text-xs text-gray-500 block mb-1">Section</label>
+              <select value={reportSection} onChange={e=>{setReportSection(e.target.value);setReportData(null);}} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+                <option value="">Select Section</option>
+                {reportSections.map(s=><option key={s} value={s}>{s}</option>)}
+              </select></div>
+            )}
+            <button onClick={fetchReport} disabled={!reportGrade||!reportSection||loadingReport}
+              className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+              {loadingReport?"Loading...":"Generate Report"}
+            </button>
+          </div>
+          {reportData&&!loadingReport&&(
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white rounded-xl shadow p-4 border-l-4 border-indigo-500"><p className="text-xs text-gray-500">Total Activities</p><p className="text-2xl font-bold text-gray-800">{reportData.report?.reduce((s:number,r:any)=>s+r.activities.length,0)||0}</p></div>
+                <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500"><p className="text-xs text-gray-500">Subjects Covered</p><p className="text-2xl font-bold text-gray-800">{reportData.report?.length||0}</p></div>
+                <div className="bg-white rounded-xl shadow p-4 border-l-4 border-orange-500"><p className="text-xs text-gray-500">Competencies Mapped</p><p className="text-2xl font-bold text-gray-800">{reportData.report?.reduce((s:number,r:any)=>s+r.covered_competencies,0)||0}</p></div>
+              </div>
+              {(reportData.report||[]).map((subRep:any)=>(
+                <div key={subRep.subject} className="bg-white rounded-xl shadow overflow-hidden">
+                  <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
+                    <div><span className="text-sm font-bold text-indigo-800 uppercase">{subRep.subject}</span><span className="ml-3 text-xs text-indigo-600">{subRep.activities.length} activities</span></div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-bold text-indigo-700">{subRep.covered_competencies}/{subRep.total_competencies} ({subRep.coverage_percent}%)</span>
+                      <div className="w-20 bg-gray-200 rounded-full h-2"><div className={`h-2 rounded-full ${subRep.coverage_percent>=80?"bg-green-500":subRep.coverage_percent>=50?"bg-yellow-500":"bg-red-500"}`} style={{width:`${subRep.coverage_percent}%`}} /></div>
+                    </div>
+                  </div>
+                  <table className="w-full text-xs border-collapse">
+                    <thead><tr className="bg-gray-50 text-gray-500 border-b border-gray-100">
+                      <th className="px-4 py-2 text-left font-medium">Activity</th><th className="px-3 py-2 text-left font-medium">Type</th><th className="px-3 py-2 text-left font-medium">Date</th>
+                      <th className="px-3 py-2 text-left font-medium">Competencies</th><th className="px-3 py-2 text-center font-medium">Marks</th><th className="px-3 py-2 text-center font-medium">Detail</th>
+                    </tr></thead>
+                    <tbody>
+                      {subRep.activities.map((act:any,i:number)=>(
+                        <>
+                          <tr key={act.id} className={i%2===0?"bg-white":"bg-gray-50"}>
+                            <td className="px-4 py-2.5 font-medium text-gray-800">{act.name}</td>
+                            <td className="px-3 py-2.5"><span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{act.activity_type}</span></td>
+                            <td className="px-3 py-2.5 text-gray-500">{act.activity_date||"-"}</td>
+                            <td className="px-3 py-2.5"><div className="flex flex-wrap gap-1">{(act.rubrics||[]).map((r:any)=>(<span key={r.competency_id} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded border border-indigo-100">{r.competency_code}</span>))}</div></td>
+                            <td className="px-3 py-2.5 text-center font-bold text-indigo-700">{act.total_max_marks||0}</td>
+                            <td className="px-3 py-2.5 text-center"><button onClick={()=>setExpandedActivity(expandedActivity===act.id?null:act.id)} className="text-xs text-indigo-600 hover:underline">{expandedActivity===act.id?"Hide":"View"}</button></td>
+                          </tr>
+                          {expandedActivity===act.id&&(<tr key={act.id+"_exp"}><td colSpan={6} className="px-4 py-3 bg-indigo-50">
+                            <div className="space-y-2">{(act.rubrics||[]).map((r:any)=>(<div key={r.competency_id} className="bg-white rounded-lg p-3 border border-indigo-100">
+                              <div className="flex items-center gap-2 mb-1"><span className="text-xs font-bold text-indigo-700">[{r.competency_code}]</span><span className="text-xs text-gray-600">{r.competency_name}</span><span className="ml-auto text-xs font-bold text-indigo-600">{r.max_marks}m</span></div>
+                              <div className="flex flex-wrap gap-2">{(r.rubric_items||[]).map((item:any,j:number)=>(<span key={j} className="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-0.5">{item.name}: <strong>{item.max_marks}m</strong></span>))}</div>
+                            </div>))}</div>
+                          </td></tr>)}
+                        </>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "marks" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
+            <h2 className="text-sm font-bold text-gray-700 mb-3">Select Class & Subject</h2>
+            <div className="flex gap-3 flex-wrap items-end">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Section</label>
-                <select value={marksSection} onChange={e=>{setMarksSection(e.target.value);setCombinedMarks(null);}}
+                <label className="text-xs text-gray-500 block mb-1">Grade</label>
+                <select value={marksGrade} onChange={e => { setMarksGrade(e.target.value); setMarksSection(""); setMarksSubject(""); setCombinedMarks(null); }}
                   className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                  <option value="">Select Section</option>
-                  {marksSections.map(s=><option key={s} value={s}>{s}</option>)}
+                  <option value="">Select Grade</option>
+                  {CLASSES.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
-            )}
-            {marksSection && (
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Subject</label>
-                <select value={marksSubject} onChange={e=>setMarksSubject(e.target.value)}
-                  className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                  <option value="">Select Subject</option>
-                  {marksSubjects.map(s=><option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-            )}
+              {marksGrade && (
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Section</label>
+                  <select value={marksSection} onChange={e => { setMarksSection(e.target.value); setCombinedMarks(null); }}
+                    className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+                    <option value="">Select Section</option>
+                    {marksSections.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              )}
+              {marksGrade && (
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Subject</label>
+                  <select value={marksSubject} onChange={e => { setMarksSubject(e.target.value); setCombinedMarks(null); }}
+                    className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+                    <option value="">Select Subject</option>
+                    {marksSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
 
           {combinedMarks && (
             <div className="space-y-6">
-              {(combinedMarks.activities || []).map((activity: any) => {
-                const rubricsList = activity.rubrics || [];
-                if (!rubricsList.length) return null;
+              {/* One table per activity — newest first (leftmost activities) */}
+              {(combinedMarks.activities || []).map((activity: any, actIdx: number) => {
+                const actCompetencies = (activity.competency_mappings || [])
+                  .map((id: string) => combinedMarks.competencies?.find((c: any) => c.id === id))
+                  .filter(Boolean);
+
+                if (!actCompetencies.length) return null;
+
+                // Group by domain
+                const byDomain = actCompetencies.reduce((acc: any, c: any) => {
+                  const d = c.domain || "General";
+                  if (!acc[d]) acc[d] = [];
+                  acc[d].push(c);
+                  return acc;
+                }, {});
+
                 return (
                   <div key={activity.id} className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-                    <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between">
+                    <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
                       <div>
-                        <p className="text-sm font-bold text-indigo-800">{activity.name}</p>
-                        <p className="text-xs text-indigo-600">{activity.activity_date} · {rubricsList.length} competencies · Max: {activity.total_max_marks} marks</p>
+                        <h3 className="text-sm font-bold text-gray-800">
+                          {actIdx === 0 && <span className="bg-indigo-600 text-white text-xs px-2 py-0.5 rounded mr-2">Latest</span>}
+                          Activity {combinedMarks.activities.length - actIdx}: {activity.name}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {activity.activity_date} · {activity.activity_type} · {actCompetencies.length} competencies
+                        </p>
                       </div>
-                      <button onClick={()=>saveActivityMarks(activity.id)} disabled={saving}
-                        className="px-4 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
-                        {saving?"Saving...":"💾 Save Marks"}
+                      <button onClick={() => saveActivityMarks(activity.id)} disabled={saving}
+                        className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
+                        {saving ? "Saving..." : "💾 Save"}
                       </button>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs border-collapse">
-                        <thead className="sticky top-0 z-10">
+                      <table className="w-full text-xs border-collapse"
+                        style={{ minWidth: `${280 + actCompetencies.length * 110}px` }}>
+                        <thead>
                           <tr className="bg-indigo-700 text-white">
-                            <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[160px]">Student</th>
-                            {rubricsList.map((rub: any) => (
-                              <th key={rub.competency_id} className="px-2 py-2 text-center border-l border-indigo-600" colSpan={(rub.rubric_items||[]).length+1}>
-                                <div className="text-xs font-bold">[{rub.competency_code}]</div>
-                                <div className="text-xs text-indigo-200 font-normal">{rub.competency_name?.slice(0,40)}</div>
-                              </th>
-                            ))}
-                            <th className="px-2 py-2 text-center border-l border-indigo-600 min-w-[70px]">Total</th>
-                            <th className="px-2 py-2 text-center min-w-[55px]">%</th>
-                            <th className="px-2 py-2 text-center min-w-[90px]">Level</th>
-                          </tr>
-                          <tr className="bg-indigo-600 text-white">
-                            <th className="px-3 py-1 sticky left-0 bg-indigo-600"></th>
-                            {rubricsList.map((rub: any) => (
-                              <>{(rub.rubric_items||[]).map((item: any, i: number) => (
-                                <th key={i} className="px-2 py-1 text-center border-l border-indigo-500 min-w-[70px]">
-                                  <div className="text-xs truncate max-w-[100px]">{item.name}</div>
-                                  <div className="text-indigo-200 text-xs">/{item.max_marks}</div>
+                            <th className="px-3 py-2 text-left sticky left-0 z-20 bg-indigo-700 border-r border-indigo-600 min-w-[180px]">Student</th>
+                            {Object.entries(byDomain).map(([domain, comps]: [string, any]) => (
+                              comps.map((c: any, ci: number) => (
+                                <th key={c.id} className={`px-2 py-2 text-center min-w-[100px] ${ci === 0 ? "border-l border-indigo-500" : ""}`}>
+                                  <div className="text-xs text-indigo-200">{domain}</div>
+                                  <div className="text-xs">{c.competency_code}</div>
                                 </th>
-                              ))}
-                              <th className="px-2 py-1 text-center border-l border-indigo-500 bg-indigo-800 min-w-[50px]">
-                                /{(rub.rubric_items||[]).reduce((s:number,it:any)=>s+(+it.max_marks||0),0)}
-                              </th></>
+                              ))
                             ))}
-                            <th className="px-2 py-1 text-center border-l border-indigo-500 bg-indigo-800">/{activity.total_max_marks}</th>
-                            <th className="px-2 py-1"></th>
-                            <th className="px-2 py-1"></th>
+                            <th className="px-3 py-2 text-center sticky right-0 z-20 bg-indigo-700 border-l border-indigo-600 min-w-[90px]">Avg</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {(combinedMarks.students || []).map((s: any, idx: number) => {
-                            // calc total for this activity
-                            let obtained = 0; let max = 0;
-                            rubricsList.forEach((rub: any) => {
-                              (rub.rubric_items||[]).forEach((item: any, i: number) => {
-                                max += +(item.max_marks||0);
-                                obtained += +(localMarks[s.student_id]?.[rub.competency_id]?.[String(i)]||0);
-                              });
-                            });
-                            const pct = max > 0 ? +((obtained/max)*100).toFixed(1) : 0;
-                            const level = getLevel(pct);
+                          {(combinedMarks.students || []).map((student: any, si: number) => {
+                            const bg = si % 2 === 0 ? "bg-white" : "bg-gray-50";
+                            const studentRatings = localRatings[student.student_id]?.[activity.id] || {};
+                            const vals = actCompetencies.map((c: any) => RATING_SCORE[studentRatings[c.id]] || 0).filter(v => v > 0);
+                            const avg = vals.length ? vals.reduce((a: number, b: number) => a + b, 0) / vals.length : 0;
                             return (
-                              <tr key={s.student_id} className={idx%2===0?"bg-white":"bg-gray-50"}>
-                                <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
-                                {rubricsList.map((rub: any) => {
-                                  const compObtained = (rub.rubric_items||[]).reduce((sum:number,_:any,i:number)=>sum+(+(localMarks[s.student_id]?.[rub.competency_id]?.[String(i)]||0)),0);
-                                  const compMax = (rub.rubric_items||[]).reduce((sm:number,it:any)=>sm+(+it.max_marks||0),0);
+                              <tr key={student.student_id} className={`border-b border-gray-100 ${bg}`}>
+                                <td className={`px-3 py-1.5 font-medium text-gray-800 sticky left-0 z-10 border-r border-gray-200 ${bg}`}>
+                                  {student.student_name}
+                                </td>
+                                {actCompetencies.map((c: any) => {
+                                  const rating = studentRatings[c.id] || "";
                                   return (
-                                    <>{(rub.rubric_items||[]).map((item: any, i: number) => (
-                                      <td key={i} className="px-2 py-1 text-center border-l border-gray-100">
-                                        <input type="number" min={0} max={item.max_marks}
-                                          value={localMarks[s.student_id]?.[rub.competency_id]?.[String(i)]??""}
-                                          onChange={e=>{const v=e.target.value===""?null:Math.min(+e.target.value,item.max_marks);updateMark(s.student_id,rub.competency_id,String(i),v);}}
-                                          className="border border-gray-200 rounded px-1 py-0.5 w-14 text-center text-xs" />
-                                      </td>
-                                    ))}
-                                    <td className="px-2 py-1 text-center border-l border-gray-200 font-bold text-indigo-700 bg-indigo-50">
-                                      {compObtained}/{compMax}
-                                    </td></>
+                                    <td key={c.id} className={`px-1 py-1 text-center border-l border-gray-100 ${bg}`}>
+                                      <select value={rating}
+                                        onChange={e => updateRating(student.student_id, activity.id, c.id, e.target.value)}
+                                        className={`text-xs border rounded px-1 py-0.5 w-full ${rating ? RATING_COLORS[rating] : "border-gray-200"}`}>
+                                        <option value="">—</option>
+                                        <option value="beginning">Beginning</option>
+                                        <option value="approaching">Approaching</option>
+                                        <option value="meeting">Meeting</option>
+                                        <option value="exceeding">Exceeding</option>
+                                      </select>
+                                    </td>
                                   );
                                 })}
-                                <td className="px-2 py-1 text-center border-l border-gray-200 font-bold">{obtained}/{max}</td>
-                                <td className="px-2 py-1 text-center font-bold text-indigo-700">{pct>0?`${pct}%`:"-"}</td>
-                                <td className="px-2 py-1 text-center">
-                                  {pct>0&&<span className={`px-2 py-0.5 rounded-full text-xs font-bold ${LEVEL_COLOR[level]||""}`}>{level}</span>}
+                                <td className={`px-3 py-1.5 text-center sticky right-0 z-10 border-l border-gray-200 ${bg}`}>
+                                  {avg > 0 ? (
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(avg)}`}>
+                                      {avg.toFixed(1)}
+                                    </span>
+                                  ) : <span className="text-gray-300">—</span>}
                                 </td>
                               </tr>
                             );
@@ -747,15 +851,99 @@ export default function ActivitiesPage() {
                   </div>
                 );
               })}
-              {(combinedMarks.activities||[]).length===0&&(
-                <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No activities found for {marksGrade} · {marksSection} · {marksSubject}</div>
+
+              {/* Competency averages summary */}
+              {combinedMarks.students?.length > 0 && (
+                <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
+                  <h3 className="text-sm font-bold text-gray-700 mb-3">
+                    Competency Averages — {marksGrade} {marksSection} ({combinedMarks.students.length} students)
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse"
+                      style={{ minWidth: `${280 + (combinedMarks.competencies?.length || 0) * 90}px` }}>
+                      <thead>
+                        <tr className="bg-indigo-700 text-white">
+                          <th className="px-3 py-2 text-left sticky left-0 z-20 bg-indigo-700 border-r border-indigo-600 min-w-[180px]">Student</th>
+                          {(combinedMarks.competencies || []).map((c: any) => (
+                            <th key={c.id} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[85px]">
+                              <div className="text-xs text-indigo-200">{c.domain}</div>
+                              <div className="text-xs">{c.competency_code}</div>
+                            </th>
+                          ))}
+                          {combinedMarks.domains?.map((d: string) => (
+                            <th key={d} className="px-2 py-2 text-center border-l border-indigo-500 min-w-[90px] bg-indigo-800">
+                              <div className="text-xs text-indigo-200">Domain Avg</div>
+                              <div className="text-xs">{d}</div>
+                            </th>
+                          ))}
+                          <th className="px-3 py-2 text-center sticky right-0 z-20 bg-indigo-700 border-l border-indigo-600 min-w-[90px]">Overall</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...(combinedMarks.students || [])].sort((a: any, b: any) => b.overall_avg - a.overall_avg).map((student: any, si: number) => {
+                          const bg = si % 2 === 0 ? "bg-white" : "bg-gray-50";
+                          return (
+                            <tr key={student.student_id} className={`border-b border-gray-100 ${bg}`}>
+                              <td className={`px-3 py-1.5 font-medium text-gray-800 sticky left-0 z-10 border-r border-gray-200 ${bg}`}>
+                                {student.student_name}
+                              </td>
+                              {(combinedMarks.competencies || []).map((c: any) => {
+                                const data = student.competency_avgs?.[c.id];
+                                return (
+                                  <td key={c.id} className={`px-2 py-1.5 text-center border-l border-gray-100 ${bg}`}>
+                                    {data ? (
+                                      <div>
+                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(data.avg)}`}>
+                                          {data.avg.toFixed(1)}
+                                        </span>
+                                        <div className="text-xs text-gray-400 mt-0.5">{data.rating}</div>
+                                        <div className="text-xs text-gray-300">{data.count}x</div>
+                                      </div>
+                                    ) : <span className="text-gray-300">—</span>}
+                                  </td>
+                                );
+                              })}
+                              {combinedMarks.domains?.map((d: string) => {
+                                const domAvg = student.domain_avgs?.[d] || 0;
+                                return (
+                                  <td key={d} className={`px-2 py-1.5 text-center border-l border-gray-100 bg-indigo-50 ${bg}`}>
+                                    {domAvg > 0 ? (
+                                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(domAvg)}`}>
+                                        {domAvg.toFixed(1)}
+                                      </span>
+                                    ) : <span className="text-gray-300">—</span>}
+                                  </td>
+                                );
+                              })}
+                              <td className={`px-3 py-1.5 text-center sticky right-0 z-10 border-l border-gray-200 ${bg}`}>
+                                {student.overall_avg > 0 ? (
+                                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(student.overall_avg)}`}>
+                                    {student.overall_avg.toFixed(2)}
+                                  </span>
+                                ) : <span className="text-gray-300">—</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               )}
+            </div>
+          )}
+
+          {!combinedMarks && marksGrade && marksSection && marksSubject && (
+            <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
+              <p className="text-sm">No activities found for {marksGrade} — {marksSection} — {marksSubject}</p>
             </div>
           )}
         </div>
       )}
 
-      {activeTab === "dashboard" && (
+      {/* ── DASHBOARD TAB ── */}
+
+            {activeTab === "dashboard" && (
         <div>
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1 flex-nowrap">
             {[
@@ -1171,7 +1359,7 @@ export default function ActivitiesPage() {
                           <span className="text-xs font-medium text-gray-800">{s.name}</span>
                           <span className="text-xs text-gray-400">{s.section}</span>
                         </div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.avg_pct||s.avg*25||0)}`}>{s.avg.toFixed(2)}/4</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.avg)}`}>{s.avg.toFixed(2)}/4</span>
                       </div>
                     ))}
                   </div>
@@ -1224,7 +1412,7 @@ export default function ActivitiesPage() {
                           <span className="text-xs font-bold text-red-700">{c.competency_code}</span>
                           <span className="text-xs text-gray-500 ml-2">{c.domain}</span>
                         </div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(c.avg_pct||c.avg*25||0)}`}>{c.avg.toFixed(2)}/4</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(c.avg)}`}>{c.avg.toFixed(2)}/4</span>
                       </div>
                     ))}
                   </div>
@@ -1288,7 +1476,7 @@ export default function ActivitiesPage() {
                       <div key={s.subject} className="flex items-center justify-between p-2 rounded border border-gray-100">
                         <span className="text-xs font-medium text-gray-700">{s.subject}</span>
                         <div className="flex items-center gap-2">
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.avg_pct||s.avg*25||0)}`}>{s.avg.toFixed(2)}/4</span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.avg)}`}>{s.avg.toFixed(2)}/4</span>
                           <span className="text-xs text-gray-400">{s.level?.split("–")[0].trim()}</span>
                         </div>
                       </div>
@@ -1336,7 +1524,7 @@ export default function ActivitiesPage() {
                             <td className="px-3 py-2 text-gray-600">{c.domain}</td>
                             <td className="px-3 py-2 text-gray-600">{c.subject}</td>
                             <td className="px-3 py-2 text-center">
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(c.avg_pct||c.avg*25||0)}`}>{c.avg.toFixed(2)}/4</span>
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(c.avg)}`}>{c.avg.toFixed(2)}/4</span>
                             </td>
                             <td className="px-3 py-2 text-center">
                               <span className={`text-xs px-2 py-0.5 rounded border ${RATING_COLORS[c.rating?.toLowerCase()] || "bg-gray-100"}`}>{c.rating}</span>
@@ -1414,5 +1602,6 @@ export default function ActivitiesPage() {
         </div>
       )}
     </div>
+
   );
 }

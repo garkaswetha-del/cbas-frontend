@@ -1579,7 +1579,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
   };
   const normalizeSubject = (s: string) => s.trim().toLowerCase().replace(/\s+/g,"_").replace(/[()]/g,"");
 
-  const [subTab, setSubTab] = useState<"create"|"marks"|"coverage"|"analysis">("create");
+  const [subTab, setSubTab] = useState<"create"|"marks"|"report"|"coverage"|"analysis">("create");
   const [activities, setActivities] = useState<any[]>([]);
   const [msg, setMsg] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -1622,6 +1622,13 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
   const [coverageGrade, setCoverageGrade] = useState("");
   const [coverage, setCoverage] = useState<any>(null);
 
+  // Subject-wise report
+  const [reportGrade, setReportGrade] = useState(allGrades[0]||"");
+  const [reportSection, setReportSection] = useState("");
+  const [reportData, setReportData] = useState<any>(null);
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [expandedActivity, setExpandedActivity] = useState<string|null>(null);
+
   useEffect(() => { fetchActivities(); }, [academicYear]);
   useEffect(() => {
     if (form.grade && form.subject) fetchCompetencies();
@@ -1631,6 +1638,13 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
   }, [form.grade, form.subject]);
   useEffect(() => { if (selectedActivity) fetchMarksData(); }, [selectedActivity]);
   useEffect(() => { if (subTab==="coverage" && coverageGrade) fetchCoverage(); }, [subTab, coverageGrade]);
+  useEffect(() => {
+    if (subTab==="report") {
+      const g = reportGrade || allGrades[0];
+      const s = reportSection || (sectionsByGrade[g]||[])[0];
+      if (g && s) fetchReport(g, s);
+    }
+  }, [subTab, reportGrade, reportSection]);
 
   const fetchActivities = async () => {
     try {
@@ -1770,7 +1784,16 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
     setTimeout(()=>setMsg(""),3000);
   };
 
-  const deleteActivity = async (id: string) => {
+  const fetchReport = async (g: string, s: string) => {
+    setLoadingReport(true); setReportData(null);
+    try {
+      const r = await axios.get(`${API}/activities/report/subject-wise/${encodeURIComponent(g)}/${encodeURIComponent(s)}?academic_year=${academicYear}`);
+      setReportData(r.data);
+    } catch {}
+    setLoadingReport(false);
+  };
+
+    const deleteActivity = async (id: string) => {
     if (!confirm("Delete this activity?")) return;
     try { await axios.delete(`${API}/activities/${id}`); setMsg("✅ Deleted"); fetchActivities(); } catch { setMsg("❌ Error"); }
     setTimeout(()=>setMsg(""),3000);
@@ -1830,7 +1853,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
   return (
     <div className="space-y-4">
       <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
-        {[{id:"create",label:"📋 Activities"},{id:"marks",label:"✏️ Marks Entry"},{id:"coverage",label:"📊 Coverage"},{id:"analysis",label:"📈 Analysis"}].map(t=>(
+        {[{id:"create",label:"📋 Activities"},{id:"marks",label:"✏️ Marks Entry"},{id:"report",label:"📑 Subject Report"},{id:"coverage",label:"📊 Coverage"},{id:"analysis",label:"📈 Analysis"}].map(t=>(
           <button key={t.id} onClick={()=>setSubTab(t.id as any)}
             className={`px-4 py-2 text-sm rounded-lg font-medium border ${subTab===t.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>{t.label}</button>
         ))}
@@ -1960,25 +1983,88 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
             </div>
           )}
 
-          {/* Activities list */}
-          <div className="bg-white rounded-xl shadow p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Your Activities ({activities.length})</h3>
-            {activities.length===0
-              ? <p className="text-sm text-gray-400 text-center py-6">No activities yet. Create one above.</p>
-              : <div className="space-y-2">
-                {activities.map((a:any)=>(
-                  <div key={a.id} className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{a.name}</p>
-                      <p className="text-xs text-gray-400">{a.grade} · {a.section} · {a.subject} · {a.activity_date} · {(a.competency_mappings||[]).length} competencies · Max: {a.total_max_marks} marks</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={()=>{setSelectedActivity(a);setSubTab("marks");}} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-xs rounded-lg hover:bg-indigo-200 font-medium">✏️ Marks</button>
-                      <button onClick={()=>deleteActivity(a.id)} className="px-3 py-1.5 bg-red-100 text-red-700 text-xs rounded-lg hover:bg-red-200 font-medium">🗑️</button>
-                    </div>
-                  </div>
-                ))}
+          {/* Activities list — table grouped by subject */}
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-700">Activities — {activities.length} total</h3>
+              <div className="flex gap-2 text-xs text-gray-500">
+                <span>{[...new Set(activities.map((a:any)=>a.grade))].join(", ")}</span>
               </div>
+            </div>
+            {activities.length===0
+              ? <p className="text-sm text-gray-400 text-center py-8">No activities yet. Create one above.</p>
+              : (() => {
+                  // Group by subject
+                  const bySubject: Record<string,any[]> = {};
+                  activities.forEach((a:any) => {
+                    const sub = a.subject||"General";
+                    if (!bySubject[sub]) bySubject[sub] = [];
+                    bySubject[sub].push(a);
+                  });
+                  return (
+                    <div>
+                      {Object.entries(bySubject).map(([subject, acts]:[string,any[]])=>(
+                        <div key={subject}>
+                          {/* Subject header */}
+                          <div className="px-4 py-2 bg-indigo-50 border-y border-indigo-100 flex items-center justify-between">
+                            <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">{subject}</span>
+                            <span className="text-xs text-indigo-500">{acts.length} activities · {acts.reduce((s,a)=>(a.competency_mappings||[]).length+s,0)} competency mappings</span>
+                          </div>
+                          {/* Activities table */}
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="bg-gray-50 text-gray-500 border-b border-gray-100">
+                                <th className="px-4 py-2 text-left font-medium">Activity Name</th>
+                                <th className="px-3 py-2 text-left font-medium">Grade · Section</th>
+                                <th className="px-3 py-2 text-left font-medium">Type</th>
+                                <th className="px-3 py-2 text-left font-medium">Date</th>
+                                <th className="px-3 py-2 text-left font-medium">Competencies</th>
+                                <th className="px-3 py-2 text-center font-medium">Max Marks</th>
+                                <th className="px-3 py-2 text-center font-medium">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {acts.map((a:any, idx:number)=>(
+                                <tr key={a.id} className={`border-b border-gray-50 ${idx%2===0?"bg-white":"bg-gray-50"} hover:bg-indigo-50 transition-colors`}>
+                                  <td className="px-4 py-2.5 font-medium text-gray-800">{a.name}</td>
+                                  <td className="px-3 py-2.5 text-gray-500">{a.grade} · {a.section}</td>
+                                  <td className="px-3 py-2.5">
+                                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs">{a.activity_type}</span>
+                                  </td>
+                                  <td className="px-3 py-2.5 text-gray-500">{a.activity_date||"-"}</td>
+                                  <td className="px-3 py-2.5">
+                                    <div className="flex flex-wrap gap-1">
+                                      {((a.rubrics||[]) as any[]).slice(0,3).map((r:any)=>(
+                                        <span key={r.competency_id} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded text-xs border border-indigo-100">
+                                          {r.competency_code}
+                                        </span>
+                                      ))}
+                                      {(a.rubrics||[]).length>3&&(
+                                        <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">+{(a.rubrics||[]).length-3}</span>
+                                      )}
+                                      {!(a.rubrics||[]).length&&(a.competency_mappings||[]).length>0&&(
+                                        <span className="text-xs text-gray-400">{(a.competency_mappings||[]).length} mapped</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-2.5 text-center font-bold text-indigo-700">{a.total_max_marks||0}</td>
+                                  <td className="px-3 py-2.5 text-center">
+                                    <div className="flex gap-1 justify-center">
+                                      <button onClick={()=>{setSelectedActivity(a);setSubTab("marks");}}
+                                        className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 font-medium">✏️ Marks</button>
+                                      <button onClick={()=>deleteActivity(a.id)}
+                                        className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">🗑️</button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()
             }
           </div>
         </div>
@@ -2087,6 +2173,139 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
         </div>
       )}
 
+      {/* ── SUBJECT-WISE REPORT ── */}
+      {subTab==="report"&&(
+        <div className="space-y-4">
+          {/* Grade + Section selectors */}
+          <div className="bg-white rounded-xl shadow p-4 flex gap-4 flex-wrap items-end">
+            <div><label className="text-xs text-gray-500 block mb-1">Grade</label>
+              <select value={reportGrade} onChange={e=>{setReportGrade(e.target.value);setReportSection("");setReportData(null);}} className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+                {allGrades.map(g=><option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            <div><label className="text-xs text-gray-500 block mb-1">Section</label>
+              <select value={reportSection||(sectionsByGrade[reportGrade]||[])[0]||""} onChange={e=>{setReportSection(e.target.value);setReportData(null);}} className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+                {(sectionsByGrade[reportGrade]||[]).map((s:string)=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <button onClick={()=>fetchReport(reportGrade,(reportSection||(sectionsByGrade[reportGrade]||[])[0]||""))}
+              className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
+              🔄 Refresh
+            </button>
+          </div>
+
+          {loadingReport&&<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 animate-pulse">Loading report...</div>}
+
+          {reportData&&!loadingReport&&(
+            <div className="space-y-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white rounded-xl shadow p-4 border-l-4 border-indigo-500">
+                  <p className="text-xs text-gray-500">Total Activities</p>
+                  <p className="text-2xl font-bold text-gray-800">{reportData.report?.reduce((s:number,r:any)=>s+r.activities.length,0)||0}</p>
+                </div>
+                <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500">
+                  <p className="text-xs text-gray-500">Subjects Covered</p>
+                  <p className="text-2xl font-bold text-gray-800">{reportData.report?.length||0}</p>
+                </div>
+                <div className="bg-white rounded-xl shadow p-4 border-l-4 border-orange-500">
+                  <p className="text-xs text-gray-500">Total Competencies Mapped</p>
+                  <p className="text-2xl font-bold text-gray-800">{reportData.report?.reduce((s:number,r:any)=>s+r.covered_competencies,0)||0}</p>
+                </div>
+              </div>
+
+              {/* Subject-wise breakdown */}
+              {(reportData.report||[]).map((subRep:any)=>(
+                <div key={subRep.subject} className="bg-white rounded-xl shadow overflow-hidden">
+                  {/* Subject header */}
+                  <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-bold text-indigo-800 uppercase">{subRep.subject}</span>
+                      <span className="ml-3 text-xs text-indigo-600">{subRep.activities.length} activities</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500">Competency Coverage</p>
+                        <p className="text-sm font-bold text-indigo-700">{subRep.covered_competencies}/{subRep.total_competencies} ({subRep.coverage_percent}%)</p>
+                      </div>
+                      <div className="w-20 bg-gray-200 rounded-full h-2">
+                        <div className={`h-2 rounded-full ${subRep.coverage_percent>=80?"bg-green-500":subRep.coverage_percent>=50?"bg-yellow-500":"bg-red-500"}`}
+                          style={{width:`${subRep.coverage_percent}%`}} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Activities table */}
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-500 border-b border-gray-100">
+                        <th className="px-4 py-2 text-left font-medium">Activity</th>
+                        <th className="px-3 py-2 text-left font-medium">Type</th>
+                        <th className="px-3 py-2 text-left font-medium">Date</th>
+                        <th className="px-3 py-2 text-left font-medium">Competencies Mapped</th>
+                        <th className="px-3 py-2 text-center font-medium">Max Marks</th>
+                        <th className="px-3 py-2 text-center font-medium">Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subRep.activities.map((act:any, i:number)=>(
+                        <>
+                          <tr key={act.id} className={`border-b border-gray-50 ${i%2===0?"bg-white":"bg-gray-50"}`}>
+                            <td className="px-4 py-2.5 font-medium text-gray-800">{act.name}</td>
+                            <td className="px-3 py-2.5"><span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{act.activity_type}</span></td>
+                            <td className="px-3 py-2.5 text-gray-500">{act.activity_date||"-"}</td>
+                            <td className="px-3 py-2.5">
+                              <div className="flex flex-wrap gap-1">
+                                {(act.rubrics||[]).map((r:any)=>(
+                                  <span key={r.competency_id} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded border border-indigo-100 text-xs">{r.competency_code}</span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5 text-center font-bold text-indigo-700">{act.total_max_marks||0}</td>
+                            <td className="px-3 py-2.5 text-center">
+                              <button onClick={()=>setExpandedActivity(expandedActivity===act.id?null:act.id)}
+                                className="text-xs text-indigo-600 hover:underline">{expandedActivity===act.id?"Hide":"View"}</button>
+                            </td>
+                          </tr>
+                          {expandedActivity===act.id&&(
+                            <tr key={act.id+"_exp"} className="bg-indigo-50">
+                              <td colSpan={6} className="px-4 py-3">
+                                <p className="text-xs font-semibold text-gray-600 mb-2">Rubric Details:</p>
+                                <div className="space-y-2">
+                                  {(act.rubrics||[]).map((r:any)=>(
+                                    <div key={r.competency_id} className="bg-white rounded-lg p-3 border border-indigo-100">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-xs font-bold text-indigo-700">[{r.competency_code}]</span>
+                                        <span className="text-xs text-gray-600">{r.competency_name}</span>
+                                        <span className="ml-auto text-xs font-bold text-indigo-600">{r.max_marks} marks</span>
+                                      </div>
+                                      <div className="flex flex-wrap gap-2">
+                                        {(r.rubric_items||[]).map((item:any,j:number)=>(
+                                          <span key={j} className="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-0.5">
+                                            {item.name}: <strong>{item.max_marks}m</strong>
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+              {(reportData.report||[]).length===0&&(
+                <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No activities found for this class.</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── COVERAGE ── */}
       {subTab==="coverage"&&(
         <div className="space-y-4">
@@ -2165,6 +2384,8 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
 // ── ACTIVITY ANALYSIS PANEL ──
 function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academicYear, API, LEVEL_COLOR, getLevel }: any) {
   const DOMAIN_COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#f97316","#84cc16"];
+  const pctBg = (v: number) => v>=76?"bg-green-100 text-green-800":v>=51?"bg-blue-100 text-blue-800":v>=36?"bg-yellow-100 text-yellow-800":v>0?"bg-red-100 text-red-800":"bg-gray-100 text-gray-400";
+  const toP = (v: number) => +(v*25).toFixed(1); // convert 0-4 score to %
 
   if (!allGrades?.length) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No grade assignments found.</div>;
 
@@ -2179,10 +2400,11 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
   const [studentList, setStudentList] = useState<any[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [compFilter, setCompFilter] = useState<"all"|"weak"|"strong">("all");
 
   const sectionsForGrade = sectionsByGrade[dashGrade]||[];
 
-  useEffect(()=>{ if(sectionsForGrade.length) setDashSection(sectionsForGrade[0]); },[dashGrade]);
+  useEffect(()=>{ if(sectionsForGrade.length&&!dashSection) setDashSection(sectionsForGrade[0]); },[dashGrade]);
   useEffect(()=>{
     if(dashTab==="grade"&&dashGrade) fetchGradeDash();
     if(dashTab==="section"&&dashGrade&&dashSection) fetchSectionDash();
@@ -2193,19 +2415,22 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
 
   const fetchGradeDash=async()=>{ setLoading(true); try{ const r=await axios.get(`${API}/activities/dashboard/grade/${encodeURIComponent(dashGrade)}?academic_year=${academicYear}`); setGradeDash(r.data); }catch{} setLoading(false); };
   const fetchSectionDash=async()=>{ setLoading(true); try{ const r=await axios.get(`${API}/activities/dashboard/section/${encodeURIComponent(dashGrade)}/${encodeURIComponent(dashSection)}?academic_year=${academicYear}`); setSectionDash(r.data); }catch{} setLoading(false); };
-  const fetchAlerts=async()=>{ try{ const r=await axios.get(`${API}/activities/alerts/decline?academic_year=${academicYear}`); const myGrades=Object.keys(sectionsByGrade).map(g=>g.toLowerCase()); setAlerts((r.data||[]).filter((a:any)=>myGrades.includes((a.grade||"").toLowerCase()))); }catch{ setAlerts([]); } };
+  const fetchAlerts=async()=>{ try{ const r=await axios.get(`${API}/activities/alerts/decline?academic_year=${academicYear}`); const mg=Object.keys(sectionsByGrade).map(g=>g.toLowerCase()); setAlerts((r.data||[]).filter((a:any)=>mg.includes((a.grade||"").toLowerCase()))); }catch{ setAlerts([]); } };
   const fetchCovDash=async()=>{ try{ const r=await axios.get(`${API}/activities/coverage/section/${encodeURIComponent(dashGrade)}/${encodeURIComponent(dashSection)}?academic_year=${academicYear}`); setCoverageData(r.data); }catch{ setCoverageData(null); } };
   const fetchStudentList=async()=>{ try{ const r=await axios.get(`${API}/students?grade=${encodeURIComponent(dashGrade)}&section=${encodeURIComponent(dashSection)}`); setStudentList(r.data?.data||r.data||[]); }catch{} };
-  const fetchStudentDash=async(id:string)=>{ try{ const r=await axios.get(`${API}/activities/dashboard/student/${id}?academic_year=${academicYear}`); setStudentDash(r.data); }catch{} };
+  const fetchStudentDash=async(id:string)=>{ setLoading(true); try{ const r=await axios.get(`${API}/activities/dashboard/student/${id}?academic_year=${academicYear}`); setStudentDash(r.data); }catch{} setLoading(false); };
 
-  const pctColor = (pct: number) => pct>=76?"text-green-700":pct>=51?"text-blue-700":pct>=36?"text-yellow-600":"text-red-600";
-  const pctBg = (pct: number) => pct>=76?"bg-green-100 text-green-800":pct>=51?"bg-blue-100 text-blue-800":pct>=36?"bg-yellow-100 text-yellow-800":"bg-red-100 text-red-800";
+  const filteredComps = (comps: any[]) => {
+    if (compFilter==="weak") return comps.filter(c=>toP(c.avg)<60);
+    if (compFilter==="strong") return comps.filter(c=>toP(c.avg)>=75);
+    return comps;
+  };
 
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl shadow p-4 flex gap-4 flex-wrap items-end">
         <div><label className="text-xs text-gray-500 block mb-1">Grade</label>
-          <select value={dashGrade} onChange={e=>{setDashGrade(e.target.value);setGradeDash(null);setSectionDash(null);}} className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+          <select value={dashGrade} onChange={e=>{setDashGrade(e.target.value);setDashSection("");setGradeDash(null);setSectionDash(null);setStudentDash(null);}} className="border border-gray-300 rounded px-3 py-1.5 text-sm">
             {allGrades.map((g:string)=><option key={g} value={g}>{g}</option>)}</select>
         </div>
         {(dashTab==="section"||dashTab==="student"||dashTab==="coverage")&&(
@@ -2223,9 +2448,9 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
         ))}
       </div>
 
-      {loading&&<div className="bg-white rounded-xl shadow p-6 text-center text-gray-400 text-sm">Loading...</div>}
+      {loading&&<div className="bg-white rounded-xl shadow p-6 text-center text-gray-400 text-sm animate-pulse">Loading...</div>}
 
-      {/* GRADE */}
+      {/* ── GRADE ── */}
       {!loading&&dashTab==="grade"&&(
         <div className="space-y-4">
           {gradeDash?(
@@ -2233,30 +2458,88 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[{label:"Total Students",value:gradeDash.total_students,color:"border-indigo-500"},
                   {label:"Assessed",value:gradeDash.total_assessed,color:"border-green-500"},
-                  {label:"Overall Avg %",value:gradeDash.overall_avg?(+gradeDash.overall_avg).toFixed(1)+"%":"-",color:"border-blue-500"},
-                  {label:"Grade",value:gradeDash.grade,color:"border-orange-500"}].map(s=>(
+                  {label:"Overall Avg %",value:gradeDash.overall_avg?toP(+gradeDash.overall_avg).toFixed(1)+"%":"-",color:"border-blue-500"},
+                  {label:"Level",value:gradeDash.overall_avg?getLevel(toP(+gradeDash.overall_avg)):"-",color:"border-orange-500"}].map(s=>(
                   <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
                     <p className="text-xs text-gray-500">{s.label}</p>
-                    <p className="text-2xl font-bold text-gray-800">{s.value}</p>
+                    <p className="text-xl font-bold text-gray-800">{s.value}</p>
                   </div>
                 ))}
               </div>
-              {gradeDash.sections?.length>0&&(
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {gradeDash.sections?.length>0&&(
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Section-wise Avg %</h3>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={gradeDash.sections.map((s:any)=>({name:s.section,avg:toP(s.avg)}))}>
+                        <CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name" tick={{fontSize:10}}/><YAxis domain={[0,100]} tick={{fontSize:10}}/>
+                        <Tooltip formatter={(v:any)=>[`${v}%`,"Avg"]}/><Bar dataKey="avg" radius={[4,4,0,0]}>{gradeDash.sections.map((_:any,i:number)=><Cell key={i} fill={DOMAIN_COLORS[i%DOMAIN_COLORS.length]}/>)}</Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+                {gradeDash.subjects?.length>0&&(
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject-wise Avg %</h3>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={gradeDash.subjects.map((s:any)=>({name:s.subject,avg:toP(s.avg)}))}>
+                        <CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name" tick={{fontSize:10}}/><YAxis domain={[0,100]} tick={{fontSize:10}}/>
+                        <Tooltip formatter={(v:any)=>[`${v}%`,"Avg"]}/><Bar dataKey="avg" radius={[4,4,0,0]}>{gradeDash.subjects.map((_:any,i:number)=><Cell key={i} fill={DOMAIN_COLORS[i%DOMAIN_COLORS.length]}/>)}</Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
+              {gradeDash.domains?.length>0&&(
                 <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Section-wise Average %</h3>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={gradeDash.sections.map((s:any)=>({name:s.section,avg:s.avg_pct||s.avg||0}))}>
-                      <CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name" tick={{fontSize:10}}/><YAxis domain={[0,100]} tick={{fontSize:10}}/>
-                      <Tooltip formatter={(v:any)=>[`${v}%`,"Avg"]}/><Bar dataKey="avg" radius={[4,4,0,0]}>{gradeDash.sections.map((_:any,i:number)=><Cell key={i} fill={DOMAIN_COLORS[i%DOMAIN_COLORS.length]}/>)}</Bar>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Domain-wise Avg %</h3>
+                  <ResponsiveContainer width="100%" height={Math.max(150,gradeDash.domains.length*32)}>
+                    <BarChart data={gradeDash.domains.map((d:any)=>({name:d.domain,avg:toP(d.avg)}))} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3"/><XAxis type="number" domain={[0,100]} tick={{fontSize:10}}/><YAxis type="category" dataKey="name" tick={{fontSize:10}} width={120}/>
+                      <Tooltip formatter={(v:any)=>[`${v}%`,"Avg"]}/><Bar dataKey="avg" radius={[0,4,4,0]}>{gradeDash.domains.map((d:any,i:number)=><Cell key={i} fill={toP(d.avg)>=76?"#10b981":toP(d.avg)>=51?"#6366f1":toP(d.avg)>=36?"#f59e0b":"#ef4444"}/>)}</Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                </div>
+              )}
+              {gradeDash.competencies?.length>0&&(
+                <div className="bg-white rounded-xl shadow p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700">Competency Averages</h3>
+                    <div className="flex gap-2">
+                      {["all","weak","strong"].map(f=>(
+                        <button key={f} onClick={()=>setCompFilter(f as any)}
+                          className={`px-2 py-0.5 rounded text-xs ${compFilter===f?"bg-indigo-600 text-white":"bg-gray-100 text-gray-600"}`}>
+                          {f==="all"?"All":f==="weak"?"Below 60%":"Above 75%"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead><tr className="bg-indigo-700 text-white">
+                        <th className="px-3 py-2 text-left">Code</th><th className="px-3 py-2 text-left">Domain</th>
+                        <th className="px-3 py-2 text-left">Subject</th><th className="px-3 py-2 text-center">Avg %</th><th className="px-3 py-2 text-center">Level</th>
+                      </tr></thead>
+                      <tbody>
+                        {filteredComps(gradeDash.competencies).map((c:any,i:number)=>{const p=toP(c.avg);return(
+                          <tr key={c.competency_id} className={i%2===0?"bg-white":"bg-gray-50"}>
+                            <td className="px-3 py-1.5 font-medium text-indigo-700">{c.competency_code}</td>
+                            <td className="px-3 py-1.5 text-gray-500">{c.domain}</td>
+                            <td className="px-3 py-1.5 text-gray-500">{c.subject}</td>
+                            <td className="px-3 py-1.5 text-center"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${pctBg(p)}`}>{p.toFixed(1)}%</span></td>
+                            <td className="px-3 py-1.5 text-center"><span className={`px-2 py-0.5 rounded text-xs ${LEVEL_COLOR[getLevel(p)]||""}`}>{getLevel(p)}</span></td>
+                          </tr>
+                        );})}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
               {gradeDash.studentRankings?.length>0&&(
                 <div className="bg-white rounded-xl shadow p-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Student Rankings</h3>
                   <div className="space-y-1 max-h-60 overflow-y-auto">
-                    {gradeDash.studentRankings.map((s:any,i:number)=>(
+                    {gradeDash.studentRankings.map((s:any,i:number)=>{const p=toP(s.avg);return(
                       <div key={s.student_id} className="flex items-center justify-between p-2 rounded border border-gray-100 hover:bg-gray-50">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-gray-400 w-6">{i+1}.</span>
@@ -2264,45 +2547,96 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
                           <span className="text-xs text-gray-400">{s.section}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg(s.avg_pct||s.avg||0)}`}>{(s.avg_pct||s.avg||0).toFixed(1)}%</span>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${LEVEL_COLOR[getLevel(s.avg_pct||s.avg||0)]||""}`}>{getLevel(s.avg_pct||s.avg||0)}</span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg(p)}`}>{p.toFixed(1)}%</span>
+                          <span className={`text-xs px-2 py-0.5 rounded ${LEVEL_COLOR[getLevel(p)]||""}`}>{getLevel(p)}</span>
                         </div>
                       </div>
-                    ))}
+                    );})}
                   </div>
                 </div>
               )}
             </>
-          ):<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No data for {dashGrade}. Create activities and enter marks first.</div>}
+          ):<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No data. Create activities and enter marks first.</div>}
         </div>
       )}
 
-      {/* SECTION */}
+      {/* ── SECTION ── */}
       {!loading&&dashTab==="section"&&(
         <div className="space-y-4">
           {sectionDash?(
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[{label:"Total Students",value:sectionDash.total_students,color:"border-indigo-500"},
-                  {label:"Overall Avg %",value:sectionDash.overall_avg?(+sectionDash.overall_avg).toFixed(1)+"%":"-",color:"border-green-500"},
+                  {label:"Overall Avg %",value:sectionDash.overall_avg?toP(+sectionDash.overall_avg).toFixed(1)+"%":"-",color:"border-green-500"},
                   {label:"Grade",value:sectionDash.grade,color:"border-blue-500"},
                   {label:"Section",value:sectionDash.section,color:"border-orange-500"}].map(s=>(
                   <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
                     <p className="text-xs text-gray-500">{s.label}</p>
-                    <p className="text-2xl font-bold text-gray-800">{s.value}</p>
+                    <p className="text-xl font-bold text-gray-800">{s.value}</p>
                   </div>
                 ))}
               </div>
+              {sectionDash.domains?.length>0&&(
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Domain-wise Avg %</h3>
+                  <ResponsiveContainer width="100%" height={Math.max(150,sectionDash.domains.length*32)}>
+                    <BarChart data={sectionDash.domains.map((d:any)=>({name:d.domain,avg:toP(d.avg)}))} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3"/><XAxis type="number" domain={[0,100]} tick={{fontSize:10}}/><YAxis type="category" dataKey="name" tick={{fontSize:10}} width={120}/>
+                      <Tooltip formatter={(v:any)=>[`${v}%`,"Avg"]}/><Bar dataKey="avg" radius={[0,4,4,0]}>{sectionDash.domains.map((d:any,i:number)=><Cell key={i} fill={toP(d.avg)>=76?"#10b981":toP(d.avg)>=51?"#6366f1":"#ef4444"}/>)}</Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
               {sectionDash.weakest?.length>0&&(
                 <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">⚠️ Weakest Competencies</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">⚠️ Weakest Competencies (below 60%)</h3>
                   <div className="space-y-2">
-                    {sectionDash.weakest.map((c:any)=>(
+                    {sectionDash.weakest.map((c:any)=>{const p=toP(c.avg);return(
                       <div key={c.competency_id} className="flex items-center justify-between p-2 bg-red-50 rounded border border-red-100">
-                        <div><span className="text-xs font-bold text-red-700">{c.competency_code}</span><span className="text-xs text-gray-500 ml-2">{c.domain}</span></div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg(c.avg_pct||c.avg||0)}`}>{(c.avg_pct||c.avg||0).toFixed(1)}%</span>
+                        <div>
+                          <span className="text-xs font-bold text-red-700">{c.competency_code}</span>
+                          <span className="text-xs text-gray-500 ml-2">{c.domain} · {c.subject}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg(p)}`}>{p.toFixed(1)}%</span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${LEVEL_COLOR[getLevel(p)]||""}`}>{getLevel(p)}</span>
+                        </div>
                       </div>
-                    ))}
+                    );})}
+                  </div>
+                </div>
+              )}
+              {sectionDash.competencyAvgs?.length>0&&(
+                <div className="bg-white rounded-xl shadow p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700">All Competency Averages</h3>
+                    <div className="flex gap-2">
+                      {["all","weak","strong"].map(f=>(
+                        <button key={f} onClick={()=>setCompFilter(f as any)}
+                          className={`px-2 py-0.5 rounded text-xs ${compFilter===f?"bg-indigo-600 text-white":"bg-gray-100 text-gray-600"}`}>
+                          {f==="all"?"All":f==="weak"?"Below 60%":"Above 75%"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead><tr className="bg-indigo-700 text-white">
+                        <th className="px-3 py-2 text-left">Code</th><th className="px-3 py-2 text-left">Domain</th>
+                        <th className="px-3 py-2 text-left">Subject</th><th className="px-3 py-2 text-center">Avg %</th><th className="px-3 py-2 text-center">Level</th>
+                      </tr></thead>
+                      <tbody>
+                        {filteredComps(sectionDash.competencyAvgs).map((c:any,i:number)=>{const p=toP(c.avg);return(
+                          <tr key={c.competency_id} className={i%2===0?"bg-white":"bg-gray-50"}>
+                            <td className="px-3 py-1.5 font-medium text-indigo-700">{c.competency_code}</td>
+                            <td className="px-3 py-1.5 text-gray-500">{c.domain}</td>
+                            <td className="px-3 py-1.5 text-gray-500">{c.subject}</td>
+                            <td className="px-3 py-1.5 text-center"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${pctBg(p)}`}>{p.toFixed(1)}%</span></td>
+                            <td className="px-3 py-1.5 text-center"><span className={`px-2 py-0.5 rounded text-xs ${LEVEL_COLOR[getLevel(p)]||""}`}>{getLevel(p)}</span></td>
+                          </tr>
+                        );})}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
@@ -2319,19 +2653,19 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
                         </tr>
                       </thead>
                       <tbody>
-                        {sectionDash.studentDomainBreakdown.map((s:any,i:number)=>(
+                        {sectionDash.studentDomainBreakdown.map((s:any,i:number)=>{const op=toP(s.overall_avg);return(
                           <tr key={s.student_id} className={i%2===0?"bg-white":"bg-gray-50"}>
                             <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
-                            {(sectionDash.domains||[]).map((d:any)=>{const val=s.domain_avgs?.[d.domain]||0;return(
+                            {(sectionDash.domains||[]).map((d:any)=>{const val=toP(s.domain_avgs?.[d.domain]||0);return(
                               <td key={d.domain} className="px-3 py-2 text-center border-l border-gray-100">
                                 {val>0?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${pctBg(val)}`}>{val.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
                               </td>
                             );})}
                             <td className="px-3 py-2 text-center border-l border-gray-200">
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg(s.overall_avg||0)}`}>{(s.overall_avg||0).toFixed(1)}%</span>
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg(op)}`}>{op.toFixed(1)}%</span>
                             </td>
                           </tr>
-                        ))}
+                        );})}
                       </tbody>
                     </table>
                   </div>
@@ -2342,7 +2676,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
         </div>
       )}
 
-      {/* STUDENT */}
+      {/* ── STUDENT ── */}
       {!loading&&dashTab==="student"&&(
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow p-4">
@@ -2359,31 +2693,65 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
                 <p className="text-lg font-bold text-gray-800">{studentDash.student?.name}</p>
                 <p className="text-sm text-gray-500">{studentDash.student?.current_class} — {studentDash.student?.section}</p>
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {studentDash.subjectSummary?.length>0&&(
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject-wise Avg %</h3>
+                    <div className="space-y-2">
+                      {studentDash.subjectSummary.map((s:any)=>{const p=toP(s.avg);return(
+                        <div key={s.subject} className="flex items-center justify-between p-2 rounded border border-gray-100">
+                          <span className="text-xs font-medium text-gray-700">{s.subject}</span>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg(p)}`}>{p.toFixed(1)}%</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${LEVEL_COLOR[getLevel(p)]||""}`}>{getLevel(p)}</span>
+                          </div>
+                        </div>
+                      );})}
+                    </div>
+                  </div>
+                )}
+                {studentDash.domainSummary?.length>0&&(
+                  <div className="bg-white rounded-xl shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Domain-wise Avg %</h3>
+                    <ResponsiveContainer width="100%" height={Math.max(150,studentDash.domainSummary.length*32)}>
+                      <BarChart data={studentDash.domainSummary.map((d:any)=>({name:d.domain,avg:toP(d.avg)}))} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3"/><XAxis type="number" domain={[0,100]} tick={{fontSize:10}}/><YAxis type="category" dataKey="name" tick={{fontSize:9}} width={100}/>
+                        <Tooltip formatter={(v:any)=>[`${v}%`,"Avg"]}/><Bar dataKey="avg" radius={[0,4,4,0]}>{studentDash.domainSummary.map((d:any,i:number)=><Cell key={i} fill={toP(d.avg)>=76?"#10b981":toP(d.avg)>=51?"#6366f1":"#ef4444"}/>)}</Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
               {studentDash.competencyScores?.length>0&&(
                 <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Competency Scores</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700">Competency-wise Scores</h3>
+                    <div className="flex gap-2">
+                      {["all","weak","strong"].map(f=>(
+                        <button key={f} onClick={()=>setCompFilter(f as any)}
+                          className={`px-2 py-0.5 rounded text-xs ${compFilter===f?"bg-indigo-600 text-white":"bg-gray-100 text-gray-600"}`}>
+                          {f==="all"?"All":f==="weak"?"Below 60%":"Above 75%"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs border-collapse">
                       <thead><tr className="bg-indigo-700 text-white">
-                        <th className="px-3 py-2 text-left">Code</th>
-                        <th className="px-3 py-2 text-left">Description</th>
-                        <th className="px-3 py-2 text-left">Domain</th>
-                        <th className="px-3 py-2 text-center">Avg %</th>
-                        <th className="px-3 py-2 text-center">Level</th>
-                        <th className="px-3 py-2 text-center">Attempts</th>
+                        <th className="px-3 py-2 text-left">Code</th><th className="px-3 py-2 text-left">Description</th>
+                        <th className="px-3 py-2 text-left">Domain</th><th className="px-3 py-2 text-left">Subject</th>
+                        <th className="px-3 py-2 text-center">Avg %</th><th className="px-3 py-2 text-center">Level</th><th className="px-3 py-2 text-center">Attempts</th>
                       </tr></thead>
                       <tbody>
-                        {studentDash.competencyScores.map((c:any,i:number)=>{
-                          const pct = c.avg_pct||(c.avg*25)||0;
-                          const level = getLevel(pct);
-                          return(
+                        {filteredComps(studentDash.competencyScores.map((c:any)=>({...c,avg:c.avg}))).map((c:any,i:number)=>{const p=toP(c.avg);return(
                           <tr key={c.competency_id} className={i%2===0?"bg-white":"bg-gray-50"}>
-                            <td className="px-3 py-2 font-medium text-indigo-700">{c.competency_code}</td>
-                            <td className="px-3 py-2 text-gray-600 max-w-[200px] truncate">{c.description}</td>
-                            <td className="px-3 py-2 text-gray-500">{c.domain}</td>
-                            <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg(pct)}`}>{pct.toFixed(1)}%</span></td>
-                            <td className="px-3 py-2 text-center"><span className={`text-xs px-2 py-0.5 rounded border ${LEVEL_COLOR[level]||""}`}>{level}</span></td>
-                            <td className="px-3 py-2 text-center text-gray-400">{c.assessment_count}x</td>
+                            <td className="px-3 py-1.5 font-medium text-indigo-700">{c.competency_code}</td>
+                            <td className="px-3 py-1.5 text-gray-600 max-w-[180px] truncate">{c.description||c.competency_name}</td>
+                            <td className="px-3 py-1.5 text-gray-500">{c.domain}</td>
+                            <td className="px-3 py-1.5 text-gray-500">{c.subject}</td>
+                            <td className="px-3 py-1.5 text-center"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${pctBg(p)}`}>{p.toFixed(1)}%</span></td>
+                            <td className="px-3 py-1.5 text-center"><span className={`px-2 py-0.5 rounded text-xs ${LEVEL_COLOR[getLevel(p)]||""}`}>{getLevel(p)}</span></td>
+                            <td className="px-3 py-1.5 text-center text-gray-400">{c.assessment_count}x</td>
                           </tr>
                         );})}
                       </tbody>
@@ -2396,29 +2764,28 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
         </div>
       )}
 
-      {/* ALERTS */}
+      {/* ── ALERTS ── */}
       {!loading&&dashTab==="alerts"&&(
         <div className="space-y-4">
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
             <h3 className="text-sm font-bold text-yellow-800 mb-1">⚠️ Consecutive Decline Alert</h3>
-            <p className="text-xs text-yellow-600">Students whose activity % dropped in 3 consecutive activities.</p>
+            <p className="text-xs text-yellow-600">Students whose activity scores dropped in 3 consecutive activities.</p>
           </div>
           <div className="bg-white rounded-xl shadow p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Students with Consecutive Decline ({alerts.length})</h3>
             {alerts.length===0
-              ?<p className="text-sm text-gray-400 text-center py-4">No consecutive declines found.</p>
+              ?<p className="text-sm text-gray-400 text-center py-4">No consecutive declines found in your sections.</p>
               :<div className="space-y-3">
                 {alerts.map((s:any,i:number)=>(
                   <div key={i} className="bg-red-50 border border-red-200 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <div><span className="text-sm font-bold text-red-800">{s.student_name}</span><span className="text-xs text-gray-500 ml-2">{s.grade} — {s.section}</span></div>
-                      <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">Drop: {s.decline_from}% → {s.decline_to}%</span>
+                      <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">Declining</span>
                     </div>
                     <div className="flex gap-2 flex-wrap">
                       {s.scores?.map((sc:any,j:number)=>(
-                        <div key={j} className={`text-center rounded px-2 py-1 text-xs border ${pctBg(sc.avg_pct||sc.avg*25||0)}`}>
-                          <p className="font-bold">{(sc.avg_pct||sc.avg*25||0).toFixed(1)}%</p>
-                          <p className="text-gray-500 text-xs truncate max-w-[80px]">{sc.name}</p>
+                        <div key={j} className={`text-center rounded px-2 py-1 text-xs border ${pctBg(toP(sc.avg))}`}>
+                          <p className="font-bold">{toP(sc.avg).toFixed(1)}%</p>
+                          <p className="text-gray-500 truncate max-w-[80px]">{sc.name}</p>
                         </div>
                       ))}
                     </div>
@@ -2430,13 +2797,16 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
         </div>
       )}
 
-      {/* COVERAGE */}
+      {/* ── COVERAGE ── */}
       {!loading&&dashTab==="coverage"&&(
         <div className="space-y-4">
           {coverageData?(
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[{label:"Total",value:coverageData.total,color:"text-gray-700"},{label:"Covered",value:coverageData.covered,color:"text-green-700"},{label:"Pending",value:coverageData.uncovered,color:"text-red-600"},{label:"Coverage %",value:`${coverageData.coverage_percent}%`,color:coverageData.coverage_percent>=80?"text-green-700":"text-yellow-600"}].map(k=>(
+                {[{label:"Total Competencies",value:coverageData.total,color:"text-gray-700"},
+                  {label:"Covered",value:coverageData.covered,color:"text-green-700"},
+                  {label:"Pending",value:coverageData.uncovered,color:"text-red-600"},
+                  {label:"Coverage %",value:`${coverageData.coverage_percent}%`,color:coverageData.coverage_percent>=80?"text-green-700":"text-yellow-600"}].map(k=>(
                   <div key={k.label} className="bg-white rounded-xl shadow p-4 text-center border border-gray-200">
                     <div className={`text-2xl font-bold ${k.color}`}>{k.value}</div>
                     <div className="text-xs text-gray-500 mt-0.5">{k.label}</div>
@@ -2446,6 +2816,43 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div className={`h-3 rounded-full ${coverageData.coverage_percent>=80?"bg-green-500":coverageData.coverage_percent>=50?"bg-yellow-500":"bg-red-500"}`} style={{width:`${coverageData.coverage_percent}%`}} />
               </div>
+              {/* Subject-wise coverage */}
+              {coverageData.bySubject?.length>0&&(
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject-wise Coverage</h3>
+                  {coverageData.bySubject.map((s:any)=>(
+                    <div key={s.subject} className="mb-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-gray-700">{s.subject}</span>
+                        <span className="text-xs text-gray-500">{s.covered}/{s.total} ({s.coverage_percent}%)</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className={`h-2 rounded-full ${s.coverage_percent>=80?"bg-green-500":s.coverage_percent>=50?"bg-yellow-500":"bg-red-500"}`} style={{width:`${s.coverage_percent}%`}} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {coverageData.covered_competencies?.length>0&&(
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-green-700 mb-2">✅ Covered ({coverageData.covered_competencies.length})</h3>
+                  <div className="flex flex-wrap gap-1">
+                    {coverageData.covered_competencies.map((c:any)=>(
+                      <span key={c.id} className="px-2 py-1 bg-green-50 border border-green-200 rounded text-xs text-green-700">{c.competency_code}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {coverageData.uncovered_competencies?.length>0&&(
+                <div className="bg-white rounded-xl shadow p-4">
+                  <h3 className="text-sm font-semibold text-red-600 mb-2">⏳ Pending ({coverageData.uncovered_competencies.length})</h3>
+                  <div className="flex flex-wrap gap-1">
+                    {coverageData.uncovered_competencies.map((c:any)=>(
+                      <span key={c.id} className="px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-600">{c.competency_code}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           ):<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No coverage data. Add competencies to registry first.</div>}
         </div>
@@ -2453,7 +2860,6 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
     </div>
   );
 }
-
 
 
 function MarksEntryPanel({ activity, combinedMarks, localRatings, updateRating, saveActivityMarks, saving, RATING_COLORS, API, academicYear }: any) {
