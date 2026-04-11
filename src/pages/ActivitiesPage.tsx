@@ -24,22 +24,24 @@ const CLASSES = [
 const ACTIVITY_TYPES = ["Individual", "Group", "Project", "Assessment", "Workshop", "Other"];
 const STAGES = ["foundation", "preparatory", "middle", "secondary"];
 
-const RATING_COLORS: Record<string, string> = {
-  beginning: "bg-red-100 text-red-700 border-red-300",
-  approaching: "bg-yellow-100 text-yellow-700 border-yellow-300",
-  meeting: "bg-blue-100 text-blue-700 border-blue-300",
-  exceeding: "bg-green-100 text-green-700 border-green-300",
+const LEVEL_COLOR: Record<string,string> = {
+  Beginning:"bg-red-100 text-red-700", Developing:"bg-orange-100 text-orange-700",
+  Approaching:"bg-yellow-100 text-yellow-700", Meeting:"bg-lime-100 text-lime-700",
+  Exceeding:"bg-green-100 text-green-700", Proficient:"bg-teal-100 text-teal-700",
+  Advanced:"bg-blue-100 text-blue-700", Mastery:"bg-purple-100 text-purple-700",
 };
-
-const RATING_SCORE: Record<string, number> = {
-  beginning: 1, approaching: 2, meeting: 3, exceeding: 4,
+const getLevel = (pct: number): string => {
+  if (pct>=95) return "Mastery";
+  if (pct>=86) return "Advanced";
+  if (pct>=76) return "Proficient";
+  if (pct>=66) return "Exceeding";
+  if (pct>=51) return "Meeting";
+  if (pct>=36) return "Approaching";
+  if (pct>=21) return "Developing";
+  return "Beginning";
 };
-
-const scoreColor = (s: number) =>
-  s >= 3.5 ? "text-green-600" : s >= 2.5 ? "text-blue-600" : s >= 1.5 ? "text-yellow-600" : s > 0 ? "text-red-500" : "text-gray-400";
-
-const scoreBg = (s: number) =>
-  s >= 3.5 ? "bg-green-100 text-green-800" : s >= 2.5 ? "bg-blue-100 text-blue-800" : s >= 1.5 ? "bg-yellow-100 text-yellow-800" : s > 0 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-400";
+const scoreBg = (pct: number) =>
+  pct >= 76 ? "bg-green-100 text-green-800" : pct >= 51 ? "bg-blue-100 text-blue-800" : pct >= 36 ? "bg-yellow-100 text-yellow-800" : pct > 0 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-400";
 
 const DOMAIN_COLORS = [
   "#6366f1", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6",
@@ -67,10 +69,12 @@ export default function ActivitiesPage() {
   // New activity form
   const [form, setForm] = useState({
     name: "", description: "", subject: "", stage: "foundation",
-    grade: "", section: "", activity_type: "Individual",
+    grade: "", sections: [] as string[], activity_type: "Individual",
     activity_date: new Date().toISOString().split("T")[0],
-    competency_mappings: [] as string[], apply_to_all_sections: false,
+    competency_mappings: [] as string[],
   });
+  const [selectedComps, setSelectedComps] = useState<string[]>([]);
+  const [rubrics, setRubrics] = useState<Record<string,{items:{name:string,max_marks:number}[]}>>({});
 
   // Marks tab
   const [marksGrade, setMarksGrade] = useState("");
@@ -79,7 +83,7 @@ export default function ActivitiesPage() {
   const [marksSections, setMarksSections] = useState<string[]>([]);
   const [marksSubjects, setMarksSubjects] = useState<string[]>([]);
   const [combinedMarks, setCombinedMarks] = useState<any>(null);
-  const [localRatings, setLocalRatings] = useState<Record<string, Record<string, Record<string, string>>>>({});
+  const [localMarks, setLocalMarks] = useState<Record<string,Record<string,Record<string,number|null>>>>({});
   const [saving, setSaving] = useState(false);
 
   // Dashboard tab
@@ -158,18 +162,23 @@ export default function ActivitiesPage() {
     try {
       const r = await axios.get(`${API}/activities/combined-marks/${encodeURIComponent(marksGrade)}/${encodeURIComponent(marksSection)}/${encodeURIComponent(marksSubject)}?academic_year=${academicYear}`);
       setCombinedMarks(r.data);
-      // Initialize local ratings from existing data
-      const init: Record<string, Record<string, Record<string, string>>> = {};
+      // Initialize localMarks from existing data
+      const init: Record<string,Record<string,Record<string,number|null>>> = {};
       (r.data?.students || []).forEach((s: any) => {
         init[s.student_id] = {};
         (r.data?.activities || []).forEach((act: any) => {
-          init[s.student_id][act.id] = { ...(s.activity_data?.[act.id] || {}) };
+          const cm = s.activity_data?.[act.id]?.competency_marks || {};
+          (act.rubrics || []).forEach((rub: any) => {
+            if (!init[s.student_id][rub.competency_id]) init[s.student_id][rub.competency_id] = {};
+            (rub.rubric_items||[]).forEach((_: any, i: number) => {
+              init[s.student_id][rub.competency_id][String(i)] = cm[rub.competency_id]?.[String(i)] ?? null;
+            });
+          });
         });
       });
-      setLocalRatings(init);
-    } catch { }
+      setLocalMarks(init);
+    } catch {}
   };
-
   const fetchSchoolDash = async () => {
     try { const r = await axios.get(`${API}/activities/dashboard/school?academic_year=${academicYear}`); setSchoolDash(r.data); } catch { }
   };
@@ -217,27 +226,39 @@ export default function ActivitiesPage() {
   // ── ACTIVITY CRUD ─────────────────────────────────────────────
 
   const saveActivity = async () => {
-    if (!form.name || !form.grade || !form.subject) {
-      setMessage("❌ Name, Grade and Subject are required");
-      setTimeout(() => setMessage(""), 3000);
-      return;
+    if (!form.name || !form.grade || !form.subject || !form.sections.length) {
+      setMessage("❌ Name, Grade, Subject and at least one Section are required");
+      setTimeout(() => setMessage(""), 3000); return;
+    }
+    if (!selectedComps.length) {
+      setMessage("❌ Select at least one competency");
+      setTimeout(() => setMessage(""), 3000); return;
+    }
+    for (const cid of selectedComps) {
+      const rub = rubrics[cid];
+      if (!rub?.items?.length) { setMessage("❌ Each competency must have at least one rubric item"); setTimeout(()=>setMessage(""),3000); return; }
+      for (const item of rub.items) {
+        if (!item.name.trim()) { setMessage("❌ All rubric items must have a name"); setTimeout(()=>setMessage(""),3000); return; }
+        if (!item.max_marks||item.max_marks<=0) { setMessage("❌ All rubric items must have marks > 0"); setTimeout(()=>setMessage(""),3000); return; }
+      }
     }
     try {
-      if (editActivity) {
-        await axios.put(`${API}/activities/${editActivity.id}`, { ...form, academic_year: academicYear });
-        setMessage("✅ Activity updated");
-      } else {
-        await axios.post(`${API}/activities`, { ...form, academic_year: academicYear });
-        setMessage("✅ Activity created");
-      }
-      setShowAddForm(false);
-      setEditActivity(null);
-      resetForm();
+      const rubricsArr = selectedComps.map(cid => {
+        const comp = competencies.find((c:any)=>c.id===cid);
+        return { competency_id: cid, competency_code: comp?.competency_code||comp?.code||"", competency_name: comp?.description||comp?.name||"", rubric_items: rubrics[cid].items };
+      });
+      await axios.post(`${API}/activities`, {
+        ...form, sections: form.sections, academic_year: academicYear,
+        competency_mappings: selectedComps, rubrics: rubricsArr,
+      });
+      setMessage("✅ Activity created");
+      setShowAddForm(false); setEditActivity(null);
+      setSelectedComps([]); setRubrics({});
+      setForm(p=>({...p,name:"",description:"",sections:[],competency_mappings:[]}));
       fetchActivities();
     } catch { setMessage("❌ Error saving activity"); }
     setTimeout(() => setMessage(""), 3000);
   };
-
   const deleteActivity = async (id: string) => {
     if (!confirm("Delete this activity?")) return;
     try {
@@ -253,19 +274,30 @@ export default function ActivitiesPage() {
     grade: filterGrade || "", section: filterSection || "",
     activity_type: "Individual",
     activity_date: new Date().toISOString().split("T")[0],
-    competency_mappings: [], apply_to_all_sections: false,
+    competency_mappings: [],
   });
 
   // ── MARKS ENTRY ───────────────────────────────────────────────
 
-  const updateRating = (studentId: string, activityId: string, competencyId: string, rating: string) => {
-    setLocalRatings(prev => ({
+  const updateMark = (studentId: string, compId: string, rubricIdx: string, value: number|null) => {
+    setLocalMarks(prev => ({
       ...prev,
-      [studentId]: {
-        ...(prev[studentId] || {}),
-        [activityId]: { ...(prev[studentId]?.[activityId] || {}), [competencyId]: rating },
-      },
+      [studentId]: { ...(prev[studentId]||{}),
+        [compId]: { ...(prev[studentId]?.[compId]||{}), [rubricIdx]: value }
+      }
     }));
+  };
+
+  const calcStudentTotal = (studentId: string, rubricsList: any[]) => {
+    let obtained = 0; let max = 0;
+    rubricsList.forEach((rub: any) => {
+      (rub.rubric_items||[]).forEach((item: any, i: number) => {
+        max += +(item.max_marks||0);
+        obtained += +(localMarks[studentId]?.[rub.competency_id]?.[String(i)]||0);
+      });
+    });
+    const pct = max > 0 ? +((obtained/max)*100).toFixed(1) : 0;
+    return { obtained, max, pct };
   };
 
   const saveActivityMarks = async (activityId: string) => {
@@ -275,7 +307,7 @@ export default function ActivitiesPage() {
       const entries = (combinedMarks.students || []).map((s: any) => ({
         student_id: s.student_id,
         student_name: s.student_name,
-        competency_ratings: localRatings[s.student_id]?.[activityId] || {},
+        competency_marks: localMarks[s.student_id] || {},
       }));
       await axios.post(`${API}/activities/${activityId}/marks`, {
         academic_year: academicYear,
@@ -371,100 +403,99 @@ export default function ActivitiesPage() {
 
           {/* Add/Edit form */}
           {showAddForm && (
-            <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
+            <div className="bg-white rounded-xl shadow border border-gray-200 p-4 space-y-4">
               <h2 className="text-sm font-bold text-gray-700 mb-3">{editActivity ? "Edit Activity" : "New Activity"}</h2>
-              <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Activity Name *</label>
-                  <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                  <input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))}
                     placeholder="e.g. Story Writing" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Grade *</label>
-                  <select value={form.grade} onChange={e => setForm(p => ({ ...p, grade: e.target.value, section: "", competency_mappings: [] }))}
+                  <select value={form.grade} onChange={e=>setForm(p=>({...p,grade:e.target.value,sections:[],competency_mappings:[]}))}
                     className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
                     <option value="">Select Grade</option>
-                    {CLASSES.map(g => <option key={g} value={g}>{g}</option>)}
+                    {CLASSES.map(g=><option key={g} value={g}>{g}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Subject *</label>
-                  <input value={form.subject} onChange={e => setForm(p => ({ ...p, subject: e.target.value, competency_mappings: [] }))}
+                  <input value={form.subject} onChange={e=>setForm(p=>({...p,subject:e.target.value,competency_mappings:[]}))}
                     placeholder="e.g. English" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">Section</label>
-                  <select value={form.section} onChange={e => setForm(p => ({ ...p, section: e.target.value }))}
-                    disabled={form.apply_to_all_sections}
-                    className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full disabled:opacity-50">
-                    <option value="">Select Section</option>
-                    {sections.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
                   <label className="text-xs text-gray-500 block mb-1">Stage</label>
-                  <select value={form.stage} onChange={e => setForm(p => ({ ...p, stage: e.target.value }))}
+                  <select value={form.stage} onChange={e=>setForm(p=>({...p,stage:e.target.value}))}
                     className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                    {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                    {STAGES.map(s=><option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Activity Type</label>
-                  <select value={form.activity_type} onChange={e => setForm(p => ({ ...p, activity_type: e.target.value }))}
+                  <select value={form.activity_type} onChange={e=>setForm(p=>({...p,activity_type:e.target.value}))}
                     className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                    {ACTIVITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    {ACTIVITY_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Date</label>
-                  <input type="date" value={form.activity_date} onChange={e => setForm(p => ({ ...p, activity_date: e.target.value }))}
+                  <input type="date" value={form.activity_date} onChange={e=>setForm(p=>({...p,activity_date:e.target.value}))}
                     className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
                 </div>
                 <div className="col-span-3">
                   <label className="text-xs text-gray-500 block mb-1">Description</label>
-                  <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                  <textarea value={form.description} onChange={e=>setForm(p=>({...p,description:e.target.value}))}
                     rows={2} placeholder="Activity description..."
                     className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full resize-none" />
                 </div>
-                <div className="col-span-3 flex items-center gap-2">
-                  <input type="checkbox" checked={form.apply_to_all_sections}
-                    onChange={e => setForm(p => ({ ...p, apply_to_all_sections: e.target.checked }))}
-                    className="w-4 h-4 accent-indigo-600" />
-                  <label className="text-sm text-gray-700">Apply to all sections of this grade</label>
-                </div>
               </div>
 
-              {/* Competency mapping */}
+              {/* Multi-section selection */}
+              {form.grade && sections.length > 0 && (
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1 font-semibold">
+                    Sections * ({form.sections.length} selected)
+                    <button onClick={()=>setForm(p=>({...p,sections:[...sections]}))} className="ml-2 text-indigo-600 hover:underline text-xs font-normal">All</button>
+                    <button onClick={()=>setForm(p=>({...p,sections:[]}))} className="ml-2 text-gray-400 hover:underline text-xs font-normal">Clear</button>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {sections.map(s=>(
+                      <button key={s} onClick={()=>setForm(p=>({...p,sections:p.sections.includes(s)?p.sections.filter(x=>x!==s):[...p.sections,s]}))}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-medium ${form.sections.includes(s)?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>{s}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Competency selection */}
               {competencies.length > 0 && (
-                <div className="mb-3">
+                <div>
                   <label className="text-xs font-semibold text-gray-600 block mb-2">
-                    Map Competencies ({form.competency_mappings.length} selected)
+                    Competencies ({selectedComps.length} selected) *
                   </label>
                   <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
-                    {Object.entries(
-                      competencies.reduce((acc: any, c: any) => {
-                        const d = c.domain || "General";
-                        if (!acc[d]) acc[d] = [];
-                        acc[d].push(c);
-                        return acc;
-                      }, {})
-                    ).map(([domain, comps]: [string, any]) => (
+                    {Object.entries(competencies.reduce((acc:any,c:any)=>{const d=c.domain||"General";if(!acc[d])acc[d]=[];acc[d].push(c);return acc;},{})).map(([domain,comps]:[string,any])=>(
                       <div key={domain}>
                         <p className="text-xs font-bold text-indigo-700 mb-1 mt-2">{domain}</p>
-                        {comps.map((c: any) => (
-                          <label key={c.id} className="flex items-start gap-2 p-1.5 rounded hover:bg-gray-50 cursor-pointer">
-                            <input type="checkbox"
-                              checked={form.competency_mappings.includes(c.id)}
-                              onChange={e => setForm(p => ({
-                                ...p,
-                                competency_mappings: e.target.checked
-                                  ? [...p.competency_mappings, c.id]
-                                  : p.competency_mappings.filter(x => x !== c.id),
-                              }))}
+                        {comps.map((c:any)=>(
+                          <label key={c.id} className={`flex items-start gap-2 p-1.5 rounded hover:bg-gray-50 cursor-pointer ${selectedComps.includes(c.id)?"bg-indigo-50":""}`}>
+                            <input type="checkbox" checked={selectedComps.includes(c.id)}
+                              onChange={e=>{
+                                if(e.target.checked){
+                                  setSelectedComps(p=>[...p,c.id]);
+                                  setRubrics(r=>({...r,[c.id]:{items:[{name:"",max_marks:0}]}}));
+                                  setForm(p=>({...p,competency_mappings:[...p.competency_mappings,c.id]}));
+                                } else {
+                                  setSelectedComps(p=>p.filter(x=>x!==c.id));
+                                  setRubrics(r=>{const n={...r};delete n[c.id];return n;});
+                                  setForm(p=>({...p,competency_mappings:p.competency_mappings.filter(x=>x!==c.id)}));
+                                }
+                              }}
                               className="mt-0.5 w-3.5 h-3.5 accent-indigo-600 flex-shrink-0" />
                             <div>
-                              <span className="text-xs font-medium text-indigo-600">{c.competency_code}</span>
-                              <span className="text-xs text-gray-600 ml-1">{c.description?.substring(0, 80)}</span>
+                              <span className="text-xs font-medium text-indigo-600">{c.competency_code||c.code}</span>
+                              <span className="text-xs text-gray-600 ml-1">{(c.description||c.name)?.substring(0,80)}</span>
                             </div>
                           </label>
                         ))}
@@ -474,18 +505,60 @@ export default function ActivitiesPage() {
                 </div>
               )}
 
-              <div className="flex gap-2">
+              {/* Rubrics per competency */}
+              {selectedComps.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-gray-700">Rubrics per Competency *</label>
+                    <span className="text-xs text-indigo-600 font-bold">
+                      Total Max: {selectedComps.reduce((sum,cid)=>sum+(rubrics[cid]?.items||[]).reduce((s,i)=>s+(+i.max_marks||0),0),0)} marks
+                    </span>
+                  </div>
+                  {selectedComps.map(cid=>{
+                    const comp = competencies.find((c:any)=>c.id===cid);
+                    const rub = rubrics[cid];
+                    if (!rub) return null;
+                    const compMax = rub.items.reduce((s,i)=>s+(+i.max_marks||0),0);
+                    return (
+                      <div key={cid} className="border border-indigo-200 rounded-xl p-3 bg-indigo-50 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-indigo-700">[{comp?.competency_code||comp?.code}] {(comp?.description||comp?.name)?.slice(0,60)}</span>
+                          <span className="text-xs text-indigo-600 font-bold">Max: {compMax} marks</span>
+                        </div>
+                        {rub.items.map((item,i)=>(
+                          <div key={i} className="flex gap-2 items-center">
+                            <span className="text-xs text-gray-500 w-14 shrink-0">Rubric {i+1}</span>
+                            <input value={item.name} onChange={e=>{const items=[...rub.items];items[i]={...items[i],name:e.target.value};setRubrics(r=>({...r,[cid]:{items}}));}}
+                              placeholder="e.g. Grammar accuracy"
+                              className="border border-gray-300 rounded px-2 py-1 text-xs flex-1" />
+                            <input type="number" min={0} value={item.max_marks||""} onChange={e=>{const items=[...rub.items];items[i]={...items[i],max_marks:+e.target.value};setRubrics(r=>({...r,[cid]:{items}}));}}
+                              placeholder="Marks" className="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center" />
+                            <span className="text-xs text-gray-400">marks</span>
+                            {rub.items.length>1&&(
+                              <button onClick={()=>{const items=rub.items.filter((_,j)=>j!==i);setRubrics(r=>({...r,[cid]:{items}}));}} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                            )}
+                          </div>
+                        ))}
+                        {rub.items.length<8&&(
+                          <button onClick={()=>setRubrics(r=>({...r,[cid]:{items:[...rub.items,{name:"",max_marks:0}]}}))} className="text-xs text-indigo-600 hover:underline">+ Add Rubric Item</button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2 border-t border-gray-100">
                 <button onClick={saveActivity} className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
                   {editActivity ? "Update" : "Create Activity"}
                 </button>
-                <button onClick={() => { setShowAddForm(false); setEditActivity(null); }}
+                <button onClick={()=>{setShowAddForm(false);setEditActivity(null);}}
                   className="px-4 py-1.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
                   Cancel
                 </button>
               </div>
             </div>
           )}
-
           {/* Activities list */}
           <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
@@ -546,125 +619,124 @@ export default function ActivitiesPage() {
       {/* ── MARKS ENTRY TAB ── */}
       {activeTab === "marks" && (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
-            <h2 className="text-sm font-bold text-gray-700 mb-3">Select Class & Subject</h2>
-            <div className="flex gap-3 flex-wrap items-end">
+          {/* Filters */}
+          <div className="bg-white rounded-xl shadow p-4 flex gap-3 flex-wrap items-end">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Grade</label>
+              <select value={marksGrade} onChange={e=>{setMarksGrade(e.target.value);setMarksSection("");setMarksSubject("");setCombinedMarks(null);}}
+                className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+                <option value="">Select Grade</option>
+                {CLASSES.map(g=><option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            {marksGrade && (
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Grade</label>
-                <select value={marksGrade} onChange={e => { setMarksGrade(e.target.value); setMarksSection(""); setMarksSubject(""); setCombinedMarks(null); }}
+                <label className="text-xs text-gray-500 block mb-1">Section</label>
+                <select value={marksSection} onChange={e=>{setMarksSection(e.target.value);setCombinedMarks(null);}}
                   className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                  <option value="">Select Grade</option>
-                  {CLASSES.map(g => <option key={g} value={g}>{g}</option>)}
+                  <option value="">Select Section</option>
+                  {marksSections.map(s=><option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
-              {marksGrade && (
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Section</label>
-                  <select value={marksSection} onChange={e => { setMarksSection(e.target.value); setCombinedMarks(null); }}
-                    className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                    <option value="">Select Section</option>
-                    {marksSections.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-              )}
-              {marksGrade && (
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Subject</label>
-                  <select value={marksSubject} onChange={e => { setMarksSubject(e.target.value); setCombinedMarks(null); }}
-                    className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                    <option value="">Select Subject</option>
-                    {marksSubjects.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-              )}
-            </div>
+            )}
+            {marksSection && (
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Subject</label>
+                <select value={marksSubject} onChange={e=>setMarksSubject(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+                  <option value="">Select Subject</option>
+                  {marksSubjects.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            )}
           </div>
 
           {combinedMarks && (
             <div className="space-y-6">
-              {/* One table per activity — newest first (leftmost activities) */}
-              {(combinedMarks.activities || []).map((activity: any, actIdx: number) => {
-                const actCompetencies = (activity.competency_mappings || [])
-                  .map((id: string) => combinedMarks.competencies?.find((c: any) => c.id === id))
-                  .filter(Boolean);
-
-                if (!actCompetencies.length) return null;
-
-                // Group by domain
-                const byDomain = actCompetencies.reduce((acc: any, c: any) => {
-                  const d = c.domain || "General";
-                  if (!acc[d]) acc[d] = [];
-                  acc[d].push(c);
-                  return acc;
-                }, {});
-
+              {(combinedMarks.activities || []).map((activity: any) => {
+                const rubricsList = activity.rubrics || [];
+                if (!rubricsList.length) return null;
                 return (
                   <div key={activity.id} className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+                    <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between">
                       <div>
-                        <h3 className="text-sm font-bold text-gray-800">
-                          {actIdx === 0 && <span className="bg-indigo-600 text-white text-xs px-2 py-0.5 rounded mr-2">Latest</span>}
-                          Activity {combinedMarks.activities.length - actIdx}: {activity.name}
-                        </h3>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {activity.activity_date} · {activity.activity_type} · {actCompetencies.length} competencies
-                        </p>
+                        <p className="text-sm font-bold text-indigo-800">{activity.name}</p>
+                        <p className="text-xs text-indigo-600">{activity.activity_date} · {rubricsList.length} competencies · Max: {activity.total_max_marks} marks</p>
                       </div>
-                      <button onClick={() => saveActivityMarks(activity.id)} disabled={saving}
-                        className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-                        {saving ? "Saving..." : "💾 Save"}
+                      <button onClick={()=>saveActivityMarks(activity.id)} disabled={saving}
+                        className="px-4 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+                        {saving?"Saving...":"💾 Save Marks"}
                       </button>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs border-collapse"
-                        style={{ minWidth: `${280 + actCompetencies.length * 110}px` }}>
-                        <thead>
+                      <table className="w-full text-xs border-collapse">
+                        <thead className="sticky top-0 z-10">
                           <tr className="bg-indigo-700 text-white">
-                            <th className="px-3 py-2 text-left sticky left-0 z-20 bg-indigo-700 border-r border-indigo-600 min-w-[180px]">Student</th>
-                            {Object.entries(byDomain).map(([domain, comps]: [string, any]) => (
-                              comps.map((c: any, ci: number) => (
-                                <th key={c.id} className={`px-2 py-2 text-center min-w-[100px] ${ci === 0 ? "border-l border-indigo-500" : ""}`}>
-                                  <div className="text-xs text-indigo-200">{domain}</div>
-                                  <div className="text-xs">{c.competency_code}</div>
-                                </th>
-                              ))
+                            <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[160px]">Student</th>
+                            {rubricsList.map((rub: any) => (
+                              <th key={rub.competency_id} className="px-2 py-2 text-center border-l border-indigo-600" colSpan={(rub.rubric_items||[]).length+1}>
+                                <div className="text-xs font-bold">[{rub.competency_code}]</div>
+                                <div className="text-xs text-indigo-200 font-normal">{rub.competency_name?.slice(0,40)}</div>
+                              </th>
                             ))}
-                            <th className="px-3 py-2 text-center sticky right-0 z-20 bg-indigo-700 border-l border-indigo-600 min-w-[90px]">Avg</th>
+                            <th className="px-2 py-2 text-center border-l border-indigo-600 min-w-[70px]">Total</th>
+                            <th className="px-2 py-2 text-center min-w-[55px]">%</th>
+                            <th className="px-2 py-2 text-center min-w-[90px]">Level</th>
+                          </tr>
+                          <tr className="bg-indigo-600 text-white">
+                            <th className="px-3 py-1 sticky left-0 bg-indigo-600"></th>
+                            {rubricsList.map((rub: any) => (
+                              <>{(rub.rubric_items||[]).map((item: any, i: number) => (
+                                <th key={i} className="px-2 py-1 text-center border-l border-indigo-500 min-w-[70px]">
+                                  <div className="text-xs truncate max-w-[100px]">{item.name}</div>
+                                  <div className="text-indigo-200 text-xs">/{item.max_marks}</div>
+                                </th>
+                              ))}
+                              <th className="px-2 py-1 text-center border-l border-indigo-500 bg-indigo-800 min-w-[50px]">
+                                /{(rub.rubric_items||[]).reduce((s:number,it:any)=>s+(+it.max_marks||0),0)}
+                              </th></>
+                            ))}
+                            <th className="px-2 py-1 text-center border-l border-indigo-500 bg-indigo-800">/{activity.total_max_marks}</th>
+                            <th className="px-2 py-1"></th>
+                            <th className="px-2 py-1"></th>
                           </tr>
                         </thead>
                         <tbody>
-                          {(combinedMarks.students || []).map((student: any, si: number) => {
-                            const bg = si % 2 === 0 ? "bg-white" : "bg-gray-50";
-                            const studentRatings = localRatings[student.student_id]?.[activity.id] || {};
-                            const vals = actCompetencies.map((c: any) => RATING_SCORE[studentRatings[c.id]] || 0).filter(v => v > 0);
-                            const avg = vals.length ? vals.reduce((a: number, b: number) => a + b, 0) / vals.length : 0;
+                          {(combinedMarks.students || []).map((s: any, idx: number) => {
+                            // calc total for this activity
+                            let obtained = 0; let max = 0;
+                            rubricsList.forEach((rub: any) => {
+                              (rub.rubric_items||[]).forEach((item: any, i: number) => {
+                                max += +(item.max_marks||0);
+                                obtained += +(localMarks[s.student_id]?.[rub.competency_id]?.[String(i)]||0);
+                              });
+                            });
+                            const pct = max > 0 ? +((obtained/max)*100).toFixed(1) : 0;
+                            const level = getLevel(pct);
                             return (
-                              <tr key={student.student_id} className={`border-b border-gray-100 ${bg}`}>
-                                <td className={`px-3 py-1.5 font-medium text-gray-800 sticky left-0 z-10 border-r border-gray-200 ${bg}`}>
-                                  {student.student_name}
-                                </td>
-                                {actCompetencies.map((c: any) => {
-                                  const rating = studentRatings[c.id] || "";
+                              <tr key={s.student_id} className={idx%2===0?"bg-white":"bg-gray-50"}>
+                                <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
+                                {rubricsList.map((rub: any) => {
+                                  const compObtained = (rub.rubric_items||[]).reduce((sum:number,_:any,i:number)=>sum+(+(localMarks[s.student_id]?.[rub.competency_id]?.[String(i)]||0)),0);
+                                  const compMax = (rub.rubric_items||[]).reduce((sm:number,it:any)=>sm+(+it.max_marks||0),0);
                                   return (
-                                    <td key={c.id} className={`px-1 py-1 text-center border-l border-gray-100 ${bg}`}>
-                                      <select value={rating}
-                                        onChange={e => updateRating(student.student_id, activity.id, c.id, e.target.value)}
-                                        className={`text-xs border rounded px-1 py-0.5 w-full ${rating ? RATING_COLORS[rating] : "border-gray-200"}`}>
-                                        <option value="">—</option>
-                                        <option value="beginning">Beginning</option>
-                                        <option value="approaching">Approaching</option>
-                                        <option value="meeting">Meeting</option>
-                                        <option value="exceeding">Exceeding</option>
-                                      </select>
-                                    </td>
+                                    <>{(rub.rubric_items||[]).map((item: any, i: number) => (
+                                      <td key={i} className="px-2 py-1 text-center border-l border-gray-100">
+                                        <input type="number" min={0} max={item.max_marks}
+                                          value={localMarks[s.student_id]?.[rub.competency_id]?.[String(i)]??""}
+                                          onChange={e=>{const v=e.target.value===""?null:Math.min(+e.target.value,item.max_marks);updateMark(s.student_id,rub.competency_id,String(i),v);}}
+                                          className="border border-gray-200 rounded px-1 py-0.5 w-14 text-center text-xs" />
+                                      </td>
+                                    ))}
+                                    <td className="px-2 py-1 text-center border-l border-gray-200 font-bold text-indigo-700 bg-indigo-50">
+                                      {compObtained}/{compMax}
+                                    </td></>
                                   );
                                 })}
-                                <td className={`px-3 py-1.5 text-center sticky right-0 z-10 border-l border-gray-200 ${bg}`}>
-                                  {avg > 0 ? (
-                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(avg)}`}>
-                                      {avg.toFixed(1)}
-                                    </span>
-                                  ) : <span className="text-gray-300">—</span>}
+                                <td className="px-2 py-1 text-center border-l border-gray-200 font-bold">{obtained}/{max}</td>
+                                <td className="px-2 py-1 text-center font-bold text-indigo-700">{pct>0?`${pct}%`:"-"}</td>
+                                <td className="px-2 py-1 text-center">
+                                  {pct>0&&<span className={`px-2 py-0.5 rounded-full text-xs font-bold ${LEVEL_COLOR[level]||""}`}>{level}</span>}
                                 </td>
                               </tr>
                             );
@@ -675,97 +747,14 @@ export default function ActivitiesPage() {
                   </div>
                 );
               })}
-
-              {/* Competency averages summary */}
-              {combinedMarks.students?.length > 0 && (
-                <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
-                  <h3 className="text-sm font-bold text-gray-700 mb-3">
-                    Competency Averages — {marksGrade} {marksSection} ({combinedMarks.students.length} students)
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs border-collapse"
-                      style={{ minWidth: `${280 + (combinedMarks.competencies?.length || 0) * 90}px` }}>
-                      <thead>
-                        <tr className="bg-indigo-700 text-white">
-                          <th className="px-3 py-2 text-left sticky left-0 z-20 bg-indigo-700 border-r border-indigo-600 min-w-[180px]">Student</th>
-                          {(combinedMarks.competencies || []).map((c: any) => (
-                            <th key={c.id} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[85px]">
-                              <div className="text-xs text-indigo-200">{c.domain}</div>
-                              <div className="text-xs">{c.competency_code}</div>
-                            </th>
-                          ))}
-                          {combinedMarks.domains?.map((d: string) => (
-                            <th key={d} className="px-2 py-2 text-center border-l border-indigo-500 min-w-[90px] bg-indigo-800">
-                              <div className="text-xs text-indigo-200">Domain Avg</div>
-                              <div className="text-xs">{d}</div>
-                            </th>
-                          ))}
-                          <th className="px-3 py-2 text-center sticky right-0 z-20 bg-indigo-700 border-l border-indigo-600 min-w-[90px]">Overall</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...(combinedMarks.students || [])].sort((a: any, b: any) => b.overall_avg - a.overall_avg).map((student: any, si: number) => {
-                          const bg = si % 2 === 0 ? "bg-white" : "bg-gray-50";
-                          return (
-                            <tr key={student.student_id} className={`border-b border-gray-100 ${bg}`}>
-                              <td className={`px-3 py-1.5 font-medium text-gray-800 sticky left-0 z-10 border-r border-gray-200 ${bg}`}>
-                                {student.student_name}
-                              </td>
-                              {(combinedMarks.competencies || []).map((c: any) => {
-                                const data = student.competency_avgs?.[c.id];
-                                return (
-                                  <td key={c.id} className={`px-2 py-1.5 text-center border-l border-gray-100 ${bg}`}>
-                                    {data ? (
-                                      <div>
-                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(data.avg)}`}>
-                                          {data.avg.toFixed(1)}
-                                        </span>
-                                        <div className="text-xs text-gray-400 mt-0.5">{data.rating}</div>
-                                        <div className="text-xs text-gray-300">{data.count}x</div>
-                                      </div>
-                                    ) : <span className="text-gray-300">—</span>}
-                                  </td>
-                                );
-                              })}
-                              {combinedMarks.domains?.map((d: string) => {
-                                const domAvg = student.domain_avgs?.[d] || 0;
-                                return (
-                                  <td key={d} className={`px-2 py-1.5 text-center border-l border-gray-100 bg-indigo-50 ${bg}`}>
-                                    {domAvg > 0 ? (
-                                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(domAvg)}`}>
-                                        {domAvg.toFixed(1)}
-                                      </span>
-                                    ) : <span className="text-gray-300">—</span>}
-                                  </td>
-                                );
-                              })}
-                              <td className={`px-3 py-1.5 text-center sticky right-0 z-10 border-l border-gray-200 ${bg}`}>
-                                {student.overall_avg > 0 ? (
-                                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(student.overall_avg)}`}>
-                                    {student.overall_avg.toFixed(2)}
-                                  </span>
-                                ) : <span className="text-gray-300">—</span>}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+              {(combinedMarks.activities||[]).length===0&&(
+                <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No activities found for {marksGrade} · {marksSection} · {marksSubject}</div>
               )}
-            </div>
-          )}
-
-          {!combinedMarks && marksGrade && marksSection && marksSubject && (
-            <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
-              <p className="text-sm">No activities found for {marksGrade} — {marksSection} — {marksSubject}</p>
             </div>
           )}
         </div>
       )}
 
-      {/* ── DASHBOARD TAB ── */}
       {activeTab === "dashboard" && (
         <div>
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1 flex-nowrap">
@@ -1182,7 +1171,7 @@ export default function ActivitiesPage() {
                           <span className="text-xs font-medium text-gray-800">{s.name}</span>
                           <span className="text-xs text-gray-400">{s.section}</span>
                         </div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.avg)}`}>{s.avg.toFixed(2)}/4</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.avg_pct||s.avg*25||0)}`}>{s.avg.toFixed(2)}/4</span>
                       </div>
                     ))}
                   </div>
@@ -1235,7 +1224,7 @@ export default function ActivitiesPage() {
                           <span className="text-xs font-bold text-red-700">{c.competency_code}</span>
                           <span className="text-xs text-gray-500 ml-2">{c.domain}</span>
                         </div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(c.avg)}`}>{c.avg.toFixed(2)}/4</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(c.avg_pct||c.avg*25||0)}`}>{c.avg.toFixed(2)}/4</span>
                       </div>
                     ))}
                   </div>
@@ -1299,7 +1288,7 @@ export default function ActivitiesPage() {
                       <div key={s.subject} className="flex items-center justify-between p-2 rounded border border-gray-100">
                         <span className="text-xs font-medium text-gray-700">{s.subject}</span>
                         <div className="flex items-center gap-2">
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.avg)}`}>{s.avg.toFixed(2)}/4</span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.avg_pct||s.avg*25||0)}`}>{s.avg.toFixed(2)}/4</span>
                           <span className="text-xs text-gray-400">{s.level?.split("–")[0].trim()}</span>
                         </div>
                       </div>
@@ -1347,7 +1336,7 @@ export default function ActivitiesPage() {
                             <td className="px-3 py-2 text-gray-600">{c.domain}</td>
                             <td className="px-3 py-2 text-gray-600">{c.subject}</td>
                             <td className="px-3 py-2 text-center">
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(c.avg)}`}>{c.avg.toFixed(2)}/4</span>
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(c.avg_pct||c.avg*25||0)}`}>{c.avg.toFixed(2)}/4</span>
                             </td>
                             <td className="px-3 py-2 text-center">
                               <span className={`text-xs px-2 py-0.5 rounded border ${RATING_COLORS[c.rating?.toLowerCase()] || "bg-gray-100"}`}>{c.rating}</span>

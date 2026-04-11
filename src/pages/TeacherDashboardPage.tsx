@@ -1563,345 +1563,399 @@ function PASATab({ user, mappings, academicYear }: any) {
 function ActivitiesTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
   const ACTIVITY_TYPES = ["Individual","Group","Project","Assessment","Workshop","Other"];
-  const CROSS_CURRICULAR = ["arts","vocational_education","interdisciplinary"];
-  const CROSS_LABELS: Record<string,string> = { arts: "Arts", vocational_education: "Vocational Education", interdisciplinary: "Interdisciplinary" };
-  const RATING_COLORS: Record<string, string> = {
-    beginning: "bg-red-100 text-red-700 border-red-300",
-    approaching: "bg-yellow-100 text-yellow-700 border-yellow-300",
-    meeting: "bg-green-100 text-green-700 border-green-300",
-    exceeding: "bg-purple-100 text-purple-700 border-purple-300"
+  const LEVELS = ["Beginning","Developing","Approaching","Meeting","Exceeding","Proficient","Advanced","Mastery"];
+  const LEVEL_COLOR: Record<string,string> = {
+    Beginning:"bg-red-100 text-red-700", Developing:"bg-orange-100 text-orange-700",
+    Approaching:"bg-yellow-100 text-yellow-700", Meeting:"bg-lime-100 text-lime-700",
+    Exceeding:"bg-green-100 text-green-700", Proficient:"bg-teal-100 text-teal-700",
+    Advanced:"bg-blue-100 text-blue-700", Mastery:"bg-purple-100 text-purple-700",
   };
-  const GRADE_TO_STAGE: Record<string, string> = {
+  const GRADE_TO_STAGE: Record<string,string> = {
     "Pre-KG":"foundation","LKG":"foundation","UKG":"foundation",
     "Grade 1":"foundation","Grade 2":"foundation",
     "Grade 3":"preparatory","Grade 4":"preparatory","Grade 5":"preparatory",
     "Grade 6":"middle","Grade 7":"middle","Grade 8":"middle",
     "Grade 9":"secondary","Grade 10":"secondary",
   };
-  const normalizeSubject = (s: string) => s.trim().toLowerCase().replace(/\s+/g,'_').replace(/[()]/g,'');
+  const normalizeSubject = (s: string) => s.trim().toLowerCase().replace(/\s+/g,"_").replace(/[()]/g,"");
 
   const [subTab, setSubTab] = useState<"create"|"marks"|"coverage"|"analysis">("create");
   const [activities, setActivities] = useState<any[]>([]);
-  const [selectedActivity, setSelectedActivity] = useState<any>(null);
-  const [combinedMarks, setCombinedMarks] = useState<any>(null);
-  const [localRatings, setLocalRatings] = useState<Record<string,Record<string,Record<string,string>>>>({});
-  const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [coverage, setCoverage] = useState<any>(null);
-  const [coverageGrade, setCoverageGrade] = useState("");
 
-  // Build teacher's combos
-  const combos: { grade: string; section: string; subject: string }[] = [];
+  // Build teacher combos from mappings
+  const allMappings: any[] = mappings?.mappings || [];
   const gradeSet = new Set<string>();
   const sectionsByGrade: Record<string,string[]> = {};
-  if (mappings?.mappings) {
-    const seen = new Set<string>();
-    mappings.mappings.forEach((m: any) => {
-      if (!m.subject) return;
-      const key = `${m.grade}||${m.section}||${m.subject}`;
-      if (!seen.has(key)) { seen.add(key); combos.push({ grade: m.grade, section: m.section, subject: m.subject }); }
-      gradeSet.add(m.grade);
-      if (!sectionsByGrade[m.grade]) sectionsByGrade[m.grade] = [];
-      if (!sectionsByGrade[m.grade].includes(m.section)) sectionsByGrade[m.grade].push(m.section);
-    });
-  }
-  const allSubjects = [...new Set(combos.map(c => c.subject))].sort();
+  const subjectSet = new Set<string>();
+  allMappings.forEach((m: any) => {
+    if (!m.subject) return;
+    gradeSet.add(m.grade);
+    subjectSet.add(m.subject);
+    if (!sectionsByGrade[m.grade]) sectionsByGrade[m.grade] = [];
+    if (!sectionsByGrade[m.grade].includes(m.section)) sectionsByGrade[m.grade].push(m.section);
+  });
   const allGrades = [...gradeSet].sort();
+  const allSubjects = [...subjectSet].sort();
 
-  // Form state
+  // Create form state
   const [form, setForm] = useState({
-    name: "", description: "", grade: allGrades[0] || "",
-    sections: [] as string[], // multi-section
-    subject: allSubjects[0] || "", activity_type: "Individual",
-    activity_date: new Date().toISOString().split("T")[0],
-    competency_areas: [] as string[],
-    competency_mappings: [] as string[],
+    name: "", description: "", grade: allGrades[0]||"",
+    sections: [] as string[], subject: allSubjects[0]||"",
+    activity_type: "Individual", activity_date: new Date().toISOString().split("T")[0],
   });
   const [competencies, setCompetencies] = useState<any[]>([]);
-  const [crossCompetencies, setCrossCompetencies] = useState<Record<string,any[]>>({});
+  const [selectedComps, setSelectedComps] = useState<string[]>([]);
+  // rubrics: { [competency_id]: { name: string, items: [{name:string, max_marks:number}] } }
+  const [rubrics, setRubrics] = useState<Record<string,{name:string,items:{name:string,max_marks:number}[]}>>({});
+  const [savingActivity, setSavingActivity] = useState(false);
 
-  const sectionsForGrade = sectionsByGrade[form.grade] || [];
+  // Marks entry state
+  const [selectedActivity, setSelectedActivity] = useState<any>(null);
+  const [marksData, setMarksData] = useState<any>(null);
+  // { student_id: { competency_id: { rubric_index: marks } } }
+  const [localMarks, setLocalMarks] = useState<Record<string,Record<string,Record<string,number|null>>>>({});
+  const [savingMarks, setSavingMarks] = useState(false);
+
+  // Coverage
+  const [coverageGrade, setCoverageGrade] = useState("");
+  const [coverage, setCoverage] = useState<any>(null);
 
   useEffect(() => { fetchActivities(); }, [academicYear]);
   useEffect(() => {
     if (form.grade && form.subject) fetchCompetencies();
-    // Reset sections when grade changes
-    setForm(p => ({ ...p, sections: [], competency_mappings: [] }));
+    setForm(p => ({ ...p, sections: [], }));
+    setSelectedComps([]);
+    setRubrics({});
   }, [form.grade, form.subject]);
-  useEffect(() => { if (form.competency_areas.length) fetchCrossCompetencies(); }, [form.competency_areas, form.grade]);
-  useEffect(() => { if (selectedActivity) fetchCombinedMarks(); }, [selectedActivity]);
-  useEffect(() => { if (subTab === "coverage" && coverageGrade) fetchCoverage(); }, [subTab, coverageGrade]);
+  useEffect(() => { if (selectedActivity) fetchMarksData(); }, [selectedActivity]);
+  useEffect(() => { if (subTab==="coverage" && coverageGrade) fetchCoverage(); }, [subTab, coverageGrade]);
 
   const fetchActivities = async () => {
     try {
-      const results = await Promise.all(allGrades.map(async grade => {
-        try {
-          const r = await axios.get(`${API}/activities?academic_year=${academicYear}&grade=${encodeURIComponent(grade)}`);
-          return r.data || [];
-        } catch { return []; }
-      }));
+      const results = await Promise.all(allGrades.map(grade =>
+        axios.get(`${API}/activities?academic_year=${academicYear}&grade=${encodeURIComponent(grade)}`).then(r=>r.data||[]).catch(()=>[])
+      ));
       const merged = results.flat();
       const seen = new Set<string>();
-      setActivities(merged.filter((a: any) => { if (seen.has(a.id)) return false; seen.add(a.id); return true; }));
+      setActivities(merged.filter((a:any)=>{ if(seen.has(a.id))return false; seen.add(a.id); return true; }));
     } catch {}
   };
 
   const fetchCompetencies = async () => {
     try {
-      const subjectNorm = normalizeSubject(form.subject);
-      const stage = GRADE_TO_STAGE[form.grade] || "middle";
-      let data: any[] = [];
-      // Try grade + subject first
-      const r = await axios.get(`${API}/activities/competencies?grade=${encodeURIComponent(form.grade)}&subject=${encodeURIComponent(subjectNorm)}`);
-      data = r.data || [];
-      // Fallback: try stage + subject
+      const subNorm = normalizeSubject(form.subject);
+      const stage = GRADE_TO_STAGE[form.grade]||"middle";
+      let r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(subNorm)}&grade=${encodeURIComponent(form.grade)}`);
+      let data = r.data?.competencies || r.data || [];
       if (!data.length) {
-        const r2 = await axios.get(`${API}/activities/competencies?stage=${encodeURIComponent(stage)}&subject=${encodeURIComponent(subjectNorm)}`);
-        data = r2.data || [];
+        r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(subNorm)}&stage=${encodeURIComponent(stage)}`);
+        data = r.data?.competencies || r.data || [];
       }
       setCompetencies(data);
     } catch { setCompetencies([]); }
   };
 
-  const fetchCrossCompetencies = async () => {
-    const map: Record<string,any[]> = {};
-    for (const area of form.competency_areas) {
-      try {
-        const stage = GRADE_TO_STAGE[form.grade] || "middle";
-        const r = await axios.get(`${API}/activities/competencies?stage=${encodeURIComponent(stage)}&subject=${encodeURIComponent(area)}`);
-        map[area] = r.data || [];
-      } catch { map[area] = []; }
-    }
-    setCrossCompetencies(map);
-  };
-
-  const fetchCombinedMarks = async () => {
+  const fetchMarksData = async () => {
     if (!selectedActivity) return;
     try {
-      const r = await axios.get(`${API}/activities/combined-marks/${encodeURIComponent(selectedActivity.grade)}/${encodeURIComponent(selectedActivity.section)}/${encodeURIComponent(selectedActivity.subject)}?academic_year=${academicYear}`);
-      setCombinedMarks(r.data);
-      const init: Record<string,Record<string,Record<string,string>>> = {};
-      (r.data?.students || []).forEach((s: any) => {
-        init[s.student_id] = {};
-        (r.data?.activities || []).forEach((act: any) => { init[s.student_id][act.id] = { ...(s.activity_data?.[act.id] || {}) }; });
+      const r = await axios.get(`${API}/activities/${selectedActivity.id}/marks?academic_year=${academicYear}`);
+      setMarksData(r.data);
+      // Initialize localMarks from existing data
+      const init: Record<string,Record<string,Record<string,number|null>>> = {};
+      (r.data?.students || []).forEach((s:any) => {
+        init[s.student.id] = {};
+        const cm = s.assessment?.competency_marks || {};
+        (r.data?.rubrics || []).forEach((rub:any) => {
+          init[s.student.id][rub.competency_id] = {};
+          (rub.rubric_items||[]).forEach((_:any, i:number) => {
+            init[s.student.id][rub.competency_id][String(i)] = cm[rub.competency_id]?.[String(i)] ?? null;
+          });
+        });
       });
-      setLocalRatings(init);
+      setLocalMarks(init);
     } catch {}
   };
 
   const fetchCoverage = async () => {
     if (!coverageGrade) return;
     try {
-      // Try with section-based coverage first (most accurate)
-      const sectionForGrade = (mappings?.mappings || []).find((m: any) => m.grade === coverageGrade)?.section;
-      if (sectionForGrade) {
-        const r = await axios.get(`${API}/activities/coverage/section/${encodeURIComponent(coverageGrade)}/${encodeURIComponent(sectionForGrade)}?academic_year=${academicYear}`);
+      const sec = sectionsByGrade[coverageGrade]?.[0];
+      if (sec) {
+        const r = await axios.get(`${API}/activities/coverage/section/${encodeURIComponent(coverageGrade)}/${encodeURIComponent(sec)}?academic_year=${academicYear}`);
         if (r.data?.total > 0) { setCoverage(r.data); return; }
       }
-      // Try subject-based coverage
-      const subjectNorm = normalizeSubject(allSubjects[0] || "");
-      const r = await axios.get(`${API}/activities/coverage/detail/${encodeURIComponent(coverageGrade)}/${encodeURIComponent(subjectNorm)}?academic_year=${academicYear}`);
-      let data = r.data;
-      if (!data?.total) {
-        const ar = await axios.get(`${API}/activities?academic_year=${academicYear}&grade=${encodeURIComponent(coverageGrade)}`);
-        const acts = ar.data || [];
-        const allMappedIds = new Set<string>();
-        acts.forEach((a: any) => (a.competency_mappings || []).forEach((id: string) => allMappedIds.add(id)));
-        data = { total: allMappedIds.size, covered: allMappedIds.size, uncovered: 0, coverage_percent: allMappedIds.size > 0 ? 100 : 0, covered_competencies: [], uncovered_competencies: [], note: "Coverage based on activities created." };
-      }
-      setCoverage(data);
+      const subNorm = normalizeSubject(allSubjects[0]||"");
+      const r = await axios.get(`${API}/activities/coverage/detail/${encodeURIComponent(coverageGrade)}/${encodeURIComponent(subNorm)}?academic_year=${academicYear}`);
+      setCoverage(r.data);
     } catch { setCoverage(null); }
   };
 
+  const toggleComp = (id: string) => {
+    setSelectedComps(prev => {
+      if (prev.includes(id)) {
+        const next = prev.filter(x=>x!==id);
+        setRubrics(r => { const n={...r}; delete n[id]; return n; });
+        return next;
+      }
+      // Add with default empty rubric
+      const comp = competencies.find(c=>c.id===id);
+      setRubrics(r => ({...r, [id]: { name: comp?.name||comp?.description||"", items:[{name:"",max_marks:0}] }}));
+      return [...prev, id];
+    });
+  };
+
+  const addRubricItem = (compId: string) => {
+    setRubrics(r => ({...r, [compId]: {...r[compId], items:[...r[compId].items, {name:"",max_marks:0}]}}));
+  };
+
+  const removeRubricItem = (compId: string, idx: number) => {
+    setRubrics(r => ({...r, [compId]: {...r[compId], items: r[compId].items.filter((_,i)=>i!==idx)}}));
+  };
+
+  const updateRubricItem = (compId: string, idx: number, field: "name"|"max_marks", value: any) => {
+    setRubrics(r => {
+      const items = [...r[compId].items];
+      items[idx] = {...items[idx], [field]: field==="max_marks"?+value:value};
+      return {...r, [compId]: {...r[compId], items}};
+    });
+  };
+
+  const totalMaxMarks = selectedComps.reduce((sum, cid) => {
+    return sum + (rubrics[cid]?.items||[]).reduce((s,item)=>s+(+item.max_marks||0),0);
+  }, 0);
+
   const saveActivity = async () => {
-    if (!form.name || !form.grade || !form.subject || !form.sections.length) {
-      setMsg("❌ Name, Grade, Subject and at least one Section are required");
-      setTimeout(() => setMsg(""), 3000); return;
+    if (!form.name||!form.grade||!form.subject||!form.sections.length) {
+      setMsg("❌ Name, Grade, Subject and at least one Section are required"); setTimeout(()=>setMsg(""),3000); return;
     }
+    if (!selectedComps.length) {
+      setMsg("❌ Select at least one competency"); setTimeout(()=>setMsg(""),3000); return;
+    }
+    // Validate rubrics
+    for (const cid of selectedComps) {
+      const rub = rubrics[cid];
+      if (!rub?.items?.length) { setMsg("❌ Each competency must have at least one rubric item"); setTimeout(()=>setMsg(""),3000); return; }
+      for (const item of rub.items) {
+        if (!item.name.trim()) { setMsg("❌ All rubric items must have a name"); setTimeout(()=>setMsg(""),3000); return; }
+        if (!item.max_marks||item.max_marks<=0) { setMsg("❌ All rubric items must have marks > 0"); setTimeout(()=>setMsg(""),3000); return; }
+      }
+    }
+    setSavingActivity(true);
     try {
-      const stage = GRADE_TO_STAGE[form.grade] || "middle";
-      // Create activity for each selected section
-      await Promise.all(form.sections.map(section =>
-        axios.post(`${API}/activities`, {
-          ...form, section, stage, academic_year: academicYear, created_by: user?.id
-        })
-      ));
+      const stage = GRADE_TO_STAGE[form.grade]||"middle";
+      const rubricsArr = selectedComps.map(cid => {
+        const comp = competencies.find(c=>c.id===cid);
+        return {
+          competency_id: cid,
+          competency_code: comp?.code||comp?.competency_code||"",
+          competency_name: comp?.name||comp?.description||"",
+          rubric_items: rubrics[cid].items,
+        };
+      });
+      await axios.post(`${API}/activities`, {
+        ...form, stage, academic_year: academicYear, created_by: user?.id,
+        sections: form.sections,
+        competency_mappings: selectedComps,
+        rubrics: rubricsArr,
+      });
       setMsg(`✅ Activity created for ${form.sections.length} section(s)`);
       setShowForm(false);
-      setForm(p => ({ ...p, name: "", description: "", sections: [], competency_mappings: [], competency_areas: [] }));
+      setSelectedComps([]); setRubrics({});
+      setForm(p=>({...p, name:"", description:"", sections:[], }));
       fetchActivities();
     } catch { setMsg("❌ Error creating activity"); }
-    setTimeout(() => setMsg(""), 3000);
+    setSavingActivity(false);
+    setTimeout(()=>setMsg(""),3000);
   };
 
   const deleteActivity = async (id: string) => {
     if (!confirm("Delete this activity?")) return;
     try { await axios.delete(`${API}/activities/${id}`); setMsg("✅ Deleted"); fetchActivities(); } catch { setMsg("❌ Error"); }
-    setTimeout(() => setMsg(""), 3000);
+    setTimeout(()=>setMsg(""),3000);
   };
 
-  const updateRating = (studentId: string, activityId: string, competencyId: string, rating: string) => {
-    setLocalRatings(prev => ({ ...prev, [studentId]: { ...(prev[studentId]||{}), [activityId]: { ...(prev[studentId]?.[activityId]||{}), [competencyId]: rating } } }));
+  const updateMark = (studentId: string, compId: string, rubricIdx: string, value: number|null) => {
+    setLocalMarks(prev => ({
+      ...prev,
+      [studentId]: { ...(prev[studentId]||{}),
+        [compId]: { ...(prev[studentId]?.[compId]||{}), [rubricIdx]: value }
+      }
+    }));
   };
 
-  const saveActivityMarks = async (activityId: string) => {
-    if (!combinedMarks) return;
-    setSaving(true);
+  const calcStudentTotal = (studentId: string) => {
+    if (!marksData?.rubrics) return { obtained: 0, max: 0, pct: 0 };
+    let obtained = 0; let max = 0;
+    marksData.rubrics.forEach((rub:any) => {
+      (rub.rubric_items||[]).forEach((item:any, i:number) => {
+        max += +(item.max_marks||0);
+        obtained += +(localMarks[studentId]?.[rub.competency_id]?.[String(i)]||0);
+      });
+    });
+    const pct = max > 0 ? +((obtained/max)*100).toFixed(1) : 0;
+    return { obtained, max, pct };
+  };
+
+  const getLevel = (pct: number) => {
+    if (pct>=95) return "Mastery";
+    if (pct>=86) return "Advanced";
+    if (pct>=76) return "Proficient";
+    if (pct>=66) return "Exceeding";
+    if (pct>=51) return "Meeting";
+    if (pct>=36) return "Approaching";
+    if (pct>=21) return "Developing";
+    return "Beginning";
+  };
+
+  const saveMarks = async () => {
+    if (!marksData||!selectedActivity) return;
+    setSavingMarks(true);
     try {
-      const entries = (combinedMarks.students || []).map((s: any) => ({
-        student_id: s.student_id, student_name: s.student_name,
-        competency_ratings: localRatings[s.student_id]?.[activityId] || {}
+      const entries = (marksData.students||[]).map((s:any) => ({
+        student_id: s.student.id,
+        student_name: s.student.name,
+        competency_marks: localMarks[s.student.id] || {},
       }));
-      await axios.post(`${API}/activities/${activityId}/marks`, { academic_year: academicYear, entries });
-      setMsg("✅ Marks saved"); fetchCombinedMarks();
+      await axios.post(`${API}/activities/${selectedActivity.id}/marks`, { academic_year: academicYear, entries });
+      setMsg("✅ Marks saved!"); fetchMarksData();
     } catch { setMsg("❌ Error saving marks"); }
-    setSaving(false);
-    setTimeout(() => setMsg(""), 3000);
+    setSavingMarks(false);
+    setTimeout(()=>setMsg(""),3000);
   };
 
-  const toggleSection = (s: string) => {
-    setForm(p => ({ ...p, sections: p.sections.includes(s) ? p.sections.filter(x => x !== s) : [...p.sections, s] }));
-  };
-
-  const toggleCompetency = (id: string) => {
-    setForm(p => ({ ...p, competency_mappings: p.competency_mappings.includes(id) ? p.competency_mappings.filter(x => x !== id) : [...p.competency_mappings, id] }));
-  };
-
-  const allCrossCompetencies = Object.values(crossCompetencies).flat();
-
-  if (!combos.length) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No subject assignments found. Contact admin.</div>;
+  if (!allGrades.length) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No subject assignments found. Contact admin.</div>;
 
   return (
     <div className="space-y-4">
-      {/* Sub-tabs */}
       <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
-        {[
-          { id: "create", label: "📋 Activities" },
-          { id: "marks", label: "✏️ Marks Entry" },
-          { id: "coverage", label: "📊 Coverage" },
-          { id: "analysis", label: "📈 Analysis" },
-        ].map(t => (
-          <button key={t.id} onClick={() => setSubTab(t.id as any)}
-            className={`px-4 py-2 text-sm rounded-lg font-medium border ${subTab === t.id ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>{t.label}</button>
+        {[{id:"create",label:"📋 Activities"},{id:"marks",label:"✏️ Marks Entry"},{id:"coverage",label:"📊 Coverage"},{id:"analysis",label:"📈 Analysis"}].map(t=>(
+          <button key={t.id} onClick={()=>setSubTab(t.id as any)}
+            className={`px-4 py-2 text-sm rounded-lg font-medium border ${subTab===t.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>{t.label}</button>
         ))}
       </div>
+      {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
-      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
-
-      {/* ── CREATE / LIST ── */}
-      {subTab === "create" && (
+      {/* ── CREATE ── */}
+      {subTab==="create"&&(
         <div className="space-y-4">
           <div className="flex justify-end">
-            <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
-              {showForm ? "✕ Cancel" : "+ Create Activity"}
+            <button onClick={()=>setShowForm(!showForm)} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
+              {showForm?"✕ Cancel":"+ Create Activity"}
             </button>
           </div>
-
-          {showForm && (
-            <div className="bg-white rounded-xl shadow border border-gray-200 p-5 space-y-4">
+          {showForm&&(
+            <div className="bg-white rounded-xl shadow border border-gray-200 p-5 space-y-5">
               <h3 className="text-sm font-bold text-gray-700">New Activity</h3>
-
-              {/* Basic info */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Activity Name *</label>
-                  <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Story Writing" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
+                  <input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} placeholder="e.g. Story Writing" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
                 <div><label className="text-xs text-gray-500 block mb-1">Grade *</label>
-                  <select value={form.grade} onChange={e => setForm(p => ({ ...p, grade: e.target.value }))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                    {allGrades.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select></div>
+                  <select value={form.grade} onChange={e=>setForm(p=>({...p,grade:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                    {allGrades.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
                 <div><label className="text-xs text-gray-500 block mb-1">Subject *</label>
-                  <select value={form.subject} onChange={e => setForm(p => ({ ...p, subject: e.target.value, competency_mappings: [] }))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                    {allSubjects.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select></div>
+                  <select value={form.subject} onChange={e=>setForm(p=>({...p,subject:e.target.value,}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                    {allSubjects.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
                 <div><label className="text-xs text-gray-500 block mb-1">Activity Type</label>
-                  <select value={form.activity_type} onChange={e => setForm(p => ({ ...p, activity_type: e.target.value }))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                    {ACTIVITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select></div>
+                  <select value={form.activity_type} onChange={e=>setForm(p=>({...p,activity_type:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+                    {ACTIVITY_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
                 <div><label className="text-xs text-gray-500 block mb-1">Date</label>
-                  <input type="date" value={form.activity_date} onChange={e => setForm(p => ({ ...p, activity_date: e.target.value }))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
+                  <input type="date" value={form.activity_date} onChange={e=>setForm(p=>({...p,activity_date:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
               </div>
 
-              {/* Multi-section selector */}
+              {/* Sections */}
               <div>
                 <label className="text-xs text-gray-500 block mb-1 font-semibold">
                   Sections * ({form.sections.length} selected)
-                  <button onClick={() => setForm(p => ({ ...p, sections: sectionsForGrade }))} className="ml-2 text-indigo-600 hover:underline text-xs font-normal">Select All</button>
-                  <button onClick={() => setForm(p => ({ ...p, sections: [] }))} className="ml-2 text-gray-400 hover:underline text-xs font-normal">Clear</button>
+                  <button onClick={()=>setForm(p=>({...p,sections:sectionsByGrade[form.grade]||[]}))} className="ml-2 text-indigo-600 hover:underline text-xs font-normal">All</button>
+                  <button onClick={()=>setForm(p=>({...p,sections:[]}))} className="ml-2 text-gray-400 hover:underline text-xs font-normal">Clear</button>
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {sectionsForGrade.map(s => (
-                    <button key={s} onClick={() => toggleSection(s)}
-                      className={`px-3 py-1.5 rounded-lg border text-xs font-medium ${form.sections.includes(s) ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:border-indigo-400"}`}>
-                      {s}
-                    </button>
+                  {(sectionsByGrade[form.grade]||[]).map(s=>(
+                    <button key={s} onClick={()=>setForm(p=>({...p,sections:p.sections.includes(s)?p.sections.filter(x=>x!==s):[...p.sections,s]}))}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-medium ${form.sections.includes(s)?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>{s}</button>
                   ))}
                 </div>
               </div>
 
-              {/* Competencies from registry — live from backend */}
+              {/* Competency selection */}
               <div>
                 <label className="text-xs text-gray-500 block mb-1 font-semibold">
-                  Competencies — {form.subject} · {form.grade} ({competencies.length} available, {form.competency_mappings.length} selected)
-                  <button onClick={() => setForm(p => ({ ...p, competency_mappings: competencies.map((c:any) => c.id) }))} className="ml-2 text-indigo-600 hover:underline text-xs font-normal">Select All</button>
-                  <button onClick={() => setForm(p => ({ ...p, competency_mappings: [] }))} className="ml-2 text-gray-400 hover:underline text-xs font-normal">Clear</button>
+                  Competencies ({competencies.length} available, {selectedComps.length} selected) *
                 </label>
-                {competencies.length === 0 ? (
-                  <p className="text-xs text-gray-400 italic py-2">No competencies found for {form.subject} — {form.grade}. Add them in Admin → Competency Registry.</p>
-                ) : (
-                  <div className="max-h-52 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
-                    {/* Group by domain */}
-                    {[...new Set(competencies.map((c:any) => c.domain))].map(domain => (
+                {competencies.length===0
+                  ? <p className="text-xs text-gray-400 italic">No competencies found. Add them in Admin → Competency Registry.</p>
+                  : <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
+                    {[...new Set(competencies.map((c:any)=>c.domain))].map(domain=>(
                       <div key={domain}>
-                        {domain && <div className="text-xs font-semibold text-indigo-700 px-1 py-0.5 mt-1">{domain}</div>}
-                        {competencies.filter((c:any) => c.domain === domain).map((c: any) => (
-                          <label key={c.id} className={`flex items-start gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 text-xs ${form.competency_mappings.includes(c.id) ? "bg-indigo-50" : ""}`}>
-                            <input type="checkbox" checked={form.competency_mappings.includes(c.id)} onChange={() => toggleCompetency(c.id)} className="accent-indigo-600 mt-0.5 shrink-0" />
-                            <span className="font-mono text-indigo-600 font-semibold shrink-0">{c.competency_code}</span>
-                            <span className="text-gray-600">{c.description}</span>
+                        {domain&&<div className="text-xs font-semibold text-indigo-700 px-1 py-0.5 mt-1">{domain}</div>}
+                        {competencies.filter((c:any)=>c.domain===domain).map((c:any)=>(
+                          <label key={c.id} className={`flex items-start gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 text-xs ${selectedComps.includes(c.id)?"bg-indigo-50":""}`}>
+                            <input type="checkbox" checked={selectedComps.includes(c.id)} onChange={()=>toggleComp(c.id)} className="accent-indigo-600 mt-0.5 shrink-0" />
+                            <span className="font-mono text-indigo-600 font-semibold shrink-0">{c.code||c.competency_code}</span>
+                            <span className="text-gray-600">{c.name||c.description}</span>
                           </label>
                         ))}
                       </div>
                     ))}
                   </div>
-                )}
+                }
               </div>
 
-              {/* Cross-curricular areas */}
-              <div>
-                <label className="text-xs text-gray-500 block mb-1 font-semibold">Cross-curricular areas (optional)</label>
-                <div className="flex gap-2 flex-wrap mb-2">
-                  {CROSS_CURRICULAR.map(area => (
-                    <label key={area} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer text-xs ${form.competency_areas.includes(area) ? "bg-purple-100 border-purple-400 text-purple-700 font-bold" : "bg-white border-gray-300 text-gray-600"}`}>
-                      <input type="checkbox" checked={form.competency_areas.includes(area)}
-                        onChange={() => setForm(p => ({ ...p, competency_areas: p.competency_areas.includes(area) ? p.competency_areas.filter(x => x !== area) : [...p.competency_areas, area] }))}
-                        className="accent-purple-600" />
-                      {CROSS_LABELS[area]}
-                    </label>
-                  ))}
-                </div>
-                {/* Cross-curricular competencies dropdown */}
-                {allCrossCompetencies.length > 0 && (
-                  <div className="max-h-36 overflow-y-auto border border-purple-200 rounded-lg p-2 space-y-1 bg-purple-50">
-                    <div className="text-xs font-semibold text-purple-700 mb-1">Cross-curricular competencies ({allCrossCompetencies.length})</div>
-                    {allCrossCompetencies.map((c: any) => (
-                      <label key={c.id} className={`flex items-start gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-purple-100 text-xs ${form.competency_mappings.includes(c.id) ? "bg-purple-100" : ""}`}>
-                        <input type="checkbox" checked={form.competency_mappings.includes(c.id)} onChange={() => toggleCompetency(c.id)} className="accent-purple-600 mt-0.5 shrink-0" />
-                        <span className="font-mono text-purple-600 font-semibold shrink-0">{c.competency_code}</span>
-                        <span className="text-gray-600">{c.description}</span>
-                        <span className="text-purple-500 text-xs shrink-0">[{c.subject}]</span>
-                      </label>
-                    ))}
+              {/* Rubrics per competency */}
+              {selectedComps.length>0&&(
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-gray-700 font-semibold">Rubrics per Competency</label>
+                    <span className="text-xs text-indigo-600 font-bold">Total Max Marks: {totalMaxMarks}</span>
                   </div>
-                )}
-              </div>
+                  {selectedComps.map(cid=>{
+                    const comp = competencies.find(c=>c.id===cid);
+                    const rub = rubrics[cid];
+                    if (!rub) return null;
+                    const compMax = rub.items.reduce((s,i)=>s+(+i.max_marks||0),0);
+                    return (
+                      <div key={cid} className="border border-indigo-200 rounded-xl p-4 bg-indigo-50 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-bold text-indigo-700">[{comp?.code||comp?.competency_code}]</span>
+                            <span className="text-xs text-gray-700 ml-2">{comp?.name||comp?.description}</span>
+                          </div>
+                          <span className="text-xs text-indigo-600 font-bold">Max: {compMax} marks</span>
+                        </div>
+                        {rub.items.map((item,i)=>(
+                          <div key={i} className="flex gap-2 items-center">
+                            <span className="text-xs text-gray-500 w-16 shrink-0">Rubric {i+1}</span>
+                            <input value={item.name} onChange={e=>updateRubricItem(cid,i,"name",e.target.value)}
+                              placeholder="Rubric name e.g. Grammar accuracy"
+                              className="border border-gray-300 rounded px-2 py-1 text-xs flex-1" />
+                            <input type="number" min={0} value={item.max_marks||""} onChange={e=>updateRubricItem(cid,i,"max_marks",e.target.value)}
+                              placeholder="Marks"
+                              className="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center" />
+                            <span className="text-xs text-gray-400">marks</span>
+                            {rub.items.length>1&&(
+                              <button onClick={()=>removeRubricItem(cid,i)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                            )}
+                          </div>
+                        ))}
+                        {rub.items.length<8&&(
+                          <button onClick={()=>addRubricItem(cid)} className="text-xs text-indigo-600 hover:underline">+ Add Rubric Item</button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               <div><label className="text-xs text-gray-500 block mb-1">Description (optional)</label>
-                <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={2} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
+                <textarea value={form.description} onChange={e=>setForm(p=>({...p,description:e.target.value}))} rows={2} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
 
               <div className="flex gap-2 pt-2 border-t border-gray-100">
-                <button onClick={saveActivity} className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-semibold">💾 Save Activity</button>
-                <button onClick={() => setShowForm(false)} className="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Cancel</button>
+                <button onClick={saveActivity} disabled={savingActivity} className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-semibold disabled:opacity-50">
+                  {savingActivity?"Saving...":"💾 Save Activity"}
+                </button>
+                <button onClick={()=>setShowForm(false)} className="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Cancel</button>
               </div>
             </div>
           )}
@@ -1909,126 +1963,177 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
           {/* Activities list */}
           <div className="bg-white rounded-xl shadow p-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Your Activities ({activities.length})</h3>
-            {activities.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">No activities yet. Create one above.</p>
-            ) : (
-              <div className="space-y-2">
-                {activities.map((a: any) => (
+            {activities.length===0
+              ? <p className="text-sm text-gray-400 text-center py-6">No activities yet. Create one above.</p>
+              : <div className="space-y-2">
+                {activities.map((a:any)=>(
                   <div key={a.id} className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div>
                       <p className="text-sm font-medium text-gray-800">{a.name}</p>
-                      <p className="text-xs text-gray-400">{a.grade} · {a.section} · {a.subject} · {a.activity_date} · {(a.competency_mappings||[]).length} competencies</p>
+                      <p className="text-xs text-gray-400">{a.grade} · {a.section} · {a.subject} · {a.activity_date} · {(a.competency_mappings||[]).length} competencies · Max: {a.total_max_marks} marks</p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => { setSelectedActivity(a); setSubTab("marks"); }} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-xs rounded-lg hover:bg-indigo-200 font-medium">✏️ Marks</button>
-                      <button onClick={() => deleteActivity(a.id)} className="px-3 py-1.5 bg-red-100 text-red-700 text-xs rounded-lg hover:bg-red-200 font-medium">🗑️</button>
+                      <button onClick={()=>{setSelectedActivity(a);setSubTab("marks");}} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-xs rounded-lg hover:bg-indigo-200 font-medium">✏️ Marks</button>
+                      <button onClick={()=>deleteActivity(a.id)} className="px-3 py-1.5 bg-red-100 text-red-700 text-xs rounded-lg hover:bg-red-200 font-medium">🗑️</button>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
+            }
           </div>
         </div>
       )}
 
       {/* ── MARKS ENTRY ── */}
-      {subTab === "marks" && (
+      {subTab==="marks"&&(
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow p-4">
             <label className="text-xs text-gray-500 block mb-2">Select Activity</label>
-            <select value={selectedActivity?.id || ""} onChange={e => { const a = activities.find(x => x.id === e.target.value); setSelectedActivity(a || null); }}
+            <select value={selectedActivity?.id||""} onChange={e=>{const a=activities.find(x=>x.id===e.target.value);setSelectedActivity(a||null);}}
               className="border border-gray-300 rounded px-3 py-2 text-sm w-full max-w-md">
               <option value="">-- Select activity --</option>
-              {activities.map(a => <option key={a.id} value={a.id}>{a.name} — {a.grade} · {a.section} · {a.subject}</option>)}
+              {activities.map(a=><option key={a.id} value={a.id}>{a.name} — {a.grade} · {a.section} · {a.subject}</option>)}
             </select>
           </div>
 
-          {selectedActivity && (
-            <MarksEntryPanel
-              activity={selectedActivity}
-              combinedMarks={combinedMarks}
-              localRatings={localRatings}
-              updateRating={updateRating}
-              saveActivityMarks={saveActivityMarks}
-              saving={saving}
-              RATING_COLORS={RATING_COLORS}
-              API={API}
-              academicYear={academicYear}
-            />
+          {selectedActivity&&marksData&&(
+            <div className="space-y-4">
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <p className="text-sm font-bold text-indigo-800">{selectedActivity.name} — {selectedActivity.grade} · {selectedActivity.section}</p>
+                  <p className="text-xs text-indigo-600">{(marksData.rubrics||[]).length} competencies · Total max: {selectedActivity.total_max_marks} marks · {(marksData.students||[]).length} students</p>
+                </div>
+                <button onClick={saveMarks} disabled={savingMarks} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+                  {savingMarks?"Saving...":"💾 Save All Marks"}
+                </button>
+              </div>
+
+              <div className="bg-white rounded-xl shadow overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="bg-indigo-700 text-white">
+                        <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[160px]">Student</th>
+                        {(marksData.rubrics||[]).map((rub:any)=>(
+                          <th key={rub.competency_id} className="px-2 py-2 text-center border-l border-indigo-600" colSpan={(rub.rubric_items||[]).length+1}>
+                            <div className="text-xs font-bold">[{rub.competency_code}]</div>
+                            <div className="text-xs text-indigo-200 font-normal truncate max-w-[200px]">{rub.competency_name}</div>
+                          </th>
+                        ))}
+                        <th className="px-2 py-2 text-center border-l border-indigo-600 min-w-[80px]">Total</th>
+                        <th className="px-2 py-2 text-center min-w-[60px]">%</th>
+                        <th className="px-2 py-2 text-center min-w-[90px]">Level</th>
+                      </tr>
+                      <tr className="bg-indigo-600 text-white">
+                        <th className="px-3 py-1 sticky left-0 bg-indigo-600"></th>
+                        {(marksData.rubrics||[]).map((rub:any)=>(
+                          <>{(rub.rubric_items||[]).map((item:any,i:number)=>(
+                            <th key={i} className="px-2 py-1 text-center border-l border-indigo-500 min-w-[70px]">
+                              <div className="text-xs truncate max-w-[100px]">{item.name}</div>
+                              <div className="text-indigo-200 text-xs">/{item.max_marks}</div>
+                            </th>
+                          ))}
+                          <th className="px-2 py-1 text-center border-l border-indigo-500 bg-indigo-800 min-w-[55px]">
+                            /{(rub.rubric_items||[]).reduce((s:number,it:any)=>s+(+it.max_marks||0),0)}
+                          </th></>
+                        ))}
+                        <th className="px-2 py-1 text-center border-l border-indigo-500 bg-indigo-800">/{selectedActivity.total_max_marks}</th>
+                        <th className="px-2 py-1"></th>
+                        <th className="px-2 py-1"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(marksData.students||[]).map((s:any,idx:number)=>{
+                        const {obtained,max,pct} = calcStudentTotal(s.student.id);
+                        const level = getLevel(pct);
+                        return (
+                          <tr key={s.student.id} className={idx%2===0?"bg-white":"bg-gray-50"}>
+                            <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student.name}</td>
+                            {(marksData.rubrics||[]).map((rub:any)=>{
+                              const compItems = rub.rubric_items||[];
+                              const compObtained = compItems.reduce((sum:number,_:any,i:number)=>sum+(+(localMarks[s.student.id]?.[rub.competency_id]?.[String(i)]||0)),0);
+                              const compMax = compItems.reduce((s:number,it:any)=>s+(+it.max_marks||0),0);
+                              return (
+                                <>{compItems.map((item:any,i:number)=>(
+                                  <td key={i} className="px-2 py-1 text-center border-l border-gray-100">
+                                    <input type="number" min={0} max={item.max_marks}
+                                      value={localMarks[s.student.id]?.[rub.competency_id]?.[String(i)]??""}
+                                      onChange={e=>{const v=e.target.value===""?null:Math.min(+e.target.value,item.max_marks);updateMark(s.student.id,rub.competency_id,String(i),v);}}
+                                      className="border border-gray-200 rounded px-1 py-0.5 w-14 text-center text-xs" />
+                                  </td>
+                                ))}
+                                <td className="px-2 py-1 text-center border-l border-gray-200 font-bold text-indigo-700 bg-indigo-50">
+                                  {compObtained}/{compMax}
+                                </td></>
+                              );
+                            })}
+                            <td className="px-2 py-1 text-center border-l border-gray-200 font-bold text-gray-800">{obtained}/{max}</td>
+                            <td className="px-2 py-1 text-center font-bold text-indigo-700">{pct}%</td>
+                            <td className="px-2 py-1 text-center">
+                              {pct>0&&<span className={`px-2 py-0.5 rounded-full text-xs font-bold ${LEVEL_COLOR[level]||""}`}>{level}</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <button onClick={saveMarks} disabled={savingMarks} className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+                {savingMarks?"Saving...":"💾 Save All Marks"}
+              </button>
+            </div>
           )}
         </div>
       )}
 
-      {/* ── COVERAGE TAB ── */}
-      {subTab === "coverage" && (
+      {/* ── COVERAGE ── */}
+      {subTab==="coverage"&&(
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow p-4">
             <div className="flex items-center gap-3 mb-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Grade</label>
-                <select value={coverageGrade} onChange={e => setCoverageGrade(e.target.value)}
-                  className="border border-gray-300 rounded px-3 py-1.5 text-sm">
-                  <option value="">-- Select grade --</option>
-                  {allGrades.map(g => <option key={g} value={g}>{g}</option>)}
+              <div><label className="text-xs text-gray-500 block mb-1">Grade</label>
+                <select value={coverageGrade} onChange={e=>setCoverageGrade(e.target.value)} className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+                  <option value="">-- Select --</option>
+                  {allGrades.map(g=><option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
               <button onClick={fetchCoverage} className="mt-4 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">Check Coverage</button>
             </div>
-
-            {coverage && (
+            {coverage&&(
               <div>
-                {/* Summary KPIs */}
                 <div className="grid grid-cols-4 gap-3 mb-4">
-                  {[
-                    { label: "Total Competencies", value: coverage.total, color: "text-gray-700" },
-                    { label: "Covered", value: coverage.covered, color: "text-green-700" },
-                    { label: "Pending", value: coverage.uncovered, color: "text-red-600" },
-                    { label: "Coverage %", value: `${coverage.coverage_percent}%`, color: coverage.coverage_percent >= 80 ? "text-green-700" : coverage.coverage_percent >= 50 ? "text-yellow-600" : "text-red-600" },
-                  ].map(k => (
+                  {[{label:"Total",value:coverage.total,color:"text-gray-700"},{label:"Covered",value:coverage.covered,color:"text-green-700"},{label:"Pending",value:coverage.uncovered,color:"text-red-600"},{label:"Coverage %",value:`${coverage.coverage_percent}%`,color:coverage.coverage_percent>=80?"text-green-700":coverage.coverage_percent>=50?"text-yellow-600":"text-red-600"}].map(k=>(
                     <div key={k.label} className="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
                       <div className={`text-2xl font-bold ${k.color}`}>{k.value}</div>
                       <div className="text-xs text-gray-500 mt-0.5">{k.label}</div>
                     </div>
                   ))}
                 </div>
-
-                {/* Coverage bar */}
-                <div className="mb-4">
-                  <div className="flex justify-between text-xs text-gray-500 mb-1">
-                    <span>Coverage Progress</span><span>{coverage.coverage_percent}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div className={`h-3 rounded-full transition-all ${coverage.coverage_percent >= 80 ? "bg-green-500" : coverage.coverage_percent >= 50 ? "bg-yellow-500" : "bg-red-500"}`}
-                      style={{ width: `${coverage.coverage_percent}%` }} />
-                  </div>
+                <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
+                  <div className={`h-3 rounded-full ${coverage.coverage_percent>=80?"bg-green-500":coverage.coverage_percent>=50?"bg-yellow-500":"bg-red-500"}`} style={{width:`${coverage.coverage_percent}%`}} />
                 </div>
-
-                {/* Covered competencies */}
-                {coverage.covered_competencies?.length > 0 && (
+                {coverage.covered_competencies?.length>0&&(
                   <div className="mb-3">
                     <div className="text-xs font-semibold text-green-700 mb-2">✅ Covered ({coverage.covered_competencies.length})</div>
-                    <div className="grid grid-cols-1 gap-1">
-                      {coverage.covered_competencies.map((c: any) => (
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {coverage.covered_competencies.map((c:any)=>(
                         <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
-                          <span className="font-mono text-green-700 font-semibold shrink-0">{c.competency_code}</span>
+                          <span className="font-mono text-green-700 font-semibold">{c.competency_code}</span>
                           <span className="text-gray-600">{c.description}</span>
-                          {c.domain && <span className="text-green-500 shrink-0 ml-auto">{c.domain}</span>}
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-
-                {/* Uncovered competencies */}
-                {coverage.uncovered_competencies?.length > 0 && (
+                {coverage.uncovered_competencies?.length>0&&(
                   <div>
                     <div className="text-xs font-semibold text-red-600 mb-2">⏳ Pending ({coverage.uncovered_competencies.length})</div>
-                    <div className="grid grid-cols-1 gap-1">
-                      {coverage.uncovered_competencies.map((c: any) => (
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {coverage.uncovered_competencies.map((c:any)=>(
                         <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs">
-                          <span className="font-mono text-red-600 font-semibold shrink-0">{c.competency_code}</span>
+                          <span className="font-mono text-red-600 font-semibold">{c.competency_code}</span>
                           <span className="text-gray-600">{c.description}</span>
-                          {c.domain && <span className="text-red-400 shrink-0 ml-auto">{c.domain}</span>}
                         </div>
                       ))}
                     </div>
@@ -2040,14 +2145,16 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
         </div>
       )}
 
-      {/* ── ANALYSIS TAB ── */}
-      {subTab === "analysis" && (
+      {/* ── ANALYSIS ── */}
+      {subTab==="analysis"&&(
         <ActivityAnalysisPanel
-          allGrades={allGrades.length ? allGrades : (user?.assigned_classes || []).map((c:string) => c.startsWith("Grade") || ["Pre-KG","LKG","UKG"].includes(c) ? c : `Grade ${c}`).filter((v:string,i:number,a:string[])=>a.indexOf(v)===i)}
-          sectionsByGrade={Object.keys(sectionsByGrade).length ? sectionsByGrade : (() => { const m: Record<string,string[]> = {}; (user?.assigned_classes||[]).forEach((g:string)=>{ const ng = g.startsWith("Grade")||["Pre-KG","LKG","UKG"].includes(g)?g:`Grade ${g}`; m[ng]=(user?.assigned_sections||[]); }); return m; })()}
-          allSubjects={allSubjects.length ? allSubjects : (user?.subjects || [])}
+          allGrades={allGrades}
+          sectionsByGrade={sectionsByGrade}
+          allSubjects={allSubjects}
           academicYear={academicYear}
           API={API}
+          LEVEL_COLOR={LEVEL_COLOR}
+          getLevel={getLevel}
         />
       )}
     </div>
@@ -2055,16 +2162,14 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
 }
 
 
-// ── ACTIVITY ANALYSIS PANEL — mirrors admin activities dashboard ──
-function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academicYear, API }: any) {
+// ── ACTIVITY ANALYSIS PANEL ──
+function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academicYear, API, LEVEL_COLOR, getLevel }: any) {
   const DOMAIN_COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#f97316","#84cc16"];
-  const scoreBg = (v: number) => v >= 3.5 ? "bg-green-100 text-green-800" : v >= 2.5 ? "bg-blue-100 text-blue-800" : v >= 1.5 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800";
-  const RATING_COLORS: Record<string,string> = { beginning:"bg-red-100 text-red-700 border-red-200", approaching:"bg-yellow-100 text-yellow-700 border-yellow-200", meeting:"bg-green-100 text-green-700 border-green-200", exceeding:"bg-purple-100 text-purple-700 border-purple-200" };
 
-  if (!allGrades?.length) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No grade assignments found. Contact admin.</div>;
+  if (!allGrades?.length) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No grade assignments found.</div>;
 
   const [dashTab, setDashTab] = useState<"grade"|"section"|"student"|"alerts"|"coverage">("grade");
-  const [dashGrade, setDashGrade] = useState(allGrades[0] || "");
+  const [dashGrade, setDashGrade] = useState(allGrades[0]||"");
   const [dashSection, setDashSection] = useState("");
   const [gradeDash, setGradeDash] = useState<any>(null);
   const [sectionDash, setSectionDash] = useState<any>(null);
@@ -2075,134 +2180,79 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const sectionsForGrade = sectionsByGrade[dashGrade] || [];
+  const sectionsForGrade = sectionsByGrade[dashGrade]||[];
 
-  useEffect(() => { if (sectionsForGrade.length) setDashSection(sectionsForGrade[0]); }, [dashGrade]);
-  useEffect(() => {
-    if (dashTab === "grade" && dashGrade) fetchGradeDash();
-    if (dashTab === "section" && dashGrade && dashSection) fetchSectionDash();
-    if (dashTab === "alerts") fetchAlerts();
-    if (dashTab === "coverage" && dashGrade && dashSection) fetchCoverage();
-  }, [dashTab, dashGrade, dashSection, academicYear]);
-  useEffect(() => { if (dashTab === "student" && dashGrade && dashSection) fetchStudentList(); }, [dashSection, dashTab]);
+  useEffect(()=>{ if(sectionsForGrade.length) setDashSection(sectionsForGrade[0]); },[dashGrade]);
+  useEffect(()=>{
+    if(dashTab==="grade"&&dashGrade) fetchGradeDash();
+    if(dashTab==="section"&&dashGrade&&dashSection) fetchSectionDash();
+    if(dashTab==="alerts") fetchAlerts();
+    if(dashTab==="coverage"&&dashGrade&&dashSection) fetchCovDash();
+  },[dashTab,dashGrade,dashSection,academicYear]);
+  useEffect(()=>{ if(dashTab==="student"&&dashGrade&&dashSection) fetchStudentList(); },[dashSection,dashTab]);
 
-  const fetchGradeDash = async () => { setLoading(true); try { const r = await axios.get(`${API}/activities/dashboard/grade/${encodeURIComponent(dashGrade)}?academic_year=${academicYear}`); setGradeDash(r.data); } catch {} setLoading(false); };
-  const fetchSectionDash = async () => { setLoading(true); try { const r = await axios.get(`${API}/activities/dashboard/section/${encodeURIComponent(dashGrade)}/${encodeURIComponent(dashSection)}?academic_year=${academicYear}`); setSectionDash(r.data); } catch {} setLoading(false); };
-  const fetchAlerts = async () => {
-    try {
-      const r = await axios.get(`${API}/activities/alerts/decline?academic_year=${academicYear}`);
-      const myGrades = Object.keys(sectionsByGrade).map(g => g.toLowerCase());
-      const myAlerts = (r.data||[]).filter((a:any) =>
-        myGrades.includes((a.grade||"").toLowerCase())
-      );
-      setAlerts(myAlerts);
-    } catch { setAlerts([]); }
-  };
-  const fetchCoverage = async () => {
-    try {
-      const subject = (allSubjects[0]||"").toLowerCase().replace(/\s+/g,"_").replace(/[()]/g,"");
-      const r = await axios.get(`${API}/activities/coverage/section/${encodeURIComponent(dashGrade)}/${encodeURIComponent(dashSection)}?academic_year=${academicYear}`);
-      setCoverageData(r.data);
-    } catch { setCoverageData(null); }
-  };
-  const fetchStudentList = async () => { try { const r = await axios.get(`${API}/students?grade=${encodeURIComponent(dashGrade)}&section=${encodeURIComponent(dashSection)}`); setStudentList(r.data?.data||r.data||[]); } catch {} };
-  const fetchStudentDash = async (id: string) => { try { const r = await axios.get(`${API}/activities/dashboard/student/${id}?academic_year=${academicYear}`); setStudentDash(r.data); } catch {} };
+  const fetchGradeDash=async()=>{ setLoading(true); try{ const r=await axios.get(`${API}/activities/dashboard/grade/${encodeURIComponent(dashGrade)}?academic_year=${academicYear}`); setGradeDash(r.data); }catch{} setLoading(false); };
+  const fetchSectionDash=async()=>{ setLoading(true); try{ const r=await axios.get(`${API}/activities/dashboard/section/${encodeURIComponent(dashGrade)}/${encodeURIComponent(dashSection)}?academic_year=${academicYear}`); setSectionDash(r.data); }catch{} setLoading(false); };
+  const fetchAlerts=async()=>{ try{ const r=await axios.get(`${API}/activities/alerts/decline?academic_year=${academicYear}`); const myGrades=Object.keys(sectionsByGrade).map(g=>g.toLowerCase()); setAlerts((r.data||[]).filter((a:any)=>myGrades.includes((a.grade||"").toLowerCase()))); }catch{ setAlerts([]); } };
+  const fetchCovDash=async()=>{ try{ const r=await axios.get(`${API}/activities/coverage/section/${encodeURIComponent(dashGrade)}/${encodeURIComponent(dashSection)}?academic_year=${academicYear}`); setCoverageData(r.data); }catch{ setCoverageData(null); } };
+  const fetchStudentList=async()=>{ try{ const r=await axios.get(`${API}/students?grade=${encodeURIComponent(dashGrade)}&section=${encodeURIComponent(dashSection)}`); setStudentList(r.data?.data||r.data||[]); }catch{} };
+  const fetchStudentDash=async(id:string)=>{ try{ const r=await axios.get(`${API}/activities/dashboard/student/${id}?academic_year=${academicYear}`); setStudentDash(r.data); }catch{} };
 
-  const DASH_TABS = [
-    { id:"grade", label:"📊 Grade" },
-    { id:"section", label:"🏫 Section" },
-    { id:"student", label:"👤 Student" },
-    { id:"alerts", label:"⚠️ Alerts" },
-    { id:"coverage", label:"📋 Coverage" },
-  ];
+  const pctColor = (pct: number) => pct>=76?"text-green-700":pct>=51?"text-blue-700":pct>=36?"text-yellow-600":"text-red-600";
+  const pctBg = (pct: number) => pct>=76?"bg-green-100 text-green-800":pct>=51?"bg-blue-100 text-blue-800":pct>=36?"bg-yellow-100 text-yellow-800":"bg-red-100 text-red-800";
 
   return (
     <div className="space-y-4">
-      {/* Grade + Section selector */}
       <div className="bg-white rounded-xl shadow p-4 flex gap-4 flex-wrap items-end">
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">Grade</label>
-          <select value={dashGrade} onChange={e => { setDashGrade(e.target.value); setGradeDash(null); setSectionDash(null); }}
-            className="border border-gray-300 rounded px-3 py-1.5 text-sm">
-            {allGrades.map((g:string) => <option key={g} value={g}>{g}</option>)}
-          </select>
+        <div><label className="text-xs text-gray-500 block mb-1">Grade</label>
+          <select value={dashGrade} onChange={e=>{setDashGrade(e.target.value);setGradeDash(null);setSectionDash(null);}} className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+            {allGrades.map((g:string)=><option key={g} value={g}>{g}</option>)}</select>
         </div>
-        {(dashTab==="section"||dashTab==="student"||dashTab==="coverage") && (
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Section</label>
-            <select value={dashSection} onChange={e => setDashSection(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-1.5 text-sm">
-              {sectionsForGrade.map((s:string) => <option key={s} value={s}>{s}</option>)}
-            </select>
+        {(dashTab==="section"||dashTab==="student"||dashTab==="coverage")&&(
+          <div><label className="text-xs text-gray-500 block mb-1">Section</label>
+            <select value={dashSection} onChange={e=>setDashSection(e.target.value)} className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+              {sectionsForGrade.map((s:string)=><option key={s} value={s}>{s}</option>)}</select>
           </div>
         )}
       </div>
 
-      {/* Sub-tabs */}
       <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
-        {DASH_TABS.map(t => (
-          <button key={t.id} onClick={() => setDashTab(t.id as any)}
-            className={`px-4 py-2 text-sm rounded-lg font-medium border ${dashTab===t.id ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
-            {t.label}
-          </button>
+        {[{id:"grade",label:"📊 Grade"},{id:"section",label:"🏫 Section"},{id:"student",label:"👤 Student"},{id:"alerts",label:"⚠️ Alerts"},{id:"coverage",label:"📋 Coverage"}].map(t=>(
+          <button key={t.id} onClick={()=>setDashTab(t.id as any)}
+            className={`px-4 py-2 text-sm rounded-lg font-medium border ${dashTab===t.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>{t.label}</button>
         ))}
       </div>
 
-      {loading && <div className="bg-white rounded-xl shadow p-6 text-center text-gray-400 text-sm">Loading...</div>}
+      {loading&&<div className="bg-white rounded-xl shadow p-6 text-center text-gray-400 text-sm">Loading...</div>}
 
-      {/* ── GRADE DASHBOARD ── */}
-      {!loading && dashTab==="grade" && (
+      {/* GRADE */}
+      {!loading&&dashTab==="grade"&&(
         <div className="space-y-4">
-          {gradeDash ? (
+          {gradeDash?(
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label:"Total Students", value:gradeDash.total_students, color:"border-indigo-500" },
-                  { label:"Assessed", value:gradeDash.total_assessed, color:"border-green-500" },
-                  { label:"Overall Avg", value:gradeDash.overall_avg?.toFixed(2)+"/4", color:"border-blue-500" },
-                  { label:"Grade", value:gradeDash.grade, color:"border-orange-500" },
-                ].map(s => (
+                {[{label:"Total Students",value:gradeDash.total_students,color:"border-indigo-500"},
+                  {label:"Assessed",value:gradeDash.total_assessed,color:"border-green-500"},
+                  {label:"Overall Avg %",value:gradeDash.overall_avg?(+gradeDash.overall_avg).toFixed(1)+"%":"-",color:"border-blue-500"},
+                  {label:"Grade",value:gradeDash.grade,color:"border-orange-500"}].map(s=>(
                   <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
                     <p className="text-xs text-gray-500">{s.label}</p>
                     <p className="text-2xl font-bold text-gray-800">{s.value}</p>
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {gradeDash.sections?.length>0&&(
                 <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Section-wise Average</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Section-wise Average %</h3>
                   <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={(gradeDash.sections||[]).map((s:any)=>({name:s.section,avg:s.avg}))}>
-                      <CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name" tick={{fontSize:10}}/><YAxis domain={[0,4]} ticks={[0,1,2,3,4]} tick={{fontSize:10}}/>
-                      <Tooltip formatter={(v:any)=>[`${v}/4`,"Avg"]}/>
-                      <Bar dataKey="avg" radius={[4,4,0,0]}>{(gradeDash.sections||[]).map((_:any,i:number)=><Cell key={i} fill={DOMAIN_COLORS[i%DOMAIN_COLORS.length]}/>)}</Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Domain-wise Average</h3>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={(gradeDash.domains||[]).map((d:any)=>({name:d.domain,avg:d.avg}))} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3"/><XAxis type="number" domain={[0,4]} tick={{fontSize:10}}/><YAxis type="category" dataKey="name" tick={{fontSize:10}} width={120}/>
-                      <Tooltip formatter={(v:any)=>[`${v}/4`,"Avg"]}/>
-                      <Bar dataKey="avg" radius={[0,4,4,0]}>{(gradeDash.domains||[]).map((_:any,i:number)=><Cell key={i} fill={DOMAIN_COLORS[i%DOMAIN_COLORS.length]}/>)}</Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              {gradeDash.competencies?.length > 0 && (
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Competency Averages</h3>
-                  <ResponsiveContainer width="100%" height={Math.min(400,gradeDash.competencies.slice(0,15).length*28)}>
-                    <BarChart data={gradeDash.competencies.slice(0,15).map((c:any)=>({name:c.competency_code,avg:c.avg,domain:c.domain}))} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3"/><XAxis type="number" domain={[0,4]} tick={{fontSize:10}}/><YAxis type="category" dataKey="name" tick={{fontSize:10}} width={80}/>
-                      <Tooltip formatter={(v:any,_,p)=>[`${v}/4 — ${p.payload.domain}`,"Avg"]}/>
-                      <Bar dataKey="avg" radius={[0,4,4,0]}>{gradeDash.competencies.slice(0,15).map((c:any,i:number)=><Cell key={i} fill={c.avg>=3.5?"#10b981":c.avg>=2.5?"#6366f1":c.avg>=1.5?"#f59e0b":"#ef4444"}/>)}</Bar>
+                    <BarChart data={gradeDash.sections.map((s:any)=>({name:s.section,avg:s.avg_pct||s.avg||0}))}>
+                      <CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name" tick={{fontSize:10}}/><YAxis domain={[0,100]} tick={{fontSize:10}}/>
+                      <Tooltip formatter={(v:any)=>[`${v}%`,"Avg"]}/><Bar dataKey="avg" radius={[4,4,0,0]}>{gradeDash.sections.map((_:any,i:number)=><Cell key={i} fill={DOMAIN_COLORS[i%DOMAIN_COLORS.length]}/>)}</Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               )}
-              {gradeDash.studentRankings?.length > 0 && (
+              {gradeDash.studentRankings?.length>0&&(
                 <div className="bg-white rounded-xl shadow p-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Student Rankings</h3>
                   <div className="space-y-1 max-h-60 overflow-y-auto">
@@ -2213,59 +2263,50 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
                           <span className="text-xs font-medium text-gray-800">{s.name}</span>
                           <span className="text-xs text-gray-400">{s.section}</span>
                         </div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.avg)}`}>{s.avg.toFixed(2)}/4</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg(s.avg_pct||s.avg||0)}`}>{(s.avg_pct||s.avg||0).toFixed(1)}%</span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${LEVEL_COLOR[getLevel(s.avg_pct||s.avg||0)]||""}`}>{getLevel(s.avg_pct||s.avg||0)}</span>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
             </>
-          ) : <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No data for {dashGrade}. Create activities and enter marks first.</div>}
+          ):<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No data for {dashGrade}. Create activities and enter marks first.</div>}
         </div>
       )}
 
-      {/* ── SECTION DASHBOARD ── */}
-      {!loading && dashTab==="section" && (
+      {/* SECTION */}
+      {!loading&&dashTab==="section"&&(
         <div className="space-y-4">
-          {sectionDash ? (
+          {sectionDash?(
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  {label:"Total Students",value:sectionDash.total_students,color:"border-indigo-500"},
-                  {label:"Overall Avg",value:sectionDash.overall_avg?.toFixed(2)+"/4",color:"border-green-500"},
+                {[{label:"Total Students",value:sectionDash.total_students,color:"border-indigo-500"},
+                  {label:"Overall Avg %",value:sectionDash.overall_avg?(+sectionDash.overall_avg).toFixed(1)+"%":"-",color:"border-green-500"},
                   {label:"Grade",value:sectionDash.grade,color:"border-blue-500"},
-                  {label:"Section",value:sectionDash.section,color:"border-orange-500"},
-                ].map(s=>(
+                  {label:"Section",value:sectionDash.section,color:"border-orange-500"}].map(s=>(
                   <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
                     <p className="text-xs text-gray-500">{s.label}</p>
                     <p className="text-2xl font-bold text-gray-800">{s.value}</p>
                   </div>
                 ))}
               </div>
-              <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Domain-wise Average</h3>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={(sectionDash.domains||[]).map((d:any)=>({name:d.domain,avg:d.avg}))} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3"/><XAxis type="number" domain={[0,4]} tick={{fontSize:10}}/><YAxis type="category" dataKey="name" tick={{fontSize:10}} width={120}/>
-                    <Tooltip formatter={(v:any)=>[`${v}/4`,"Avg"]}/>
-                    <Bar dataKey="avg" radius={[0,4,4,0]}>{(sectionDash.domains||[]).map((_:any,i:number)=><Cell key={i} fill={DOMAIN_COLORS[i%DOMAIN_COLORS.length]}/>)}</Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              {sectionDash.weakest?.length > 0 && (
+              {sectionDash.weakest?.length>0&&(
                 <div className="bg-white rounded-xl shadow p-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">⚠️ Weakest Competencies</h3>
                   <div className="space-y-2">
                     {sectionDash.weakest.map((c:any)=>(
                       <div key={c.competency_id} className="flex items-center justify-between p-2 bg-red-50 rounded border border-red-100">
                         <div><span className="text-xs font-bold text-red-700">{c.competency_code}</span><span className="text-xs text-gray-500 ml-2">{c.domain}</span></div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(c.avg)}`}>{c.avg.toFixed(2)}/4</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg(c.avg_pct||c.avg||0)}`}>{(c.avg_pct||c.avg||0).toFixed(1)}%</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-              {sectionDash.studentDomainBreakdown?.length > 0 && (
+              {sectionDash.studentDomainBreakdown?.length>0&&(
                 <div className="bg-white rounded-xl shadow p-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Student × Domain Breakdown</h3>
                   <div className="overflow-x-auto">
@@ -2283,11 +2324,11 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
                             <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
                             {(sectionDash.domains||[]).map((d:any)=>{const val=s.domain_avgs?.[d.domain]||0;return(
                               <td key={d.domain} className="px-3 py-2 text-center border-l border-gray-100">
-                                {val>0?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(val)}`}>{val.toFixed(1)}</span>:<span className="text-gray-300">—</span>}
+                                {val>0?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${pctBg(val)}`}>{val.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
                               </td>
                             );})}
                             <td className="px-3 py-2 text-center border-l border-gray-200">
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.overall_avg)}`}>{s.overall_avg.toFixed(2)}</span>
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg(s.overall_avg||0)}`}>{(s.overall_avg||0).toFixed(1)}%</span>
                             </td>
                           </tr>
                         ))}
@@ -2297,71 +2338,54 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
                 </div>
               )}
             </>
-          ) : <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No data for {dashGrade} — {dashSection}.</div>}
+          ):<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No data for {dashGrade} — {dashSection}.</div>}
         </div>
       )}
 
-      {/* ── STUDENT DASHBOARD ── */}
-      {!loading && dashTab==="student" && (
+      {/* STUDENT */}
+      {!loading&&dashTab==="student"&&(
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow p-4">
             <label className="text-xs text-gray-500 block mb-2">Select Student</label>
-            <select value={selectedStudentId} onChange={e => { setSelectedStudentId(e.target.value); if(e.target.value) fetchStudentDash(e.target.value); }}
+            <select value={selectedStudentId} onChange={e=>{setSelectedStudentId(e.target.value);if(e.target.value)fetchStudentDash(e.target.value);}}
               className="border border-gray-300 rounded px-3 py-2 text-sm w-full max-w-md">
               <option value="">-- Select student --</option>
               {studentList.map((s:any)=><option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
-          {studentDash && (
+          {studentDash&&(
             <div className="space-y-4">
               <div className="bg-white rounded-xl shadow p-4 border-l-4 border-indigo-500">
                 <p className="text-lg font-bold text-gray-800">{studentDash.student?.name}</p>
                 <p className="text-sm text-gray-500">{studentDash.student?.current_class} — {studentDash.student?.section}</p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {studentDash.competencyScores?.length>0&&(
                 <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject-wise Average</h3>
-                  <div className="space-y-2">
-                    {(studentDash.subjectSummary||[]).map((s:any)=>(
-                      <div key={s.subject} className="flex items-center justify-between p-2 rounded border border-gray-100">
-                        <span className="text-xs font-medium text-gray-700">{s.subject}</span>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.avg)}`}>{s.avg.toFixed(2)}/4</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Domain-wise Average</h3>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={(studentDash.domainSummary||[]).map((d:any)=>({name:d.domain,avg:d.avg}))} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3"/><XAxis type="number" domain={[0,4]} tick={{fontSize:10}}/><YAxis type="category" dataKey="name" tick={{fontSize:9}} width={100}/>
-                      <Tooltip formatter={(v:any)=>[`${v}/4`,"Avg"]}/>
-                      <Bar dataKey="avg" radius={[0,4,4,0]}>{(studentDash.domainSummary||[]).map((_:any,i:number)=><Cell key={i} fill={DOMAIN_COLORS[i%DOMAIN_COLORS.length]}/>)}</Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              {studentDash.competencyScores?.length > 0 && (
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Individual Competency Scores</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Competency Scores</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs border-collapse">
                       <thead><tr className="bg-indigo-700 text-white">
-                        <th className="px-3 py-2 text-left">Code</th><th className="px-3 py-2 text-left">Description</th>
-                        <th className="px-3 py-2 text-left">Domain</th><th className="px-3 py-2 text-center">Score</th>
-                        <th className="px-3 py-2 text-center">Rating</th><th className="px-3 py-2 text-center">Attempts</th>
+                        <th className="px-3 py-2 text-left">Code</th>
+                        <th className="px-3 py-2 text-left">Description</th>
+                        <th className="px-3 py-2 text-left">Domain</th>
+                        <th className="px-3 py-2 text-center">Avg %</th>
+                        <th className="px-3 py-2 text-center">Level</th>
+                        <th className="px-3 py-2 text-center">Attempts</th>
                       </tr></thead>
                       <tbody>
-                        {studentDash.competencyScores.map((c:any,i:number)=>(
+                        {studentDash.competencyScores.map((c:any,i:number)=>{
+                          const pct = c.avg_pct||(c.avg*25)||0;
+                          const level = getLevel(pct);
+                          return(
                           <tr key={c.competency_id} className={i%2===0?"bg-white":"bg-gray-50"}>
                             <td className="px-3 py-2 font-medium text-indigo-700">{c.competency_code}</td>
                             <td className="px-3 py-2 text-gray-600 max-w-[200px] truncate">{c.description}</td>
                             <td className="px-3 py-2 text-gray-500">{c.domain}</td>
-                            <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(c.avg)}`}>{c.avg.toFixed(2)}/4</span></td>
-                            <td className="px-3 py-2 text-center"><span className={`text-xs px-2 py-0.5 rounded border ${RATING_COLORS[c.rating?.toLowerCase()]||"bg-gray-100"}`}>{c.rating}</span></td>
+                            <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg(pct)}`}>{pct.toFixed(1)}%</span></td>
+                            <td className="px-3 py-2 text-center"><span className={`text-xs px-2 py-0.5 rounded border ${LEVEL_COLOR[level]||""}`}>{level}</span></td>
                             <td className="px-3 py-2 text-center text-gray-400">{c.assessment_count}x</td>
                           </tr>
-                        ))}
+                        );})}
                       </tbody>
                     </table>
                   </div>
@@ -2372,29 +2396,28 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
         </div>
       )}
 
-      {/* ── ALERTS ── */}
-      {!loading && dashTab==="alerts" && (
+      {/* ALERTS */}
+      {!loading&&dashTab==="alerts"&&(
         <div className="space-y-4">
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
             <h3 className="text-sm font-bold text-yellow-800 mb-1">⚠️ Consecutive Decline Alert</h3>
-            <p className="text-xs text-yellow-600">Students in your sections whose competency average dropped in 3 consecutive activities.</p>
+            <p className="text-xs text-yellow-600">Students whose activity % dropped in 3 consecutive activities.</p>
           </div>
           <div className="bg-white rounded-xl shadow p-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Students with Consecutive Decline ({alerts.length})</h3>
-            {alerts.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">No students with 3 consecutive declines in your sections.</p>
-            ) : (
-              <div className="space-y-3">
+            {alerts.length===0
+              ?<p className="text-sm text-gray-400 text-center py-4">No consecutive declines found.</p>
+              :<div className="space-y-3">
                 {alerts.map((s:any,i:number)=>(
                   <div key={i} className="bg-red-50 border border-red-200 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <div><span className="text-sm font-bold text-red-800">{s.student_name}</span><span className="text-xs text-gray-500 ml-2">{s.grade} — {s.section}</span></div>
-                      <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">Drop: {s.decline_from} → {s.decline_to} (-{s.drop})</span>
+                      <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">Drop: {s.decline_from}% → {s.decline_to}%</span>
                     </div>
-                    <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
+                    <div className="flex gap-2 flex-wrap">
                       {s.scores?.map((sc:any,j:number)=>(
-                        <div key={j} className={`text-center rounded px-2 py-1 text-xs border ${scoreBg(sc.avg)}`}>
-                          <p className="font-bold">{sc.avg?.toFixed(2)}/4</p>
+                        <div key={j} className={`text-center rounded px-2 py-1 text-xs border ${pctBg(sc.avg_pct||sc.avg*25||0)}`}>
+                          <p className="font-bold">{(sc.avg_pct||sc.avg*25||0).toFixed(1)}%</p>
                           <p className="text-gray-500 text-xs truncate max-w-[80px]">{sc.name}</p>
                         </div>
                       ))}
@@ -2402,23 +2425,18 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
                   </div>
                 ))}
               </div>
-            )}
+            }
           </div>
         </div>
       )}
 
-      {/* ── COVERAGE ── */}
-      {!loading && dashTab==="coverage" && (
+      {/* COVERAGE */}
+      {!loading&&dashTab==="coverage"&&(
         <div className="space-y-4">
-          {coverageData ? (
+          {coverageData?(
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  {label:"Total Competencies",value:coverageData.total,color:"text-gray-700"},
-                  {label:"Covered",value:coverageData.covered,color:"text-green-700"},
-                  {label:"Pending",value:coverageData.uncovered,color:"text-red-600"},
-                  {label:"Coverage %",value:`${coverageData.coverage_percent}%`,color:coverageData.coverage_percent>=80?"text-green-700":coverageData.coverage_percent>=50?"text-yellow-600":"text-red-600"},
-                ].map(k=>(
+                {[{label:"Total",value:coverageData.total,color:"text-gray-700"},{label:"Covered",value:coverageData.covered,color:"text-green-700"},{label:"Pending",value:coverageData.uncovered,color:"text-red-600"},{label:"Coverage %",value:`${coverageData.coverage_percent}%`,color:coverageData.coverage_percent>=80?"text-green-700":"text-yellow-600"}].map(k=>(
                   <div key={k.label} className="bg-white rounded-xl shadow p-4 text-center border border-gray-200">
                     <div className={`text-2xl font-bold ${k.color}`}>{k.value}</div>
                     <div className="text-xs text-gray-500 mt-0.5">{k.label}</div>
@@ -2426,44 +2444,18 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
                 ))}
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
-                <div className={`h-3 rounded-full transition-all ${coverageData.coverage_percent>=80?"bg-green-500":coverageData.coverage_percent>=50?"bg-yellow-500":"bg-red-500"}`}
-                  style={{width:`${coverageData.coverage_percent}%`}}/>
+                <div className={`h-3 rounded-full ${coverageData.coverage_percent>=80?"bg-green-500":coverageData.coverage_percent>=50?"bg-yellow-500":"bg-red-500"}`} style={{width:`${coverageData.coverage_percent}%`}} />
               </div>
-              {coverageData.covered_competencies?.length > 0 && (
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-green-700 mb-2">✅ Covered ({coverageData.covered_competencies.length})</h3>
-                  <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {coverageData.covered_competencies.map((c:any)=>(
-                      <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
-                        <span className="font-mono text-green-700 font-semibold shrink-0">{c.competency_code}</span>
-                        <span className="text-gray-600">{c.description}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {coverageData.uncovered_competencies?.length > 0 && (
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-red-600 mb-2">⏳ Pending ({coverageData.uncovered_competencies.length})</h3>
-                  <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {coverageData.uncovered_competencies.map((c:any)=>(
-                      <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs">
-                        <span className="font-mono text-red-600 font-semibold shrink-0">{c.competency_code}</span>
-                        <span className="text-gray-600">{c.description}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </>
-          ) : <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No coverage data for {dashGrade} — {dashSection}. Add competencies to the registry first.</div>}
+          ):<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No coverage data. Add competencies to registry first.</div>}
         </div>
       )}
     </div>
   );
 }
 
-// ── MARKS ENTRY PANEL — fetches students directly, works even before any marks entered ──
+
+
 function MarksEntryPanel({ activity, combinedMarks, localRatings, updateRating, saveActivityMarks, saving, RATING_COLORS, API, academicYear }: any) {
   const [students, setStudents] = useState<any[]>([]);
   const [competencies, setCompetencies] = useState<any[]>([]);
