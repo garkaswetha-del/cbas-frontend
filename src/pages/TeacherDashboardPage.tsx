@@ -2216,7 +2216,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                   <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
                     <div>
                       <span className="text-sm font-bold text-indigo-800 uppercase">{subRep.subject}</span>
-                      <span className="ml-3 text-xs text-indigo-600">{subRep.activities.length} activities</span>
+                      <span className="ml-3 text-xs text-indigo-600">{(subRep.activities||[]).length} activities</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
@@ -2329,7 +2329,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                 </div>
                 {coverage.bySubject?.length>0&&(
                   <div className="mb-3">
-                    <div className="text-xs font-semibold text-green-700 mb-2">✅ Covered ({coverage.covered_competencies.length})</div>
+                    <div className="text-xs font-semibold text-green-700 mb-2">✅ Covered ({(coverage.bySubject||[]).flatMap((s:any)=>s.covered_competencies||[]).length})</div>
                     <div className="space-y-1 max-h-40 overflow-y-auto">
                       {(coverage.bySubject||[]).flatMap((s:any)=>s.covered_competencies||[]).map((c:any)=>(
                         <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
@@ -2342,7 +2342,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                 )}
                 {(coverage.bySubject||[]).some((s:any)=>(s.uncovered_competencies||[]).length>0)&&(
                   <div>
-                    <div className="text-xs font-semibold text-red-600 mb-2">⏳ Pending ({coverage.uncovered_competencies.length})</div>
+                    <div className="text-xs font-semibold text-red-600 mb-2">⏳ Pending ({(coverage.bySubject||[]).flatMap((s:any)=>s.uncovered_competencies||[]).length})</div>
                     <div className="space-y-1 max-h-40 overflow-y-auto">
                       {(coverage.bySubject||[]).flatMap((s:any)=>s.uncovered_competencies||[]).map((c:any)=>(
                         <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs">
