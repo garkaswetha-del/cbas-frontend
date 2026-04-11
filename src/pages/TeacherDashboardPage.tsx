@@ -1695,12 +1695,8 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
     if (!coverageGrade) return;
     try {
       const sec = sectionsByGrade[coverageGrade]?.[0];
-      if (sec) {
-        const r = await axios.get(`${API}/activities/coverage/section/${encodeURIComponent(coverageGrade)}/${encodeURIComponent(sec)}?academic_year=${academicYear}`);
-        if (r.data?.total > 0) { setCoverage(r.data); return; }
-      }
-      const subNorm = normalizeSubject(allSubjects[0]||"");
-      const r = await axios.get(`${API}/activities/coverage/detail/${encodeURIComponent(coverageGrade)}/${encodeURIComponent(subNorm)}?academic_year=${academicYear}`);
+      if (!sec) { setCoverage(null); return; }
+      const r = await axios.get(`${API}/activities/coverage/section/${encodeURIComponent(coverageGrade)}/${encodeURIComponent(sec)}?academic_year=${academicYear}`);
       setCoverage(r.data);
     } catch { setCoverage(null); }
   };
