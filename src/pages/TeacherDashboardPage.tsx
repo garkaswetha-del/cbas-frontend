@@ -2316,8 +2316,19 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
             </div>
             {coverage&&(
               <div>
+                {(() => {
+                  // Filter bySubject to only teacher's mapped subjects
+                  const teacherSubjects = allSubjects.map((s:string)=>s.toLowerCase().replace(/\s+/g,'_').replace(/[()]/g,''));
+                  const filteredBySubject = (coverage.bySubject||[]).filter((s:any)=>
+                    teacherSubjects.length===0 || teacherSubjects.includes((s.subject||'').toLowerCase().replace(/\s+/g,'_').replace(/[()]/g,''))
+                  );
+                  const totalComp = filteredBySubject.reduce((sum:number,s:any)=>sum+s.total,0);
+                  const coveredComp = filteredBySubject.reduce((sum:number,s:any)=>sum+s.covered,0);
+                  const covPct = totalComp>0?+((coveredComp/totalComp)*100).toFixed(1):0;
+                  return (
+                <div>
                 <div className="grid grid-cols-4 gap-3 mb-4">
-                  {[{label:"Total",value:coverage.total_competencies,color:"text-gray-700"},{label:"Covered",value:coverage.activity_covered,color:"text-green-700"},{label:"Pending",value:(coverage.total_competencies||0)-(coverage.activity_covered||0),color:"text-red-600"},{label:"Coverage %",value:`${coverage.activity_coverage_percent||0}%`,color:(coverage.activity_coverage_percent||0)>=80?"text-green-700":(coverage.activity_coverage_percent||0)>=50?"text-yellow-600":"text-red-600"}].map(k=>(
+                  {[{label:"Total",value:totalComp,color:"text-gray-700"},{label:"Covered",value:coveredComp,color:"text-green-700"},{label:"Pending",value:totalComp-coveredComp,color:"text-red-600"},{label:"Coverage %",value:`${covPct}%`,color:covPct>=80?"text-green-700":covPct>=50?"text-yellow-600":"text-red-600"}].map(k=>(
                     <div key={k.label} className="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
                       <div className={`text-2xl font-bold ${k.color}`}>{k.value}</div>
                       <div className="text-xs text-gray-500 mt-0.5">{k.label}</div>
@@ -2325,13 +2336,13 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                   ))}
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
-                  <div className={`h-3 rounded-full ${(coverage.activity_coverage_percent||0)>=80?"bg-green-500":(coverage.activity_coverage_percent||0)>=50?"bg-yellow-500":"bg-red-500"}`} style={{width:`${coverage.activity_coverage_percent||0}%`}} />
+                  <div className={`h-3 rounded-full ${covPct>=80?"bg-green-500":covPct>=50?"bg-yellow-500":"bg-red-500"}`} style={{width:`${covPct}%`}} />
                 </div>
-                {coverage.bySubject?.length>0&&(
+                {filteredBySubject.length>0&&(
                   <div className="mb-3">
-                    <div className="text-xs font-semibold text-green-700 mb-2">✅ Covered ({(coverage.bySubject||[]).flatMap((s:any)=>s.covered_competencies||[]).length})</div>
+                    <div className="text-xs font-semibold text-green-700 mb-2">✅ Covered ({filteredBySubject.flatMap((s:any)=>s.covered_competencies||[]).length})</div>
                     <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {(coverage.bySubject||[]).flatMap((s:any)=>s.covered_competencies||[]).map((c:any)=>(
+                      {filteredBySubject.flatMap((s:any)=>s.covered_competencies||[]).map((c:any)=>(
                         <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
                           <span className="font-mono text-green-700 font-semibold">{c.competency_code}</span>
                           <span className="text-gray-600">{c.description}</span>
@@ -2340,11 +2351,11 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                     </div>
                   </div>
                 )}
-                {(coverage.bySubject||[]).some((s:any)=>(s.uncovered_competencies||[]).length>0)&&(
+                {filteredBySubject.some((s:any)=>(s.uncovered_competencies||[]).length>0)&&(
                   <div>
-                    <div className="text-xs font-semibold text-red-600 mb-2">⏳ Pending ({(coverage.bySubject||[]).flatMap((s:any)=>s.uncovered_competencies||[]).length})</div>
+                    <div className="text-xs font-semibold text-red-600 mb-2">⏳ Pending ({filteredBySubject.flatMap((s:any)=>s.uncovered_competencies||[]).length})</div>
                     <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {(coverage.bySubject||[]).flatMap((s:any)=>s.uncovered_competencies||[]).map((c:any)=>(
+                      {filteredBySubject.flatMap((s:any)=>s.uncovered_competencies||[]).map((c:any)=>(
                         <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs">
                           <span className="font-mono text-red-600 font-semibold">{c.competency_code}</span>
                           <span className="text-gray-600">{c.description}</span>
@@ -2354,6 +2365,8 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                   </div>
                 )}
               </div>
+                  </div>);
+                })()}
             )}
           </div>
         </div>
