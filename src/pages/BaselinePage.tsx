@@ -1,11 +1,174 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import * as XLSX from "xlsx";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line, Cell,
 } from "recharts";
 
 const API = "https://cbas-backend-production.up.railway.app";
+
+// ── Excel section-name corrections (typos/spelling diffs in the Excel file) ──
+const SECTION_CORRECTIONS: Record<string, string> = {
+  "asteriod":  "ASTEROID",
+  "einstien":  "EINSTEIN",
+  "dimond":    "DIAMOND",
+  "shanti":    "SHANTHI",
+  "satya":     "SATHYA",
+  "veda":      "VEDHA",
+  "centarus":  "CENTAURUS",
+};
+
+// Grade number → app grade name
+const GRADE_NUM_MAP: Record<string, string> = {
+  "1": "Grade 1", "2": "Grade 2", "3": "Grade 3", "4": "Grade 4",
+  "5": "Grade 5", "6": "Grade 6", "7": "Grade 7", "8": "Grade 8",
+  "9": "Grade 9", "10": "Grade 10",
+  "pkg": "Pre-KG", "lkg": "LKG", "ukg": "UKG",
+};
+
+// ── Parse a single sheet's student rows ──────────────────────────────────────
+function parseBaselineSheet(ws: XLSX.WorkSheet): Array<{
+  name: string;
+  listening: number | null; speaking: number | null;
+  reading: number | null;   writing: number | null;
+  operations: number | null; base10: number | null;
+  measurement: number | null; geometry: number | null;
+  isAbsent: boolean;
+}> {
+  const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, defval: null });
+
+  // Find the sub-header row (contains "Listening" or similar)
+  let dataStartRow = 2; // default: row index 2
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const r = rows[i];
+    if (r && r.some((c: any) => typeof c === "string" && c.toLowerCase().includes("listen"))) {
+      dataStartRow = i + 1; // data starts after this header
+      break;
+    }
+  }
+
+  // Find column indices by scanning the header row
+  const headerRow = rows[dataStartRow - 1] || [];
+  const colIdx = { listening: -1, speaking: -1, reading: -1, writing: -1, operations: -1, base10: -1, measurement: -1, geometry: -1 };
+  headerRow.forEach((cell: any, ci: number) => {
+    if (!cell) return;
+    const c = String(cell).toLowerCase().trim();
+    if (c.includes("listen"))      colIdx.listening   = ci;
+    else if (c.includes("speak"))  colIdx.speaking    = ci;
+    else if (c.includes("read"))   colIdx.reading     = ci;
+    else if (c.includes("writ"))   colIdx.writing     = ci;
+    else if (c.includes("operat")) colIdx.operations  = ci;
+    else if (c.includes("base"))   colIdx.base10      = ci;
+    else if (c.includes("measur")) colIdx.measurement = ci;
+    else if (c.includes("geom"))   colIdx.geometry    = ci;
+  });
+
+  const parseVal = (raw: any): number | null => {
+    if (raw === null || raw === undefined) return null;
+    const s = String(raw).trim().toLowerCase();
+    if (s === "" || s === "ab" || s === "abs" || s === "absent" || s === "-") return null;
+    const n = parseFloat(s);
+    return isNaN(n) ? null : n;
+  };
+
+  const results = [];
+  for (let i = dataStartRow; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !row[0]) continue;
+    const name = String(row[0]).trim();
+    if (!name || name.toLowerCase() === "total" || name.toLowerCase() === "average") continue;
+
+    const listening   = colIdx.listening   >= 0 ? parseVal(row[colIdx.listening])   : null;
+    const speaking    = colIdx.speaking    >= 0 ? parseVal(row[colIdx.speaking])    : null;
+    const reading     = colIdx.reading     >= 0 ? parseVal(row[colIdx.reading])     : null;
+    const writing     = colIdx.writing     >= 0 ? parseVal(row[colIdx.writing])     : null;
+    const operations  = colIdx.operations  >= 0 ? parseVal(row[colIdx.operations])  : null;
+    const base10      = colIdx.base10      >= 0 ? parseVal(row[colIdx.base10])      : null;
+    const measurement = colIdx.measurement >= 0 ? parseVal(row[colIdx.measurement]) : null;
+    const geometry    = colIdx.geometry    >= 0 ? parseVal(row[colIdx.geometry])    : null;
+
+    // Absent if ALL values are null
+    const allNull = [listening, speaking, reading, writing, operations, base10, measurement, geometry].every(v => v === null);
+    // Check if any raw cell contained "ab"
+    const hasAbMarker = [colIdx.listening, colIdx.speaking, colIdx.reading, colIdx.writing,
+      colIdx.operations, colIdx.base10, colIdx.measurement, colIdx.geometry
+    ].some(ci => {
+      if (ci < 0) return false;
+      const raw = row[ci];
+      if (raw === null || raw === undefined) return false;
+      const s = String(raw).trim().toLowerCase();
+      return s === "ab" || s === "abs" || s === "absent";
+    });
+
+    results.push({ name, listening, speaking, reading, writing, operations, base10, measurement, geometry, isAbsent: hasAbMarker || allNull });
+  }
+  return results;
+}
+
+// ── Fuzzy name matching utilities ────────────────────────────────────────────
+
+// Normalize a name: uppercase, trim, collapse spaces, sort words alphabetically
+// This handles: "B ANANYA" ↔ "ANANYA B", "K R Chiranjeevi" ↔ "Chiranjeevi K R"
+function normalizeName(name: string): string {
+  return name.trim().toUpperCase().replace(/\s+/g, " ").split(" ").sort().join(" ");
+}
+
+// Compute similarity score (0–100) between two raw names
+// Uses word-sorted comparison + character overlap
+function nameSimilarity(a: string, b: string): number {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (na === nb) return 100;
+
+  // Check if all words of shorter name appear in longer name
+  const wordsA = na.split(" ");
+  const wordsB = nb.split(" ");
+  const shorter = wordsA.length <= wordsB.length ? wordsA : wordsB;
+  const longer  = wordsA.length <= wordsB.length ? wordsB : wordsA;
+  const allFound = shorter.every(w => longer.includes(w));
+  if (allFound) return 90; // all words present, just different order or extra initial
+
+  // Partial word match — count how many words are shared
+  const shared = shorter.filter(w => longer.some(lw => lw.startsWith(w) || w.startsWith(lw)));
+  const wordScore = shared.length / Math.max(shorter.length, longer.length);
+
+  // Character-level overlap (Jaccard on bigrams)
+  const bigrams = (s: string) => {
+    const bg = new Set<string>();
+    for (let i = 0; i < s.length - 1; i++) bg.add(s.slice(i, i + 2));
+    return bg;
+  };
+  const bgA = bigrams(na.replace(/ /g, ""));
+  const bgB = bigrams(nb.replace(/ /g, ""));
+  const intersection = [...bgA].filter(x => bgB.has(x)).length;
+  const union = new Set([...bgA, ...bgB]).size;
+  const charScore = union > 0 ? intersection / union : 0;
+
+  return Math.round((wordScore * 0.6 + charScore * 0.4) * 100);
+}
+
+// Find top suggestions from dbStudents for a given excel name
+function findSuggestions(excelName: string, dbStudents: any[], topN = 4): Array<{ dbStudent: any; score: number }> {
+  return dbStudents
+    .map(s => ({ dbStudent: s, score: nameSimilarity(excelName, s.name) }))
+    .filter(x => x.score >= 50) // only show reasonably close matches
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topN);
+}
+function parseSheetName(sheetName: string): { grade: string; section: string } | null {
+  const s = sheetName.trim();
+  // Pattern: G<num> <section>  e.g. "G1 galaxy", "G8 centarus "
+  const m = s.match(/^[Gg](\d{1,2})\s+(.+)$/);
+  if (!m) return null;
+  const gradeNum = m[1];
+  const sectionRaw = m[2].trim().toLowerCase();
+  const grade = GRADE_NUM_MAP[gradeNum];
+  if (!grade) return null;
+  // Apply correction map first, then uppercase
+  const corrected = SECTION_CORRECTIONS[sectionRaw] || sectionRaw.toUpperCase();
+  return { grade, section: corrected };
+}
 
 const generateAcademicYears = () => {
   const years = [];
@@ -1093,6 +1256,26 @@ export default function BaselinePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
+  // ── Excel bulk upload state ──────────────────────────────────
+  const xlFileRef = useRef<HTMLInputElement>(null);
+  const [xlParsing, setXlParsing] = useState(false);
+  const [xlSheets, setXlSheets] = useState<Array<{
+    sheetName: string; grade: string; section: string;
+    rows: ReturnType<typeof parseBaselineSheet>;
+    matched: Array<{ dbStudent: any; excelRow: ReturnType<typeof parseBaselineSheet>[0] }>;
+    unmatched: Array<{
+      excelRow: ReturnType<typeof parseBaselineSheet>[0];
+      suggestions: Array<{ dbStudent: any; score: number }>;
+    }>;
+    dbStudents: any[];
+  }>>([]);
+  const [xlActiveSheet, setXlActiveSheet] = useState(0);
+  // overrides[sheetIdx][excelName] = dbStudent chosen by admin (or null = skip)
+  const [xlOverrides, setXlOverrides] = useState<Record<number, Record<string, any | null>>>({});
+  const [xlSaving, setXlSaving] = useState(false);
+  const [xlSaveResults, setXlSaveResults] = useState<Array<{ section: string; saved: number; skipped: number }>>([]);
+  const [xlStep, setXlStep] = useState<"idle" | "preview" | "done">("idle");
+
   // Teacher entry
   const [teachers, setTeachers] = useState<any[]>([]);
   const [teacherStage, setTeacherStage] = useState("foundation");
@@ -1208,6 +1391,173 @@ export default function BaselinePage() {
 
   const updateScore = (studentId: string, field: string, val: string) => {
     setScores(prev => ({ ...prev, [studentId]: { ...(prev[studentId] || {}), [field]: val } }));
+  };
+
+  // ── Excel upload handler ─────────────────────────────────────
+  const handleXlUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setXlParsing(true);
+    setXlSheets([]);
+    setXlSaveResults([]);
+    setXlOverrides({});
+    setXlStep("idle");
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer);
+
+      // Fetch ALL students once
+      const studRes = await axios.get(`${API}/students?limit=5000`);
+      const allDbStudents: any[] = studRes.data?.data || studRes.data || [];
+
+      const parsed: typeof xlSheets = [];
+
+      for (const sheetName of wb.SheetNames) {
+        const meta = parseSheetName(sheetName);
+        if (!meta) continue;
+
+        const ws = wb.Sheets[sheetName];
+        const rows = parseBaselineSheet(ws);
+        if (!rows.length) continue;
+
+        // DB students for this grade+section
+        const dbStudents = allDbStudents.filter((s: any) =>
+          s.current_class?.toLowerCase() === meta.grade.toLowerCase() &&
+          s.section?.toUpperCase() === meta.section.toUpperCase() &&
+          s.is_active !== false
+        );
+
+        const matched: typeof parsed[0]["matched"] = [];
+        const unmatched: typeof parsed[0]["unmatched"] = [];
+
+        // Track which DB students are already matched (avoid double-matching)
+        const usedDbIds = new Set<string>();
+
+        for (const row of rows) {
+          const excelNameUpper = row.name.trim().toUpperCase().replace(/\s+/g, " ");
+
+          // First try exact UPPER match
+          let dbMatch = dbStudents.find((s: any) =>
+            !usedDbIds.has(s.id) &&
+            s.name.trim().toUpperCase().replace(/\s+/g, " ") === excelNameUpper
+          );
+
+          // Then try word-sorted match (handles "B ANANYA" ↔ "ANANYA B")
+          if (!dbMatch) {
+            const excelSorted = normalizeName(row.name);
+            dbMatch = dbStudents.find((s: any) =>
+              !usedDbIds.has(s.id) &&
+              normalizeName(s.name) === excelSorted
+            );
+          }
+
+          if (dbMatch) {
+            usedDbIds.add(dbMatch.id);
+            matched.push({ dbStudent: dbMatch, excelRow: row });
+          } else {
+            // Compute suggestions from remaining unmatched DB students
+            const remainingDb = dbStudents.filter(s => !usedDbIds.has(s.id));
+            const suggestions = findSuggestions(row.name, remainingDb);
+            unmatched.push({ excelRow: row, suggestions });
+          }
+        }
+
+        parsed.push({ sheetName, grade: meta.grade, section: meta.section, rows, matched, unmatched, dbStudents });
+      }
+
+      setXlSheets(parsed);
+      setXlActiveSheet(0);
+      setXlStep("preview");
+    } catch (err: any) {
+      setMessage("❌ Failed to parse Excel: " + err.message);
+      setTimeout(() => setMessage(""), 5000);
+    }
+
+    setXlParsing(false);
+    if (xlFileRef.current) xlFileRef.current.value = "";
+  };
+
+  // ── Save all matched sheets to backend ───────────────────────
+  const saveAllXlSheets = async () => {
+    setXlSaving(true);
+    const results: typeof xlSaveResults = [];
+
+    for (let si = 0; si < xlSheets.length; si++) {
+      const sheet = xlSheets[si];
+      const sheetOverrides = xlOverrides[si] || {};
+
+      // Build final list: auto-matched + admin-confirmed overrides
+      const allToSave: Array<{ dbStudent: any; excelRow: ReturnType<typeof parseBaselineSheet>[0] }> = [
+        ...sheet.matched,
+        // Add overrides where admin picked a DB student
+        ...sheet.unmatched
+          .filter(u => sheetOverrides[u.excelRow.name] != null)
+          .map(u => ({ dbStudent: sheetOverrides[u.excelRow.name], excelRow: u.excelRow })),
+      ];
+
+      // Skip students with no data (empty rows, absent)
+      const readyToSave = allToSave.filter(({ excelRow }) => {
+        if (excelRow.isAbsent) return false;
+        return [
+          excelRow.listening, excelRow.speaking, excelRow.reading, excelRow.writing,
+          excelRow.operations, excelRow.base10, excelRow.measurement, excelRow.geometry,
+        ].some(v => v !== null);
+      });
+
+      if (!readyToSave.length) {
+        const totalSkipped = sheet.matched.length + sheet.unmatched.length;
+        results.push({ section: `${sheet.grade} · ${sheet.section}`, saved: 0, skipped: totalSkipped });
+        continue;
+      }
+
+      const stage = (() => {
+        const g = sheet.grade;
+        if (["Pre-KG","LKG","UKG","Grade 1","Grade 2"].includes(g)) return "foundation";
+        if (["Grade 3","Grade 4","Grade 5"].includes(g)) return "preparatory";
+        if (["Grade 6","Grade 7","Grade 8"].includes(g)) return "middle";
+        return "secondary";
+      })();
+
+      const assessments = readyToSave.map(({ dbStudent, excelRow }) => ({
+        student_id: dbStudent.id,
+        student_name: dbStudent.name,
+        listening_score:   excelRow.listening   ?? undefined,
+        speaking_score:    excelRow.speaking    ?? undefined,
+        reading_score:     excelRow.reading     ?? undefined,
+        writing_score:     excelRow.writing     ?? undefined,
+        operations_score:  excelRow.operations  ?? undefined,
+        base10_score:      excelRow.base10      ?? undefined,
+        measurement_score: excelRow.measurement ?? undefined,
+        geometry_score:    excelRow.geometry    ?? undefined,
+        stage,
+      }));
+
+      try {
+        await axios.post(`${API}/baseline/section`, {
+          grade: sheet.grade,
+          section: sheet.section,
+          academic_year: academicYear,
+          round,
+          assessment_date: assessmentDate,
+          assessments,
+        });
+        const notYetAssessed = allToSave.length - readyToSave.length;
+        const stillUnmatched = sheet.unmatched.filter(u => sheetOverrides[u.excelRow.name] == null).length;
+        results.push({
+          section: `${sheet.grade} · ${sheet.section}`,
+          saved: readyToSave.length,
+          skipped: notYetAssessed + stillUnmatched,
+        });
+      } catch {
+        results.push({ section: `${sheet.grade} · ${sheet.section}`, saved: 0, skipped: allToSave.length });
+      }
+    }
+
+    setXlSaveResults(results);
+    setXlStep("done");
+    setXlSaving(false);
+    if (grade && section) fetchStudents();
   };
 
   const saveScores = async () => {
@@ -1414,6 +1764,335 @@ export default function BaselinePage() {
       {/* ── STUDENT ENTRY ── */}
       {activeTab === "entry" && (
         <div className="space-y-4">
+
+          {/* ── EXCEL UPLOAD PANEL ── */}
+          <div className="bg-white rounded-xl shadow border border-indigo-200 p-4">
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
+              <div>
+                <h2 className="text-sm font-bold text-indigo-800">📥 Bulk Upload from Excel</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Upload the school's literacy &amp; numeracy Excel file — all sections processed at once</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input ref={xlFileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleXlUpload} />
+                <button
+                  onClick={() => xlFileRef.current?.click()}
+                  disabled={xlParsing}
+                  className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium flex items-center gap-2">
+                  {xlParsing ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" /> Parsing...</> : "📂 Choose Excel File"}
+                </button>
+                {xlStep === "preview" && (
+                  <button
+                    onClick={() => { setXlStep("idle"); setXlSheets([]); setXlSaveResults([]); }}
+                    className="px-3 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
+                    ✕ Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Format hint */}
+            {xlStep === "idle" && !xlParsing && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 text-xs text-indigo-700 mt-2">
+                <p className="font-semibold mb-1">Expected format:</p>
+                <p>• One sheet per section, named like <code className="bg-indigo-100 px-1 rounded">G1 galaxy</code>, <code className="bg-indigo-100 px-1 rounded">G6 Shanti</code>, etc.</p>
+                <p>• Row 1: <em>Literacy / Numeracy</em> group headers &nbsp;|&nbsp; Row 2: domain sub-headers (Listening, Speaking…)</p>
+                <p>• Row 3+: student name in col A, then 8 scores &nbsp;|&nbsp; Absent = <code className="bg-indigo-100 px-1 rounded">Ab</code> or <code className="bg-indigo-100 px-1 rounded">AB</code></p>
+                <p className="mt-1 text-indigo-500">Spelling corrections are applied automatically (e.g. "Dimond"→Diamond, "Shanti"→Shanthi)</p>
+              </div>
+            )}
+
+            {/* ── PREVIEW TABLE ── */}
+            {xlStep === "preview" && xlSheets.length > 0 && (
+              <div className="mt-3 space-y-3">
+                {/* Summary stats */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-center">
+                    <p className="text-xs text-gray-500">Sections Found</p>
+                    <p className="text-2xl font-bold text-indigo-700">{xlSheets.length}</p>
+                  </div>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                    <p className="text-xs text-gray-500">Auto Matched</p>
+                    <p className="text-2xl font-bold text-green-700">{xlSheets.reduce((a, s) => a + s.matched.length, 0)}</p>
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
+                    <p className="text-xs text-gray-500">Need Review</p>
+                    <p className="text-2xl font-bold text-yellow-700">
+                      {xlSheets.reduce((a, s, si) => {
+                        const ov = xlOverrides[si] || {};
+                        return a + s.unmatched.filter(u => ov[u.excelRow.name] === undefined).length;
+                      }, 0)}
+                    </p>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                    <p className="text-xs text-gray-500">Manually Confirmed</p>
+                    <p className="text-2xl font-bold text-blue-700">
+                      {Object.values(xlOverrides).reduce((a, ov) => a + Object.values(ov).filter(v => v != null).length, 0)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Sheet tabs */}
+                <div className="flex gap-1.5 flex-wrap overflow-x-auto pb-1">
+                  {xlSheets.map((s, i) => {
+                    const ov = xlOverrides[i] || {};
+                    const pendingReview = s.unmatched.filter(u => ov[u.excelRow.name] === undefined).length;
+                    return (
+                      <button key={i} onClick={() => setXlActiveSheet(i)}
+                        className={`px-3 py-1.5 text-xs rounded-lg font-medium border flex-shrink-0 ${xlActiveSheet === i ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
+                        {s.grade.replace("Grade ", "G")} {s.section}
+                        {pendingReview > 0
+                          ? <span className="ml-1.5 text-xs font-bold text-yellow-400">⚠ {pendingReview}</span>
+                          : <span className="ml-1.5 text-xs font-bold text-green-400">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Active sheet preview */}
+                {xlSheets[xlActiveSheet] && (() => {
+                  const sh = xlSheets[xlActiveSheet];
+                  return (
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-bold text-gray-700">{sh.grade} — {sh.section}</span>
+                          <span className="ml-3 text-xs text-gray-500">
+                            {sh.matched.length} auto-matched ·{" "}
+                            {sh.unmatched.filter(u => (xlOverrides[xlActiveSheet]||{})[u.excelRow.name] != null).length} confirmed ·{" "}
+                            {sh.unmatched.filter(u => (xlOverrides[xlActiveSheet]||{})[u.excelRow.name] === undefined).length} pending review
+                          </span>
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs border-collapse" style={{ minWidth: "900px" }}>
+                          <thead>
+                            <tr className="bg-indigo-700 text-white">
+                              <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[180px]">Student (Excel)</th>
+                              <th className="px-3 py-2 text-left min-w-[160px]">DB Name</th>
+                              <th className="px-2 py-2 text-center border-l border-indigo-500">Status</th>
+                              <th className="px-2 py-2 text-center border-l border-indigo-500">Listen</th>
+                              <th className="px-2 py-2 text-center">Speak</th>
+                              <th className="px-2 py-2 text-center">Read</th>
+                              <th className="px-2 py-2 text-center">Write</th>
+                              <th className="px-2 py-2 text-center border-l border-indigo-500">Ops</th>
+                              <th className="px-2 py-2 text-center">Base10</th>
+                              <th className="px-2 py-2 text-center">Measure</th>
+                              <th className="px-2 py-2 text-center">Geom</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {/* Matched rows */}
+                            {sh.matched.map(({ dbStudent, excelRow }, i) => (
+                              <tr key={i} className={`border-b border-gray-100 ${i % 2 === 0 ? "bg-white" : "bg-gray-50"} ${excelRow.isAbsent ? "opacity-60" : ""}`}>
+                                <td className="px-3 py-1.5 font-medium text-gray-800 sticky left-0 bg-inherit">{excelRow.name}</td>
+                                <td className="px-3 py-1.5 text-green-700 font-medium">{dbStudent.name}</td>
+                                <td className="px-2 py-1.5 text-center">
+                                  {excelRow.isAbsent
+                                    ? <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">ABSENT</span>
+                                    : (() => {
+                                        const hasAny = [excelRow.listening, excelRow.speaking, excelRow.reading, excelRow.writing, excelRow.operations, excelRow.base10, excelRow.measurement, excelRow.geometry].some(v => v !== null);
+                                        return hasAny
+                                          ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">✓ Ready</span>
+                                          : <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-bold">⏭ Empty</span>;
+                                      })()
+                                  }
+                                </td>
+                                {[excelRow.listening, excelRow.speaking, excelRow.reading, excelRow.writing].map((v, j) => (
+                                  <td key={j} className={`px-2 py-1.5 text-center ${j === 0 ? "border-l border-gray-200" : ""}`}>
+                                    {v !== null ? <span className={scoreBg(v) + " text-xs px-1 py-0.5 rounded"}>{v}</span> : <span className="text-gray-300">—</span>}
+                                  </td>
+                                ))}
+                                {[excelRow.operations, excelRow.base10, excelRow.measurement, excelRow.geometry].map((v, j) => (
+                                  <td key={j} className={`px-2 py-1.5 text-center ${j === 0 ? "border-l border-gray-200" : ""}`}>
+                                    {v !== null ? <span className={scoreBg(v) + " text-xs px-1 py-0.5 rounded"}>{v}</span> : <span className="text-gray-300">—</span>}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                            {/* Unmatched rows — show suggestions */}
+                            {sh.unmatched.map((u, i) => {
+                              const override = (xlOverrides[xlActiveSheet] || {})[u.excelRow.name];
+                              const isConfirmed = override != null;
+                              const isSkipped = override === null;
+                              return (
+                                <tr key={`u${i}`} className={`border-b ${isConfirmed ? "bg-green-50 border-green-100" : isSkipped ? "bg-gray-50 border-gray-100 opacity-50" : "bg-yellow-50 border-yellow-100"}`}>
+                                  <td className="px-3 py-2 font-medium text-gray-700 sticky left-0 bg-inherit">
+                                    {u.excelRow.name}
+                                  </td>
+                                  <td className="px-3 py-2" colSpan={2}>
+                                    {isConfirmed ? (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">✓ Mapped</span>
+                                        <span className="text-xs font-medium text-green-800">{override.name}</span>
+                                        <button
+                                          onClick={() => setXlOverrides(prev => {
+                                            const copy = { ...prev, [xlActiveSheet]: { ...(prev[xlActiveSheet] || {}) } };
+                                            delete copy[xlActiveSheet][u.excelRow.name];
+                                            return copy;
+                                          })}
+                                          className="text-xs text-gray-400 hover:text-red-500 ml-1">undo</button>
+                                      </div>
+                                    ) : isSkipped ? (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full font-bold">⏭ Skipped</span>
+                                        <button
+                                          onClick={() => setXlOverrides(prev => {
+                                            const copy = { ...prev, [xlActiveSheet]: { ...(prev[xlActiveSheet] || {}) } };
+                                            delete copy[xlActiveSheet][u.excelRow.name];
+                                            return copy;
+                                          })}
+                                          className="text-xs text-gray-400 hover:text-indigo-500 ml-1">undo</button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-bold">⚠ No exact match</span>
+                                        {u.suggestions.length > 0 ? (
+                                          <>
+                                            <span className="text-xs text-gray-500">Suggestions:</span>
+                                            {u.suggestions.map((sg, si) => (
+                                              <button key={si}
+                                                onClick={() => setXlOverrides(prev => ({
+                                                  ...prev,
+                                                  [xlActiveSheet]: { ...(prev[xlActiveSheet] || {}), [u.excelRow.name]: sg.dbStudent }
+                                                }))}
+                                                className="text-xs px-2 py-0.5 rounded border font-medium hover:bg-green-50 hover:border-green-400 hover:text-green-700 border-gray-300 text-gray-600 flex items-center gap-1">
+                                                {sg.dbStudent.name}
+                                                <span className={`text-xs font-bold ml-0.5 ${sg.score >= 85 ? "text-green-600" : sg.score >= 70 ? "text-yellow-600" : "text-orange-500"}`}>
+                                                  {sg.score}%
+                                                </span>
+                                              </button>
+                                            ))}
+                                            <button
+                                              onClick={() => setXlOverrides(prev => ({
+                                                ...prev,
+                                                [xlActiveSheet]: { ...(prev[xlActiveSheet] || {}), [u.excelRow.name]: null }
+                                              }))}
+                                              className="text-xs px-2 py-0.5 rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200">
+                                              skip
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs text-gray-400 italic">No close match found in DB</span>
+                                            <button
+                                              onClick={() => setXlOverrides(prev => ({
+                                                ...prev,
+                                                [xlActiveSheet]: { ...(prev[xlActiveSheet] || {}), [u.excelRow.name]: null }
+                                              }))}
+                                              className="text-xs px-2 py-0.5 rounded border border-gray-200 text-gray-400 hover:text-red-500">
+                                              skip
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </td>
+                                  {/* Show scores even for unmatched so admin can verify */}
+                                  {[u.excelRow.listening, u.excelRow.speaking, u.excelRow.reading, u.excelRow.writing].map((v, j) => (
+                                    <td key={j} className={`px-2 py-1.5 text-center ${j === 0 ? "border-l border-gray-200" : ""}`}>
+                                      {v !== null ? <span className="text-xs text-gray-600">{v}</span> : <span className="text-gray-300">—</span>}
+                                    </td>
+                                  ))}
+                                  {[u.excelRow.operations, u.excelRow.base10, u.excelRow.measurement, u.excelRow.geometry].map((v, j) => (
+                                    <td key={j} className={`px-2 py-1.5 text-center ${j === 0 ? "border-l border-gray-200" : ""}`}>
+                                      {v !== null ? <span className="text-xs text-gray-600">{v}</span> : <span className="text-gray-300">—</span>}
+                                    </td>
+                                  ))}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Save / Cancel */}
+                <div className="flex items-center gap-3 pt-1 flex-wrap">
+                  {(() => {
+                    const totalReady = xlSheets.reduce((a, s, si) => {
+                      const ov = xlOverrides[si] || {};
+                      const allToSave = [
+                        ...s.matched,
+                        ...s.unmatched.filter(u => ov[u.excelRow.name] != null).map(u => ({ excelRow: u.excelRow })),
+                      ];
+                      return a + allToSave.filter(({ excelRow }) =>
+                        !excelRow.isAbsent && [excelRow.listening, excelRow.speaking, excelRow.reading, excelRow.writing,
+                          excelRow.operations, excelRow.base10, excelRow.measurement, excelRow.geometry].some(v => v !== null)
+                      ).length;
+                    }, 0);
+                    const pendingTotal = xlSheets.reduce((a, s, si) => {
+                      const ov = xlOverrides[si] || {};
+                      return a + s.unmatched.filter(u => ov[u.excelRow.name] === undefined).length;
+                    }, 0);
+                    return (
+                      <>
+                        <button onClick={saveAllXlSheets} disabled={xlSaving}
+                          className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-bold flex items-center gap-2">
+                          {xlSaving
+                            ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" /> Saving...</>
+                            : `💾 Save ${totalReady} Students · Round ${round}`}
+                        </button>
+                        {pendingTotal > 0 && (
+                          <span className="text-xs text-yellow-600 font-medium">
+                            ⚠ {pendingTotal} names still need review — they will be skipped
+                          </span>
+                        )}
+                        <p className="text-xs text-gray-400">Empty rows skipped — re-upload same file later to fill them in.</p>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* ── DONE RESULTS ── */}
+            {xlStep === "done" && xlSaveResults.length > 0 && (
+              <div className="mt-3 space-y-3">
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                  <h3 className="text-sm font-bold text-green-800 mb-3">✅ Upload Complete</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-green-700 text-white">
+                          <th className="px-3 py-2 text-left">Section</th>
+                          <th className="px-3 py-2 text-center">Saved</th>
+                          <th className="px-3 py-2 text-center">Skipped</th>
+                          <th className="px-3 py-2 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {xlSaveResults.map((r, i) => (
+                          <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-green-50/40"}>
+                            <td className="px-3 py-2 font-medium text-gray-800">{r.section}</td>
+                            <td className="px-3 py-2 text-center text-green-700 font-bold">{r.saved}</td>
+                            <td className="px-3 py-2 text-center text-yellow-700">{r.skipped}</td>
+                            <td className="px-3 py-2 text-center">
+                              {r.saved > 0
+                                ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">✓ Done</span>
+                                : <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">✗ Failed</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <p className="text-xs text-green-700 font-medium">
+                      Total saved: {xlSaveResults.reduce((a, r) => a + r.saved, 0)} students across {xlSaveResults.filter(r => r.saved > 0).length} sections
+                    </p>
+                    <button onClick={() => { setXlStep("idle"); setXlSheets([]); setXlSaveResults([]); }}
+                      className="ml-auto px-4 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 font-medium">
+                      Upload Another File
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── MANUAL ENTRY (existing) ── */}
           <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
             <div className="flex gap-3 flex-wrap items-end">
               <div>
