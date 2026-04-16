@@ -815,8 +815,8 @@ function BaselineTab({ user, academicYear }: any) {
   const STAGE_LABELS: Record<string,string> = { foundation:"Foundation", preparatory:"Preparatory", middle:"Middle", secondary:"Secondary" };
   const STAGE_GRADE: Record<string,string> = { foundation:"Grade 2", preparatory:"Grade 5", middle:"Grade 8", secondary:"Grade 10" };
   const PROMOTION_THRESHOLD = 80;
-  const LIT_DOMAINS = ["listening_score","speaking_score","reading_score","writing_score"];
-  const NUM_DOMAINS = ["operations_score","base10_score","measurement_score","geometry_score"];
+  const LIT_DOMAINS = ["Listening","Speaking","Reading","Writing"];
+  const NUM_DOMAINS = ["Operations","Base 10","Measurement","Geometry"];
   const LIT_LABELS  = ["Listening","Speaking","Reading","Writing"];
   const NUM_LABELS  = ["Operations","Base 10","Measurement","Geometry"];
   const DOMAIN_COLORS = ["#6366f1","#8b5cf6","#06b6d4","#10b981","#f59e0b","#ef4444","#ec4899","#84cc16"];
@@ -849,23 +849,29 @@ function BaselineTab({ user, academicYear }: any) {
 
   const assessments: any[] = data.assessments || [];
 
-  // Group by subject
-  const litRounds = assessments.filter((a:any) => a.subject === "literacy").sort((a:any,b:any) => a.round > b.round ? 1 : -1);
-  const numRounds = assessments.filter((a:any) => a.subject === "numeracy").sort((a:any,b:any) => a.round > b.round ? 1 : -1);
+  // All assessments are now single records per round (subject field kept for compat)
+  const allRounds = assessments.sort((a:any,b:any) => a.round > b.round ? 1 : -1);
+  const latest = allRounds[allRounds.length - 1];
 
-  const hasLit = litRounds.length > 0;
-  const hasNum = numRounds.length > 0;
-
-  // Latest per subject
+  const hasLit = allRounds.some((a:any) => a.literacy_scores && Object.keys(a.literacy_scores).length > 0);
+  const hasNum = allRounds.some((a:any) => a.numeracy_scores && Object.keys(a.numeracy_scores).length > 0);
+  const litRounds = allRounds.filter((a:any) => a.literacy_scores && Object.keys(a.literacy_scores).length > 0);
+  const numRounds = allRounds.filter((a:any) => a.numeracy_scores && Object.keys(a.numeracy_scores).length > 0);
   const latestLit = litRounds[litRounds.length - 1];
   const latestNum = numRounds[numRounds.length - 1];
 
-  const litAvg = latestLit ? (LIT_DOMAINS.reduce((s,d) => s + +(latestLit[d]||0),0)/LIT_DOMAINS.length) : null;
-  const numAvg = latestNum ? (NUM_DOMAINS.reduce((s,d) => s + +(latestNum[d]||0),0)/NUM_DOMAINS.length) : null;
-  const overall = litAvg !== null && numAvg !== null ? (litAvg+numAvg)/2 : (litAvg ?? numAvg ?? 0);
+  const litAvg = latest?.literacy_total ? +latest.literacy_total : null;
+  const numAvg = latest?.numeracy_total ? +latest.numeracy_total : null;
+  const overall = latest?.overall_score ? +latest.overall_score : (litAvg !== null && numAvg !== null ? (litAvg+numAvg)/2 : (litAvg ?? numAvg ?? 0));
 
-  const litStage = latestLit?.stage || "foundation";
-  const numStage = latestNum?.stage || "foundation";
+  // Get domain names dynamically
+  const LIT_LABELS = latest?.literacy_scores ? Object.keys(latest.literacy_scores) : ["Listening","Speaking","Reading","Writing"];
+  const NUM_LABELS = latest?.numeracy_scores ? Object.keys(latest.numeracy_scores) : ["Operations","Base 10","Measurement","Geometry"];
+  const LIT_DOMAINS = LIT_LABELS; // same — now using names directly
+  const NUM_DOMAINS = NUM_LABELS;
+
+  const litStage = latestLit?.stage || latest?.stage || "foundation";
+  const numStage = latestNum?.stage || latest?.stage || "foundation";
   const litGrade = STAGE_GRADE[litStage];
   const numGrade = STAGE_GRADE[numStage];
 
@@ -3005,51 +3011,264 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
 
   const roundKey = sectionData.rounds[activeRoundIdx];
   const DOMAIN_COLORS = ["#2196F3","#E91E63","#9C27B0","#FF5722","#00BCD4","#8BC34A","#FF9800","#607D8B"];
-  const allDomains = [...LITERACY_DOMAINS, ...NUMERACY_DOMAINS];
 
-  // Compute class stats for this round
+  // Helper: get pct value for a domain from a round
+  const getRndLitPct = (rnd: any, d: string) => rnd?.literacy_pct?.[d] ?? rnd?.literacy_scores?.[d] ?? 0;
+  const getRndNumPct = (rnd: any, d: string) => rnd?.numeracy_pct?.[d] ?? rnd?.numeracy_scores?.[d] ?? 0;
+  const getRndLitAvg = (rnd: any) => rnd?.literacy_total != null ? +rnd.literacy_total : 0;
+  const getRndNumAvg = (rnd: any) => rnd?.numeracy_total != null ? +rnd.numeracy_total : 0;
+  const getRndOverall = (rnd: any) => rnd?.overall != null ? +rnd.overall : 0;
+
+  // Get dynamic domains from actual data
   const assessed = sectionData.students.filter((s: any) => s.rounds[activeRoundIdx]?.exists);
   if (!assessed.length) return null;
 
-  const litAvgs = assessed.map((s: any) => s.rounds[activeRoundIdx].literacy.avg || 0);
-  const numAvgs = assessed.map((s: any) => s.rounds[activeRoundIdx].numeracy.avg || 0);
-  const overallAvgs = assessed.map((s: any) => s.rounds[activeRoundIdx].overall || 0);
+  const sampleRnd = assessed[0]?.rounds[activeRoundIdx];
+  const litDomains = sampleRnd?.literacy_scores ? Object.keys(sampleRnd.literacy_scores) : LITERACY_DOMAINS;
+  const numDomains = sampleRnd?.numeracy_scores ? Object.keys(sampleRnd.numeracy_scores) : NUMERACY_DOMAINS;
+  const allDomains = [...litDomains, ...numDomains];
+
   const avg = (arr: number[]) => arr.length ? +(arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1) : 0;
+
+  const litAvgs = assessed.map((s: any) => getRndLitAvg(s.rounds[activeRoundIdx]));
+  const numAvgs = assessed.map((s: any) => getRndNumAvg(s.rounds[activeRoundIdx]));
+  const overallAvgs = assessed.map((s: any) => getRndOverall(s.rounds[activeRoundIdx]));
 
   const classLitAvg = avg(litAvgs);
   const classNumAvg = avg(numAvgs);
   const classOverall = avg(overallAvgs);
 
-  // Level distribution
-  const levelDist: Record<string, number> = { "Exceeding": 0, "Meeting": 0, "Approaching": 0, "Beginning": 0 };
-  overallAvgs.forEach(o => { const lv = getLevel(o); levelDist[lv.label] = (levelDist[lv.label] || 0) + 1; });
+  const levelDist: Record<string, number> = { "Exceeding":0, "Meeting":0, "Approaching":0, "Beginning":0 };
+  overallAvgs.forEach(o => { const lv = getLevel(o); levelDist[lv.label] = (levelDist[lv.label]||0)+1; });
 
-  // Domain averages across all students for this round
-  const domainData = allDomains.map((d: string, i: number) => {
-    const isLit = LITERACY_DOMAINS.includes(d);
-    const vals = assessed.map((s: any) => s.rounds[activeRoundIdx][isLit ? "literacy" : "numeracy"][d] || 0);
-    return { domain: d, avg: avg(vals), type: isLit ? "literacy" : "numeracy" };
-  });
+  const domainData = [
+    ...litDomains.map((d: string, i: number) => ({ domain:d, avg: avg(assessed.map((s: any) => getRndLitPct(s.rounds[activeRoundIdx], d))), type:"literacy" })),
+    ...numDomains.map((d: string, i: number) => ({ domain:d, avg: avg(assessed.map((s: any) => getRndNumPct(s.rounds[activeRoundIdx], d))), type:"numeracy" })),
+  ];
 
-  // Progress over rounds
   const progressData = sectionData.rounds.map((rk: string, i: number) => {
     const roundStudents = sectionData.students.filter((s: any) => s.rounds[i]?.exists);
     if (!roundStudents.length) return null;
-    const ovs = roundStudents.map((s: any) => s.rounds[i].overall || 0);
-    const lits = roundStudents.map((s: any) => s.rounds[i].literacy.avg || 0);
-    const nums = roundStudents.map((s: any) => s.rounds[i].numeracy.avg || 0);
-    return { name: `Round ${i + 1}`, overall: avg(ovs), literacy: avg(lits), numeracy: avg(nums) };
+    return {
+      name: `Round ${i+1}`,
+      overall: avg(roundStudents.map((s: any) => getRndOverall(s.rounds[i]))),
+      literacy: avg(roundStudents.map((s: any) => getRndLitAvg(s.rounds[i]))),
+      numeracy: avg(roundStudents.map((s: any) => getRndNumAvg(s.rounds[i]))),
+    };
   }).filter(Boolean);
+
+  const downloadReport = () => {
+    const rows = assessed.map((s: any) => {
+      const r = s.rounds[activeRoundIdx];
+      return [s.student_name,
+        ...litDomains.map((d: string) => r.literacy_scores?.[d]??0),
+        getRndLitAvg(r).toFixed(1),
+        ...numDomains.map((d: string) => r.numeracy_scores?.[d]??0),
+        getRndNumAvg(r).toFixed(1),
+        getRndOverall(r).toFixed(1),
+        getLevel(getRndOverall(r)).label,
+        r.promoted ? `Promoted → ${r.promoted_to_stage}` : "In progress"
+      ].join(",");
+    });
+    const header = ["Student",...litDomains,"Lit%",...numDomains,"Num%","Overall%","Level","Status"].join(",");
+    const csv = [header,...rows].join("\n");
+    const blob = new Blob([csv],{type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url;
+    a.download=`Baseline_${grade}_${section}_Round${activeRoundIdx+1}.csv`; a.click(); URL.revokeObjectURL(url);
+  };
+
+  const downloadHTMLReport = () => {
+    const rows = assessed.map((s: any) => {
+      const r = s.rounds[activeRoundIdx];
+      const lv = getLevel(getRndOverall(r));
+      return `<tr>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:600">${s.student_name}</td>
+        ${litDomains.map((d: string) => `<td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${r.literacy_scores?.[d]??0}</td>`).join("")}
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;color:#2563eb">${getRndLitAvg(r).toFixed(1)}%</td>
+        ${numDomains.map((d: string) => `<td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${r.numeracy_scores?.[d]??0}</td>`).join("")}
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;color:#d97706">${getRndNumAvg(r).toFixed(1)}%</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700">${getRndOverall(r).toFixed(1)}%</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${lv.label}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;color:${r.promoted?"#16a34a":"#6b7280"}">${r.promoted?"🎉 Promoted":"In progress"}</td>
+      </tr>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>Baseline Report — ${grade} ${section} Round ${activeRoundIdx+1}</title>
+    <style>body{font-family:Arial,sans-serif;max-width:1100px;margin:30px auto;color:#111}
+    h1{color:#4338ca}table{width:100%;border-collapse:collapse;font-size:13px}
+    th{background:#4338ca;color:white;padding:10px 8px;text-align:center}
+    tr:nth-child(even){background:#f9fafb}
+    .kpi{display:flex;gap:16px;margin:20px 0}
+    .kpi-card{flex:1;background:#f5f3ff;border-left:4px solid #6366f1;padding:12px 16px;border-radius:8px}
+    .kpi-card .val{font-size:22px;font-weight:700;color:#4338ca}
+    .kpi-card .lbl{font-size:12px;color:#6b7280}
+    </style></head><body>
+    <h1>Baseline Assessment Report</h1>
+    <p style="color:#6b7280">${grade} — ${section} &nbsp;·&nbsp; Round ${activeRoundIdx+1} &nbsp;·&nbsp; ${new Date().toLocaleDateString()}</p>
+    <div class="kpi">
+      <div class="kpi-card"><div class="val">${assessed.length}</div><div class="lbl">Students Assessed</div></div>
+      <div class="kpi-card"><div class="val">${classLitAvg}%</div><div class="lbl">Class Literacy Avg</div></div>
+      <div class="kpi-card"><div class="val">${classNumAvg}%</div><div class="lbl">Class Numeracy Avg</div></div>
+      <div class="kpi-card"><div class="val">${classOverall}%</div><div class="lbl">Class Overall Avg</div></div>
+      <div class="kpi-card"><div class="val">${assessed.filter((s: any) => s.rounds[activeRoundIdx].promoted).length}</div><div class="lbl">Promoted (≥80%)</div></div>
+    </div>
+    <table><thead><tr>
+      <th style="text-align:left">Student</th>
+      ${litDomains.map((d: string) => `<th>${d.substring(0,5)}</th>`).join("")}<th>📖%</th>
+      ${numDomains.map((d: string) => `<th>${d.substring(0,5)}</th>`).join("")}<th>🔢%</th>
+      <th>Overall</th><th>Level</th><th>Status</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    <p style="margin-top:30px;color:#9ca3af;font-size:12px">Generated by CBAS — Wisdom Techno School</p>
+    </body></html>`;
+    const blob = new Blob([html],{type:"text/html"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url;
+    a.download=`Baseline_Report_${grade}_${section}_Round${activeRoundIdx+1}.html`; a.click(); URL.revokeObjectURL(url);
+  };
+
+  const LEVEL_COLORS: Record<string,string> = { "Exceeding":"#16a34a","Meeting":"#2563eb","Approaching":"#d97706","Beginning":"#dc2626" };
+
+  return (
+    <div className="space-y-4 mt-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold text-gray-700">📊 Analytics — Round {activeRoundIdx+1}</h3>
+        <div className="flex gap-2">
+          <button onClick={downloadReport} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">⬇️ CSV</button>
+          <button onClick={downloadHTMLReport} className="px-3 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium">⬇️ Report Card</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-5 gap-3">
+        {[
+          {label:"Assessed",value:assessed.length,color:"border-indigo-500"},
+          {label:"Lit Avg",value:`${classLitAvg}%`,color:"border-blue-500"},
+          {label:"Num Avg",value:`${classNumAvg}%`,color:"border-orange-500"},
+          {label:"Overall Avg",value:`${classOverall}%`,color:"border-green-500"},
+          {label:"Promoted",value:assessed.filter((s: any) => s.rounds[activeRoundIdx].promoted).length,color:"border-purple-500"},
+        ].map(k => (
+          <div key={k.label} className={`bg-white rounded-xl shadow p-3 border-l-4 ${k.color}`}>
+            <p className="text-xs text-gray-500">{k.label}</p>
+            <p className="text-lg font-bold text-gray-800">{k.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-white rounded-xl shadow p-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Level Distribution</h4>
+          <div className="space-y-2">
+            {Object.entries(levelDist).map(([level, count]) => {
+              const pct = assessed.length > 0 ? (count/assessed.length)*100 : 0;
+              return (
+                <div key={level}>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs font-medium text-gray-600">{level}</span>
+                    <span className="text-xs font-bold" style={{color:LEVEL_COLORS[level]}}>{count} ({pct.toFixed(0)}%)</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div className="h-2.5 rounded-full" style={{width:`${pct}%`,backgroundColor:LEVEL_COLORS[level]}} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Domain Averages</h4>
+          <div className="space-y-1.5">
+            {domainData.map((d: any, i: number) => (
+              <div key={d.domain} className="flex items-center gap-2">
+                <span className="text-xs text-gray-600 w-24 shrink-0">{d.domain}</span>
+                <div className="flex-1 bg-gray-200 rounded-full h-2.5">
+                  <div className="h-2.5 rounded-full" style={{width:`${Math.min(d.avg,100)}%`,backgroundColor:DOMAIN_COLORS[i%8]}} />
+                </div>
+                <span className="text-xs font-bold w-12 text-right" style={{color:DOMAIN_COLORS[i%8]}}>{d.avg}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {progressData.length > 1 && (
+        <div className="bg-white rounded-xl shadow p-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">📈 Class Progress Across Rounds</h4>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={progressData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" tick={{fontSize:10}} />
+              <YAxis domain={[0,100]} tick={{fontSize:10}} />
+              <Tooltip formatter={(v: any) => [`${Number(v).toFixed(1)}%`]} />
+              <Legend wrapperStyle={{fontSize:"11px"}} />
+              <Line type="monotone" dataKey="overall" name="Overall" stroke="#6366f1" strokeWidth={3} dot={{r:5}} />
+              <Line type="monotone" dataKey="literacy" name="Literacy" stroke="#3b82f6" strokeWidth={2} dot={{r:4}} />
+              <Line type="monotone" dataKey="numeracy" name="Numeracy" stroke="#f59e0b" strokeWidth={2} dot={{r:4}} />
+              <Line type="monotone" dataKey={() => 80} name="Target (80%)" stroke="#22c55e" strokeDasharray="5 5" strokeWidth={1.5} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl shadow p-4">
+        <h4 className="text-sm font-semibold text-gray-700 mb-3">Student Rankings — Round {activeRoundIdx+1}</h4>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-indigo-700 text-white">
+                <th className="px-3 py-2 text-center w-10">Rank</th>
+                <th className="px-3 py-2 text-left min-w-[150px]">Student</th>
+                <th className="px-3 py-2 text-center">📖 Literacy</th>
+                <th className="px-3 py-2 text-center">🔢 Numeracy</th>
+                <th className="px-3 py-2 text-center">Overall</th>
+                <th className="px-3 py-2 text-center">Level</th>
+                <th className="px-3 py-2 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...assessed]
+                .sort((a: any, b: any) => getRndOverall(b.rounds[activeRoundIdx]) - getRndOverall(a.rounds[activeRoundIdx]))
+                .map((s: any, i: number) => {
+                  const r = s.rounds[activeRoundIdx];
+                  const litA = getRndLitAvg(r);
+                  const numA = getRndNumAvg(r);
+                  const ov = getRndOverall(r);
+                  const lv = getLevel(ov);
+                  return (
+                    <tr key={s.student_id} className={i%2===0?"bg-white":"bg-gray-50"}>
+                      <td className="px-3 py-2 text-center font-bold text-gray-400">{i+1}</td>
+                      <td className="px-3 py-2 font-semibold text-gray-800">{s.student_name}</td>
+                      <td className="px-3 py-2 text-center font-bold text-blue-700">{litA.toFixed(1)}%</td>
+                      <td className="px-3 py-2 text-center font-bold text-orange-600">{numA.toFixed(1)}%</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv.bg} ${lv.color}`}>{ov.toFixed(1)}%</span>
+                      </td>
+                      <td className="px-3 py-2 text-center text-xs text-gray-600">{lv.label}</td>
+                      <td className="px-3 py-2 text-center text-xs">
+                        {r.promoted
+                          ? <span className="text-green-600 font-bold">🎉 Promoted</span>
+                          : <span className="text-gray-400">In progress</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
 
   // Download class report
   const downloadReport = () => {
     const rows = assessed.map((s: any) => {
       const r = s.rounds[activeRoundIdx];
       return [s.student_name,
-        ...LITERACY_DOMAINS.map((d: string) => r.literacy[d] || 0),
-        r.literacy.avg?.toFixed(1),
-        ...NUMERACY_DOMAINS.map((d: string) => r.numeracy[d] || 0),
-        r.numeracy.avg?.toFixed(1),
+        ...LITERACY_DOMAINS.map((d: string) => r.literacy_pct?.[d] ?? r.literacy_scores?.[d] ?? 0),
+        (r.literacy_total != null ? +r.literacy_total : 0).toFixed(1),
+        ...NUMERACY_DOMAINS.map((d: string) => r.numeracy_pct?.[d] ?? r.numeracy_scores?.[d] ?? 0),
+        (r.numeracy_total != null ? +r.numeracy_total : 0).toFixed(1),
         r.overall?.toFixed(1),
         getLevel(r.overall).label,
         r.promoted ? `Promoted → ${r.promoted_to_stage}` : "In progress"
@@ -3071,10 +3290,10 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
       const lv = getLevel(r.overall);
       return `<tr>
         <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:600">${s.student_name}</td>
-        ${LITERACY_DOMAINS.map((d: string) => `<td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${r.literacy[d] || 0}</td>`).join("")}
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;color:#2563eb">${r.literacy.avg?.toFixed(1)}%</td>
-        ${NUMERACY_DOMAINS.map((d: string) => `<td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${r.numeracy[d] || 0}</td>`).join("")}
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;color:#d97706">${r.numeracy.avg?.toFixed(1)}%</td>
+        ${LITERACY_DOMAINS.map((d: string) => `<td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${r.literacy_pct?.[d] ?? r.literacy_scores?.[d] ?? 0}</td>`).join("")}
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;color:#2563eb">${(r.literacy_total != null ? +r.literacy_total : 0).toFixed(1)}%</td>
+        ${NUMERACY_DOMAINS.map((d: string) => `<td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${r.numeracy_pct?.[d] ?? r.numeracy_scores?.[d] ?? 0}</td>`).join("")}
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;color:#d97706">${(r.numeracy_total != null ? +r.numeracy_total : 0).toFixed(1)}%</td>
         <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;color:${lv.label === "Exceeding" ? "#16a34a" : lv.label === "Meeting" ? "#2563eb" : lv.label === "Approaching" ? "#d97706" : "#dc2626"}">${r.overall?.toFixed(1)}%</td>
         <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${lv.label}</td>
         <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;color:${r.promoted ? "#16a34a" : "#6b7280"}">${r.promoted ? "🎉 Promoted" : "In progress"}</td>
@@ -3230,8 +3449,8 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
                     <tr key={s.student_id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                       <td className="px-3 py-2 text-center font-bold text-gray-400">{i + 1}</td>
                       <td className="px-3 py-2 font-semibold text-gray-800">{s.student_name}</td>
-                      <td className="px-3 py-2 text-center font-bold text-blue-700">{r.literacy.avg?.toFixed(1)}%</td>
-                      <td className="px-3 py-2 text-center font-bold text-orange-600">{r.numeracy.avg?.toFixed(1)}%</td>
+                      <td className="px-3 py-2 text-center font-bold text-blue-700">{(r.literacy_total != null ? +r.literacy_total : 0).toFixed(1)}%</td>
+                      <td className="px-3 py-2 text-center font-bold text-orange-600">{(r.numeracy_total != null ? +r.numeracy_total : 0).toFixed(1)}%</td>
                       <td className="px-3 py-2 text-center">
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv.bg} ${lv.color}`}>{r.overall?.toFixed(1)}%</span>
                       </td>
@@ -3252,33 +3471,37 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
   );
 }
 
-// Sub-component: Read-only or editable marks table for existing rounds
+// Sub-component: Read-only marks table for existing rounds (JSONB aware)
 function MarksTable({ students, roundKey, roundIdx, isEditing, localMarks, updateMark, LITERACY_DOMAINS, NUMERACY_DOMAINS, calcAvg, getLevel, onStudentClick }: any) {
+  // Detect actual domains from data
+  const sampleRnd = students.find((s: any) => s.rounds[roundIdx]?.exists)?.rounds[roundIdx];
+  const litDomains = sampleRnd?.literacy_scores ? Object.keys(sampleRnd.literacy_scores) : LITERACY_DOMAINS;
+  const numDomains = sampleRnd?.numeracy_scores ? Object.keys(sampleRnd.numeracy_scores) : NUMERACY_DOMAINS;
+
+  const getLitVal = (rnd: any, d: string) => rnd?.literacy_scores?.[d] ?? 0;
+  const getNumVal = (rnd: any, d: string) => rnd?.numeracy_scores?.[d] ?? 0;
+  const getLitAvg = (rnd: any) => rnd?.literacy_total != null ? +rnd.literacy_total : 0;
+  const getNumAvg = (rnd: any) => rnd?.numeracy_total != null ? +rnd.numeracy_total : 0;
+  const getOverall = (rnd: any) => rnd?.overall != null ? +rnd.overall : 0;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-xs border-collapse" style={{ minWidth: `${400 + (LITERACY_DOMAINS.length + NUMERACY_DOMAINS.length) * 70}px` }}>
+      <table className="w-full text-xs border-collapse" style={{ minWidth:`${300+(litDomains.length+numDomains.length)*70}px` }}>
         <thead>
           <tr className="bg-indigo-700 text-white">
             <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[160px]">Student</th>
-            {LITERACY_DOMAINS.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[65px]"><span className="text-blue-200">📖</span> {d.substring(0, 5)}</th>)}
+            {litDomains.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[65px] bg-blue-700"><span className="text-blue-200">📖</span> {d.substring(0,5)}</th>)}
             <th className="px-2 py-2 text-center border-l border-indigo-500 bg-blue-800 min-w-[55px]">📖 Avg</th>
-            {NUMERACY_DOMAINS.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[65px]"><span className="text-orange-200">🔢</span> {d.substring(0, 5)}</th>)}
-            <th className="px-2 py-2 text-center border-l border-indigo-500 bg-orange-800 min-w-[55px]">🔢 Avg</th>
+            {numDomains.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[65px] bg-purple-700"><span className="text-orange-200">🔢</span> {d.substring(0,5)}</th>)}
+            <th className="px-2 py-2 text-center border-l border-indigo-500 bg-purple-800 min-w-[55px]">🔢 Avg</th>
             <th className="px-2 py-2 text-center border-l border-indigo-500 min-w-[65px]">Overall</th>
           </tr>
         </thead>
         <tbody>
           {students.map((s: any, i: number) => {
             const rnd = s.rounds[roundIdx];
-            const litVals = isEditing
-              ? (localMarks[s.student_id]?.literacy || Object.fromEntries(LITERACY_DOMAINS.map((d: string) => [d, 0])))
-              : (rnd?.exists ? rnd.literacy : Object.fromEntries(LITERACY_DOMAINS.map((d: string) => [d, 0])));
-            const numVals = isEditing
-              ? (localMarks[s.student_id]?.numeracy || Object.fromEntries(NUMERACY_DOMAINS.map((d: string) => [d, 0])))
-              : (rnd?.exists ? rnd.numeracy : Object.fromEntries(NUMERACY_DOMAINS.map((d: string) => [d, 0])));
-            const litAvg = calcAvg(litVals);
-            const numAvg = calcAvg(numVals);
-            const overall = (litAvg + numAvg) / 2;
+            const litAvg = rnd?.exists ? getLitAvg(rnd) : 0;
+            const numAvg = rnd?.exists ? getNumAvg(rnd) : 0;
+            const overall = rnd?.exists ? getOverall(rnd) : 0;
             const lv = getLevel(overall);
             const bg = i % 2 === 0 ? "bg-white" : "bg-gray-50";
             return (
@@ -3289,32 +3512,24 @@ function MarksTable({ students, roundKey, roundIdx, isEditing, localMarks, updat
                     <span className="ml-1 text-gray-400 text-xs">({s.rounds.filter((r: any) => r.exists).length} rounds)</span>
                   </button>
                 </td>
-                {LITERACY_DOMAINS.map((d: string) => (
-                  <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
-                    {isEditing ? (
-                      <input type="number" min={0} max={100} value={litVals[d] ?? 0}
-                        onChange={e => updateMark(s.student_id, "literacy", d, +e.target.value)}
-                        className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-xs" />
-                    ) : <span>{litVals[d] ?? 0}</span>}
+                {litDomains.map((d: string) => (
+                  <td key={d} className="px-2 py-1 text-center border-l border-gray-100">
+                    <span className="text-gray-700">{rnd?.exists ? getLitVal(rnd,d) : "—"}</span>
                   </td>
                 ))}
                 <td className="px-2 py-2 text-center border-l border-blue-100 bg-blue-50">
-                  <span className="font-bold text-blue-700">{litAvg.toFixed(0)}%</span>
+                  <span className="font-bold text-blue-700">{litAvg.toFixed(1)}%</span>
                 </td>
-                {NUMERACY_DOMAINS.map((d: string) => (
-                  <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
-                    {isEditing ? (
-                      <input type="number" min={0} max={100} value={numVals[d] ?? 0}
-                        onChange={e => updateMark(s.student_id, "numeracy", d, +e.target.value)}
-                        className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-xs" />
-                    ) : <span>{numVals[d] ?? 0}</span>}
+                {numDomains.map((d: string) => (
+                  <td key={d} className="px-2 py-1 text-center border-l border-gray-100">
+                    <span className="text-gray-700">{rnd?.exists ? getNumVal(rnd,d) : "—"}</span>
                   </td>
                 ))}
                 <td className="px-2 py-2 text-center border-l border-orange-100 bg-orange-50">
-                  <span className="font-bold text-orange-700">{numAvg.toFixed(0)}%</span>
+                  <span className="font-bold text-orange-700">{numAvg.toFixed(1)}%</span>
                 </td>
                 <td className="px-2 py-2 text-center border-l border-gray-100">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv.bg} ${lv.color}`}>{overall.toFixed(0)}%</span>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv.bg} ${lv.color}`}>{overall.toFixed(1)}%</span>
                   {rnd?.promoted && <div className="text-xs text-green-600 font-bold">🎉 Promoted</div>}
                 </td>
               </tr>
@@ -3402,8 +3617,8 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
   // Compute strengths and weaknesses from rolling averages
   const domainAvgs: Record<string, number[]> = {};
   rounds.forEach((r: any) => {
-    LITERACY_DOMAINS.forEach((d: string) => { domainAvgs[d] = domainAvgs[d] || []; domainAvgs[d].push(r.literacy[d] || 0); });
-    NUMERACY_DOMAINS.forEach((d: string) => { domainAvgs[d] = domainAvgs[d] || []; domainAvgs[d].push(r.numeracy[d] || 0); });
+    LITERACY_DOMAINS.forEach((d: string) => { domainAvgs[d] = domainAvgs[d] || []; domainAvgs[d].push(r.literacy_pct?.[d] ?? r.literacy_scores?.[d] ?? 0); });
+    NUMERACY_DOMAINS.forEach((d: string) => { domainAvgs[d] = domainAvgs[d] || []; domainAvgs[d].push(r.numeracy_pct?.[d] ?? r.numeracy_scores?.[d] ?? 0); });
   });
   const strengths: string[] = [], weaknesses: string[] = [];
   Object.entries(domainAvgs).forEach(([d, vals]) => {
@@ -3413,8 +3628,8 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
   });
 
   const lastRound = rounds[rounds.length - 1];
-  const litAvg = lastRound ? lastRound.literacy.avg : 0;
-  const numAvg = lastRound ? lastRound.numeracy.avg : 0;
+  const litAvg = lastRound ? lastRound?.literacy_total != null ? +lastRound.literacy_total : 0 : 0;
+  const numAvg = lastRound ? lastRound?.numeracy_total != null ? +lastRound.numeracy_total : 0 : 0;
   const overall = lastRound ? lastRound.overall : 0;
   const lv = getLevel(overall);
 
@@ -3422,8 +3637,8 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
   const chartData = rounds.map((r: any, i: number) => ({
     name: `Round ${i + 1}`,
     overall: r.overall,
-    literacy: r.literacy.avg,
-    numeracy: r.numeracy.avg,
+    literacy: (r.literacy_total != null ? +r.literacy_total : 0),
+    numeracy: (r.numeracy_total != null ? +r.numeracy_total : 0),
   }));
 
   return (
@@ -3544,8 +3759,8 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
                       <td className="px-3 py-2 text-center font-bold text-indigo-700">Round {i+1}</td>
                       <td className="px-3 py-2 text-center text-gray-500">{r.date}</td>
                       <td className="px-3 py-2 text-center capitalize text-gray-600">{r.stage}</td>
-                      <td className="px-3 py-2 text-center font-bold text-blue-700">{r.literacy.avg?.toFixed(1)}%</td>
-                      <td className="px-3 py-2 text-center font-bold text-orange-600">{r.numeracy.avg?.toFixed(1)}%</td>
+                      <td className="px-3 py-2 text-center font-bold text-blue-700">{(r.literacy_total != null ? +r.literacy_total : 0).toFixed(1)}%</td>
+                      <td className="px-3 py-2 text-center font-bold text-orange-600">{(r.numeracy_total != null ? +r.numeracy_total : 0).toFixed(1)}%</td>
                       <td className="px-3 py-2 text-center">
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv2.bg} ${lv2.color}`}>{r.overall?.toFixed(1)}%</span>
                       </td>
@@ -3642,18 +3857,20 @@ function StudentAITab({ user, mappings, academicYear }: any) {
         // Baseline gaps
         const r = await axios.get(`${API}/baseline/student/${selectedStudent.id}/portfolio`);
         const baselineGaps: any[] = [];
-        (r.data?.years || []).slice(-1).forEach((yr: any) => {
-          if (yr.literacy) {
-            ["listening","speaking","reading","writing"].forEach((d: string) => {
-              if ((yr.literacy[d] || 0) < 60) baselineGaps.push({ subject: "literacy", domain: d, score: yr.literacy[d] || 0 });
+        const allAssessments: any[] = r.data?.assessments || [];
+        const latest = allAssessments.sort((a: any, b: any) => a.round > b.round ? 1 : -1).slice(-1)[0];
+        if (latest) {
+          if (latest.literacy_pct) {
+            Object.entries(latest.literacy_pct).forEach(([d, v]: [string, any]) => {
+              if (+v < 60) baselineGaps.push({ subject: "literacy", domain: d, score: +v });
             });
           }
-          if (yr.numeracy) {
-            ["operations","base10","measurement","geometry"].forEach((d: string) => {
-              if ((yr.numeracy[d] || 0) < 60) baselineGaps.push({ subject: "numeracy", domain: d, score: yr.numeracy[d] || 0 });
+          if (latest.numeracy_pct) {
+            Object.entries(latest.numeracy_pct).forEach(([d, v]: [string, any]) => {
+              if (+v < 60) baselineGaps.push({ subject: "numeracy", domain: d, score: +v });
             });
           }
-        });
+        }
         setGaps(baselineGaps);
       }
     } catch {}
@@ -3860,8 +4077,8 @@ function SelfAITab({ user, academicYear }: any) {
   const STAGE_GRADE: Record<string,string> = { foundation:"Grade 2", preparatory:"Grade 5", middle:"Grade 8", secondary:"Grade 10" };
   const LIT_DOMAINS = ["Listening","Speaking","Reading","Writing"];
   const NUM_DOMAINS = ["Operations","Base 10","Measurement","Geometry"];
-  const LIT_KEYS   = ["listening_score","speaking_score","reading_score","writing_score"];
-  const NUM_KEYS   = ["operations_score","base10_score","measurement_score","geometry_score"];
+  const LIT_KEYS   = ["Listening","Speaking","Reading","Writing"];
+  const NUM_KEYS   = ["Operations","Base 10","Measurement","Geometry"];
 
   const [baselineData, setBaselineData] = useState<any>(null);
   const [mode, setMode] = useState<"gap"|"custom">("gap");
@@ -3920,25 +4137,23 @@ function SelfAITab({ user, academicYear }: any) {
   // Build gap list with competencies
   const buildGapContext = async () => {
     const assessments = baselineData?.assessments || [];
-    const litRounds = assessments.filter((a:any)=>a.subject==="literacy");
-    const numRounds = assessments.filter((a:any)=>a.subject==="numeracy");
-    const latestLit = litRounds[litRounds.length-1];
-    const latestNum = numRounds[numRounds.length-1];
+    const allRounds = [...assessments].sort((a:any,b:any) => a.round > b.round ? 1 : -1);
+    const latest = allRounds[allRounds.length-1];
 
     const gaps: any[] = [];
-    if (latestLit) {
-      const avg = LIT_KEYS.reduce((s,k)=>s + Number(latestLit[k]||0),0)/LIT_KEYS.length;
-      for (let i=0;i<LIT_KEYS.length;i++) {
-        const sc = +(latestLit[LIT_KEYS[i]]||0);
-        if (sc < avg && sc > 0) gaps.push({ domain:"Literacy", sub:LIT_DOMAINS[i], score:sc, subject:"literacy", stage:latestLit.stage||"foundation" });
-      }
+    if (latest?.literacy_pct) {
+      const litAvg = latest.literacy_total ? +latest.literacy_total : 0;
+      Object.entries(latest.literacy_pct).forEach(([domain, pct]: [string, any]) => {
+        const sc = +pct;
+        if (sc < litAvg && sc > 0) gaps.push({ domain:"Literacy", sub:domain, score:sc, subject:"literacy", stage:latest.stage||"foundation" });
+      });
     }
-    if (latestNum) {
-      const avg = NUM_KEYS.reduce((s,k)=>s + Number(latestNum[k]||0),0)/NUM_KEYS.length;
-      for (let i=0;i<NUM_KEYS.length;i++) {
-        const sc = +(latestNum[NUM_KEYS[i]]||0);
-        if (sc < avg && sc > 0) gaps.push({ domain:"Numeracy", sub:NUM_DOMAINS[i], score:sc, subject:"numeracy", stage:latestNum.stage||"foundation" });
-      }
+    if (latest?.numeracy_pct) {
+      const numAvg = latest.numeracy_total ? +latest.numeracy_total : 0;
+      Object.entries(latest.numeracy_pct).forEach(([domain, pct]: [string, any]) => {
+        const sc = +pct;
+        if (sc < numAvg && sc > 0) gaps.push({ domain:"Numeracy", sub:domain, score:sc, subject:"numeracy", stage:latest.stage||"foundation" });
+      });
     }
 
     // Fetch competencies for each gap
@@ -4418,15 +4633,16 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
       } else {
         const r = await axios.get(`${API}/baseline/student/${selectedStudent.id}/portfolio`);
         const gaps: any[] = [];
-        (r.data?.years || []).slice(-1).forEach((yr: any) => {
-          ["literacy","numeracy"].forEach((subj: string) => {
-            if (!yr[subj]) return;
-            Object.entries(yr[subj]).forEach(([domain, score]: [string, any]) => {
-              if (!["avg","stage"].includes(domain) && +score < 60)
-                gaps.push({ subject: subj, domain, score: +score });
-            });
+        const allA: any[] = r.data?.assessments || [];
+        const latestA = allA.sort((a: any, b: any) => a.round > b.round ? 1 : -1).slice(-1)[0];
+        if (latestA) {
+          if (latestA.literacy_pct) Object.entries(latestA.literacy_pct).forEach(([domain, score]: [string, any]) => {
+            if (+score < 60) gaps.push({ subject: "literacy", domain, score: +score });
           });
-        });
+          if (latestA.numeracy_pct) Object.entries(latestA.numeracy_pct).forEach(([domain, score]: [string, any]) => {
+            if (+score < 60) gaps.push({ subject: "numeracy", domain, score: +score });
+          });
+        }
         setStudentGaps(gaps);
       }
     } catch {}
@@ -5238,12 +5454,41 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
         axios.get(`${API}/pasa/portfolio/student/${student.id}${subjectsParam ? `?subjects=${encodeURIComponent(subjectsParam)}` : ""}`),
         (isClassTeacher || isEnglishTeacher || isMathTeacher)
           ? axios.get(`${API}/baseline/student/${student.id}/portfolio`)
-          : Promise.resolve({ data: { years: [] } }),
+          : Promise.resolve({ data: { assessments: [] } }),
         axios.get(`${API}/activities/longitudinal/student/${student.id}`),
       ]);
+
+      // Transform baseline assessments → years structure for portfolio display
+      const baselineAssessments: any[] = baselineRes.data?.assessments || [];
+      const byYear: Record<string, any[]> = {};
+      baselineAssessments.forEach((a: any) => {
+        if (!byYear[a.academic_year]) byYear[a.academic_year] = [];
+        byYear[a.academic_year].push(a);
+      });
+      const baselineYears = Object.entries(byYear).sort(([a],[b]) => a > b ? 1 : -1).map(([year, recs]) => {
+        const latest = recs[recs.length - 1];
+        return {
+          academic_year: year,
+          grade: latest?.grade || "",
+          rounds: recs.length,
+          literacy: latest?.literacy_total != null ? {
+            avg: +latest.literacy_total,
+            stage: latest.stage,
+            pct: latest.literacy_pct || {},
+          } : null,
+          numeracy: latest?.numeracy_total != null ? {
+            avg: +latest.numeracy_total,
+            stage: latest.stage,
+            pct: latest.numeracy_pct || {},
+          } : null,
+          overall: latest?.overall_score != null ? +latest.overall_score : null,
+          level: latest?.level || null,
+        };
+      });
+
       setPortfolio({
         pasa: pasaRes.data,
-        baseline: baselineRes.data,
+        baseline: { years: baselineYears },
         activities: activitiesRes.data,
       });
     } catch { }
@@ -5370,14 +5615,14 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
                       {(isClassTeacher || isEnglishTeacher) && yr.literacy && (
                         <div className="bg-blue-50 rounded-lg p-3">
                           <p className="text-xs font-bold text-blue-700 mb-1">📖 Literacy</p>
-                          <p className="text-2xl font-bold text-blue-800">{yr.literacy.avg ?? "—"}<span className="text-sm font-normal text-blue-500">%</span></p>
+                          <p className="text-2xl font-bold text-blue-800">{yr.literacy.avg != null ? yr.literacy.avg.toFixed(1) : "—"}<span className="text-sm font-normal text-blue-500">%</span></p>
                           <p className="text-xs text-blue-600 mt-1">Stage: {yr.literacy.stage || "—"}</p>
                         </div>
                       )}
                       {(isClassTeacher || isMathTeacher) && yr.numeracy && (
                         <div className="bg-purple-50 rounded-lg p-3">
                           <p className="text-xs font-bold text-purple-700 mb-1">🔢 Numeracy</p>
-                          <p className="text-2xl font-bold text-purple-800">{yr.numeracy.avg ?? "—"}<span className="text-sm font-normal text-purple-500">%</span></p>
+                          <p className="text-2xl font-bold text-purple-800">{yr.numeracy.avg != null ? yr.numeracy.avg.toFixed(1) : "—"}<span className="text-sm font-normal text-purple-500">%</span></p>
                           <p className="text-xs text-purple-600 mt-1">Stage: {yr.numeracy.stage || "—"}</p>
                         </div>
                       )}
@@ -5794,33 +6039,25 @@ function LearningResourcesTab({ user, academicYear }: any) {
 
   const getRoundGaps = (roundIdx: number) => {
     if (!baselineData?.assessments?.length) return [];
-    const rounds: Record<number, any[]> = {};
-    baselineData.assessments.forEach((a: any) => {
-      const rn = a.round_number || 1;
-      if (!rounds[rn]) rounds[rn] = [];
-      rounds[rn].push(a);
-    });
-    const roundNums = Object.keys(rounds).map(Number).sort();
-    const rn = roundNums[roundIdx];
-    if (!rn) return [];
-    const roundAssessments = rounds[rn];
+    const allRounds = [...baselineData.assessments].sort((a:any,b:any) => a.round > b.round ? 1 : -1);
+    const a = allRounds[roundIdx];
+    if (!a) return [];
     const gaps: any[] = [];
-    roundAssessments.forEach((a: any) => {
-      const subj = a.subject;
-      const stage = a.stage || "foundation";
-      const grade = RESOURCE_GRADE[stage] || "Grade 2";
-      const domains = subj === "literacy" ? LIT_DOMAINS : NUM_DOMAINS;
-      const keys = subj === "literacy"
-        ? ["listening_score","speaking_score","reading_score","writing_score"]
-        : ["operations_score","base10_score","measurement_score","geometry_score"];
-      const scores = keys.map((k: string) => +(a[k] || 0));
-      const subAvg = scores.reduce((s: number, v: number) => s + v, 0) / scores.length;
-      domains.forEach((domain: string, i: number) => {
-        if (scores[i] < subAvg) {
-          gaps.push({ subject: subj, domain, score: scores[i], stage, grade, round: rn });
-        }
+    const stage = a.stage || "foundation";
+    const grade = RESOURCE_GRADE[stage] || "Grade 2";
+
+    if (a.literacy_pct) {
+      const litAvg = a.literacy_total ? +a.literacy_total : 0;
+      Object.entries(a.literacy_pct).forEach(([domain, pct]: [string, any]) => {
+        if (+pct < litAvg) gaps.push({ subject:"literacy", domain, score:+pct, stage, grade, round: roundIdx+1 });
       });
-    });
+    }
+    if (a.numeracy_pct) {
+      const numAvg = a.numeracy_total ? +a.numeracy_total : 0;
+      Object.entries(a.numeracy_pct).forEach(([domain, pct]: [string, any]) => {
+        if (+pct < numAvg) gaps.push({ subject:"numeracy", domain, score:+pct, stage, grade, round: roundIdx+1 });
+      });
+    }
     return gaps;
   };
 
@@ -6287,35 +6524,31 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
     { id: "alerts",  label: "⚠️ Alerts" },
   ];
 
-  // Compute section stats from rounds data
+  // Compute section stats from rounds data — JSONB aware
   const computeSectionStats = () => {
     if (!sectionDash?.students?.length) return null;
     const students = sectionDash.students;
-    // Get latest round data
     const latestRound = sectionDash.rounds?.[sectionDash.rounds.length - 1];
     if (!latestRound) return null;
-
-    const calcAvg = (marks: Record<string,number>) => {
-      const v = Object.entries(marks).filter(([k,x]) => k !== 'avg' && x > 0).map(([,x]) => x);
-      return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0;
-    };
-    const getLvl = (s: number) => s >= 80 ? "L4" : s >= 60 ? "L3" : s >= 40 ? "L2" : "L1";
 
     const studentStats = students.map((s: any) => {
       const rnd = s.rounds?.find((r: any) => r.round === latestRound);
       if (!rnd?.exists) return null;
-      const lit = calcAvg(rnd.literacy || {});
-      const num = calcAvg(rnd.numeracy || {});
-      const overall = (lit + num) / 2;
-      return { name: s.student_name, lit, num, overall, level: getLvl(overall) };
+      const lit = rnd.literacy_total ? +rnd.literacy_total : null;
+      const num = rnd.numeracy_total ? +rnd.numeracy_total : null;
+      const overall = rnd.overall ? +rnd.overall : (lit !== null && num !== null ? (lit+num)/2 : lit ?? num ?? null);
+      if (overall === null) return null;
+      const level = overall >= 80 ? "L4" : overall >= 60 ? "L3" : overall >= 40 ? "L2" : "L1";
+      return { name: s.student_name, lit, num, overall, level };
     }).filter(Boolean);
 
     if (!studentStats.length) return null;
-    const litAvg = studentStats.reduce((a: number, s: any) => a + s.lit, 0) / studentStats.length;
-    const numAvg = studentStats.reduce((a: number, s: any) => a + s.num, 0) / studentStats.length;
-    const overallAvg = studentStats.reduce((a: number, s: any) => a + s.overall, 0) / studentStats.length;
-    const levelDist = { L4: 0, L3: 0, L2: 0, L1: 0 } as Record<string,number>;
-    studentStats.forEach((s: any) => levelDist[s.level] = (levelDist[s.level] || 0) + 1);
+    const avg = (arr: (number|null)[]) => { const v = arr.filter(x => x !== null) as number[]; return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0; };
+    const litAvg = avg(studentStats.map((s: any) => s.lit));
+    const numAvg = avg(studentStats.map((s: any) => s.num));
+    const overallAvg = avg(studentStats.map((s: any) => s.overall));
+    const levelDist = { L4:0, L3:0, L2:0, L1:0 } as Record<string,number>;
+    studentStats.forEach((s: any) => levelDist[s.level] = (levelDist[s.level]||0)+1);
     return { studentStats, litAvg, numAvg, overallAvg, levelDist, total: studentStats.length };
   };
 
@@ -6546,26 +6779,31 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
 
 function BaselineEntryTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
-  const LITERACY_DOMAINS2 = ["Listening", "Speaking", "Reading", "Writing"];
-  const NUMERACY_DOMAINS2 = ["Operations", "Base 10", "Measurement", "Geometry"];
-  const GRADE_TO_STAGE2: Record<string, string> = {
-    "Pre-KG": "foundation", "LKG": "foundation", "UKG": "foundation",
-    "Grade 1": "foundation", "Grade 2": "foundation",
-    "Grade 3": "preparatory", "Grade 4": "preparatory", "Grade 5": "preparatory",
-    "Grade 6": "middle", "Grade 7": "middle", "Grade 8": "middle",
-    "Grade 9": "secondary", "Grade 10": "secondary",
+  const GRADE_TO_STAGE: Record<string, string> = {
+    "Pre-KG":"foundation","LKG":"foundation","UKG":"foundation",
+    "Grade 1":"foundation","Grade 2":"foundation",
+    "Grade 3":"preparatory","Grade 4":"preparatory","Grade 5":"preparatory",
+    "Grade 6":"middle","Grade 7":"middle","Grade 8":"middle",
+    "Grade 9":"secondary","Grade 10":"secondary",
   };
 
-  const classGrade = mappings?.class_grade || (user?.class_teacher_of || "").trim().split(' ').slice(0,-1).join(' ');
-  const classSection = mappings?.class_section || (user?.class_teacher_of || "").trim().split(' ').pop();
+  const classGrade = mappings?.class_grade || (user?.class_teacher_of||"").trim().split(' ').slice(0,-1).join(' ');
+  const classSection = mappings?.class_section || (user?.class_teacher_of||"").trim().split(' ').pop();
+  const stage = GRADE_TO_STAGE[classGrade] || "foundation";
 
   const [sectionData, setSectionData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
-  const [localMarks, setLocalMarks] = useState<Record<string, any>>({});
   const [activeRoundIdx, setActiveRoundIdx] = useState(0);
   const [newRoundOpen, setNewRoundOpen] = useState(false);
+
+  // Dynamic domains — detected from existing data or defaults
+  const [litDomains, setLitDomains] = useState(["Listening","Speaking","Reading","Writing"]);
+  const [numDomains, setNumDomains] = useState(["Operations","Base 10","Measurement","Geometry"]);
+  const [maxMarks, setMaxMarks] = useState<Record<string,string>>({});
+  // scores[studentId][domain] = raw string value
+  const [scores, setScores] = useState<Record<string,Record<string,string>>>({});
 
   useEffect(() => { if (classGrade && classSection) fetchRounds(); }, [classGrade, classSection, academicYear]);
 
@@ -6575,33 +6813,67 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
       const r = await axios.get(`${API}/baseline/section/rounds?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}&academic_year=${academicYear}`);
       setSectionData(r.data);
       setNewRoundOpen(!r.data?.total_rounds);
-      setActiveRoundIdx(Math.max(0, (r.data?.total_rounds || 1) - 1));
+      setActiveRoundIdx(Math.max(0, (r.data?.total_rounds||1) - 1));
+      // Detect domains from existing data
+      const students = r.data?.students || [];
+      const anyRound = students[0]?.rounds?.find((rnd: any) => rnd.exists);
+      if (anyRound) {
+        if (anyRound.literacy_scores && Object.keys(anyRound.literacy_scores).length) setLitDomains(Object.keys(anyRound.literacy_scores));
+        if (anyRound.numeracy_scores && Object.keys(anyRound.numeracy_scores).length) setNumDomains(Object.keys(anyRound.numeracy_scores));
+        if (anyRound.max_marks) {
+          const mm: Record<string,string> = {};
+          Object.entries(anyRound.max_marks).forEach(([d,v]) => { mm[d] = String(v); });
+          setMaxMarks(mm);
+        }
+      }
     } catch { setSectionData(null); }
     setLoading(false);
   };
 
-  const stage = GRADE_TO_STAGE2[classGrade] || "middle";
+  const getLvl = (s: number) => s >= 80 ? {label:"Exceeding",bg:"bg-green-100 text-green-800"} : s >= 60 ? {label:"Meeting",bg:"bg-blue-100 text-blue-800"} : s >= 40 ? {label:"Approaching",bg:"bg-yellow-100 text-yellow-800"} : {label:"Beginning",bg:"bg-red-100 text-red-800"};
 
-  const initMarks = (roundData?: any) => {
-    const m: Record<string, any> = {};
-    (sectionData?.students || []).forEach((s: any) => {
-      if (roundData) {
-        const rnd = s.rounds?.find((r: any) => r.round === roundData.round);
-        if (rnd?.exists) { m[s.student_id] = { literacy: { ...rnd.literacy }, numeracy: { ...rnd.numeracy } }; return; }
-      }
-      m[s.student_id] = { literacy: Object.fromEntries(LITERACY_DOMAINS2.map(d => [d, 0])), numeracy: Object.fromEntries(NUMERACY_DOMAINS2.map(d => [d, 0])) };
-    });
-    setLocalMarks(m);
+  const calcPct = (domain: string, raw: string) => {
+    const v = parseFloat(raw); if (isNaN(v)) return null;
+    const max = parseFloat(maxMarks[domain]||"0");
+    return max > 0 ? (v/max)*100 : v;
   };
 
-  const calcAvg = (marks: Record<string, number>) => { const vals = Object.values(marks).filter(v => v >= 0); return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0; };
+  const calcAvgPct = (studentId: string, domains: string[]) => {
+    const sc = scores[studentId] || {};
+    const vals = domains.map(d => calcPct(d, sc[d]||"")).filter(v => v !== null) as number[];
+    return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+  };
 
-  const getLvl = (score: number) => score >= 80 ? { label: "Exceeding", bg: "bg-green-100 text-green-800" } : score >= 60 ? { label: "Meeting", bg: "bg-blue-100 text-blue-800" } : score >= 40 ? { label: "Approaching", bg: "bg-yellow-100 text-yellow-800" } : { label: "Beginning", bg: "bg-red-100 text-red-800" };
+  const initNewRound = (existingRound?: any) => {
+    const newScores: Record<string,Record<string,string>> = {};
+    (sectionData?.students||[]).forEach((s: any) => {
+      if (existingRound) {
+        const rnd = s.rounds?.find((r: any) => r.round === existingRound);
+        if (rnd?.exists) {
+          const sc: Record<string,string> = {};
+          if (rnd.literacy_scores) Object.entries(rnd.literacy_scores).forEach(([d,v]) => { sc[d] = String(v); });
+          if (rnd.numeracy_scores) Object.entries(rnd.numeracy_scores).forEach(([d,v]) => { sc[d] = String(v); });
+          newScores[s.student_id] = sc;
+          return;
+        }
+      }
+      newScores[s.student_id] = {};
+    });
+    setScores(newScores);
+  };
 
   const saveRound = async (roundKey: string) => {
     setSaving(true);
     try {
-      const entries = (sectionData?.students || []).map((s: any) => ({ student_id: s.student_id, student_name: s.student_name, literacy: localMarks[s.student_id]?.literacy || {}, numeracy: localMarks[s.student_id]?.numeracy || {} }));
+      const entries = (sectionData?.students||[]).map((s: any) => {
+        const sc = scores[s.student_id] || {};
+        const litScores: Record<string,number> = {};
+        const numScores: Record<string,number> = {};
+        const mm: Record<string,number> = {};
+        litDomains.forEach(d => { const v = parseFloat(sc[d]||""); if (!isNaN(v)) { litScores[d] = v; mm[d] = parseFloat(maxMarks[d]||"0")||0; } });
+        numDomains.forEach(d => { const v = parseFloat(sc[d]||""); if (!isNaN(v)) { numScores[d] = v; mm[d] = parseFloat(maxMarks[d]||"0")||0; } });
+        return { student_id: s.student_id, student_name: s.student_name, literacy_scores: litScores, numeracy_scores: numScores, max_marks: mm };
+      });
       await axios.post(`${API}/baseline/section/round`, { grade: classGrade, section: classSection, academic_year: academicYear, round: roundKey, stage, entries });
       setMsg("✅ Round saved"); fetchRounds(); setNewRoundOpen(false);
     } catch { setMsg("❌ Error saving"); }
@@ -6613,29 +6885,31 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
 
   const rounds = sectionData?.rounds || [];
   const students = sectionData?.students || [];
-  const nextRound = `baseline_${(rounds.length + 1)}`;
+  const nextRound = `baseline_${rounds.length + 1}`;
+  const allDomains = [...litDomains, ...numDomains];
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow p-4 flex items-center justify-between">
+      <div className="bg-white rounded-xl shadow p-4 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-sm font-bold text-indigo-800">{classGrade} — {classSection}</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Stage: {stage.charAt(0).toUpperCase() + stage.slice(1)} · {students.length} students · {rounds.length} round(s) completed</p>
+          <p className="text-xs text-gray-500 mt-0.5">Stage: {stage.charAt(0).toUpperCase()+stage.slice(1)} · {students.length} students · {rounds.length} round(s) completed</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => { setNewRoundOpen(true); initMarks(); }} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">+ New Round</button>
-        </div>
+        <button onClick={() => { setNewRoundOpen(true); initNewRound(); }}
+          className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
+          + New Round
+        </button>
       </div>
 
-      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
       {/* Round tabs */}
       {rounds.length > 0 && (
         <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
           {rounds.map((rk: string, i: number) => (
-            <button key={rk} onClick={() => { setActiveRoundIdx(i); setNewRoundOpen(false); initMarks(sectionData?.students?.[0]?.rounds?.find((r: any) => r.round === rk)); }}
-              className={`px-4 py-2 text-sm rounded-lg font-medium border ${activeRoundIdx === i && !newRoundOpen ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300"}`}>
-              Round {i + 1}
+            <button key={rk} onClick={() => { setActiveRoundIdx(i); setNewRoundOpen(false); }}
+              className={`px-4 py-2 text-sm rounded-lg font-medium border ${activeRoundIdx===i && !newRoundOpen?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>
+              Round {i+1}
             </button>
           ))}
         </div>
@@ -6644,50 +6918,69 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
       {/* New round entry */}
       {newRoundOpen && (
         <div className="bg-white rounded-xl shadow border border-indigo-200 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 bg-indigo-50 border-b border-indigo-200">
-            <h3 className="text-sm font-bold text-indigo-800">+ Entering Round {rounds.length + 1} — {classGrade} {classSection}</h3>
-            <button onClick={() => saveRound(nextRound)} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
+          <div className="flex items-center justify-between px-4 py-3 bg-indigo-50 border-b border-indigo-200 flex-wrap gap-2">
+            <h3 className="text-sm font-bold text-indigo-800">+ Round {rounds.length+1} — {classGrade} {classSection}</h3>
+            <button onClick={() => saveRound(nextRound)} disabled={saving}
+              className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
               {saving ? "Saving..." : "💾 Save Round"}
             </button>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse" style={{ minWidth: `${400 + (LITERACY_DOMAINS2.length + NUMERACY_DOMAINS2.length) * 70}px` }}>
+            <table className="w-full text-xs border-collapse" style={{ minWidth:`${300+allDomains.length*75}px` }}>
               <thead>
                 <tr className="bg-indigo-700 text-white">
                   <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[180px]">Student</th>
-                  {LITERACY_DOMAINS2.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[70px]">📖 {d.substring(0,5)}</th>)}
-                  <th className="px-2 py-2 text-center border-l border-indigo-500 bg-indigo-800">Lit%</th>
-                  {NUMERACY_DOMAINS2.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[70px]">🔢 {d.substring(0,5)}</th>)}
-                  <th className="px-2 py-2 text-center border-l border-indigo-500 bg-indigo-800">Num%</th>
+                  {litDomains.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[72px] bg-blue-700">{d.substring(0,6)}</th>)}
+                  <th className="px-2 py-2 text-center border-l border-indigo-500 bg-blue-800 min-w-[55px]">Lit%</th>
+                  {numDomains.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[72px] bg-purple-700">{d.substring(0,6)}</th>)}
+                  <th className="px-2 py-2 text-center border-l border-indigo-500 bg-purple-800 min-w-[55px]">Num%</th>
+                  <th className="px-2 py-2 text-center border-l border-indigo-500 min-w-[65px]">Overall</th>
+                </tr>
+                {/* Max marks row */}
+                <tr className="bg-amber-50 border-b-2 border-amber-300">
+                  <td className="px-3 py-1 text-xs font-bold text-amber-800 sticky left-0 bg-amber-50">📐 Max Marks</td>
+                  {allDomains.map(d => (
+                    <td key={d} className="px-1 py-1 text-center border-l border-amber-200">
+                      <input type="number" min={1} step={1} value={maxMarks[d]||""} placeholder="max"
+                        onChange={e => setMaxMarks(p => ({...p,[d]:e.target.value}))}
+                        className="w-14 text-center text-xs border border-amber-300 bg-amber-50 rounded px-1 py-0.5 font-bold text-amber-800" />
+                    </td>
+                  ))}
+                  <td colSpan={2} className="px-2 py-1 text-xs text-amber-600 italic text-center">Enter max per domain</td>
                 </tr>
               </thead>
               <tbody>
                 {students.map((s: any, i: number) => {
-                  const marks = localMarks[s.student_id] || { literacy: {}, numeracy: {} };
-                  const litAvg = calcAvg(marks.literacy);
-                  const numAvg = calcAvg(marks.numeracy);
+                  const sc = scores[s.student_id] || {};
+                  const litAvg = calcAvgPct(s.student_id, litDomains);
+                  const numAvg = calcAvgPct(s.student_id, numDomains);
+                  const overall = litAvg !== null && numAvg !== null ? (litAvg+numAvg)/2 : litAvg ?? numAvg;
+                  const bg = i%2===0?"bg-white":"bg-gray-50";
                   return (
-                    <tr key={s.student_id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                      <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
-                      {LITERACY_DOMAINS2.map(d => (
+                    <tr key={s.student_id} className={`border-b border-gray-100 ${bg}`}>
+                      <td className={`px-3 py-1.5 font-medium text-gray-800 sticky left-0 bg-inherit border-r border-gray-200`}>{s.student_name}</td>
+                      {litDomains.map(d => (
                         <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
-                          <input type="number" min={0} max={100} value={marks.literacy[d] || 0}
-                            onChange={e => setLocalMarks(prev => ({ ...prev, [s.student_id]: { ...prev[s.student_id], literacy: { ...prev[s.student_id]?.literacy, [d]: +e.target.value } } }))}
-                            className="w-14 text-center border border-gray-200 rounded px-1 py-0.5 text-xs" />
+                          <input type="number" min={0} step={0.5} value={sc[d]??""} placeholder="—"
+                            onChange={e => setScores(p => ({...p,[s.student_id]:{...(p[s.student_id]||{}),[d]:e.target.value}}))}
+                            className="w-14 text-center text-xs border border-gray-200 rounded px-1 py-0.5" />
                         </td>
                       ))}
-                      <td className="px-2 py-2 text-center border-l border-gray-200">
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(litAvg).bg}`}>{litAvg.toFixed(0)}%</span>
+                      <td className="px-2 py-1.5 text-center border-l border-gray-200">
+                        {litAvg!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(litAvg).bg}`}>{litAvg.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
                       </td>
-                      {NUMERACY_DOMAINS2.map(d => (
+                      {numDomains.map(d => (
                         <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
-                          <input type="number" min={0} max={100} value={marks.numeracy[d] || 0}
-                            onChange={e => setLocalMarks(prev => ({ ...prev, [s.student_id]: { ...prev[s.student_id], numeracy: { ...prev[s.student_id]?.numeracy, [d]: +e.target.value } } }))}
-                            className="w-14 text-center border border-gray-200 rounded px-1 py-0.5 text-xs" />
+                          <input type="number" min={0} step={0.5} value={sc[d]??""} placeholder="—"
+                            onChange={e => setScores(p => ({...p,[s.student_id]:{...(p[s.student_id]||{}),[d]:e.target.value}}))}
+                            className="w-14 text-center text-xs border border-gray-200 rounded px-1 py-0.5" />
                         </td>
                       ))}
-                      <td className="px-2 py-2 text-center border-l border-gray-200">
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(numAvg).bg}`}>{numAvg.toFixed(0)}%</span>
+                      <td className="px-2 py-1.5 text-center border-l border-gray-200">
+                        {numAvg!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(numAvg).bg}`}>{numAvg.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        {overall!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{overall.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
                       </td>
                     </tr>
                   );
@@ -6699,46 +6992,89 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
       )}
 
       {/* Previous round view */}
-      {!newRoundOpen && rounds.length > 0 && (
-        <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <h3 className="text-sm font-bold text-gray-700">Round {activeRoundIdx + 1} Results</h3>
+      {!newRoundOpen && rounds.length > 0 && (() => {
+        const roundKey = rounds[activeRoundIdx];
+        // Collect all domains from this round's data
+        const rndLitDomains = new Set<string>();
+        const rndNumDomains = new Set<string>();
+        students.forEach((s: any) => {
+          const rnd = s.rounds?.find((r: any) => r.round === roundKey);
+          if (rnd?.exists) {
+            Object.keys(rnd.literacy_scores||{}).forEach((d:string) => rndLitDomains.add(d));
+            Object.keys(rnd.numeracy_scores||{}).forEach((d:string) => rndNumDomains.add(d));
+          }
+        });
+        const litD = rndLitDomains.size ? [...rndLitDomains] : litDomains;
+        const numD = rndNumDomains.size ? [...rndNumDomains] : numDomains;
+
+        return (
+          <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-700">Round {activeRoundIdx+1} Results — {classGrade} {classSection}</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse" style={{ minWidth:`${300+(litD.length+numD.length)*70}px` }}>
+                <thead>
+                  <tr className="bg-indigo-700 text-white">
+                    <th className="px-3 py-2 text-left min-w-[180px]">Student</th>
+                    {litD.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 bg-blue-700">{d.substring(0,6)}</th>)}
+                    <th className="px-2 py-2 text-center border-l border-indigo-500 bg-blue-800">Lit%</th>
+                    {numD.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 bg-purple-700">{d.substring(0,6)}</th>)}
+                    <th className="px-2 py-2 text-center border-l border-indigo-500 bg-purple-800">Num%</th>
+                    <th className="px-2 py-2 text-center border-l border-indigo-500">Overall</th>
+                    <th className="px-2 py-2 text-center">Level</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((s: any, i: number) => {
+                    const rnd = s.rounds?.find((r: any) => r.round === roundKey);
+                    if (!rnd?.exists) return (
+                      <tr key={s.student_id} className={i%2===0?"bg-white":"bg-gray-50"}>
+                        <td className="px-3 py-2 text-gray-400">{s.student_name}</td>
+                        <td colSpan={litD.length+numD.length+3} className="px-2 py-2 text-gray-300 text-center">No data</td>
+                      </tr>
+                    );
+                    const litPct = rnd.literacy_pct || {};
+                    const numPct = rnd.numeracy_pct || {};
+                    const litAvg = rnd.literacy_total ? +rnd.literacy_total : null;
+                    const numAvg = rnd.numeracy_total ? +rnd.numeracy_total : null;
+                    const overall = rnd.overall ? +rnd.overall : null;
+                    return (
+                      <tr key={s.student_id} className={i%2===0?"bg-white":"bg-gray-50"}>
+                        <td className="px-3 py-2 font-medium text-gray-800">{s.student_name}</td>
+                        {litD.map(d => (
+                          <td key={d} className="px-2 py-2 text-center border-l border-gray-100">
+                            <span className="text-gray-700">{rnd.literacy_scores?.[d]??<span className="text-gray-300">—</span>}</span>
+                            {litPct[d]!==undefined && <span className="text-gray-400 ml-1">({litPct[d].toFixed(0)}%)</span>}
+                          </td>
+                        ))}
+                        <td className="px-2 py-2 text-center border-l border-gray-200">
+                          {litAvg!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(litAvg).bg}`}>{litAvg.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
+                        </td>
+                        {numD.map(d => (
+                          <td key={d} className="px-2 py-2 text-center border-l border-gray-100">
+                            <span className="text-gray-700">{rnd.numeracy_scores?.[d]??<span className="text-gray-300">—</span>}</span>
+                            {numPct[d]!==undefined && <span className="text-gray-400 ml-1">({numPct[d].toFixed(0)}%)</span>}
+                          </td>
+                        ))}
+                        <td className="px-2 py-2 text-center border-l border-gray-200">
+                          {numAvg!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(numAvg).bg}`}>{numAvg.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {overall!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{overall.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {overall!==null?<span className={`text-xs px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{getLvl(overall).label}</span>:<span className="text-gray-300">—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="bg-indigo-700 text-white">
-                  <th className="px-3 py-2 text-left">Student</th>
-                  {LITERACY_DOMAINS2.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600">{d.substring(0,5)}</th>)}
-                  <th className="px-2 py-2 text-center border-l border-indigo-500">Lit%</th>
-                  {NUMERACY_DOMAINS2.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600">{d.substring(0,5)}</th>)}
-                  <th className="px-2 py-2 text-center border-l border-indigo-500">Num%</th>
-                  <th className="px-2 py-2 text-center border-l border-indigo-500">Level</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((s: any, i: number) => {
-                  const rnd = s.rounds?.find((r: any) => r.round === rounds[activeRoundIdx]);
-                  if (!rnd?.exists) return <tr key={s.student_id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}><td className="px-3 py-2 text-gray-400">{s.student_name}</td><td colSpan={10} className="px-2 py-2 text-gray-300 text-center">No data</td></tr>;
-                  const litAvg = calcAvg(rnd.literacy || {});
-                  const numAvg = calcAvg(rnd.numeracy || {});
-                  const overall = (litAvg + numAvg) / 2;
-                  return (
-                    <tr key={s.student_id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                      <td className="px-3 py-2 font-medium text-gray-800">{s.student_name}</td>
-                      {LITERACY_DOMAINS2.map(d => <td key={d} className="px-2 py-2 text-center border-l border-gray-100">{rnd.literacy?.[d] ?? "—"}</td>)}
-                      <td className="px-2 py-2 text-center border-l border-gray-200"><span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(litAvg).bg}`}>{litAvg.toFixed(0)}%</span></td>
-                      {NUMERACY_DOMAINS2.map(d => <td key={d} className="px-2 py-2 text-center border-l border-gray-100">{rnd.numeracy?.[d] ?? "—"}</td>)}
-                      <td className="px-2 py-2 text-center border-l border-gray-200"><span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(numAvg).bg}`}>{numAvg.toFixed(0)}%</span></td>
-                      <td className="px-2 py-2 text-center border-l border-gray-200"><span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{getLvl(overall).label}</span></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
