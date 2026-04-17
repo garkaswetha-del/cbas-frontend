@@ -4083,8 +4083,8 @@ Create a ${ppMode === "practice" ? "PRACTICE PAPER" : "ASSESSMENT PAPER"} for te
 
 TEACHER: ${user?.name}
 Overall: ${overallAvg.toFixed(1)}%
-Literacy Stage: ${latestLit?.stage||"—"} (Grade: ${STAGE_GRADE[latestLit?.stage||"foundation"]})
-Numeracy Stage: ${latestNum?.stage||"—"} (Grade: ${STAGE_GRADE[latestNum?.stage||"foundation"]})
+Literacy Stage: ${latestRound?.gaps?.lit_stage||latestRound?.stage||"—"} (Grade: ${STAGE_GRADE[latestRound?.gaps?.lit_stage||latestRound?.stage||"foundation"]||"—"})
+Numeracy Stage: ${latestRound?.gaps?.num_stage||latestRound?.stage||"—"} (Grade: ${STAGE_GRADE[latestRound?.gaps?.num_stage||latestRound?.stage||"foundation"]||"—"})
 
 FOCUS COMPETENCIES (from gap analysis):
 ${compBlock || "General competencies — no specific gaps identified"}
@@ -4147,23 +4147,19 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
         body: JSON.stringify({ model:"llama-3.3-70b-versatile", messages:[{role:"user",content:prompt}], max_tokens:3000 }),
       });
       const d = await res.json();
-      setOutput(d.choices?.[0]?.message?.content || "No response from AI");
-    } catch { setMsg("❌ AI generation failed. Check API key."); }
+      if (!res.ok) { setMsg(`❌ GROQ Error ${res.status}: ${d.error?.message||JSON.stringify(d)}`); }
+      else setOutput(d.choices?.[0]?.message?.content || "No response from AI");
+    } catch(e:any) { setMsg(`❌ AI failed: ${e.message}`); }
     setGenerating(false);
   };
 
   const assessments = baselineData?.assessments || [];
-  const litRounds = assessments.filter((a:any)=>a.subject==="literacy");
-  const numRounds = assessments.filter((a:any)=>a.subject==="numeracy");
-  const latestLit = litRounds[litRounds.length-1];
-  const latestNum = numRounds[numRounds.length-1];
-  const litAvg = latestLit ? LIT_KEYS.reduce((s:number,k:string)=>s + Number(latestLit[k]||0),0)/LIT_KEYS.length : null;
-  const numAvg = latestNum ? NUM_KEYS.reduce((s:number,k:string)=>s + Number(latestNum[k]||0),0)/NUM_KEYS.length : null;
+  const latestA = [...assessments].sort((a:any,b:any)=>a.round>b.round?1:-1).slice(-1)[0];
 
-  // Compute gaps for display
+  // Compute gaps for display — domains below 60%
   const gapList: string[] = [];
-  if (latestLit && litAvg !== null) LIT_DOMAINS.forEach((l,i) => { if (+(latestLit[LIT_KEYS[i]]||0) < litAvg!) gapList.push(`Literacy – ${l}`); });
-  if (latestNum && numAvg !== null) NUM_DOMAINS.forEach((l,i) => { if (+(latestNum[NUM_KEYS[i]]||0) < numAvg!) gapList.push(`Numeracy – ${l}`); });
+  if (latestA?.literacy_pct) Object.entries(latestA.literacy_pct).forEach(([d,v]:any) => { if (+v < 60) gapList.push(`Literacy – ${d}`); });
+  if (latestA?.numeracy_pct) Object.entries(latestA.numeracy_pct).forEach(([d,v]:any) => { if (+v < 60) gapList.push(`Numeracy – ${d}`); });
 
   const custDomains = custSubj === "literacy" ? LIT_DOMAINS : NUM_DOMAINS;
 
@@ -5974,9 +5970,13 @@ Format exactly:
         body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }], max_tokens: 1500, temperature: 0.5 }),
       });
       const data = await res.json();
-      const result = data.choices?.[0]?.message?.content || "Could not generate resources.";
-      setResources(p => ({ ...p, [key]: result }));
-    } catch { setResources(p => ({ ...p, [key]: "⚠️ Generation failed. Check API key." })); }
+      if (!res.ok) {
+        setResources(p => ({ ...p, [key]: `⚠️ GROQ Error ${res.status}: ${data.error?.message || JSON.stringify(data)}` }));
+      } else {
+        const result = data.choices?.[0]?.message?.content || "Could not generate resources.";
+        setResources(p => ({ ...p, [key]: result }));
+      }
+    } catch(e:any) { setResources(p => ({ ...p, [key]: `⚠️ Generation failed: ${e.message}` })); }
     setGenerating(p => ({ ...p, [key]: false }));
   };
 
