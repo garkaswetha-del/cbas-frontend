@@ -1589,7 +1589,8 @@ export default function BaselinePage() {
               <div className="bg-white rounded-xl shadow p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">All Teachers</h3>
                 <div className="space-y-1">
-                  {(teacherDashData.teacherList||[]).map((t:any) => (\n                    <div key={t.teacher_id} className={`flex items-center justify-between p-2 rounded border ${t.assessment?"bg-green-50 border-green-100":"bg-gray-50 border-gray-100"}`}>
+                  {(teacherDashData.teacherList||[]).map((t:any) => (
+                    <div key={t.teacher_id} className={`flex items-center justify-between p-2 rounded border ${t.assessment?"bg-green-50 border-green-100":"bg-gray-50 border-gray-100"}`}>
                       <span className="text-sm font-medium text-gray-800">{t.teacher_name}</span>
                       {t.assessment ? (
                         <div className="flex gap-2">
