@@ -1101,12 +1101,13 @@ export default function BaselinePage() {
                       <th className="px-2 py-2 text-center border-l border-indigo-500 min-w-[70px]">Overall</th>
                       <th className="px-2 py-2 text-center min-w-[100px]">Level</th>
                     </tr>
-                    {/* Max marks row */}
+                    {/* Max marks row — must match column order exactly */}
                     <tr className="bg-amber-50 border-b-2 border-amber-300">
                       <td className="px-3 py-1.5 text-xs font-bold text-amber-800 sticky left-0 bg-amber-50">📐 Max Marks</td>
                       <td className="px-2 py-1 text-center text-xs text-amber-500 italic">—</td>
-                      {allDomains.map(d => (
-                        <td key={d} className="px-1 py-1 text-center border-l border-amber-200">
+                      {/* Literacy domain inputs */}
+                      {litDomains.map(d => (
+                        <td key={`litmax-${d}`} className="px-1 py-1 text-center border-l border-amber-200">
                           <input
                             type="number" min={1} step={1}
                             value={maxMarks[d] || ""}
@@ -1116,7 +1117,24 @@ export default function BaselinePage() {
                           />
                         </td>
                       ))}
-                      <td colSpan={3} className="px-2 py-1 text-xs text-amber-600 italic text-center">Enter max marks per domain for % conversion</td>
+                      {/* Empty cell for Lit% column */}
+                      <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">—</td>
+                      {/* Numeracy domain inputs */}
+                      {numDomains.map(d => (
+                        <td key={`nummax-${d}`} className="px-1 py-1 text-center border-l border-amber-200">
+                          <input
+                            type="number" min={1} step={1}
+                            value={maxMarks[d] || ""}
+                            onChange={e => setMaxMarks(prev => ({...prev,[d]:e.target.value}))}
+                            placeholder="max"
+                            className="w-14 text-center text-xs border border-amber-300 bg-amber-50 rounded px-1 py-0.5 font-bold text-amber-800"
+                          />
+                        </td>
+                      ))}
+                      {/* Empty cells for Num%, Overall, Level columns */}
+                      <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">—</td>
+                      <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">—</td>
+                      <td className="px-1 py-1 text-center text-xs text-amber-400">—</td>
                     </tr>
                   </thead>
                   <tbody>
