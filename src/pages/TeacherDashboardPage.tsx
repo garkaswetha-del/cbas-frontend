@@ -3794,7 +3794,7 @@ Title: Practice Paper — ${selectedStudent.name} — ${subject || "Mixed"} — 
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
-        body: JSON.stringify({ model: "llama3-8b-8192", messages: [{ role: "user", content: prompt }], max_tokens: 3000, temperature: 0.7 }),
+        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }], max_tokens: 3000, temperature: 0.7 }),
       });
       const data = await res.json();
       setOutput(data.choices?.[0]?.message?.content || "Generation failed.");
@@ -4016,14 +4016,14 @@ function SelfAITab({ user, academicYear }: any) {
       const litAvg = latest.literacy_total ? +latest.literacy_total : 0;
       Object.entries(latest.literacy_pct).forEach(([domain, pct]: [string, any]) => {
         const sc = +pct;
-        if (sc < litAvg && sc > 0) gaps.push({ domain:"Literacy", sub:domain, score:sc, subject:"literacy", stage:latest.stage||"foundation" });
+        if (sc < 60) gaps.push({ domain:"Literacy", sub:domain, score:sc, subject:"literacy", stage:latest.gaps?.lit_stage||latest.stage||"foundation", grade:STAGE_GRADE[latest.gaps?.lit_stage||latest.stage||"foundation"]||"Grade 2" });
       });
     }
     if (latest?.numeracy_pct) {
       const numAvg = latest.numeracy_total ? +latest.numeracy_total : 0;
       Object.entries(latest.numeracy_pct).forEach(([domain, pct]: [string, any]) => {
         const sc = +pct;
-        if (sc < numAvg && sc > 0) gaps.push({ domain:"Numeracy", sub:domain, score:sc, subject:"numeracy", stage:latest.stage||"foundation" });
+        if (sc < 60) gaps.push({ domain:"Numeracy", sub:domain, score:sc, subject:"numeracy", stage:latest.gaps?.num_stage||latest.stage||"foundation", grade:STAGE_GRADE[latest.gaps?.num_stage||latest.stage||"foundation"]||"Grade 2" });
       });
     }
 
@@ -4049,12 +4049,10 @@ function SelfAITab({ user, academicYear }: any) {
     setGenerating(true); setOutput(""); setMsg("");
 
     const assessments = baselineData.assessments || [];
-    const litRounds = assessments.filter((a:any)=>a.subject==="literacy");
-    const numRounds = assessments.filter((a:any)=>a.subject==="numeracy");
-    const latestLit = litRounds[litRounds.length-1];
-    const latestNum = numRounds[numRounds.length-1];
-    const litAvg = latestLit ? LIT_KEYS.reduce((s:number,k:string)=>s + Number(latestLit[k]||0),0)/LIT_KEYS.length : null;
-    const numAvg = latestNum ? NUM_KEYS.reduce((s:number,k:string)=>s + Number(latestNum[k]||0),0)/NUM_KEYS.length : null;
+    const sortedRounds = [...assessments].sort((a:any,b:any)=>a.round>b.round?1:-1);
+    const latestRound = sortedRounds[sortedRounds.length-1];
+    const litAvg = latestRound?.literacy_total ? +latestRound.literacy_total : null;
+    const numAvg = latestRound?.numeracy_total ? +latestRound.numeracy_total : null;
     const overallAvg = litAvg!==null&&numAvg!==null?(litAvg+numAvg)/2:litAvg??numAvg??0;
 
     let prompt = "";
@@ -4542,7 +4540,7 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
-      body: JSON.stringify({ model: "llama3-8b-8192", messages: [{ role: "user", content: prompt }], max_tokens: maxTokens, temperature: 0.7 }),
+      body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }], max_tokens: maxTokens, temperature: 0.7 }),
     });
     const data = await res.json();
     return data.choices?.[0]?.message?.content || "";
@@ -5918,15 +5916,17 @@ function LearningResourcesTab({ user, academicYear }: any) {
     const grade = RESOURCE_GRADE[stage] || "Grade 2";
 
     if (a.literacy_pct) {
-      const litAvg = a.literacy_total ? +a.literacy_total : 0;
+      const litStage = (a.gaps as any)?.lit_stage || a.stage || "foundation";
+      const litGrade = RESOURCE_GRADE[litStage] || "Grade 2";
       Object.entries(a.literacy_pct).forEach(([domain, pct]: [string, any]) => {
-        if (+pct < litAvg) gaps.push({ subject:"literacy", domain, score:+pct, stage, grade, round: roundIdx+1 });
+        if (+pct < 60) gaps.push({ subject:"literacy", domain, score:+pct, stage:litStage, grade:litGrade, round: roundIdx+1 });
       });
     }
     if (a.numeracy_pct) {
-      const numAvg = a.numeracy_total ? +a.numeracy_total : 0;
+      const numStage = (a.gaps as any)?.num_stage || a.stage || "foundation";
+      const numGrade = RESOURCE_GRADE[numStage] || "Grade 2";
       Object.entries(a.numeracy_pct).forEach(([domain, pct]: [string, any]) => {
-        if (+pct < numAvg) gaps.push({ subject:"numeracy", domain, score:+pct, stage, grade, round: roundIdx+1 });
+        if (+pct < 60) gaps.push({ subject:"numeracy", domain, score:+pct, stage:numStage, grade:numGrade, round: roundIdx+1 });
       });
     }
     return gaps;
@@ -5971,7 +5971,7 @@ Format exactly:
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
-        body: JSON.stringify({ model: "llama3-8b-8192", messages: [{ role: "user", content: prompt }], max_tokens: 1500, temperature: 0.5 }),
+        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }], max_tokens: 1500, temperature: 0.5 }),
       });
       const data = await res.json();
       const result = data.choices?.[0]?.message?.content || "Could not generate resources.";
