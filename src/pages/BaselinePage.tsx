@@ -175,23 +175,26 @@ function parseBaselineExcel(ws: XLSX.WorkSheet): {
   return { domains: { literacy: litDomains, numeracy: numDomains }, rows: dataRows };
 }
 
-// ── TeacherBaselineEntry component (fixed) ─────────────────────────
+// ── TeacherBaselineEntry component ────────────────────────────────
 function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAssessmentDate, API: apiUrl }: any) {
   const LIT_DOMAINS = ["Listening","Speaking","Reading","Writing"];
   const NUM_DOMAINS = ["Operations","Base 10","Measurement","Geometry"];
   const TROUNDS = [
     {value:"baseline_1",label:"Round 1"},{value:"baseline_2",label:"Round 2"},
     {value:"baseline_3",label:"Round 3"},{value:"baseline_4",label:"Round 4"},
-    {value:"baseline_5",label:"Round 5"},
+    {value:"baseline_5",label:"Round 5"},{value:"baseline_6",label:"Round 6"},
+    {value:"baseline_7",label:"Round 7"},{value:"baseline_8",label:"Round 8"},
+    {value:"baseline_9",label:"Round 9"},{value:"baseline_10",label:"Round 10"},
   ];
+  const STAGE_ORDER = ["foundation","preparatory","middle","secondary"];
 
   const [round, setRound] = useState("baseline_1");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [entries, setEntries] = useState<Record<string, any>>({});
-  const [existingRounds, setExistingRounds] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(false);
-  const PROMOTION_THRESHOLD = 80;
+  // Per-teacher entry: { [tid]: { subjects, lit_stage, num_stage, litScores, numScores, lit_max, num_max } }
+  const [entries, setEntries] = useState<Record<string, any>>({});
+  const [existingData, setExistingData] = useState<Record<string, any[]>>({});
 
   useEffect(() => { loadExistingRounds(); }, [round, academicYear]);
 
@@ -201,43 +204,87 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
     await Promise.all(teachers.map(async (t: any) => {
       try {
         const r = await axios.get(`${apiUrl}/baseline/teacher/${t.id}?academic_year=${academicYear}`);
-        result[t.id] = r.data?.assessments || [];
-        const roundData = result[t.id].find((a: any) => a.round === round);
+        const assessments: any[] = r.data?.assessments || [];
+        result[t.id] = assessments;
+
+        // Find this round's data
+        const roundData = assessments.find((a: any) => a.round === round);
+
+        // Find previous round to check promotion
+        const ROUND_ORDER = TROUNDS.map(r => r.value);
+        const prevRoundIdx = ROUND_ORDER.indexOf(round) - 1;
+        const prevRound = prevRoundIdx >= 0 ? ROUND_ORDER[prevRoundIdx] : null;
+        const prevData = prevRound ? assessments.find((a: any) => a.round === prevRound) : null;
+
         if (roundData) {
+          // Pre-fill from saved data
           const litScores: Record<string,string> = {};
           const numScores: Record<string,string> = {};
-          LIT_DOMAINS.forEach(d => { litScores[d] = roundData.literacy_scores?.[d]?.toString() || ""; });
-          NUM_DOMAINS.forEach(d => { numScores[d] = roundData.numeracy_scores?.[d]?.toString() || ""; });
+          const litMax: Record<string,string> = {};
+          const numMax: Record<string,string> = {};
+          LIT_DOMAINS.forEach(d => {
+            litScores[d] = roundData.literacy_scores?.[d]?.toString() || "";
+            litMax[d] = roundData.max_marks?.[d]?.toString() || "";
+          });
+          NUM_DOMAINS.forEach(d => {
+            numScores[d] = roundData.numeracy_scores?.[d]?.toString() || "";
+            numMax[d] = roundData.max_marks?.[d]?.toString() || "";
+          });
           setEntries(prev => ({ ...prev, [t.id]: {
-            subjects: "both", lit_stage: roundData.stage || "foundation", num_stage: roundData.stage || "foundation",
-            litScores, numScores,
+            subjects: "both",
+            lit_stage: roundData.stage || "foundation",
+            num_stage: roundData.stage || "foundation",
+            litScores, numScores, litMax, numMax,
+          }}));
+        } else if (prevData?.promoted) {
+          // Auto-advance stage if promoted in previous round
+          const prevStage = prevData.stage || "foundation";
+          const nextStageIdx = STAGE_ORDER.indexOf(prevStage) + 1;
+          const nextStage = nextStageIdx < STAGE_ORDER.length ? STAGE_ORDER[nextStageIdx] : prevStage;
+          setEntries(prev => ({ ...prev, [t.id]: {
+            ...(prev[t.id] || {}),
+            subjects: "both",
+            lit_stage: nextStage,
+            num_stage: nextStage,
+            litScores: {}, numScores: {}, litMax: {}, numMax: {},
           }}));
         }
       } catch {}
     }));
-    setExistingRounds(result);
+    setExistingData(result);
     setLoading(false);
   };
 
   const getEntry = (tid: string) => entries[tid] || {
     subjects: "both", lit_stage: "foundation", num_stage: "foundation",
-    litScores: {}, numScores: {},
+    litScores: {}, numScores: {}, litMax: {}, numMax: {},
   };
 
   const updateScore = (tid: string, subject: "lit"|"num", domain: string, value: string) => {
     const key = subject === "lit" ? "litScores" : "numScores";
-    setEntries(prev => ({
-      ...prev,
-      [tid]: { ...getEntry(tid), [key]: { ...(getEntry(tid)[key] || {}), [domain]: value } },
-    }));
+    setEntries(prev => ({ ...prev, [tid]: { ...getEntry(tid), [key]: { ...(getEntry(tid)[key]||{}), [domain]: value } } }));
+  };
+
+  const updateMax = (tid: string, subject: "lit"|"num", domain: string, value: string) => {
+    const key = subject === "lit" ? "litMax" : "numMax";
+    setEntries(prev => ({ ...prev, [tid]: { ...getEntry(tid), [key]: { ...(getEntry(tid)[key]||{}), [domain]: value } } }));
   };
 
   const updateEntry = (tid: string, field: string, value: string) => {
     setEntries(prev => ({ ...prev, [tid]: { ...getEntry(tid), [field]: value } }));
   };
 
-  const calcAvg = (scores: Record<string,string>, domains: string[]) => {
-    const vals = domains.map(d => parseFloat(scores[d]||"")).filter(v => !isNaN(v) && v > 0);
+  // Calculate % using per-teacher max marks
+  const calcPct = (score: string, maxMark: string) => {
+    const s = parseFloat(score);
+    const m = parseFloat(maxMark);
+    if (isNaN(s) || s === 0) return null;
+    if (isNaN(m) || m <= 0) return s; // treat as % if no max
+    return (s / m) * 100;
+  };
+
+  const calcAvgPct = (scores: Record<string,string>, maxMarks: Record<string,string>, domains: string[]) => {
+    const vals = domains.map(d => calcPct(scores[d]||"", maxMarks[d]||"")).filter(v => v !== null) as number[];
     return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
   };
 
@@ -256,9 +303,11 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
     try {
       for (const teacher of teachers) {
         const entry = getEntry(teacher.id);
-        const { litScores, numScores, lit_stage } = entry;
-        const hasLit = LIT_DOMAINS.some(d => litScores[d] && litScores[d] !== "");
-        const hasNum = NUM_DOMAINS.some(d => numScores[d] && numScores[d] !== "");
+        const { litScores, numScores, litMax, numMax, lit_stage, num_stage, subjects } = entry;
+        const doLit = subjects === "literacy" || subjects === "both";
+        const doNum = subjects === "numeracy" || subjects === "both";
+        const hasLit = doLit && LIT_DOMAINS.some(d => litScores[d] && litScores[d] !== "");
+        const hasNum = doNum && NUM_DOMAINS.some(d => numScores[d] && numScores[d] !== "");
         if (!hasLit && !hasNum) continue;
 
         const literacyScores: Record<string,number> = {};
@@ -267,17 +316,26 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
 
         if (hasLit) LIT_DOMAINS.forEach(d => {
           const v = parseFloat(litScores[d]||"");
-          if (!isNaN(v)) { literacyScores[d] = v; maxMarks[d] = 100; }
+          if (!isNaN(v)) {
+            literacyScores[d] = v;
+            maxMarks[d] = parseFloat(litMax[d]||"0") || 0;
+          }
         });
         if (hasNum) NUM_DOMAINS.forEach(d => {
           const v = parseFloat(numScores[d]||"");
-          if (!isNaN(v)) { numeracyScores[d] = v; maxMarks[d] = 100; }
+          if (!isNaN(v)) {
+            numeracyScores[d] = v;
+            maxMarks[d] = parseFloat(numMax[d]||"0") || 0;
+          }
         });
+
+        // Use the relevant stage (lit_stage for literacy-only, num_stage for numeracy-only, lit_stage for both)
+        const stage = hasLit ? (lit_stage || "foundation") : (num_stage || "foundation");
 
         await axios.post(`${apiUrl}/baseline/teacher`, {
           teacher_id: teacher.id, teacher_name: teacher.name,
           academic_year: academicYear, round,
-          stage: lit_stage || "foundation",
+          stage,
           assessment_date: assessmentDate,
           literacy_scores: literacyScores,
           numeracy_scores: numeracyScores,
@@ -285,7 +343,7 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
         });
         saved++;
       }
-      setMessage(`✅ Saved ${saved} teacher baseline records`);
+      setMessage(`✅ Saved ${saved} teacher records`);
       loadExistingRounds();
     } catch { setMessage("❌ Error saving"); }
     setSaving(false);
@@ -294,6 +352,7 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
 
   return (
     <div className="space-y-4">
+      {/* Controls */}
       <div className="bg-white rounded-xl shadow border border-gray-200 p-4 flex gap-4 flex-wrap items-end">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Round</label>
@@ -305,112 +364,192 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
           <label className="text-xs text-gray-500 block mb-1">Assessment Date</label>
           <input type="date" value={assessmentDate} onChange={e => setAssessmentDate(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm" />
         </div>
-        <button onClick={saveAll} disabled={saving}
-          className="ml-auto px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold">
-          {saving ? "Saving..." : "💾 Save All Teachers"}
-        </button>
+        <div className="ml-auto flex items-center gap-3">
+          <p className="text-xs text-gray-500">Enter raw marks + max marks per teacher. % calculated automatically.</p>
+          <button onClick={saveAll} disabled={saving}
+            className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold">
+            {saving ? "Saving..." : "💾 Save All Teachers"}
+          </button>
+        </div>
       </div>
 
-      {message && <div className={`px-4 py-2 rounded text-sm border ${message.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{message}</div>}
+      {message && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-xl text-sm font-semibold border ${message.startsWith("✅")?"bg-green-600 text-white border-green-700":"bg-red-600 text-white border-red-700"}`}>
+          {message}
+        </div>
+      )}
 
       {loading ? (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Loading...</div>
       ) : (
-        <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <p className="text-xs text-gray-500">{teachers.length} teachers · Scores as % (0-100) · Auto-promotes at {PROMOTION_THRESHOLD}%</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse" style={{ minWidth: "1100px" }}>
-              <thead>
-                <tr className="bg-indigo-700 text-white">
-                  <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[180px]">Teacher</th>
-                  <th className="px-2 py-2 text-center min-w-[100px]">Subjects</th>
-                  <th className="px-2 py-2 text-center min-w-[100px]">Stage</th>
-                  {LIT_DOMAINS.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[70px]">📖 {d.substring(0,5)}</th>)}
-                  <th className="px-2 py-2 text-center border-l border-indigo-500 bg-blue-800 min-w-[65px]">Lit%</th>
-                  {NUM_DOMAINS.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[70px]">🔢 {d.substring(0,5)}</th>)}
-                  <th className="px-2 py-2 text-center border-l border-indigo-500 bg-purple-800 min-w-[65px]">Num%</th>
-                  <th className="px-2 py-2 text-center border-l border-indigo-500 min-w-[70px]">Overall</th>
-                  <th className="px-2 py-2 text-center min-w-[80px]">Level</th>
-                </tr>
-              </thead>
-              <tbody>
-                {teachers.map((teacher: any, idx: number) => {
-                  const entry = getEntry(teacher.id);
-                  const { litScores = {}, numScores = {}, subjects = "both", lit_stage = "foundation" } = entry;
-                  const doLit = subjects === "literacy" || subjects === "both";
-                  const doNum = subjects === "numeracy" || subjects === "both";
-                  const litAvg = doLit ? calcAvg(litScores, LIT_DOMAINS) : 0;
-                  const numAvg = doNum ? calcAvg(numScores, NUM_DOMAINS) : 0;
-                  const overall = doLit && doNum ? (litAvg+numAvg)/2 : doLit ? litAvg : numAvg;
-                  const bg = idx % 2 === 0 ? "bg-white" : "bg-gray-50";
+        <div className="space-y-3">
+          {teachers.map((teacher: any, idx: number) => {
+            const entry = getEntry(teacher.id);
+            const { litScores={}, numScores={}, litMax={}, numMax={}, subjects="both", lit_stage="foundation", num_stage="foundation" } = entry;
+            const doLit = subjects === "literacy" || subjects === "both";
+            const doNum = subjects === "numeracy" || subjects === "both";
+            const litAvgPct = doLit ? calcAvgPct(litScores, litMax, LIT_DOMAINS) : 0;
+            const numAvgPct = doNum ? calcAvgPct(numScores, numMax, NUM_DOMAINS) : 0;
+            const overall = doLit && doNum ? (litAvgPct+numAvgPct)/2 : doLit ? litAvgPct : numAvgPct;
+            const isPromoted = overall >= 80;
+            const prevAssessments = existingData[teacher.id] || [];
+            const prevRound = prevAssessments.find((a:any) => a.round === TROUNDS[Math.max(0,TROUNDS.findIndex(r=>r.value===round)-1)]?.value);
 
-                  return (
-                    <tr key={teacher.id} className={`border-b border-gray-100 ${bg}`}>
-                      <td className={`px-3 py-2 font-medium text-gray-800 sticky left-0 z-10 border-r border-gray-200 ${bg}`}>
-                        <div className="font-medium">{teacher.name}</div>
-                        <div className="text-gray-400 text-xs">{(teacher.subjects||[]).join(", ")}</div>
-                      </td>
-                      <td className="px-1 py-1">
-                        <select value={subjects} onChange={e => updateEntry(teacher.id, "subjects", e.target.value)}
-                          className="border border-gray-300 rounded px-1 py-0.5 text-xs w-full">
-                          <option value="both">Both</option>
-                          <option value="literacy">Literacy</option>
-                          <option value="numeracy">Numeracy</option>
-                        </select>
-                      </td>
-                      <td className="px-1 py-1">
+            return (
+              <div key={teacher.id} className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+                {/* Teacher header */}
+                <div className={`px-4 py-3 flex items-center justify-between flex-wrap gap-2 ${isPromoted?"bg-green-50 border-b border-green-200":"bg-gray-50 border-b border-gray-200"}`}>
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <span className="font-bold text-sm text-gray-800">{teacher.name}</span>
+                      <span className="text-xs text-gray-400 ml-2">{(teacher.subjects||[]).join(", ")}</span>
+                    </div>
+                    {prevRound?.promoted && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">🎉 Promoted from prev round</span>
+                    )}
+                    {isPromoted && overall > 0 && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">🎉 Will Promote This Round</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Subject selection */}
+                    <div className="flex items-center gap-1">
+                      <label className="text-xs text-gray-500">Subject:</label>
+                      <select value={subjects} onChange={e => updateEntry(teacher.id, "subjects", e.target.value)}
+                        className="border border-gray-300 rounded px-2 py-1 text-xs min-w-[90px]">
+                        <option value="both">Both</option>
+                        <option value="literacy">Literacy only</option>
+                        <option value="numeracy">Numeracy only</option>
+                      </select>
+                    </div>
+                    {/* Stage per subject */}
+                    {doLit && (
+                      <div className="flex items-center gap-1">
+                        <label className="text-xs text-blue-600">Lit Stage:</label>
                         <select value={lit_stage} onChange={e => updateEntry(teacher.id, "lit_stage", e.target.value)}
-                          className="border border-gray-300 rounded px-1 py-0.5 text-xs w-full">
+                          className="border border-blue-300 rounded px-2 py-1 text-xs text-blue-700 min-w-[110px]">
                           {STAGES.map(s => <option key={s.value} value={s.value}>{s.label.split(" ")[0]}</option>)}
                         </select>
-                      </td>
-                      {LIT_DOMAINS.map(d => (
-                        <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
-                          {doLit ? (
-                            <input
-                              type="number" min={0} max={100} step={0.5}
-                              value={litScores[d] ?? ""}
-                              onChange={e => updateScore(teacher.id, "lit", d, e.target.value)}
-                              placeholder="—"
-                              className={`w-14 text-center text-xs border rounded px-1 py-0.5 ${scoreBgInput(litScores[d]||"")}`}
-                            />
-                          ) : <span className="text-gray-300">—</span>}
-                        </td>
-                      ))}
-                      <td className="px-2 py-1.5 text-center border-l border-gray-200">
-                        {doLit && litAvg > 0 ? <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(litAvg)}`}>{litAvg.toFixed(1)}</span> : <span className="text-gray-300">—</span>}
-                      </td>
-                      {NUM_DOMAINS.map(d => (
-                        <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
-                          {doNum ? (
-                            <input
-                              type="number" min={0} max={100} step={0.5}
-                              value={numScores[d] ?? ""}
-                              onChange={e => updateScore(teacher.id, "num", d, e.target.value)}
-                              placeholder="—"
-                              className={`w-14 text-center text-xs border rounded px-1 py-0.5 ${scoreBgInput(numScores[d]||"")}`}
-                            />
-                          ) : <span className="text-gray-300">—</span>}
-                        </td>
-                      ))}
-                      <td className="px-2 py-1.5 text-center border-l border-gray-200">
-                        {doNum && numAvg > 0 ? <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(numAvg)}`}>{numAvg.toFixed(1)}</span> : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-2 py-1.5 text-center">
-                        {overall > 0 ? <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(overall)}`}>{overall.toFixed(1)}</span> : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-2 py-1.5 text-center">
-                        {overall > 0 ? <span className={`text-xs px-1.5 py-0.5 rounded ${overall>=80?"bg-green-100 text-green-800":overall>=60?"bg-blue-100 text-blue-800":overall>=40?"bg-yellow-100 text-yellow-800":"bg-red-100 text-red-800"}`}>
-                          {overall>=80?"L4":overall>=60?"L3":overall>=40?"L2":"L1"}</span> : <span className="text-gray-300">—</span>}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    )}
+                    {doNum && (
+                      <div className="flex items-center gap-1">
+                        <label className="text-xs text-purple-600">Num Stage:</label>
+                        <select value={num_stage} onChange={e => updateEntry(teacher.id, "num_stage", e.target.value)}
+                          className="border border-purple-300 rounded px-2 py-1 text-xs text-purple-700 min-w-[110px]">
+                          {STAGES.map(s => <option key={s.value} value={s.value}>{s.label.split(" ")[0]}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {/* Overall score badge */}
+                    {overall > 0 && (
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${scoreBg(overall)}`}>
+                        {overall.toFixed(1)}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Score entry */}
+                <div className="p-3 overflow-x-auto">
+                  <table className="text-xs border-collapse w-full" style={{minWidth:"600px"}}>
+                    <thead>
+                      <tr>
+                        <th className="px-2 py-1 text-left text-gray-500 w-20">Subject</th>
+                        <th className="px-2 py-1 text-center text-gray-400 font-normal w-16">Row</th>
+                        {[...LIT_DOMAINS.filter(()=>doLit), ...NUM_DOMAINS.filter(()=>doNum)].map((d,i) => {
+                          const isLit = LIT_DOMAINS.includes(d);
+                          return <th key={d+i} className={`px-2 py-1 text-center min-w-[70px] ${isLit?"text-blue-700":"text-purple-700"}`}>{d}</th>;
+                        })}
+                        <th className="px-2 py-1 text-center text-gray-600 w-16">Avg %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Literacy rows */}
+                      {doLit && (<>
+                        <tr className="bg-blue-50">
+                          <td className="px-2 py-1.5 font-bold text-blue-700" rowSpan={2}>📖 Literacy</td>
+                          <td className="px-2 py-1 text-center text-xs text-amber-700 font-bold bg-amber-50 border border-amber-200 rounded">Max</td>
+                          {LIT_DOMAINS.map(d => (
+                            <td key={d} className="px-1 py-1 text-center">
+                              <input type="number" min={1} step={1}
+                                value={litMax[d]||""}
+                                onChange={e => updateMax(teacher.id, "lit", d, e.target.value)}
+                                placeholder="max"
+                                className="w-16 text-center text-xs border border-amber-300 bg-amber-50 rounded px-1 py-0.5 font-bold text-amber-800"
+                              />
+                            </td>
+                          ))}
+                          {doNum && NUM_DOMAINS.map(d => <td key={d} />)}
+                          <td />
+                        </tr>
+                        <tr className="bg-blue-50">
+                          <td className="px-2 py-1 text-center text-xs text-blue-600 font-bold">Marks</td>
+                          {LIT_DOMAINS.map(d => (
+                            <td key={d} className="px-1 py-1 text-center">
+                              <input type="number" min={0} step={0.5}
+                                value={litScores[d]||""}
+                                onChange={e => updateScore(teacher.id, "lit", d, e.target.value)}
+                                placeholder="—"
+                                className={`w-16 text-center text-xs border rounded px-1 py-0.5 ${scoreBgInput(litScores[d]||"")}`}
+                              />
+                              {litMax[d] && litScores[d] && <div className="text-gray-400 text-xs text-center mt-0.5">
+                                {((parseFloat(litScores[d])/parseFloat(litMax[d]))*100).toFixed(0)}%
+                              </div>}
+                            </td>
+                          ))}
+                          {doNum && NUM_DOMAINS.map(d => <td key={d} />)}
+                          <td className="px-2 text-center">
+                            {litAvgPct > 0 && <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(litAvgPct)}`}>{litAvgPct.toFixed(1)}%</span>}
+                          </td>
+                        </tr>
+                      </>)}
+
+                      {/* Numeracy rows */}
+                      {doNum && (<>
+                        <tr className="bg-purple-50">
+                          <td className="px-2 py-1.5 font-bold text-purple-700" rowSpan={2}>🔢 Numeracy</td>
+                          <td className="px-2 py-1 text-center text-xs text-amber-700 font-bold bg-amber-50 border border-amber-200 rounded">Max</td>
+                          {doLit && LIT_DOMAINS.map(d => <td key={d} />)}
+                          {NUM_DOMAINS.map(d => (
+                            <td key={d} className="px-1 py-1 text-center">
+                              <input type="number" min={1} step={1}
+                                value={numMax[d]||""}
+                                onChange={e => updateMax(teacher.id, "num", d, e.target.value)}
+                                placeholder="max"
+                                className="w-16 text-center text-xs border border-amber-300 bg-amber-50 rounded px-1 py-0.5 font-bold text-amber-800"
+                              />
+                            </td>
+                          ))}
+                          <td />
+                        </tr>
+                        <tr className="bg-purple-50">
+                          <td className="px-2 py-1 text-center text-xs text-purple-600 font-bold">Marks</td>
+                          {doLit && LIT_DOMAINS.map(d => <td key={d} />)}
+                          {NUM_DOMAINS.map(d => (
+                            <td key={d} className="px-1 py-1 text-center">
+                              <input type="number" min={0} step={0.5}
+                                value={numScores[d]||""}
+                                onChange={e => updateScore(teacher.id, "num", d, e.target.value)}
+                                placeholder="—"
+                                className={`w-16 text-center text-xs border rounded px-1 py-0.5 ${scoreBgInput(numScores[d]||"")}`}
+                              />
+                              {numMax[d] && numScores[d] && <div className="text-gray-400 text-xs text-center mt-0.5">
+                                {((parseFloat(numScores[d])/parseFloat(numMax[d]))*100).toFixed(0)}%
+                              </div>}
+                            </td>
+                          ))}
+                          <td className="px-2 text-center">
+                            {numAvgPct > 0 && <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(numAvgPct)}`}>{numAvgPct.toFixed(1)}%</span>}
+                          </td>
+                        </tr>
+                      </>)}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -787,8 +926,9 @@ export default function BaselinePage() {
         ))}
       </div>
 
+      {/* Sticky toast — visible regardless of scroll position */}
       {message && (
-        <div className={`mb-4 px-4 py-2 rounded text-sm border ${message.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-xl text-sm font-semibold border flex items-center gap-2 ${message.startsWith("✅")?"bg-green-600 text-white border-green-700":"bg-red-600 text-white border-red-700"}`}>
           {message}
         </div>
       )}
