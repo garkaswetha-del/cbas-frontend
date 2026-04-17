@@ -1819,8 +1819,10 @@ function AdminAIPaperTab({ teachers, academicYear, API }: any) {
   const STAGE_GRADE: Record<string, string> = {
     foundation: "Grade 2", preparatory: "Grade 5", middle: "Grade 8", secondary: "Grade 10",
   };
-  const LIT_KEYS = ["listening_score","speaking_score","reading_score","writing_score"];
-  const NUM_KEYS = ["operations_score","base10_score","measurement_score","geometry_score"];
+  const getLitKeys = (a: any) => a?.literacy_pct ? Object.keys(a.literacy_pct) : a?.literacy_scores ? Object.keys(a.literacy_scores) : ["Listening","Speaking","Reading","Writing"];
+  const getNumKeys = (a: any) => a?.numeracy_pct ? Object.keys(a.numeracy_pct) : a?.numeracy_scores ? Object.keys(a.numeracy_scores) : ["Operations","Base 10","Measurement","Geometry"];
+  const LIT_KEYS = getLitKeys(null);
+  const NUM_KEYS = getNumKeys(null);
   const LIT_LABELS = ["Listening","Speaking","Reading","Writing"];
   const NUM_LABELS = ["Operations","Base 10","Measurement","Geometry"];
 
@@ -1858,10 +1860,10 @@ function AdminAIPaperTab({ teachers, academicYear, API }: any) {
     const gaps: any[] = [];
 
     if (latestLit) {
-      const avg = LIT_KEYS.reduce((s,k) => s + +(latestLit[k]||0), 0) / LIT_KEYS.length;
-      LIT_KEYS.forEach((k,i) => {
-        const sc = +(latestLit[k]||0);
-        if (sc < avg && sc > 0) gaps.push({ domain:"Literacy", sub:LIT_LABELS[i], score:sc, subject:"literacy", stage:latestLit.stage||"foundation" });
+      const avg = latestLit.literacy_total ? +latestLit.literacy_total : 0;
+      const litPct = latestLit.literacy_pct || {};
+      Object.entries(litPct).forEach(([domain, sc]: [string, any]) => {
+        if (+sc < 60) gaps.push({ domain:"Literacy", sub:domain, score:+sc, subject:"literacy", stage:latestLit.gaps?.lit_stage||latestLit.stage||"foundation", grade: latestLit.gaps?.lit_grade||"Grade 2" });
       });
     }
     if (latestNum) {
@@ -1891,8 +1893,8 @@ function AdminAIPaperTab({ teachers, academicYear, API }: any) {
     const numRounds = assessments.filter((a:any) => a.subject === "numeracy");
     const latestLit = litRounds[litRounds.length-1];
     const latestNum = numRounds[numRounds.length-1];
-    const litAvg = latestLit ? LIT_KEYS.reduce((s,k)=>s + Number(latestLit[k]||0),0)/LIT_KEYS.length : null;
-    const numAvg = latestNum ? NUM_KEYS.reduce((s,k)=>s + Number(latestNum[k]||0),0)/NUM_KEYS.length : null;
+    const litAvg = latestLit?.literacy_total ? +latestLit.literacy_total : null;
+    const numAvg = latestNum?.numeracy_total ? +latestNum.numeracy_total : null;
     const overall = litAvg!==null&&numAvg!==null?(litAvg+numAvg)/2:litAvg??numAvg??0;
 
     const compBlock = gapWithComps.map((g:any) => {
@@ -2134,8 +2136,10 @@ function ReportCardTab({ teachers, academicYear, API }: any) {
   const STAGE_LABELS: Record<string,string> = { foundation:"Foundation", preparatory:"Preparatory", middle:"Middle", secondary:"Secondary" };
   const STAGE_GRADE: Record<string,string> = { foundation:"Grade 2", preparatory:"Grade 5", middle:"Grade 8", secondary:"Grade 10" };
   const STAGE_ORDER = ["foundation","preparatory","middle","secondary"];
-  const LIT_KEYS = ["listening_score","speaking_score","reading_score","writing_score"];
-  const NUM_KEYS = ["operations_score","base10_score","measurement_score","geometry_score"];
+  const getLitKeys = (a: any) => a?.literacy_pct ? Object.keys(a.literacy_pct) : a?.literacy_scores ? Object.keys(a.literacy_scores) : ["Listening","Speaking","Reading","Writing"];
+  const getNumKeys = (a: any) => a?.numeracy_pct ? Object.keys(a.numeracy_pct) : a?.numeracy_scores ? Object.keys(a.numeracy_scores) : ["Operations","Base 10","Measurement","Geometry"];
+  const LIT_KEYS = getLitKeys(null);
+  const NUM_KEYS = getNumKeys(null);
   const LIT_LABELS = ["Listening","Speaking","Reading","Writing"];
   const NUM_LABELS = ["Operations","Base 10","Measurement","Geometry"];
 
@@ -2171,8 +2175,8 @@ function ReportCardTab({ teachers, academicYear, API }: any) {
     const numRounds = assessments.filter((a:any) => a.subject==="numeracy").sort((a:any,b:any)=>a.round>b.round?1:-1);
     const latestLit = litRounds[litRounds.length-1];
     const latestNum = numRounds[numRounds.length-1];
-    const litAvg = latestLit ? LIT_KEYS.reduce((s,k)=>s + Number(latestLit[k]||0),0)/LIT_KEYS.length : null;
-    const numAvg = latestNum ? NUM_KEYS.reduce((s,k)=>s + Number(latestNum[k]||0),0)/NUM_KEYS.length : null;
+    const litAvg = latestLit?.literacy_total ? +latestLit.literacy_total : null;
+    const numAvg = latestNum?.numeracy_total ? +latestNum.numeracy_total : null;
     const overall = litAvg!==null&&numAvg!==null?(litAvg+numAvg)/2:litAvg??numAvg??0;
 
     const filtered = roundFilter ? assessments.filter((a:any)=>a.round===roundFilter) : assessments;
@@ -2184,7 +2188,7 @@ function ReportCardTab({ teachers, academicYear, API }: any) {
 
     const subjSections = Object.entries(groupedBySubj).map(([subj, rounds]) => {
       const isLit = subj === "literacy";
-      const domains = isLit ? LIT_KEYS : NUM_KEYS;
+      const domains = isLit ? getLitKeys(latestLit) : getNumKeys(latestNum);
       const labels = isLit ? LIT_LABELS : NUM_LABELS;
 
       // Group by stage
@@ -2355,7 +2359,7 @@ function ReportCardTab({ teachers, academicYear, API }: any) {
                 </thead>
                 <tbody>
                   {assessments.map((a:any,i:number)=>{
-                    const keys = a.subject==="literacy"?LIT_KEYS:NUM_KEYS;
+                    const domains = isLit ? getLitKeys(latestLit) : getNumKeys(latestNum);
                     const avg = keys.reduce((s:number,k:string)=>s + Number(a[k]||0),0)/keys.length;
                     return (
                       <tr key={i} className={`border-b border-gray-100 ${i%2===0?"bg-white":"bg-gray-50"}`}>
