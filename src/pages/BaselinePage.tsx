@@ -232,17 +232,17 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
           });
           setEntries(prev => ({ ...prev, [t.id]: {
             subjects: "both",
-            lit_stage: roundData.lit_stage || roundData.stage || "foundation",
-            num_stage: roundData.num_stage || roundData.stage || "foundation",
+            lit_stage: roundData.gaps?.lit_stage || roundData.stage || "foundation",
+            num_stage: roundData.gaps?.num_stage || roundData.stage || "foundation",
             litScores, numScores, litMax, numMax,
           }}));
         } else {
           // No saved data for this round — start FRESH (empty marks)
           // Carry stage forward from previous round (with subject-wise promotion)
-          const prevLitStage = prevData?.lit_stage || prevData?.stage || "foundation";
-          const prevNumStage = prevData?.num_stage || prevData?.stage || "foundation";
-          const litPromoted = prevData?.lit_promoted === true;
-          const numPromoted = prevData?.num_promoted === true;
+          const prevLitStage = prevData?.gaps?.lit_stage || prevData?.stage || "foundation";
+          const prevNumStage = prevData?.gaps?.num_stage || prevData?.stage || "foundation";
+          const litPromoted = prevData?.gaps?.lit_promoted === true;
+          const numPromoted = prevData?.gaps?.num_promoted === true;
           const nextLitIdx = STAGE_ORDER.indexOf(prevLitStage) + (litPromoted ? 1 : 0);
           const nextNumIdx = STAGE_ORDER.indexOf(prevNumStage) + (numPromoted ? 1 : 0);
           const nextLitStage = STAGE_ORDER[Math.min(nextLitIdx, STAGE_ORDER.length - 1)] || prevLitStage;
