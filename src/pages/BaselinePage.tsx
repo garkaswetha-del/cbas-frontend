@@ -232,17 +232,17 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
           });
           setEntries(prev => ({ ...prev, [t.id]: {
             subjects: "both",
-            lit_stage: roundData.gaps?.lit_stage || roundData.stage || "foundation",
-            num_stage: roundData.gaps?.num_stage || roundData.stage || "foundation",
+            lit_stage: roundData.lit_stage || roundData.stage || "foundation",
+            num_stage: roundData.num_stage || roundData.stage || "foundation",
             litScores, numScores, litMax, numMax,
           }}));
         } else {
           // No saved data for this round — start FRESH (empty marks)
           // Carry stage forward from previous round (with subject-wise promotion)
-          const prevLitStage = prevData?.gaps?.lit_stage || prevData?.stage || "foundation";
-          const prevNumStage = prevData?.gaps?.num_stage || prevData?.stage || "foundation";
-          const litPromoted = prevData?.gaps?.lit_promoted === true;
-          const numPromoted = prevData?.gaps?.num_promoted === true;
+          const prevLitStage = prevData?.lit_stage || prevData?.stage || "foundation";
+          const prevNumStage = prevData?.num_stage || prevData?.stage || "foundation";
+          const litPromoted = prevData?.lit_promoted === true;
+          const numPromoted = prevData?.num_promoted === true;
           const nextLitIdx = STAGE_ORDER.indexOf(prevLitStage) + (litPromoted ? 1 : 0);
           const nextNumIdx = STAGE_ORDER.indexOf(prevNumStage) + (numPromoted ? 1 : 0);
           const nextLitStage = STAGE_ORDER[Math.min(nextLitIdx, STAGE_ORDER.length - 1)] || prevLitStage;
@@ -1819,10 +1819,8 @@ function AdminAIPaperTab({ teachers, academicYear, API }: any) {
   const STAGE_GRADE: Record<string, string> = {
     foundation: "Grade 2", preparatory: "Grade 5", middle: "Grade 8", secondary: "Grade 10",
   };
-  const getLitKeys = (a: any) => a?.literacy_pct ? Object.keys(a.literacy_pct) : a?.literacy_scores ? Object.keys(a.literacy_scores) : ["Listening","Speaking","Reading","Writing"];
-  const getNumKeys = (a: any) => a?.numeracy_pct ? Object.keys(a.numeracy_pct) : a?.numeracy_scores ? Object.keys(a.numeracy_scores) : ["Operations","Base 10","Measurement","Geometry"];
-  const LIT_KEYS = getLitKeys(null);
-  const NUM_KEYS = getNumKeys(null);
+  const LIT_KEYS = ["listening_score","speaking_score","reading_score","writing_score"];
+  const NUM_KEYS = ["operations_score","base10_score","measurement_score","geometry_score"];
   const LIT_LABELS = ["Listening","Speaking","Reading","Writing"];
   const NUM_LABELS = ["Operations","Base 10","Measurement","Geometry"];
 
@@ -1853,24 +1851,22 @@ function AdminAIPaperTab({ teachers, academicYear, API }: any) {
   };
 
   const buildGaps = (assessments: any[]) => {
-    const litRounds = assessments.filter((a:any) => a.subject === "literacy");
-    const numRounds = assessments.filter((a:any) => a.subject === "numeracy");
-    const latestLit = litRounds[litRounds.length - 1];
-    const latestNum = numRounds[numRounds.length - 1];
+    const sorted = [...assessments].sort((a:any,b:any)=>a.round>b.round?1:-1);
+    const latest = sorted[sorted.length - 1];
     const gaps: any[] = [];
+    if (!latest) return gaps;
 
-    if (latestLit) {
-      const avg = latestLit.literacy_total ? +latestLit.literacy_total : 0;
-      const litPct = latestLit.literacy_pct || {};
-      Object.entries(litPct).forEach(([domain, sc]: [string, any]) => {
-        if (+sc < 60) gaps.push({ domain:"Literacy", sub:domain, score:+sc, subject:"literacy", stage:latestLit.gaps?.lit_stage||latestLit.stage||"foundation", grade: latestLit.gaps?.lit_grade||"Grade 2" });
+    const litStage = latest.gaps?.lit_stage || latest.stage || "foundation";
+    const numStage = latest.gaps?.num_stage || latest.stage || "foundation";
+
+    if (latest.literacy_pct) {
+      Object.entries(latest.literacy_pct).forEach(([domain, sc]: [string, any]) => {
+        if (+sc < 60) gaps.push({ domain:"Literacy", sub:domain, score:+sc, subject:"literacy", stage:litStage, grade:STAGE_GRADE[litStage]||"Grade 2" });
       });
     }
-    if (latestNum) {
-      const avg = NUM_KEYS.reduce((s,k) => s + +(latestNum[k]||0), 0) / NUM_KEYS.length;
-      NUM_KEYS.forEach((k,i) => {
-        const sc = +(latestNum[k]||0);
-        if (sc < avg && sc > 0) gaps.push({ domain:"Numeracy", sub:NUM_LABELS[i], score:sc, subject:"numeracy", stage:latestNum.stage||"foundation" });
+    if (latest.numeracy_pct) {
+      Object.entries(latest.numeracy_pct).forEach(([domain, sc]: [string, any]) => {
+        if (+sc < 60) gaps.push({ domain:"Numeracy", sub:domain, score:+sc, subject:"numeracy", stage:numStage, grade:STAGE_GRADE[numStage]||"Grade 2" });
       });
     }
     return gaps;
@@ -1889,12 +1885,10 @@ function AdminAIPaperTab({ teachers, academicYear, API }: any) {
   };
 
   const buildPrompt = (teacher: any, assessments: any[], gaps: any[], gapWithComps: any[]) => {
-    const litRounds = assessments.filter((a:any) => a.subject === "literacy");
-    const numRounds = assessments.filter((a:any) => a.subject === "numeracy");
-    const latestLit = litRounds[litRounds.length-1];
-    const latestNum = numRounds[numRounds.length-1];
-    const litAvg = latestLit?.literacy_total ? +latestLit.literacy_total : null;
-    const numAvg = latestNum?.numeracy_total ? +latestNum.numeracy_total : null;
+    const sortedA = [...assessments].sort((a:any,b:any)=>a.round>b.round?1:-1);
+    const latest = sortedA[sortedA.length-1];
+    const litAvg = latest?.literacy_total ? +latest.literacy_total : null;
+    const numAvg = latest?.numeracy_total ? +latest.numeracy_total : null;
     const overall = litAvg!==null&&numAvg!==null?(litAvg+numAvg)/2:litAvg??numAvg??0;
 
     const compBlock = gapWithComps.map((g:any) => {
@@ -1911,8 +1905,8 @@ Generate an ASSESSMENT PAPER for teacher ${teacher.name}.
 TEACHER PROFILE:
 Name: ${teacher.name}
 Overall: ${overall.toFixed(1)}%
-Literacy Stage: ${latestLit?.stage||"—"} (Grade: ${STAGE_GRADE[latestLit?.stage||"foundation"]||"—"})
-Numeracy Stage: ${latestNum?.stage||"—"} (Grade: ${STAGE_GRADE[latestNum?.stage||"foundation"]||"—"})
+Literacy Stage: ${latest?.gaps?.lit_stage||latest?.stage||"—"} (Grade: ${STAGE_GRADE[latest?.gaps?.lit_stage||latest?.stage||"foundation"]||"—"})
+Numeracy Stage: ${latest?.gaps?.num_stage||latest?.stage||"—"} (Grade: ${STAGE_GRADE[latest?.gaps?.num_stage||latest?.stage||"foundation"]||"—"})
 Rounds Completed: ${assessments.length}
 
 GAP AREAS:
@@ -2136,10 +2130,8 @@ function ReportCardTab({ teachers, academicYear, API }: any) {
   const STAGE_LABELS: Record<string,string> = { foundation:"Foundation", preparatory:"Preparatory", middle:"Middle", secondary:"Secondary" };
   const STAGE_GRADE: Record<string,string> = { foundation:"Grade 2", preparatory:"Grade 5", middle:"Grade 8", secondary:"Grade 10" };
   const STAGE_ORDER = ["foundation","preparatory","middle","secondary"];
-  const getLitKeys = (a: any) => a?.literacy_pct ? Object.keys(a.literacy_pct) : a?.literacy_scores ? Object.keys(a.literacy_scores) : ["Listening","Speaking","Reading","Writing"];
-  const getNumKeys = (a: any) => a?.numeracy_pct ? Object.keys(a.numeracy_pct) : a?.numeracy_scores ? Object.keys(a.numeracy_scores) : ["Operations","Base 10","Measurement","Geometry"];
-  const LIT_KEYS = getLitKeys(null);
-  const NUM_KEYS = getNumKeys(null);
+  const LIT_KEYS = ["listening_score","speaking_score","reading_score","writing_score"];
+  const NUM_KEYS = ["operations_score","base10_score","measurement_score","geometry_score"];
   const LIT_LABELS = ["Listening","Speaking","Reading","Writing"];
   const NUM_LABELS = ["Operations","Base 10","Measurement","Geometry"];
 
@@ -2171,25 +2163,24 @@ function ReportCardTab({ teachers, academicYear, API }: any) {
   };
 
   const buildHtmlCard = (teacher: any, assessments: any[], roundFilter?: string) => {
-    const litRounds = assessments.filter((a:any) => a.subject==="literacy").sort((a:any,b:any)=>a.round>b.round?1:-1);
-    const numRounds = assessments.filter((a:any) => a.subject==="numeracy").sort((a:any,b:any)=>a.round>b.round?1:-1);
-    const latestLit = litRounds[litRounds.length-1];
-    const latestNum = numRounds[numRounds.length-1];
+    const allRounds = [...assessments].sort((a:any,b:any)=>a.round>b.round?1:-1);
+    const latestLit = allRounds[allRounds.length-1];
+    const latestNum = latestLit;
     const litAvg = latestLit?.literacy_total ? +latestLit.literacy_total : null;
-    const numAvg = latestNum?.numeracy_total ? +latestNum.numeracy_total : null;
+    const numAvg = latestLit?.numeracy_total ? +latestLit.numeracy_total : null;
     const overall = litAvg!==null&&numAvg!==null?(litAvg+numAvg)/2:litAvg??numAvg??0;
 
     const filtered = roundFilter ? assessments.filter((a:any)=>a.round===roundFilter) : assessments;
-    const groupedBySubj: Record<string,any[]> = {};
-    filtered.forEach((a:any) => {
-      if (!groupedBySubj[a.subject]) groupedBySubj[a.subject] = [];
-      groupedBySubj[a.subject].push(a);
-    });
+    const filteredSorted = [...filtered].sort((a:any,b:any)=>a.round>b.round?1:-1);
+    const sampleRound = filteredSorted[filteredSorted.length-1];
 
-    const subjSections = Object.entries(groupedBySubj).map(([subj, rounds]) => {
+    const subjSections = ["literacy","numeracy"].map(subj => {
       const isLit = subj === "literacy";
-      const domains = isLit ? getLitKeys(latestLit) : getNumKeys(latestNum);
-      const labels = isLit ? LIT_LABELS : NUM_LABELS;
+      if (isLit && (!sampleRound?.literacy_scores || !Object.keys(sampleRound.literacy_scores).length)) return "";
+      if (!isLit && (!sampleRound?.numeracy_scores || !Object.keys(sampleRound.numeracy_scores).length)) return "";
+      const domains = isLit ? Object.keys(sampleRound.literacy_scores||{}) : Object.keys(sampleRound.numeracy_scores||{});
+      const labels = domains;
+      const rounds = filteredSorted;
 
       // Group by stage
       const stageGroups: Record<string,any[]> = {};
@@ -2202,18 +2193,23 @@ function ReportCardTab({ teachers, academicYear, API }: any) {
       const stageHtml = STAGE_ORDER.filter(s => stageGroups[s]).map(stage => {
         const stageRounds = stageGroups[stage];
         const roundRows = stageRounds.map((r:any, i:number) => {
-          const avg = domains.reduce((s,k)=>s + Number(r[k]||0),0)/domains.length;
+          const pctObj = isLit ? (r.literacy_pct||{}) : (r.numeracy_pct||{});
+          const avg = isLit ? (r.literacy_total ? +r.literacy_total : 0) : (r.numeracy_total ? +r.numeracy_total : 0);
           const domainRows = labels.map((l,j) => {
-            const val = +(r[domains[j]]||0);
+            const val = +(pctObj[l]??0);
             const color = val>=80?"#16a34a":val>=60?"#2563eb":val>=40?"#d97706":"#dc2626";
             return `<tr><td style="padding:5px 10px;border:1px solid #e5e7eb">${l}</td>
               <td style="padding:5px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:bold;color:${color}">${val>0?val.toFixed(1)+"%":"—"}</td>
               <td style="padding:5px 10px;border:1px solid #e5e7eb;font-size:11px;color:#6b7280">${val>0?getLevel(val).split("—")[0].trim():"—"}</td>
             </tr>`;
           }).join("");
-          const promoted = r.promoted;
+          const rGaps = (r.gaps as any) || {};
+          const litProm = rGaps.lit_promoted === true;
+          const numProm = rGaps.num_promoted === true;
+          const promoted = isLit ? litProm : numProm;
+          const promotedTo = isLit ? rGaps.lit_promoted_to : rGaps.num_promoted_to;
           const promotionBanner = promoted ? `<div style="background:#dcfce7;border:1px solid #16a34a;border-radius:6px;padding:8px 12px;margin:8px 0;color:#15803d;font-weight:bold">
-            🎉 STAGE PROMOTION — Promoted to ${r.promoted_to_stage} Stage (${STAGE_GRADE[r.promoted_to_stage?.toLowerCase()||"foundation"]})
+            🎉 STAGE PROMOTION — Promoted to ${promotedTo||""} Stage (${STAGE_GRADE[promotedTo?.toLowerCase()||"foundation"]||""})
           </div>` : "";
           return `<div style="margin-bottom:12px">
             <h4 style="margin:8px 0;color:#374151;font-size:13px">Round ${r.round?.replace("baseline_","R")} &nbsp;·&nbsp; ${r.assessment_date||""}</h4>
@@ -2236,7 +2232,7 @@ function ReportCardTab({ teachers, academicYear, API }: any) {
           <h3 style="background:#e0e7ff;color:#3730a3;padding:6px 12px;border-radius:4px;font-size:13px;margin:8px 0">
             ${STAGE_LABELS[stage]} Stage &nbsp;·&nbsp; Assessed on ${STAGE_GRADE[stage]} Competencies
           </h3>
-          ${stageRounds.some((r:any)=>r.promoted)?`<p style="color:#16a34a;font-size:11px;font-style:italic">✓ Cleared this stage</p>`:""}
+          ${stageRounds.some((r:any)=>(r.gaps as any)?.lit_promoted||(r.gaps as any)?.num_promoted||r.promoted)?`<p style="color:#16a34a;font-size:11px;font-style:italic">✓ Cleared this stage</p>`:""}
           ${stageRounds.every((r:any)=>r.stage===STAGE_ORDER[STAGE_ORDER.indexOf(stage)])&&!stageRounds.some((r:any)=>r.promoted)?`<p style="color:#6b7280;font-size:11px;font-style:italic">Current stage</p>`:""}
           ${roundRows}
         </div>`;
@@ -2276,8 +2272,8 @@ function ReportCardTab({ teachers, academicYear, API }: any) {
     </div>
     <div>
       <h2 style="font-size:14px;color:#374151;margin-bottom:8px">Current Stage</h2>
-      ${latestLit?`<p style="font-size:12px">📖 Literacy: <strong>${STAGE_LABELS[latestLit.stage]||latestLit.stage}</strong> — Assessed on <strong>${STAGE_GRADE[latestLit.stage]||"Grade 2"}</strong> competencies</p>`:""}
-      ${latestNum?`<p style="font-size:12px">🔢 Numeracy: <strong>${STAGE_LABELS[latestNum.stage]||latestNum.stage}</strong> — Assessed on <strong>${STAGE_GRADE[latestNum.stage]||"Grade 2"}</strong> competencies</p>`:""}
+      ${latestLit?`<p style="font-size:12px">📖 Literacy: <strong>${STAGE_LABELS[latestLit.gaps?.lit_stage||latestLit.stage]||latestLit.stage}</strong> — Assessed on <strong>${STAGE_GRADE[latestLit.gaps?.lit_stage||latestLit.stage]||"Grade 2"}</strong> competencies</p>`:""}
+      ${latestLit?`<p style="font-size:12px">🔢 Numeracy: <strong>${STAGE_LABELS[latestLit.gaps?.num_stage||latestLit.stage]||latestLit.stage}</strong> — Assessed on <strong>${STAGE_GRADE[latestLit.gaps?.num_stage||latestLit.stage]||"Grade 2"}</strong> competencies</p>`:""}
     </div>
     <hr style="margin:20px 0;border:none;border-top:1px solid #e5e7eb">
     ${subjSections}
@@ -2359,8 +2355,7 @@ function ReportCardTab({ teachers, academicYear, API }: any) {
                 </thead>
                 <tbody>
                   {assessments.map((a:any,i:number)=>{
-                    const domains = isLit ? getLitKeys(latestLit) : getNumKeys(latestNum);
-                    const avg = keys.reduce((s:number,k:string)=>s + Number(a[k]||0),0)/keys.length;
+                    const avg = a.subject==="literacy" ? (a.literacy_total ? +a.literacy_total : 0) : (a.numeracy_total ? +a.numeracy_total : 0);
                     return (
                       <tr key={i} className={`border-b border-gray-100 ${i%2===0?"bg-white":"bg-gray-50"}`}>
                         <td className="px-3 py-2 font-medium">{a.round?.replace("baseline_","R")}</td>
