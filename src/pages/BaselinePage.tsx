@@ -217,7 +217,7 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
         const prevData = prevRound ? assessments.find((a: any) => a.round === prevRound) : null;
 
         if (roundData) {
-          // Pre-fill from saved data
+          // Pre-fill from saved data for THIS round only
           const litScores: Record<string,string> = {};
           const numScores: Record<string,string> = {};
           const litMax: Record<string,string> = {};
@@ -232,20 +232,26 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
           });
           setEntries(prev => ({ ...prev, [t.id]: {
             subjects: "both",
-            lit_stage: roundData.stage || "foundation",
-            num_stage: roundData.stage || "foundation",
+            lit_stage: roundData.lit_stage || roundData.stage || "foundation",
+            num_stage: roundData.num_stage || roundData.stage || "foundation",
             litScores, numScores, litMax, numMax,
           }}));
-        } else if (prevData?.promoted) {
-          // Auto-advance stage if promoted in previous round
-          const prevStage = prevData.stage || "foundation";
-          const nextStageIdx = STAGE_ORDER.indexOf(prevStage) + 1;
-          const nextStage = nextStageIdx < STAGE_ORDER.length ? STAGE_ORDER[nextStageIdx] : prevStage;
+        } else {
+          // No saved data for this round — start FRESH (empty marks)
+          // Carry stage forward from previous round (with subject-wise promotion)
+          const prevLitStage = prevData?.lit_stage || prevData?.stage || "foundation";
+          const prevNumStage = prevData?.num_stage || prevData?.stage || "foundation";
+          const litPromoted = prevData?.lit_promoted === true;
+          const numPromoted = prevData?.num_promoted === true;
+          const nextLitIdx = STAGE_ORDER.indexOf(prevLitStage) + (litPromoted ? 1 : 0);
+          const nextNumIdx = STAGE_ORDER.indexOf(prevNumStage) + (numPromoted ? 1 : 0);
+          const nextLitStage = STAGE_ORDER[Math.min(nextLitIdx, STAGE_ORDER.length - 1)] || prevLitStage;
+          const nextNumStage = STAGE_ORDER[Math.min(nextNumIdx, STAGE_ORDER.length - 1)] || prevNumStage;
           setEntries(prev => ({ ...prev, [t.id]: {
-            ...(prev[t.id] || {}),
-            subjects: "both",
-            lit_stage: nextStage,
-            num_stage: nextStage,
+            subjects: prev[t.id]?.subjects || "both",
+            lit_stage: nextLitStage,
+            num_stage: nextNumStage,
+            // Always empty for a new round
             litScores: {}, numScores: {}, litMax: {}, numMax: {},
           }}));
         }
@@ -329,13 +335,23 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
           }
         });
 
-        // Use the relevant stage (lit_stage for literacy-only, num_stage for numeracy-only, lit_stage for both)
+        // Calculate subject-wise % averages to determine promotion
+        const litPctAvg = hasLit ? calcAvgPct(litScores, litMax, LIT_DOMAINS) : 0;
+        const numPctAvg = hasNum ? calcAvgPct(numScores, numMax, NUM_DOMAINS) : 0;
+        const lit_promoted = hasLit && litPctAvg >= 80;
+        const num_promoted = hasNum && numPctAvg >= 80;
+
+        // Primary stage = lit_stage (for backward compat with single stage field)
         const stage = hasLit ? (lit_stage || "foundation") : (num_stage || "foundation");
 
         await axios.post(`${apiUrl}/baseline/teacher`, {
           teacher_id: teacher.id, teacher_name: teacher.name,
           academic_year: academicYear, round,
           stage,
+          lit_stage: lit_stage || "foundation",
+          num_stage: num_stage || "foundation",
+          lit_promoted,
+          num_promoted,
           assessment_date: assessmentDate,
           literacy_scores: literacyScores,
           numeracy_scores: numeracyScores,
@@ -1573,8 +1589,7 @@ export default function BaselinePage() {
               <div className="bg-white rounded-xl shadow p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">All Teachers</h3>
                 <div className="space-y-1">
-                  {(teacherDashData.teacherList||[]).map((t:any) => (
-                    <div key={t.teacher_id} className={`flex items-center justify-between p-2 rounded border ${t.assessment?"bg-green-50 border-green-100":"bg-gray-50 border-gray-100"}`}>
+                  {(teacherDashData.teacherList||[]).map((t:any) => (\n                    <div key={t.teacher_id} className={`flex items-center justify-between p-2 rounded border ${t.assessment?"bg-green-50 border-green-100":"bg-gray-50 border-gray-100"}`}>
                       <span className="text-sm font-medium text-gray-800">{t.teacher_name}</span>
                       {t.assessment ? (
                         <div className="flex gap-2">
@@ -1588,6 +1603,137 @@ export default function BaselinePage() {
                       )}
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* ── GAP ANALYSIS TABLE ── */}
+              <div className="bg-white rounded-xl shadow p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-1">🎯 Teacher Gap Analysis — {ROUNDS.find(r=>r.value===round)?.label}</h3>
+                <p className="text-xs text-gray-400 mb-3">Domains below 60% are flagged as gaps. Grade shown = highest grade for the teacher's current stage.</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-indigo-700 text-white">
+                        <th className="px-3 py-2 text-left min-w-[160px]">Teacher</th>
+                        <th className="px-3 py-2 text-center">Lit Stage</th>
+                        <th className="px-3 py-2 text-center">Num Stage</th>
+                        <th className="px-3 py-2 text-center">Grade (Lit)</th>
+                        <th className="px-3 py-2 text-center">Grade (Num)</th>
+                        <th className="px-3 py-2 text-left">📚 Literacy Gaps</th>
+                        <th className="px-3 py-2 text-left">🔢 Numeracy Gaps</th>
+                        <th className="px-3 py-2 text-center">Lit Promoted</th>
+                        <th className="px-3 py-2 text-center">Num Promoted</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(teacherDashData.teacherList||[]).filter((t:any) => t.assessment).map((t:any, i:number) => {
+                        const gaps = t.assessment.gaps || {};
+                        const litGaps: string[] = gaps.literacy || [];
+                        const numGaps: string[] = gaps.numeracy || [];
+                        const litStage = gaps.lit_stage || t.assessment.stage || "foundation";
+                        const numStage = gaps.num_stage || t.assessment.stage || "foundation";
+                        const litPromoted = gaps.lit_promoted === true;
+                        const numPromoted = gaps.num_promoted === true;
+                        const STAGE_GRADE_MAP: Record<string,string> = { foundation:"Grade 2", preparatory:"Grade 5", middle:"Grade 8", secondary:"Grade 10" };
+                        const litGrade = STAGE_GRADE_MAP[litStage] || litStage;
+                        const numGrade = STAGE_GRADE_MAP[numStage] || numStage;
+                        return (
+                          <tr key={t.teacher_id} className={i%2===0?"bg-white":"bg-gray-50"}>
+                            <td className="px-3 py-2 font-medium text-gray-800">{t.teacher_name}</td>
+                            <td className="px-3 py-2 text-center">
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full capitalize">{litStage}</span>
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full capitalize">{numStage}</span>
+                            </td>
+                            <td className="px-3 py-2 text-center text-xs text-gray-600">{litGrade}</td>
+                            <td className="px-3 py-2 text-center text-xs text-gray-600">{numGrade}</td>
+                            <td className="px-3 py-2">
+                              {litGaps.length > 0
+                                ? <div className="flex flex-wrap gap-1">{litGaps.map((g:string) => <span key={g} className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded text-xs">{g}</span>)}</div>
+                                : <span className="text-green-600 text-xs">✅ No gaps</span>}
+                            </td>
+                            <td className="px-3 py-2">
+                              {numGaps.length > 0
+                                ? <div className="flex flex-wrap gap-1">{numGaps.map((g:string) => <span key={g} className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded text-xs">{g}</span>)}</div>
+                                : <span className="text-green-600 text-xs">✅ No gaps</span>}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {litPromoted
+                                ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">🎉 Yes → {gaps.lit_promoted_to || "next"}</span>
+                                : <span className="text-xs text-gray-400">—</span>}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {numPromoted
+                                ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">🎉 Yes → {gaps.num_promoted_to || "next"}</span>
+                                : <span className="text-xs text-gray-400">—</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ── STAGE PROGRESSION TABLE ── */}
+              <div className="bg-white rounded-xl shadow p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-1">📈 Stage Progression — All Rounds</h3>
+                <p className="text-xs text-gray-400 mb-3">Starting stage → progression round by round. 🎉 = promoted that round.</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-indigo-700 text-white">
+                        <th className="px-3 py-2 text-left min-w-[160px]">Teacher</th>
+                        <th className="px-3 py-2 text-center">Subject</th>
+                        {ROUNDS.slice(0,6).map(r => (
+                          <th key={r.value} className="px-2 py-2 text-center min-w-[80px]">{r.label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(teacherDashData.teacherStageProgression||[]).map((t:any, i:number) => (
+                        <>
+                          <tr key={t.teacher_id+"lit"} className={i%2===0?"bg-white":"bg-gray-50"}>
+                            <td className="px-3 py-2 font-medium text-gray-800" rowSpan={2}>{t.teacher_name}</td>
+                            <td className="px-3 py-2 text-center"><span className="text-blue-600 font-bold text-xs">📖 Lit</span></td>
+                            {ROUNDS.slice(0,6).map(r => {
+                              const rd = t.rounds?.[r.value];
+                              return (
+                                <td key={r.value} className="px-2 py-1.5 text-center">
+                                  {rd ? (
+                                    <div>
+                                      <span className="text-xs capitalize text-gray-700">{rd.lit_stage||rd.stage||"—"}</span>
+                                      {rd.lit_promoted && <div className="text-green-600 text-xs font-bold">🎉</div>}
+                                    </div>
+                                  ) : <span className="text-gray-200">—</span>}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                          <tr key={t.teacher_id+"num"} className={i%2===0?"bg-white":"bg-gray-50"}>
+                            <td className="px-3 py-2 text-center"><span className="text-purple-600 font-bold text-xs">🔢 Num</span></td>
+                            {ROUNDS.slice(0,6).map(r => {
+                              const rd = t.rounds?.[r.value];
+                              return (
+                                <td key={r.value} className="px-2 py-1.5 text-center">
+                                  {rd ? (
+                                    <div>
+                                      <span className="text-xs capitalize text-gray-700">{rd.num_stage||rd.stage||"—"}</span>
+                                      {rd.num_promoted && <div className="text-purple-600 text-xs font-bold">🎉</div>}
+                                    </div>
+                                  ) : <span className="text-gray-200">—</span>}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        </>
+                      ))}
+                      {(!teacherDashData.teacherStageProgression?.length) && (
+                        <tr><td colSpan={8} className="px-3 py-6 text-center text-gray-400">No stage data yet. Save teacher assessments first.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

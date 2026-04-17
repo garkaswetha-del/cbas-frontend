@@ -866,14 +866,26 @@ function BaselineTab({ user, academicYear }: any) {
   const LIT_DOMAINS = LIT_LABELS; // same — now using names directly
   const NUM_DOMAINS = NUM_LABELS;
 
-  const litStage = latestLit?.stage || latest?.stage || "foundation";
-  const numStage = latestNum?.stage || latest?.stage || "foundation";
+  const litStage = (latestLit?.gaps as any)?.lit_stage || latestLit?.stage || latest?.stage || "foundation";
+  const numStage = (latestNum?.gaps as any)?.num_stage || latestNum?.stage || latest?.stage || "foundation";
   const litGrade = STAGE_GRADE[litStage];
   const numGrade = STAGE_GRADE[numStage];
 
-  // Gaps = domains below subject avg
-  const litGaps = hasLit ? LIT_DOMAINS.filter(d => litAvg !== null && +(latestLit[d]||0) < litAvg).map((d,i) => LIT_LABELS[LIT_DOMAINS.indexOf(d)]) : [];
-  const numGaps = hasNum ? NUM_DOMAINS.filter(d => numAvg !== null && +(latestNum[d]||0) < numAvg).map((d,i) => NUM_LABELS[NUM_DOMAINS.indexOf(d)]) : [];
+  // Subject-wise promotion — read from gaps JSONB where we stored lit_promoted / num_promoted
+  const litPromotedInfo = (latestLit?.gaps as any) || {};
+  const numPromotedInfo = (latestNum?.gaps as any) || {};
+  const litPromoted = litPromotedInfo.lit_promoted === true || latestLit?.promoted === true;
+  const numPromoted = numPromotedInfo.num_promoted === true || latestNum?.promoted === true;
+  const litPromotedTo = litPromotedInfo.lit_promoted_to || latestLit?.promoted_to_stage || null;
+  const numPromotedTo = numPromotedInfo.num_promoted_to || latestNum?.promoted_to_stage || null;
+
+  // Gaps = domains below 60% (using pct values from literacy_pct / numeracy_pct)
+  const litGaps = hasLit && latestLit?.literacy_pct
+    ? Object.entries(latestLit.literacy_pct).filter(([,v]) => (v as number) < 60).map(([d]) => d)
+    : [];
+  const numGaps = hasNum && latestNum?.numeracy_pct
+    ? Object.entries(latestNum.numeracy_pct).filter(([,v]) => (v as number) < 60).map(([d]) => d)
+    : [];
 
   // Stage progression per subject
   const getStageGroups = (rounds: any[], domains: string[]) => {
@@ -886,30 +898,37 @@ function BaselineTab({ user, academicYear }: any) {
     return groups;
   };
 
-  // Chart data for a subject: one point per round
-  const buildTrendData = (rounds: any[], domains: string[], labels: string[]) =>
+  // Chart data for a subject: one point per round using pct values
+  const buildTrendData = (rounds: any[], domains: string[], labels: string[], pctKey: string) =>
     rounds.map((r:any, i:number) => {
+      const pctObj = r[pctKey] || {};
       const obj: any = { name: `R${i+1}`, round: r.round };
-      labels.forEach((l,j) => { obj[l] = +(r[domains[j]]||0); });
-      const vals = domains.map(d => +(r[d]||0)).filter(v=>v>0);
+      labels.forEach((l,j) => { obj[l] = +(pctObj[domains[j]] ?? pctObj[l] ?? 0); });
+      const vals = labels.map(l => +(pctObj[l] ?? 0)).filter(v=>v>0);
       obj["Avg"] = vals.length ? +(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : 0;
       return obj;
     });
 
-  const litTrend = buildTrendData(litRounds, LIT_DOMAINS, LIT_LABELS);
-  const numTrend = buildTrendData(numRounds, NUM_DOMAINS, NUM_LABELS);
+  const litTrend = buildTrendData(litRounds, LIT_DOMAINS, LIT_LABELS, "literacy_pct");
+  const numTrend = buildTrendData(numRounds, NUM_DOMAINS, NUM_LABELS, "numeracy_pct");
 
   const litStageGroups = getStageGroups(litRounds, LIT_DOMAINS);
   const numStageGroups = getStageGroups(numRounds, NUM_DOMAINS);
 
   const scoreBadge = (v: number) => v >= 80 ? "bg-green-100 text-green-800" : v >= 60 ? "bg-blue-100 text-blue-800" : v >= 40 ? "bg-yellow-100 text-yellow-800" : v > 0 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-400";
 
-  const SubjectCharts = ({ rounds, trend, domains, labels, stageGroups, subj }: any) => {
+  const SubjectCharts = ({ rounds, trend, domains, labels, stageGroups, subj, pctKey }: any) => {
     if (!rounds.length) return null;
-    const latest = rounds[rounds.length-1];
-    const avg = domains.reduce((s:number,d:string)=>s + Number(latest[d]||0),0)/domains.length;
-    const promoted = latest?.promoted;
-    const promotedTo = latest?.promoted_to_stage;
+    const latestRnd = rounds[rounds.length-1];
+    const pctObj = latestRnd[pctKey] || {};
+    const vals = labels.map((l:string) => +(pctObj[l] ?? 0)).filter((v:number)=>v>0);
+    const avg = vals.length ? vals.reduce((a:number,b:number)=>a+b,0)/vals.length : 0;
+    const rGaps = (latestRnd?.gaps as any) || {};
+    const isLit = subj === "literacy";
+    const promoted = isLit ? (rGaps.lit_promoted === true || latestRnd?.promoted === true) : (rGaps.num_promoted === true);
+    const promotedTo = isLit ? (rGaps.lit_promoted_to || latestRnd?.promoted_to_stage) : rGaps.num_promoted_to;
+    const currentStage = isLit ? (rGaps.lit_stage || latestRnd?.stage || "foundation") : (rGaps.num_stage || latestRnd?.stage || "foundation");
+    const currentGrade = STAGE_GRADE[currentStage] || "Grade 2";
 
     return (
       <div className="space-y-4">
@@ -918,8 +937,11 @@ function BaselineTab({ user, academicYear }: any) {
           <span className="text-xs text-gray-500 font-medium">Stage Journey:</span>
           {STAGE_ORDER.map((s,i) => {
             const hasStage = !!stageGroups[s];
-            const isCurrentStage = (latest?.stage || "foundation") === s;
-            const wasPromoted = rounds.some((r:any) => r.stage === s && r.promoted);
+            const isCurrentStage = currentStage === s;
+            const wasPromoted = rounds.some((r:any) => {
+              const rg = (r.gaps as any) || {};
+              return (isLit ? rg.lit_promoted : rg.num_promoted) && (isLit ? (rg.lit_stage || r.stage) : (rg.num_stage || r.stage)) === s;
+            });
             return (
               <span key={s} className={`px-3 py-1 rounded-full text-xs font-semibold border ${
                 wasPromoted ? "bg-green-600 text-white border-green-600" :
@@ -939,22 +961,22 @@ function BaselineTab({ user, academicYear }: any) {
             <span className="text-2xl">🎉</span>
             <div>
               <p className="text-sm font-bold text-green-800">Stage Promoted!</p>
-              <p className="text-xs text-green-600">Promoted to <strong>{promotedTo}</strong> stage · Grade: {STAGE_GRADE[promotedTo?.toLowerCase()||"foundation"]}</p>
+              <p className="text-xs text-green-600">Promoted to <strong>{STAGE_LABELS[promotedTo]||promotedTo}</strong> stage · Next assessment: {STAGE_GRADE[promotedTo?.toLowerCase()||"foundation"]} competencies</p>
             </div>
           </div>
         )}
 
         {/* Domain scores — latest round */}
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h4 className="text-xs font-bold text-gray-600 mb-3">Latest Round — {STAGE_LABELS[latest?.stage||"foundation"]} Stage ({STAGE_GRADE[latest?.stage||"foundation"]})</h4>
+          <h4 className="text-xs font-bold text-gray-600 mb-3">Latest Round — {STAGE_LABELS[currentStage]||currentStage} Stage (Assessed on {currentGrade} competencies)</h4>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {labels.map((label:string, i:number) => {
-              const val = +(latest[domains[i]]||0);
+            {labels.map((label:string) => {
+              const val = +(pctObj[label] ?? 0);
               return (
                 <div key={label} className={`rounded-lg p-3 text-center ${scoreBadge(val)}`}>
                   <div className="text-lg font-bold">{val > 0 ? val.toFixed(1)+"%" : "—"}</div>
                   <div className="text-xs mt-0.5">{label}</div>
-                  {avg > 0 && val > 0 && val < avg && <div className="text-xs mt-0.5">⚠️ gap</div>}
+                  {val > 0 && val < 60 && <div className="text-xs mt-0.5">⚠️ gap</div>}
                 </div>
               );
             })}
@@ -998,14 +1020,14 @@ function BaselineTab({ user, academicYear }: any) {
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <h4 className="text-xs font-bold text-gray-600 mb-3">Domain Breakdown (Latest Round)</h4>
             <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={labels.map((l:string,i:number) => ({ domain:l, score: +(latest[domains[i]]||0), threshold:80 }))} margin={{top:5,right:10,bottom:5,left:0}}>
+              <BarChart data={labels.map((l:string) => ({ domain:l, score: +(pctObj[l] ?? 0), threshold:80 }))} margin={{top:5,right:10,bottom:5,left:0}}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="domain" tick={{ fontSize:10 }} />
                 <YAxis domain={[0,100]} tick={{ fontSize:10 }} tickFormatter={v=>`${v}%`} />
                 <Tooltip formatter={(v:any)=>`${(+v).toFixed(1)}%`} />
                 <Bar dataKey="score" radius={[4,4,0,0]}>
                   {labels.map((_:string,i:number) => {
-                    const val = +(latest[domains[i]]||0);
+                    const val = +(pctObj[labels[i]] ?? 0);
                     return <Cell key={i} fill={val >= 80 ? "#10b981" : val >= 60 ? "#6366f1" : val >= 40 ? "#f59e0b" : "#ef4444"} />;
                   })}
                 </Bar>
@@ -1054,7 +1076,11 @@ function BaselineTab({ user, academicYear }: any) {
               <div className="text-xs text-blue-600 font-semibold mb-1">📖 Literacy</div>
               <div className="text-sm font-bold text-blue-800">{STAGE_LABELS[litStage]} Stage</div>
               <div className="text-xs text-blue-600">Assessed on {litGrade} competencies</div>
-              {latestLit?.promoted && <div className="text-xs text-green-700 font-bold mt-1">🎉 Promoted to {latestLit.promoted_to_stage}</div>}
+              {litPromoted && (
+                <div className="text-xs text-green-700 font-bold mt-1 bg-green-50 rounded px-2 py-0.5">
+                  🎉 Promoted to {litPromotedTo ? STAGE_LABELS[litPromotedTo] || litPromotedTo : "next stage"}
+                </div>
+              )}
             </div>
           )}
           {hasNum && (
@@ -1062,11 +1088,70 @@ function BaselineTab({ user, academicYear }: any) {
               <div className="text-xs text-purple-600 font-semibold mb-1">🔢 Numeracy</div>
               <div className="text-sm font-bold text-purple-800">{STAGE_LABELS[numStage]} Stage</div>
               <div className="text-xs text-purple-600">Assessed on {numGrade} competencies</div>
-              {latestNum?.promoted && <div className="text-xs text-green-700 font-bold mt-1">🎉 Promoted to {latestNum.promoted_to_stage}</div>}
+              {numPromoted && (
+                <div className="text-xs text-green-700 font-bold mt-1 bg-green-50 rounded px-2 py-0.5">
+                  🎉 Promoted to {numPromotedTo ? STAGE_LABELS[numPromotedTo] || numPromotedTo : "next stage"}
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {/* Stage progression timeline — all rounds */}
+      {allRounds.length > 1 && (
+        <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
+          <h3 className="text-sm font-bold text-gray-700 mb-3">📈 Stage Progression</h3>
+          <div className="overflow-x-auto">
+            <table className="text-xs border-collapse w-full" style={{minWidth:"400px"}}>
+              <thead>
+                <tr className="bg-indigo-700 text-white">
+                  <th className="px-3 py-2 text-left">Subject</th>
+                  {allRounds.map((r:any, i:number) => (
+                    <th key={r.round} className="px-3 py-2 text-center">Round {i+1}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="bg-blue-50">
+                  <td className="px-3 py-2 font-bold text-blue-700">📖 Literacy</td>
+                  {allRounds.map((r:any, i:number) => {
+                    const rGaps = (r.gaps as any) || {};
+                    const stage = rGaps.lit_stage || r.stage || "foundation";
+                    const promoted = rGaps.lit_promoted === true;
+                    const promotedTo = rGaps.lit_promoted_to;
+                    const pct = r.literacy_total ? +r.literacy_total : null;
+                    return (
+                      <td key={r.round} className="px-2 py-2 text-center">
+                        <div className="text-xs capitalize font-medium text-blue-700">{STAGE_LABELS[stage]||stage}</div>
+                        {pct !== null && <div className={`text-xs font-bold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${pct>=80?"bg-green-100 text-green-700":pct>=60?"bg-blue-100 text-blue-700":pct>=40?"bg-yellow-100 text-yellow-700":"bg-red-100 text-red-700"}`}>{pct.toFixed(1)}%</div>}
+                        {promoted && <div className="text-green-600 font-bold text-xs mt-0.5">🎉 → {STAGE_LABELS[promotedTo]||promotedTo}</div>}
+                      </td>
+                    );
+                  })}
+                </tr>
+                <tr className="bg-purple-50">
+                  <td className="px-3 py-2 font-bold text-purple-700">🔢 Numeracy</td>
+                  {allRounds.map((r:any, i:number) => {
+                    const rGaps = (r.gaps as any) || {};
+                    const stage = rGaps.num_stage || r.stage || "foundation";
+                    const promoted = rGaps.num_promoted === true;
+                    const promotedTo = rGaps.num_promoted_to;
+                    const pct = r.numeracy_total ? +r.numeracy_total : null;
+                    return (
+                      <td key={r.round} className="px-2 py-2 text-center">
+                        <div className="text-xs capitalize font-medium text-purple-700">{STAGE_LABELS[stage]||stage}</div>
+                        {pct !== null && <div className={`text-xs font-bold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${pct>=80?"bg-green-100 text-green-700":pct>=60?"bg-blue-100 text-blue-700":pct>=40?"bg-yellow-100 text-yellow-700":"bg-red-100 text-red-700"}`}>{pct.toFixed(1)}%</div>}
+                        {promoted && <div className="text-green-600 font-bold text-xs mt-0.5">🎉 → {STAGE_LABELS[promotedTo]||promotedTo}</div>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Gap analysis */}
       {(litGaps.length > 0 || numGaps.length > 0) && (
@@ -1094,10 +1179,10 @@ function BaselineTab({ user, academicYear }: any) {
 
       {/* Charts */}
       {(!hasLit || !hasNum || activeSubj === "literacy") && hasLit && (
-        <SubjectCharts rounds={litRounds} trend={litTrend} domains={LIT_DOMAINS} labels={LIT_LABELS} stageGroups={litStageGroups} subj="literacy" />
+        <SubjectCharts rounds={litRounds} trend={litTrend} domains={LIT_DOMAINS} labels={LIT_LABELS} stageGroups={litStageGroups} subj="literacy" pctKey="literacy_pct" />
       )}
       {(!hasLit || !hasNum || activeSubj === "numeracy") && hasNum && (
-        <SubjectCharts rounds={numRounds} trend={numTrend} domains={NUM_DOMAINS} labels={NUM_LABELS} stageGroups={numStageGroups} subj="numeracy" />
+        <SubjectCharts rounds={numRounds} trend={numTrend} domains={NUM_DOMAINS} labels={NUM_LABELS} stageGroups={numStageGroups} subj="numeracy" pctKey="numeracy_pct" />
       )}
 
       {/* All rounds history table */}
