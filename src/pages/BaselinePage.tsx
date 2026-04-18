@@ -1116,6 +1116,7 @@ export default function BaselinePage() {
                       <th className="px-2 py-2 text-center border-l border-indigo-400 bg-purple-800 min-w-[60px]">Num%</th>
                       <th className="px-2 py-2 text-center border-l border-indigo-500 min-w-[70px]">Overall</th>
                       <th className="px-2 py-2 text-center min-w-[100px]">Level</th>
+                      <th className="px-2 py-2 text-left min-w-[120px]">Gaps</th>
                     </tr>
                     {/* Max marks row — must match column order exactly */}
                     <tr className="bg-amber-50 border-b-2 border-amber-300">
@@ -1203,6 +1204,23 @@ export default function BaselinePage() {
                           </td>
                           <td className="px-2 py-1.5 text-center">
                             {level ? <span className={`text-xs px-1.5 py-0.5 rounded ${levelBg(level)}`}>{level.split("–")[0].trim()}</span> : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-2 py-1.5 text-left min-w-[120px]">
+                            {(() => {
+                              const sc = scores[st.student_id] || {};
+                              const gaps: string[] = [];
+                              [...litDomains, ...numDomains].forEach(d => {
+                                const raw = parseFloat(sc[d]||"");
+                                const max = parseFloat(maxMarks[d]||"0");
+                                if (!isNaN(raw) && raw > 0) {
+                                  const pct = max > 0 ? (raw/max)*100 : raw;
+                                  if (pct < 60) gaps.push(d);
+                                }
+                              });
+                              return gaps.length > 0
+                                ? <div className="flex flex-wrap gap-1">{gaps.map(g => <span key={g} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">⚠️ {g}</span>)}</div>
+                                : overall !== null ? <span className="text-xs text-green-600">✅ No gaps</span> : null;
+                            })()}
                           </td>
                         </tr>
                       );
