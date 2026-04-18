@@ -6668,13 +6668,20 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
   const [msg, setMsg] = useState("");
   const [activeRoundIdx, setActiveRoundIdx] = useState(0);
   const [newRoundOpen, setNewRoundOpen] = useState(false);
+  const [editingRound, setEditingRound] = useState<string|null>(null);
+  const [assessmentDate, setAssessmentDate] = useState(new Date().toISOString().split("T")[0]);
 
-  // Dynamic domains — detected from existing data or defaults
+  // Configurable domains
   const [litDomains, setLitDomains] = useState(["Listening","Speaking","Reading","Writing"]);
   const [numDomains, setNumDomains] = useState(["Operations","Base 10","Measurement","Geometry"]);
+  const [newLitDomain, setNewLitDomain] = useState("");
+  const [newNumDomain, setNewNumDomain] = useState("");
   const [maxMarks, setMaxMarks] = useState<Record<string,string>>({});
-  // scores[studentId][domain] = raw string value
   const [scores, setScores] = useState<Record<string,Record<string,string>>>({});
+
+  // Excel import
+  const xlFileRef = useRef<HTMLInputElement>(null);
+  const [xlParsing, setXlParsing] = useState(false);
 
   useEffect(() => { if (classGrade && classSection) fetchRounds(); }, [classGrade, classSection, academicYear]);
 
@@ -6685,7 +6692,6 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
       setSectionData(r.data);
       setNewRoundOpen(!r.data?.total_rounds);
       setActiveRoundIdx(Math.max(0, (r.data?.total_rounds||1) - 1));
-      // Detect domains from existing data
       const students = r.data?.students || [];
       const anyRound = students[0]?.rounds?.find((rnd: any) => rnd.exists);
       if (anyRound) {
@@ -6715,15 +6721,33 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
     return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
   };
 
-  const initNewRound = (existingRound?: any) => {
+  const scoreCellBg = (val: string, domain: string) => {
+    const raw = parseFloat(val);
+    if (isNaN(raw) || val === "") return "border-gray-200";
+    const max = parseFloat(maxMarks[domain]||"0");
+    const pct = max > 0 ? (raw/max)*100 : raw;
+    if (pct >= 80) return "border-green-400 bg-green-50";
+    if (pct >= 60) return "border-blue-300 bg-blue-50";
+    if (pct >= 40) return "border-yellow-400 bg-yellow-50";
+    return "border-red-400 bg-red-50";
+  };
+
+  const initScoresForRound = (roundKey?: string) => {
     const newScores: Record<string,Record<string,string>> = {};
     (sectionData?.students||[]).forEach((s: any) => {
-      if (existingRound) {
-        const rnd = s.rounds?.find((r: any) => r.round === existingRound);
+      if (roundKey) {
+        const rnd = s.rounds?.find((r: any) => r.round === roundKey);
         if (rnd?.exists) {
           const sc: Record<string,string> = {};
           if (rnd.literacy_scores) Object.entries(rnd.literacy_scores).forEach(([d,v]) => { sc[d] = String(v); });
           if (rnd.numeracy_scores) Object.entries(rnd.numeracy_scores).forEach(([d,v]) => { sc[d] = String(v); });
+          if (rnd.literacy_scores && Object.keys(rnd.literacy_scores).length) setLitDomains(Object.keys(rnd.literacy_scores));
+          if (rnd.numeracy_scores && Object.keys(rnd.numeracy_scores).length) setNumDomains(Object.keys(rnd.numeracy_scores));
+          if (rnd.max_marks) {
+            const mm: Record<string,string> = {};
+            Object.entries(rnd.max_marks).forEach(([d,v]) => { mm[d] = String(v); });
+            setMaxMarks(mm);
+          }
           newScores[s.student_id] = sc;
           return;
         }
@@ -6745,10 +6769,97 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
         numDomains.forEach(d => { const v = parseFloat(sc[d]||""); if (!isNaN(v)) { numScores[d] = v; mm[d] = parseFloat(maxMarks[d]||"0")||0; } });
         return { student_id: s.student_id, student_name: s.student_name, literacy_scores: litScores, numeracy_scores: numScores, max_marks: mm };
       });
-      await axios.post(`${API}/baseline/section/round`, { grade: classGrade, section: classSection, academic_year: academicYear, round: roundKey, stage, entries });
-      setMsg("✅ Round saved"); fetchRounds(); setNewRoundOpen(false);
+      await axios.post(`${API}/baseline/section/round`, {
+        grade: classGrade, section: classSection, academic_year: academicYear,
+        round: roundKey, stage, assessment_date: assessmentDate, entries,
+      });
+      setMsg("✅ Round saved"); fetchRounds(); setNewRoundOpen(false); setEditingRound(null);
     } catch { setMsg("❌ Error saving"); }
     setSaving(false); setTimeout(() => setMsg(""), 3000);
+  };
+
+  const handleXlUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setXlParsing(true);
+    try {
+      const XLSX = await import("xlsx");
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer);
+      const students = sectionData?.students || [];
+
+      let targetSheet = wb.SheetNames[0];
+      const gradeNums: Record<string,string> = {"1":"Grade 1","2":"Grade 2","3":"Grade 3","4":"Grade 4","5":"Grade 5","6":"Grade 6","7":"Grade 7","8":"Grade 8","9":"Grade 9","10":"Grade 10"};
+      for (const sn of wb.SheetNames) {
+        const m = sn.trim().match(/[Gg](\d{1,2})\s+(.+)/);
+        if (m && gradeNums[m[1]]?.toLowerCase() === classGrade.toLowerCase()) { targetSheet = sn; break; }
+      }
+
+      const ws = wb.Sheets[targetSheet];
+      const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header:1, defval:null });
+      if (rows.length < 2) { setMsg("❌ No data in Excel"); setXlParsing(false); return; }
+
+      let hdrIdx = 1;
+      for (let i = 0; i < Math.min(5, rows.length); i++) {
+        if (rows[i]?.some((c:any) => typeof c === "string" && c.toLowerCase().includes("listen"))) { hdrIdx = i; break; }
+      }
+      const hdr = rows[hdrIdx] || [];
+      const grpRow = rows[0] || [];
+      let litStart = -1, numStart = -1;
+      grpRow.forEach((c:any, ci:number) => {
+        if (typeof c === "string") {
+          if (c.toLowerCase().includes("literacy")) litStart = ci;
+          if (c.toLowerCase().includes("numeracy")) numStart = ci;
+        }
+      });
+      const litCols: Array<{name:string;col:number}> = [];
+      const numCols: Array<{name:string;col:number}> = [];
+      hdr.forEach((c:any, ci:number) => {
+        if (!c || typeof c !== "string" || ci === 0) return;
+        const clean = c.trim().replace(/\s*\([^)]*\)/g,"").replace(/\d+marks?/gi,"").trim();
+        if (!clean) return;
+        if (numStart > 0 && ci >= numStart) { if (!clean.toLowerCase().includes("student")) numCols.push({name:clean,col:ci}); }
+        else if (litStart >= 0 && ci >= litStart) { if (!clean.toLowerCase().includes("student")) litCols.push({name:clean,col:ci}); }
+        else {
+          const l = clean.toLowerCase();
+          if (l.includes("listen")||l.includes("speak")||l.includes("read")||l.includes("writ")) litCols.push({name:clean,col:ci});
+          else if (l.includes("operat")||l.includes("base")||l.includes("measur")||l.includes("geom")) numCols.push({name:clean,col:ci});
+        }
+      });
+
+      if (litCols.length) setLitDomains(litCols.map(c=>c.name));
+      if (numCols.length) setNumDomains(numCols.map(c=>c.name));
+
+      const parseVal = (raw:any) => {
+        if (raw===null||raw===undefined) return null;
+        const s = String(raw).trim().toLowerCase();
+        if (!s||s==="ab"||s==="abs"||s==="absent"||s==="-") return null;
+        const n = parseFloat(s); return isNaN(n)?null:n;
+      };
+
+      const newScores = {...scores};
+      let matched = 0;
+      for (let i = hdrIdx+1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row||!row[0]) continue;
+        const excelName = String(row[0]).trim().toUpperCase().replace(/\s+/g," ");
+        if (!excelName||excelName==="TOTAL"||excelName==="AVERAGE") continue;
+        const match = students.find((s:any) => {
+          const dbName = s.student_name.toUpperCase().replace(/\s+/g," ");
+          return dbName===excelName || dbName.split(" ").sort().join(" ")===excelName.split(" ").sort().join(" ");
+        });
+        if (!match) continue;
+        const sc: Record<string,string> = {};
+        [...litCols,...numCols].forEach(({name:d,col}) => { const v=parseVal(row[col]); if(v!==null) sc[d]=String(v); });
+        newScores[match.student_id] = sc;
+        matched++;
+      }
+      setScores(newScores);
+      setMsg(`✅ Excel imported — ${matched} students matched`);
+    } catch (err:any) { setMsg("❌ Excel import failed: "+err.message); }
+    setXlParsing(false);
+    if (xlFileRef.current) xlFileRef.current.value = "";
+    setTimeout(()=>setMsg(""),4000);
   };
 
   if (!classGrade || !classSection) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No class assigned. Only class teachers can enter baseline data.</div>;
@@ -6758,43 +6869,105 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
   const students = sectionData?.students || [];
   const nextRound = `baseline_${rounds.length + 1}`;
   const allDomains = [...litDomains, ...numDomains];
+  const isEntryOpen = newRoundOpen || !!editingRound;
+  const activeRoundKey = editingRound || nextRound;
 
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="bg-white rounded-xl shadow p-4 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-sm font-bold text-indigo-800">{classGrade} — {classSection}</h2>
           <p className="text-xs text-gray-500 mt-0.5">Stage: {stage.charAt(0).toUpperCase()+stage.slice(1)} · {students.length} students · {rounds.length} round(s) completed</p>
         </div>
-        <button onClick={() => { setNewRoundOpen(true); initNewRound(); }}
-          className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
-          + New Round
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <input ref={xlFileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleXlUpload} />
+          <button onClick={() => xlFileRef.current?.click()} disabled={xlParsing}
+            className="px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center gap-1.5">
+            {xlParsing ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"/>Parsing...</> : "📂 Import Excel"}
+          </button>
+          <button onClick={() => { setNewRoundOpen(true); setEditingRound(null); initScoresForRound(); }}
+            className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
+            + New Round
+          </button>
+        </div>
       </div>
 
       {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+
+      {/* Domain configuration */}
+      <div className="bg-white rounded-xl shadow border border-indigo-100 p-4">
+        <h3 className="text-xs font-bold text-indigo-800 mb-3">⚙️ Domain Configuration — {classGrade} · {classSection}</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs font-semibold text-blue-700 mb-2">📚 Literacy Domains</p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {litDomains.map((d, i) => (
+                <span key={d} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2 py-0.5 rounded-full">
+                  {d}
+                  <button onClick={() => setLitDomains(prev => prev.filter((_,j) => j !== i))} className="text-blue-400 hover:text-red-500 ml-0.5">✕</button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-1">
+              <input value={newLitDomain} onChange={e => setNewLitDomain(e.target.value)}
+                onKeyDown={e => { if(e.key==="Enter"&&newLitDomain.trim()){setLitDomains(p=>[...p,newLitDomain.trim()]);setNewLitDomain("");}}}
+                placeholder="Add domain (Enter)" className="border border-gray-300 rounded px-2 py-1 text-xs flex-1" />
+              <button onClick={() => {if(newLitDomain.trim()){setLitDomains(p=>[...p,newLitDomain.trim()]);setNewLitDomain("");}}}
+                className="px-2 py-1 bg-blue-600 text-white text-xs rounded">+</button>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-purple-700 mb-2">🔢 Numeracy Domains</p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {numDomains.map((d, i) => (
+                <span key={d} className="flex items-center gap-1 bg-purple-50 border border-purple-200 text-purple-700 text-xs px-2 py-0.5 rounded-full">
+                  {d}
+                  <button onClick={() => setNumDomains(prev => prev.filter((_,j) => j !== i))} className="text-purple-400 hover:text-red-500 ml-0.5">✕</button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-1">
+              <input value={newNumDomain} onChange={e => setNewNumDomain(e.target.value)}
+                onKeyDown={e => { if(e.key==="Enter"&&newNumDomain.trim()){setNumDomains(p=>[...p,newNumDomain.trim()]);setNewNumDomain("");}}}
+                placeholder="Add domain (Enter)" className="border border-gray-300 rounded px-2 py-1 text-xs flex-1" />
+              <button onClick={() => {if(newNumDomain.trim()){setNumDomains(p=>[...p,newNumDomain.trim()]);setNewNumDomain("");}}}
+                className="px-2 py-1 bg-purple-600 text-white text-xs rounded">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Round tabs */}
       {rounds.length > 0 && (
         <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
           {rounds.map((rk: string, i: number) => (
-            <button key={rk} onClick={() => { setActiveRoundIdx(i); setNewRoundOpen(false); }}
-              className={`px-4 py-2 text-sm rounded-lg font-medium border ${activeRoundIdx===i && !newRoundOpen?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>
+            <button key={rk} onClick={() => { setActiveRoundIdx(i); setNewRoundOpen(false); setEditingRound(null); }}
+              className={`px-4 py-2 text-sm rounded-lg font-medium border ${activeRoundIdx===i && !isEntryOpen?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>
               Round {i+1}
             </button>
           ))}
         </div>
       )}
 
-      {/* New round entry */}
-      {newRoundOpen && (
+      {/* Entry form (new round or editing existing) */}
+      {isEntryOpen && (
         <div className="bg-white rounded-xl shadow border border-indigo-200 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 bg-indigo-50 border-b border-indigo-200 flex-wrap gap-2">
-            <h3 className="text-sm font-bold text-indigo-800">+ Round {rounds.length+1} — {classGrade} {classSection}</h3>
-            <button onClick={() => saveRound(nextRound)} disabled={saving}
-              className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-              {saving ? "Saving..." : "💾 Save Round"}
-            </button>
+            <h3 className="text-sm font-bold text-indigo-800">
+              {editingRound ? `✏️ Editing Round ${rounds.indexOf(editingRound)+1}` : `+ Round ${rounds.length+1}`} — {classGrade} {classSection}
+            </h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-gray-500">Date:</label>
+                <input type="date" value={assessmentDate} onChange={e => setAssessmentDate(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs" />
+              </div>
+              <button onClick={() => saveRound(activeRoundKey)} disabled={saving}
+                className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
+                {saving ? "Saving..." : "💾 Save"}
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse" style={{ minWidth:`${300+allDomains.length*75}px` }}>
@@ -6807,7 +6980,6 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
                   <th className="px-2 py-2 text-center border-l border-indigo-500 bg-purple-800 min-w-[55px]">Num%</th>
                   <th className="px-2 py-2 text-center border-l border-indigo-500 min-w-[65px]">Overall</th>
                 </tr>
-                {/* Max marks row */}
                 <tr className="bg-amber-50 border-b-2 border-amber-300">
                   <td className="px-3 py-1 text-xs font-bold text-amber-800 sticky left-0 bg-amber-50">📐 Max Marks</td>
                   {allDomains.map(d => (
@@ -6834,7 +7006,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
                         <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
                           <input type="number" min={0} step={0.5} value={sc[d]??""} placeholder="—"
                             onChange={e => setScores(p => ({...p,[s.student_id]:{...(p[s.student_id]||{}),[d]:e.target.value}}))}
-                            className="w-14 text-center text-xs border border-gray-200 rounded px-1 py-0.5" />
+                            className={`w-14 text-center text-xs border rounded px-1 py-0.5 ${scoreCellBg(sc[d]||"",d)}`} />
                         </td>
                       ))}
                       <td className="px-2 py-1.5 text-center border-l border-gray-200">
@@ -6844,7 +7016,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
                         <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
                           <input type="number" min={0} step={0.5} value={sc[d]??""} placeholder="—"
                             onChange={e => setScores(p => ({...p,[s.student_id]:{...(p[s.student_id]||{}),[d]:e.target.value}}))}
-                            className="w-14 text-center text-xs border border-gray-200 rounded px-1 py-0.5" />
+                            className={`w-14 text-center text-xs border rounded px-1 py-0.5 ${scoreCellBg(sc[d]||"",d)}`} />
                         </td>
                       ))}
                       <td className="px-2 py-1.5 text-center border-l border-gray-200">
@@ -6862,10 +7034,9 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
         </div>
       )}
 
-      {/* Previous round view */}
-      {!newRoundOpen && rounds.length > 0 && (() => {
+      {/* Previous round view (read-only with Edit button) */}
+      {!isEntryOpen && rounds.length > 0 && (() => {
         const roundKey = rounds[activeRoundIdx];
-        // Collect all domains from this round's data
         const rndLitDomains = new Set<string>();
         const rndNumDomains = new Set<string>();
         students.forEach((s: any) => {
@@ -6880,8 +7051,12 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
 
         return (
           <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
               <h3 className="text-sm font-bold text-gray-700">Round {activeRoundIdx+1} Results — {classGrade} {classSection}</h3>
+              <button onClick={() => { setEditingRound(roundKey); setNewRoundOpen(false); initScoresForRound(roundKey); }}
+                className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-xs rounded-lg hover:bg-indigo-200 font-medium border border-indigo-200">
+                ✏️ Edit Round
+              </button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse" style={{ minWidth:`${300+(litD.length+numD.length)*70}px` }}>
