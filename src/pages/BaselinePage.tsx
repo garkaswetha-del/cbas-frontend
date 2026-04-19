@@ -284,9 +284,10 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
   const calcPct = (score: string, maxMark: string) => {
     const s = parseFloat(score);
     const m = parseFloat(maxMark);
-    if (isNaN(s) || s === 0) return null;
-    if (isNaN(m) || m <= 0) return s; // treat as % if no max
-    return (s / m) * 100;
+    if (isNaN(s) || s < 0) return null;
+    if (s === 0) return 0;
+    if (isNaN(m) || m <= 0) return Math.min(100, s); // treat as % if no max, cap at 100
+    return Math.min(100, (s / m) * 100);
   };
 
   const calcAvgPct = (scores: Record<string,string>, maxMarks: Record<string,string>, domains: string[]) => {
@@ -729,9 +730,10 @@ export default function BaselinePage() {
     const mm = maxMarks;
     const vals = domains.map(d => {
       const raw = parseFloat(sc[d]||"");
-      if (isNaN(raw)) return null;
+      if (isNaN(raw) || raw < 0) return null;
       const max = parseFloat(mm[d]||"0");
-      return max > 0 ? (raw/max)*100 : raw; // treat as % if no max
+      const pct = max > 0 ? (raw/max)*100 : raw;
+      return Math.min(100, pct);
     }).filter(v => v !== null) as number[];
     return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
   };
@@ -755,6 +757,7 @@ export default function BaselinePage() {
     const raw = parseFloat(val);
     if (isNaN(raw) || val === "") return "border-gray-200";
     const max = parseFloat(maxMarks[domain]||"0");
+    if (max > 0 && raw > max) return "border-orange-500 bg-orange-50"; // exceeds max — data entry error
     const pct = max > 0 ? (raw/max)*100 : raw;
     if (pct >= 80) return "border-green-400 bg-green-50";
     if (pct >= 60) return "border-blue-300 bg-blue-50";

@@ -6710,9 +6710,11 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
   const getLvl = (s: number) => s >= 80 ? {label:"Exceeding",bg:"bg-green-100 text-green-800"} : s >= 60 ? {label:"Meeting",bg:"bg-blue-100 text-blue-800"} : s >= 40 ? {label:"Approaching",bg:"bg-yellow-100 text-yellow-800"} : {label:"Beginning",bg:"bg-red-100 text-red-800"};
 
   const calcPct = (domain: string, raw: string) => {
-    const v = parseFloat(raw); if (isNaN(v)) return null;
+    const v = parseFloat(raw); if (isNaN(v) || v < 0) return null;
+    if (v === 0) return 0;
     const max = parseFloat(maxMarks[domain]||"0");
-    return max > 0 ? (v/max)*100 : v;
+    const pct = max > 0 ? (v/max)*100 : v;
+    return Math.min(100, pct);
   };
 
   const calcAvgPct = (studentId: string, domains: string[]) => {
@@ -6725,6 +6727,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
     const raw = parseFloat(val);
     if (isNaN(raw) || val === "") return "border-gray-200";
     const max = parseFloat(maxMarks[domain]||"0");
+    if (max > 0 && raw > max) return "border-orange-500 bg-orange-50"; // exceeds max — data entry error
     const pct = max > 0 ? (raw/max)*100 : raw;
     if (pct >= 80) return "border-green-400 bg-green-50";
     if (pct >= 60) return "border-blue-300 bg-blue-50";
