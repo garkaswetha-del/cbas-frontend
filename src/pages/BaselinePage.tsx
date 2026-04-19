@@ -1000,6 +1000,20 @@ export default function BaselinePage() {
           <label className="text-xs text-gray-500 block mb-1">Assessment Date</label>
           <input type="date" value={assessmentDate} onChange={e => setAssessmentDate(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm" />
         </div>
+        <button
+          onClick={async () => {
+            if (!window.confirm("Recalculate ALL stored percentages using saved max marks? This fixes any >100% values.")) return;
+            try {
+              const r = await axios.post(`${API}/baseline/recalculate`);
+              setMessage(`✅ ${r.data.message}`);
+              fetchStudents();
+            } catch { setMessage("❌ Recalculate failed"); }
+            setTimeout(() => setMessage(""), 5000);
+          }}
+          className="ml-auto px-4 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 font-medium"
+        >
+          🔧 Fix All Percentages
+        </button>
       </div>
 
       {/* Main tabs */}
