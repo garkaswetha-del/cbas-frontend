@@ -614,6 +614,8 @@ export default function BaselinePage() {
   const [xlOverrides, setXlOverrides] = useState<Record<number, Record<string, any|null>>>({});
   const [xlActiveSheet, setXlActiveSheet] = useState(0);
   const [xlImported, setXlImported] = useState(false);
+  const [xlBulkSaving, setXlBulkSaving] = useState(false);
+  const [xlBulkProgress, setXlBulkProgress] = useState("");
 
   // Teacher / Dashboard state
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -881,6 +883,62 @@ export default function BaselinePage() {
     if (xlFileRef.current) xlFileRef.current.value = "";
   };
 
+  // ── Bulk save ALL sheets from Excel in one click ─────────────
+  const saveAllFromExcel = async () => {
+    if (!xlSheets.length) return;
+    setXlBulkSaving(true);
+    let totalStudents = 0, totalClasses = 0;
+    try {
+      for (let si = 0; si < xlSheets.length; si++) {
+        const sheet = xlSheets[si];
+        const ov = xlOverrides[si] || {};
+        const stage = GRADE_TO_STAGE[sheet.grade] || "foundation";
+
+        const buildEntry = (dbStudent: any, excelRow: { name: string; scores: Record<string, number|null> }) => {
+          const litScores: Record<string,number> = {};
+          const numScores: Record<string,number> = {};
+          const mm: Record<string,number> = {};
+          sheet.domains.literacy.forEach(d => {
+            const v = parseFloat(String(excelRow.scores[d] ?? ""));
+            if (!isNaN(v)) { litScores[d] = v; mm[d] = parseFloat(maxMarks[d]||"0")||0; }
+          });
+          sheet.domains.numeracy.forEach(d => {
+            const v = parseFloat(String(excelRow.scores[d] ?? ""));
+            if (!isNaN(v)) { numScores[d] = v; mm[d] = parseFloat(maxMarks[d]||"0")||0; }
+          });
+          const hasAny = Object.keys(litScores).length > 0 || Object.keys(numScores).length > 0;
+          if (!hasAny) return null;
+          return { student_id: dbStudent.id, student_name: dbStudent.name, stage, literacy_scores: litScores, numeracy_scores: numScores, max_marks: mm };
+        };
+
+        const assessments = [
+          ...sheet.matched.map(({ dbStudent, excelRow }) => buildEntry(dbStudent, excelRow)),
+          ...sheet.unmatched
+            .filter(u => ov[u.excelRow.name] && ov[u.excelRow.name] !== null)
+            .map(u => buildEntry(ov[u.excelRow.name], u.excelRow)),
+        ].filter(Boolean);
+
+        if (!assessments.length) continue;
+
+        setXlBulkProgress(`Saving ${sheet.grade} ${sheet.section}... (${si+1}/${xlSheets.length})`);
+        await axios.post(`${API}/baseline/section`, {
+          grade: sheet.grade, section: sheet.section,
+          academic_year: academicYear, round, assessment_date: assessmentDate,
+          assessments,
+        });
+        totalStudents += assessments.length;
+        totalClasses++;
+      }
+      setMessage(`✅ Saved ${totalStudents} students across ${totalClasses} classes`);
+      fetchStudents();
+    } catch {
+      setMessage("❌ Error during bulk save");
+    }
+    setXlBulkSaving(false);
+    setXlBulkProgress("");
+    setTimeout(() => setMessage(""), 5000);
+  };
+
   const applyOverrideToTable = (sheetIdx: number) => {
     const sheet = xlSheets[sheetIdx];
     if (!sheet) return;
@@ -968,15 +1026,23 @@ export default function BaselinePage() {
                   {sections.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
-              <div className="ml-auto flex gap-2 items-center">
+              <div className="ml-auto flex gap-2 items-center flex-wrap">
                 <input ref={xlFileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleXlUpload} />
                 <button onClick={() => xlFileRef.current?.click()} disabled={xlParsing}
                   className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center gap-2">
                   {xlParsing ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"/>Parsing...</> : "📂 Import Excel"}
                 </button>
+                {xlSheets.length > 0 && (
+                  <button onClick={saveAllFromExcel} disabled={xlBulkSaving}
+                    className="px-5 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-semibold flex items-center gap-2">
+                    {xlBulkSaving
+                      ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"/>{xlBulkProgress || "Saving..."}</>
+                      : `💾 Save All ${xlSheets.length} Classes`}
+                  </button>
+                )}
                 <button onClick={saveScores} disabled={saving}
                   className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold">
-                  {saving ? "Saving..." : "💾 Save All"}
+                  {saving ? "Saving..." : "💾 Save This Class"}
                 </button>
               </div>
             </div>
