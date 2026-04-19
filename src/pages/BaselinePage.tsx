@@ -134,7 +134,7 @@ function parseBaselineExcel(ws: XLSX.WorkSheet): {
 
   hdr.forEach((c: any, ci: number) => {
     if (!c || typeof c !== "string") return;
-    const clean = c.trim().replace(/\s*\([^)]*\)/g,"").replace(/\d+marks?/gi,"").trim();
+    const clean = c.trim().replace(/\s*\([^)]*\)/g,"").replace(/\s*\d+\s*marks?/gi,"").replace(/\s+/g," ").trim();
     if (!clean) return;
     // Skip student name column
     if (ci === 0) return;
@@ -685,7 +685,9 @@ export default function BaselinePage() {
           if (a.literacy_scores) Object.entries(a.literacy_scores).forEach(([d, v]) => { sc[d] = String(v); });
           if (a.numeracy_scores) Object.entries(a.numeracy_scores).forEach(([d, v]) => { sc[d] = String(v); });
           if (a.max_marks && !Object.keys(newMaxMarks).length) {
-            Object.entries(a.max_marks).forEach(([d, v]) => { newMaxMarks[d] = String(v); });
+            Object.entries(a.max_marks).forEach(([d, v]) => {
+              if (parseFloat(String(v)) > 0) newMaxMarks[d] = String(v);
+            });
           }
           if (!detectedLitDomains && a.literacy_scores) detectedLitDomains = Object.keys(a.literacy_scores);
           if (!detectedNumDomains && a.numeracy_scores) detectedNumDomains = Object.keys(a.numeracy_scores);
