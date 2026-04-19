@@ -134,7 +134,15 @@ function parseBaselineExcel(ws: XLSX.WorkSheet): {
 
   hdr.forEach((c: any, ci: number) => {
     if (!c || typeof c !== "string") return;
-    const clean = c.trim().replace(/\s*\([^)]*\)/g,"").replace(/\s*\d+\s*marks?/gi,"").replace(/\s+/g," ").trim();
+    const clean = c.trim()
+      .replace(/\s*\([^)]*\)/g, "")        // remove (anything) e.g. "(5marks)", "(%)", "(15)"
+      .replace(/\s*\d+\s*marks?/gi, "")    // remove "15 marks", "15marks", " 5 mark"
+      .replace(/\s*\/\s*\d+/g, "")         // remove "/20", "/ 15"
+      .replace(/\s*-\s*\d+\s*marks?/gi,"") // remove "- 15 marks"
+      .replace(/\s*%\s*$/g, "")            // remove trailing %
+      .replace(/\s*:\s*\d+/g, "")          // remove ": 20"
+      .replace(/\s+/g, " ")
+      .trim();
     if (!clean) return;
     // Skip student name column
     if (ci === 0) return;
