@@ -6767,13 +6767,16 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
         const mm: Record<string,number> = {};
         litDomains.forEach(d => { const v = parseFloat(sc[d]||""); if (!isNaN(v)) { litScores[d] = v; mm[d] = parseFloat(maxMarks[d]||"0")||0; } });
         numDomains.forEach(d => { const v = parseFloat(sc[d]||""); if (!isNaN(v)) { numScores[d] = v; mm[d] = parseFloat(maxMarks[d]||"0")||0; } });
+        const hasAny = Object.keys(litScores).length > 0 || Object.keys(numScores).length > 0;
+        if (!hasAny) return null;
         return { student_id: s.student_id, student_name: s.student_name, literacy_scores: litScores, numeracy_scores: numScores, max_marks: mm };
-      });
+      }).filter(Boolean);
+      if (!entries.length) { setMsg("❌ No scores entered to save"); setSaving(false); setTimeout(()=>setMsg(""),3000); return; }
       await axios.post(`${API}/baseline/section/round`, {
         grade: classGrade, section: classSection, academic_year: academicYear,
         round: roundKey, stage, assessment_date: assessmentDate, entries,
       });
-      setMsg("✅ Round saved"); fetchRounds(); setNewRoundOpen(false); setEditingRound(null);
+      setMsg(`✅ Round saved — ${entries.length} students`); fetchRounds(); setNewRoundOpen(false); setEditingRound(null);
     } catch { setMsg("❌ Error saving"); }
     setSaving(false); setTimeout(() => setMsg(""), 3000);
   };
@@ -6970,26 +6973,39 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse" style={{ minWidth:`${300+allDomains.length*75}px` }}>
+            <table className="w-full text-xs border-collapse" style={{ minWidth:`${300+(litDomains.length+numDomains.length)*75+220}px` }}>
               <thead>
                 <tr className="bg-indigo-700 text-white">
                   <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[180px]">Student</th>
-                  {litDomains.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[72px] bg-blue-700">{d.substring(0,6)}</th>)}
-                  <th className="px-2 py-2 text-center border-l border-indigo-500 bg-blue-800 min-w-[55px]">Lit%</th>
-                  {numDomains.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[72px] bg-purple-700">{d.substring(0,6)}</th>)}
-                  <th className="px-2 py-2 text-center border-l border-indigo-500 bg-purple-800 min-w-[55px]">Num%</th>
+                  {litDomains.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[75px] bg-blue-700">{d}</th>)}
+                  <th className="px-2 py-2 text-center border-l border-indigo-500 bg-blue-800 min-w-[60px]">Lit%</th>
+                  {numDomains.map(d => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[75px] bg-purple-700">{d}</th>)}
+                  <th className="px-2 py-2 text-center border-l border-indigo-500 bg-purple-800 min-w-[60px]">Num%</th>
                   <th className="px-2 py-2 text-center border-l border-indigo-500 min-w-[65px]">Overall</th>
+                  <th className="px-2 py-2 text-center min-w-[65px]">Level</th>
+                  <th className="px-2 py-2 text-left min-w-[120px]">Gaps</th>
                 </tr>
                 <tr className="bg-amber-50 border-b-2 border-amber-300">
                   <td className="px-3 py-1 text-xs font-bold text-amber-800 sticky left-0 bg-amber-50">📐 Max Marks</td>
-                  {allDomains.map(d => (
-                    <td key={d} className="px-1 py-1 text-center border-l border-amber-200">
+                  {litDomains.map(d => (
+                    <td key={`litmax-${d}`} className="px-1 py-1 text-center border-l border-amber-200">
                       <input type="number" min={1} step={1} value={maxMarks[d]||""} placeholder="max"
                         onChange={e => setMaxMarks(p => ({...p,[d]:e.target.value}))}
                         className="w-14 text-center text-xs border border-amber-300 bg-amber-50 rounded px-1 py-0.5 font-bold text-amber-800" />
                     </td>
                   ))}
-                  <td colSpan={2} className="px-2 py-1 text-xs text-amber-600 italic text-center">Enter max per domain</td>
+                  <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">—</td>
+                  {numDomains.map(d => (
+                    <td key={`nummax-${d}`} className="px-1 py-1 text-center border-l border-amber-200">
+                      <input type="number" min={1} step={1} value={maxMarks[d]||""} placeholder="max"
+                        onChange={e => setMaxMarks(p => ({...p,[d]:e.target.value}))}
+                        className="w-14 text-center text-xs border border-amber-300 bg-amber-50 rounded px-1 py-0.5 font-bold text-amber-800" />
+                    </td>
+                  ))}
+                  <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">—</td>
+                  <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">—</td>
+                  <td className="px-1 py-1 text-center text-xs text-amber-400">—</td>
+                  <td className="px-1 py-1 text-xs text-amber-400 italic">Enter max per domain</td>
                 </tr>
               </thead>
               <tbody>
@@ -6999,6 +7015,12 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
                   const numAvg = calcAvgPct(s.student_id, numDomains);
                   const overall = litAvg !== null && numAvg !== null ? (litAvg+numAvg)/2 : litAvg ?? numAvg;
                   const bg = i%2===0?"bg-white":"bg-gray-50";
+                  const gaps: string[] = [];
+                  allDomains.forEach(d => {
+                    const raw = parseFloat(sc[d]||"");
+                    const max = parseFloat(maxMarks[d]||"0");
+                    if (!isNaN(raw) && raw > 0) { const pct = max > 0 ? (raw/max)*100 : raw; if (pct < 60) gaps.push(d); }
+                  });
                   return (
                     <tr key={s.student_id} className={`border-b border-gray-100 ${bg}`}>
                       <td className={`px-3 py-1.5 font-medium text-gray-800 sticky left-0 bg-inherit border-r border-gray-200`}>{s.student_name}</td>
@@ -7022,8 +7044,16 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
                       <td className="px-2 py-1.5 text-center border-l border-gray-200">
                         {numAvg!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(numAvg).bg}`}>{numAvg.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
                       </td>
-                      <td className="px-2 py-1.5 text-center">
+                      <td className="px-2 py-1.5 text-center border-l border-gray-200">
                         {overall!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{overall.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        {overall!==null?<span className={`text-xs px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{getLvl(overall).label}</span>:<span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        {gaps.length>0
+                          ? <div className="flex flex-wrap gap-1">{gaps.map(g=><span key={g} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">⚠️ {g}</span>)}</div>
+                          : overall!==null?<span className="text-xs text-green-600">✅ No gaps</span>:null}
                       </td>
                     </tr>
                   );
