@@ -107,6 +107,7 @@ function findSuggestions(name: string, dbStudents: any[], topN=4) {
 function parseBaselineExcel(ws: XLSX.WorkSheet): {
   domains: { literacy: string[]; numeracy: string[] };
   rows: Array<{ name: string; scores: Record<string, number | null> }>;
+  maxMarks: Record<string, number>;
 } {
   const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header:1, defval:null });
   if (rows.length < 2) return { domains: { literacy: DEFAULT_LIT_DOMAINS, numeracy: DEFAULT_NUM_DOMAINS }, rows: [] };
@@ -159,11 +160,20 @@ function parseBaselineExcel(ws: XLSX.WorkSheet): {
   };
 
   const dataRows = [];
+  const maxMarks: Record<string, number> = {};
   for (let i = hdrIdx + 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || !row[0]) continue;
     const name = String(row[0]).trim();
     if (!name || name.toLowerCase() === "total" || name.toLowerCase() === "average") continue;
+    // Detect max marks row (first cell contains "max")
+    if (name.toLowerCase().includes("max")) {
+      [...litCols, ...numCols].forEach(({ name: dn, col }) => {
+        const v = parseVal(row[col]);
+        if (v !== null && v > 0) maxMarks[dn] = v;
+      });
+      continue;
+    }
     const scores: Record<string, number | null> = {};
     [...litCols, ...numCols].forEach(({ name: dn, col }) => { scores[dn] = parseVal(row[col]); });
     dataRows.push({ name, scores });
@@ -172,7 +182,7 @@ function parseBaselineExcel(ws: XLSX.WorkSheet): {
   const litDomains = litCols.length ? litCols.map(c => c.name) : DEFAULT_LIT_DOMAINS;
   const numDomains = numCols.length ? numCols.map(c => c.name) : DEFAULT_NUM_DOMAINS;
 
-  return { domains: { literacy: litDomains, numeracy: numDomains }, rows: dataRows };
+  return { domains: { literacy: litDomains, numeracy: numDomains }, rows: dataRows, maxMarks };
 }
 
 // ── TeacherBaselineEntry component ────────────────────────────────
@@ -608,6 +618,7 @@ export default function BaselinePage() {
   const [xlSheets, setXlSheets] = useState<Array<{
     sheetName: string; grade: string; section: string;
     domains: { literacy: string[]; numeracy: string[] };
+    maxMarks: Record<string, number>;
     matched: Array<{ dbStudent: any; excelRow: { name: string; scores: Record<string, number|null> } }>;
     unmatched: Array<{ excelRow: { name: string; scores: Record<string, number|null> }; suggestions: Array<{ dbStudent: any; score: number }> }>;
     dbStudents: any[];
@@ -829,7 +840,7 @@ export default function BaselinePage() {
       for (const sheetName of wb.SheetNames) {
         const meta = parseSheetName(sheetName);
         if (!meta) continue;
-        const { domains, rows } = parseBaselineExcel(wb.Sheets[sheetName]);
+        const { domains, rows, maxMarks: sheetMaxMarks } = parseBaselineExcel(wb.Sheets[sheetName]);
         if (!rows.length) continue;
 
         const dbStudents = allDb.filter((s:any) =>
@@ -857,6 +868,10 @@ export default function BaselinePage() {
           // Update domains from Excel
           setLitDomains(domains.literacy);
           setNumDomains(domains.numeracy);
+          // Apply max marks from Excel to UI state
+          if (Object.keys(sheetMaxMarks).length > 0) {
+            setMaxMarks(prev => ({ ...prev, ...Object.fromEntries(Object.entries(sheetMaxMarks).map(([k,v]) => [k, String(v)])) }));
+          }
           // Fill scores
           const newScores: Record<string, Record<string, string>> = { ...scores };
           matched.forEach(({ dbStudent, excelRow }) => {
@@ -868,7 +883,7 @@ export default function BaselinePage() {
           setXlImported(true);
         }
 
-        parsed.push({ sheetName, grade: meta.grade, section: meta.section, domains, matched, unmatched, dbStudents });
+        parsed.push({ sheetName, grade: meta.grade, section: meta.section, domains, maxMarks: sheetMaxMarks, matched, unmatched, dbStudents });
       }
 
       setXlSheets(parsed);
@@ -903,11 +918,11 @@ export default function BaselinePage() {
           const mm: Record<string,number> = {};
           sheet.domains.literacy.forEach(d => {
             const v = parseFloat(String(excelRow.scores[d] ?? ""));
-            if (!isNaN(v)) { litScores[d] = v; mm[d] = parseFloat(maxMarks[d]||"0")||0; }
+            if (!isNaN(v)) { litScores[d] = v; mm[d] = sheet.maxMarks[d] || parseFloat(maxMarks[d]||"0") || 0; }
           });
           sheet.domains.numeracy.forEach(d => {
             const v = parseFloat(String(excelRow.scores[d] ?? ""));
-            if (!isNaN(v)) { numScores[d] = v; mm[d] = parseFloat(maxMarks[d]||"0")||0; }
+            if (!isNaN(v)) { numScores[d] = v; mm[d] = sheet.maxMarks[d] || parseFloat(maxMarks[d]||"0") || 0; }
           });
           const hasAny = Object.keys(litScores).length > 0 || Object.keys(numScores).length > 0;
           if (!hasAny) return null;
@@ -1281,7 +1296,7 @@ export default function BaselinePage() {
                               [...litDomains, ...numDomains].forEach(d => {
                                 const raw = parseFloat(sc[d]||"");
                                 const max = parseFloat(maxMarks[d]||"0");
-                                if (!isNaN(raw) && raw > 0) {
+                                if (!isNaN(raw) && raw >= 0) {
                                   const pct = max > 0 ? (raw/max)*100 : raw;
                                   if (pct < 60) gaps.push(d);
                                 }

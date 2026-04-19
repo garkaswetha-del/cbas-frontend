@@ -7022,7 +7022,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
                   allDomains.forEach(d => {
                     const raw = parseFloat(sc[d]||"");
                     const max = parseFloat(maxMarks[d]||"0");
-                    if (!isNaN(raw) && raw > 0) { const pct = max > 0 ? (raw/max)*100 : raw; if (pct < 60) gaps.push(d); }
+                    if (!isNaN(raw) && raw >= 0) { const pct = max > 0 ? (raw/max)*100 : raw; if (pct < 60) gaps.push(d); }
                   });
                   return (
                     <tr key={s.student_id} className={`border-b border-gray-100 ${bg}`}>
