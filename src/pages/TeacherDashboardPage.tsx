@@ -1706,6 +1706,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
   // { student_id: { competency_id: { rubric_index: marks } } }
   const [localMarks, setLocalMarks] = useState<Record<string,Record<string,Record<string,number|null>>>>({});
   const [savingMarks, setSavingMarks] = useState(false);
+  const [marksViewMode, setMarksViewMode] = useState(false);
 
   // Coverage
   const [coverageGrade, setCoverageGrade] = useState("");
@@ -1725,7 +1726,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
     setSelectedComps([]);
     setRubrics({});
   }, [form.grade, form.subject]);
-  useEffect(() => { if (selectedActivity) fetchMarksData(); }, [selectedActivity]);
+  useEffect(() => { if (selectedActivity) { fetchMarksData(); setMarksViewMode(false); } }, [selectedActivity]);
   useEffect(() => { if (subTab==="coverage" && coverageGrade) fetchCoverage(); }, [subTab, coverageGrade]);
   useEffect(() => {
     if (subTab==="report") {
@@ -1928,6 +1929,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
       }));
       await axios.post(`${API}/activities/${selectedActivity.id}/marks`, { academic_year: academicYear, entries });
       setMsg("✅ Marks saved!"); fetchMarksData();
+      setMarksViewMode(true);
     } catch { setMsg("❌ Error saving marks"); }
     setSavingMarks(false);
     setTimeout(()=>setMsg(""),3000);
@@ -2244,9 +2246,15 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                   <p className="text-sm font-bold text-indigo-800">{selectedActivity.name} — {selectedActivity.grade} · {selectedActivity.section}</p>
                   <p className="text-xs text-indigo-600">{(marksData.rubrics||[]).length} competencies · Total max: {selectedActivity.total_max_marks} marks · {(marksData.students||[]).length} students</p>
                 </div>
-                <button onClick={saveMarks} disabled={savingMarks} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
-                  {savingMarks?"Saving...":"💾 Save All Marks"}
-                </button>
+                <div className="flex gap-2">
+                  {marksViewMode?(
+                    <button onClick={()=>setMarksViewMode(false)} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">✏️ Edit Marks</button>
+                  ):(
+                    <button onClick={saveMarks} disabled={savingMarks} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+                      {savingMarks?"Saving...":"💾 Save All Marks"}
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="bg-white rounded-xl shadow overflow-hidden">
@@ -2293,16 +2301,28 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                             {(marksData.rubrics||[]).map((rub:any)=>{
                               const compItems = rub.rubric_items||[];
                               const compObtained = compItems.reduce((sum:number,_:any,i:number)=>sum+(+(localMarks[s.student.id]?.[rub.competency_id]?.[String(i)]||0)),0);
-                              const compMax = compItems.reduce((s:number,it:any)=>s+(+it.max_marks||0),0);
+                              const compMax = compItems.reduce((sm:number,it:any)=>sm+(+it.max_marks||0),0);
                               return (
-                                <>{compItems.map((item:any,i:number)=>(
-                                  <td key={i} className="px-2 py-1 text-center border-l border-gray-100">
-                                    <input type="number" min={0} max={item.max_marks}
-                                      value={localMarks[s.student.id]?.[rub.competency_id]?.[String(i)]??""}
-                                      onChange={e=>{const v=e.target.value===""?null:Math.min(+e.target.value,item.max_marks);updateMark(s.student.id,rub.competency_id,String(i),v);}}
-                                      className="border border-gray-200 rounded px-1 py-0.5 w-14 text-center text-xs" />
-                                  </td>
-                                ))}
+                                <>{compItems.map((item:any,i:number)=>{
+                                  const val=localMarks[s.student.id]?.[rub.competency_id]?.[String(i)];
+                                  const cellPct=item.max_marks>0?+((+(val??0)/item.max_marks)*100):0;
+                                  return (
+                                    <td key={i} className="px-2 py-1 text-center border-l border-gray-100">
+                                      {marksViewMode?(
+                                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${val!==null&&val!==undefined?
+                                          (cellPct>=76?"bg-green-100 text-green-800":cellPct>=51?"bg-blue-100 text-blue-800":cellPct>=36?"bg-yellow-100 text-yellow-800":cellPct>0?"bg-red-100 text-red-800":"bg-gray-100 text-gray-400")
+                                          :"bg-gray-100 text-gray-400"}`}>
+                                          {val!==null&&val!==undefined?val:"—"}
+                                        </span>
+                                      ):(
+                                        <input type="number" min={0} max={item.max_marks}
+                                          value={val??""}
+                                          onChange={e=>{const v=e.target.value===""?null:Math.min(+e.target.value,item.max_marks);updateMark(s.student.id,rub.competency_id,String(i),v);}}
+                                          className="border border-gray-200 rounded px-1 py-0.5 w-14 text-center text-xs" />
+                                      )}
+                                    </td>
+                                  );
+                                })}
                                 <td className="px-2 py-1 text-center border-l border-gray-200 font-bold text-indigo-700 bg-indigo-50">
                                   {compObtained}/{compMax}
                                 </td></>
@@ -2320,9 +2340,63 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                   </table>
                 </div>
               </div>
-              <button onClick={saveMarks} disabled={savingMarks} className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
-                {savingMarks?"Saving...":"💾 Save All Marks"}
-              </button>
+
+              {/* Per-competency summary for this activity */}
+              {(marksData.rubrics||[]).length>0&&(
+                <div className="bg-white rounded-xl shadow border border-purple-200 overflow-hidden">
+                  <div className="px-4 py-3 bg-purple-50 border-b border-purple-200">
+                    <h3 className="text-sm font-bold text-purple-800">Competency Performance — {selectedActivity.name}</h3>
+                    <p className="text-xs text-purple-600">Average % per competency for this activity</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead><tr className="bg-purple-700 text-white">
+                        <th className="px-3 py-2 text-left">CG No</th>
+                        <th className="px-3 py-2 text-left">Competency</th>
+                        <th className="px-2 py-2 text-center w-24">Avg %</th>
+                        <th className="px-2 py-2 text-center">Level</th>
+                        <th className="px-2 py-2 text-center">At Risk (&lt;50%)</th>
+                      </tr></thead>
+                      <tbody>
+                        {(marksData.rubrics||[]).map((rub:any,ri:number)=>{
+                          const itemMax=(rub.rubric_items||[]).reduce((s:number,it:any)=>s+(+it.max_marks||0),0);
+                          let totalObt=0,atRisk=0,assessed=0;
+                          (marksData.students||[]).forEach((s:any)=>{
+                            const sObt=(rub.rubric_items||[]).reduce((sum:number,_:any,i:number)=>sum+(+(localMarks[s.student.id]?.[rub.competency_id]?.[String(i)]||0)),0);
+                            const hasData=(rub.rubric_items||[]).some((_:any,i:number)=>localMarks[s.student.id]?.[rub.competency_id]?.[String(i)]!==null&&localMarks[s.student.id]?.[rub.competency_id]?.[String(i)]!==undefined);
+                            if(hasData){totalObt+=sObt;assessed++;}
+                            const sPct=itemMax>0?(sObt/itemMax)*100:0;
+                            if(hasData&&sPct<50) atRisk++;
+                          });
+                          const avgPct=assessed>0&&itemMax>0?+((totalObt/(assessed*itemMax))*100).toFixed(1):0;
+                          const level=getLevel(avgPct);
+                          return (
+                            <tr key={rub.competency_id} className={ri%2===0?"bg-white":"bg-gray-50"}>
+                              <td className="px-3 py-2 font-mono text-purple-700 font-bold whitespace-nowrap">{rub.competency_code}</td>
+                              <td className="px-3 py-2 text-gray-700">{rub.competency_name}</td>
+                              <td className="px-2 py-2 text-center">
+                                {avgPct>0?(<span className={`px-2 py-0.5 rounded-full font-bold ${avgPct>=76?"bg-green-100 text-green-800":avgPct>=51?"bg-blue-100 text-blue-800":avgPct>=36?"bg-yellow-100 text-yellow-800":"bg-red-100 text-red-800"}`}>{avgPct}%</span>):(<span className="text-gray-300">—</span>)}
+                              </td>
+                              <td className="px-2 py-2 text-center">
+                                {avgPct>0&&<span className={`px-2 py-0.5 rounded-full text-xs font-bold ${LEVEL_COLOR[level]||""}`}>{level}</span>}
+                              </td>
+                              <td className="px-2 py-2 text-center">
+                                {atRisk>0?<span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">{atRisk} student{atRisk>1?"s":""}</span>:<span className="text-gray-300">—</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {!marksViewMode&&(
+                <button onClick={saveMarks} disabled={savingMarks} className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+                  {savingMarks?"Saving...":"💾 Save All Marks"}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -2555,7 +2629,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
 
   if (!allGrades?.length) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No grade assignments found.</div>;
 
-  const [dashTab, setDashTab] = useState<"grade"|"section"|"student"|"alerts"|"coverage">("grade");
+  const [dashTab, setDashTab] = useState<"grade"|"section"|"student"|"alerts"|"coverage"|"competency">("grade");
   const [dashGrade, setDashGrade] = useState(allGrades[0]||"");
   const [dashSection, setDashSection] = useState("");
   const [gradeDash, setGradeDash] = useState<any>(null);
@@ -2567,6 +2641,11 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [loading, setLoading] = useState(false);
   const [compFilter, setCompFilter] = useState<"all"|"weak"|"strong">("all");
+  // Competency tab state
+  const [compTabSubject, setCompTabSubject] = useState("");
+  const [compTabCombined, setCompTabCombined] = useState<any>(null);
+  const [compTabLocalMarks, setCompTabLocalMarks] = useState<Record<string,Record<string,Record<string,Record<string,number|null>>>>>({});
+  const [loadingCompTab, setLoadingCompTab] = useState(false);
 
   const sectionsForGrade = sectionsByGrade[dashGrade]||[];
 
@@ -2578,6 +2657,29 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
     if(dashTab==="coverage"&&dashGrade&&dashSection) fetchCovDash();
   },[dashTab,dashGrade,dashSection,academicYear]);
   useEffect(()=>{ if(dashTab==="student"&&dashGrade&&dashSection) fetchStudentList(); },[dashSection,dashTab]);
+  useEffect(()=>{ if(dashTab==="competency"&&dashGrade&&dashSection&&compTabSubject) fetchCompTabData(); },[dashTab,dashGrade,dashSection,compTabSubject,academicYear]);
+
+  const fetchCompTabData=async()=>{
+    setLoadingCompTab(true); setCompTabCombined(null);
+    try{
+      const r=await axios.get(`${API}/activities/combined-marks/${encodeURIComponent(dashGrade)}/${encodeURIComponent(dashSection)}/${encodeURIComponent(compTabSubject)}?academic_year=${academicYear}`);
+      setCompTabCombined(r.data);
+      // Build localMarks from saved data
+      const init: Record<string,Record<string,Record<string,Record<string,number|null>>>>={};
+      (r.data?.students||[]).forEach((s:any)=>{
+        init[s.student_id]={};
+        (r.data?.activities||[]).forEach((act:any)=>{
+          init[s.student_id][act.id]={};
+          const cm=s.activity_data?.[act.id]?.competency_marks||{};
+          Object.entries(cm).forEach(([cid,rubricMarks]:[string,any])=>{
+            init[s.student_id][act.id][cid]={};
+            Object.entries(rubricMarks||{}).forEach(([idx,val]:[string,any])=>{ init[s.student_id][act.id][cid][idx]=val; });
+          });
+        });
+      });
+      setCompTabLocalMarks(init);
+    }catch{} setLoadingCompTab(false);
+  };
 
   const fetchGradeDash=async()=>{ setLoading(true); try{ const r=await axios.get(`${API}/activities/dashboard/grade/${encodeURIComponent(dashGrade)}?academic_year=${academicYear}`); setGradeDash(r.data); }catch{} setLoading(false); };
   const fetchSectionDash=async()=>{ setLoading(true); try{ const r=await axios.get(`${API}/activities/dashboard/section/${encodeURIComponent(dashGrade)}/${encodeURIComponent(dashSection)}?academic_year=${academicYear}`); setSectionDash(r.data); }catch{} setLoading(false); };
@@ -2608,7 +2710,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
       </div>
 
       <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
-        {[{id:"grade",label:"📊 Grade"},{id:"section",label:"🏫 Section"},{id:"student",label:"👤 Student"},{id:"alerts",label:"⚠️ Alerts"},{id:"coverage",label:"📋 Coverage"}].map(t=>(
+        {[{id:"grade",label:"📊 Grade"},{id:"section",label:"🏫 Section"},{id:"student",label:"👤 Student"},{id:"alerts",label:"⚠️ Alerts"},{id:"coverage",label:"📋 Coverage"},{id:"competency",label:"🎯 Competency"}].map(t=>(
           <button key={t.id} onClick={()=>setDashTab(t.id as any)}
             className={`px-4 py-2 text-sm rounded-lg font-medium border ${dashTab===t.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>{t.label}</button>
         ))}
@@ -3021,6 +3123,108 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
               )}
             </>
           ):<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No coverage data. Add competencies to registry first.</div>}
+        </div>
+      )}
+
+      {/* ── COMPETENCY TAB ── */}
+      {!loading&&dashTab==="competency"&&(
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl shadow p-4 flex gap-3 flex-wrap items-end">
+            <div><label className="text-xs text-gray-500 block mb-1">Section</label>
+              <select value={dashSection} onChange={e=>{setDashSection(e.target.value);setCompTabCombined(null);}} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+                {sectionsForGrade.map((s:string)=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div><label className="text-xs text-gray-500 block mb-1">Subject</label>
+              <select value={compTabSubject} onChange={e=>setCompTabSubject(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+                <option value="">Select Subject</option>
+                {allSubjects.map((s:string)=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {loadingCompTab&&<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm animate-pulse">Loading...</div>}
+
+          {!loadingCompTab&&compTabCombined&&(()=>{
+            const compMap: Record<string,{code:string,name:string,obtained:number,max:number,actSet:Set<string>,atRisk:Set<string>}>={};
+            (compTabCombined.activities||[]).forEach((activity:any)=>{
+              (activity.rubrics||[]).forEach((rub:any)=>{
+                const cid=rub.competency_id;
+                if(!compMap[cid]) compMap[cid]={code:rub.competency_code||'',name:rub.competency_name||'',obtained:0,max:0,actSet:new Set(),atRisk:new Set()};
+                compMap[cid].actSet.add(activity.id);
+                const itemMax=(rub.rubric_items||[]).reduce((s:number,it:any)=>s+(+it.max_marks||0),0);
+                (compTabCombined.students||[]).forEach((s:any)=>{
+                  const sObt=(rub.rubric_items||[]).reduce((sum:number,_:any,i:number)=>sum+(+(compTabLocalMarks[s.student_id]?.[activity.id]?.[cid]?.[String(i)]||0)),0);
+                  compMap[cid].obtained+=sObt; compMap[cid].max+=itemMax;
+                  const sPct=itemMax>0?(sObt/itemMax)*100:0;
+                  if(sPct>0&&sPct<50) compMap[cid].atRisk.add(s.student_id);
+                });
+              });
+            });
+            const rows=Object.entries(compMap).map(([id,c])=>({
+              id,code:c.code,name:c.name,activities:c.actSet.size,
+              avgPct:c.max>0?+((c.obtained/c.max)*100).toFixed(1):0,
+              atRisk:c.atRisk.size,
+            })).sort((a,b)=>a.code.localeCompare(b.code));
+            if(!rows.length) return <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No marks data found for {compTabSubject} · {dashGrade} · {dashSection}</div>;
+            return (
+              <div className="bg-white rounded-xl shadow border border-purple-200 overflow-hidden">
+                <div className="px-4 py-3 bg-purple-50 border-b border-purple-200 flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-purple-800">Competency-wise Analysis — {compTabSubject} · {dashGrade} · {dashSection}</h3>
+                    <p className="text-xs text-purple-600">{rows.length} competencies · {(compTabCombined.activities||[]).length} activities · {(compTabCombined.students||[]).length} students</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {[
+                      {v:"all",l:"All"},
+                      {v:"weak",l:"Below 50%"},
+                      {v:"strong",l:"Above 75%"},
+                    ].map(f=>(
+                      <button key={f.v} onClick={()=>setCompFilter(f.v as any)}
+                        className={`px-2 py-0.5 rounded text-xs ${compFilter===f.v?"bg-purple-600 text-white":"bg-gray-100 text-gray-600"}`}>{f.l}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead><tr className="bg-purple-700 text-white">
+                      <th className="px-3 py-2 text-left">CG No</th>
+                      <th className="px-3 py-2 text-left">Competency</th>
+                      <th className="px-2 py-2 text-center">Activities</th>
+                      <th className="px-2 py-2 text-center w-24">Avg %</th>
+                      <th className="px-2 py-2 text-center">Level</th>
+                      <th className="px-2 py-2 text-center">At Risk (&lt;50%)</th>
+                    </tr></thead>
+                    <tbody>
+                      {rows.filter(r=>compFilter==="all"||(compFilter==="weak"&&r.avgPct<50&&r.avgPct>0)||(compFilter==="strong"&&r.avgPct>=75)).map((row,idx)=>{
+                        const level=getLevel(row.avgPct);
+                        return (
+                          <tr key={row.id} className={idx%2===0?"bg-white":"bg-gray-50"}>
+                            <td className="px-3 py-2 font-mono text-purple-700 font-bold whitespace-nowrap">{row.code}</td>
+                            <td className="px-3 py-2 text-gray-700">{row.name}</td>
+                            <td className="px-2 py-2 text-center text-gray-500">{row.activities}</td>
+                            <td className="px-2 py-2 text-center">
+                              {row.avgPct>0?(<span className={`px-2 py-0.5 rounded-full font-bold ${pctBg(row.avgPct)}`}>{row.avgPct}%</span>):(<span className="text-gray-300">—</span>)}
+                            </td>
+                            <td className="px-2 py-2 text-center">
+                              {row.avgPct>0&&<span className={`px-2 py-0.5 rounded-full text-xs font-bold ${LEVEL_COLOR[level]||""}`}>{level}</span>}
+                            </td>
+                            <td className="px-2 py-2 text-center">
+                              {row.atRisk>0?<span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">{row.atRisk} student{row.atRisk>1?"s":""}</span>:<span className="text-gray-300">—</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+
+          {!loadingCompTab&&!compTabCombined&&compTabSubject&&dashSection&&(
+            <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Select grade, section and subject to view competency analysis</div>
+          )}
         </div>
       )}
     </div>
