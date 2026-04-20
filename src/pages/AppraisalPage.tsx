@@ -421,12 +421,14 @@ export default function AppraisalPage() {
                         className="px-2 py-0.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50 w-full">
                         {saving===t.teacher_id?"...":"Save"}
                       </button>
-                      {a.id&&!a.is_shared&&(
-                        <button onClick={()=>share(a.id,t.teacher_name)} disabled={sharing===a.id}
-                          className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:opacity-50 w-full">
-                          {sharing===a.id?"...":"Share"}
-                        </button>
-                      )}
+                      {a.is_shared
+                        ? <span className="text-green-600 font-semibold text-xs">✅ Shared</span>
+                        : <button onClick={()=>a.id&&share(a.id,t.teacher_name)} disabled={!a.id||sharing===a.id}
+                            title={!a.id?"Save first":"Share with teacher"}
+                            className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:opacity-40 w-full">
+                            {sharing===a.id?"...":"Share"}
+                          </button>
+                      }
                     </div>
                   </td>
                 </tr>
