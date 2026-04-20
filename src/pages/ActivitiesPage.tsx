@@ -170,9 +170,15 @@ export default function ActivitiesPage() {
   const fetchCompetencies = async () => {
     if (!form.grade || !form.subject) return;
     try {
-      const r = await axios.get(`${API}/activities/competencies?grade=${encodeURIComponent(form.grade)}&subject=${encodeURIComponent(form.subject)}`);
-      setCompetencies(r.data || []);
-    } catch { }
+      const subNorm = form.subject.trim().toLowerCase().replace(/\s+/g,'_');
+      let r = await axios.get(`${API}/activities/competencies?grade=${encodeURIComponent(form.grade)}&subject=${encodeURIComponent(subNorm)}`);
+      let data = r.data?.competencies || (Array.isArray(r.data) ? r.data : []);
+      if (!data.length) {
+        r = await axios.get(`${API}/activities/competencies?subject=${encodeURIComponent(subNorm)}`);
+        data = r.data?.competencies || (Array.isArray(r.data) ? r.data : []);
+      }
+      setCompetencies(data);
+    } catch { setCompetencies([]); }
   };
 
   const fetchActivities = async () => {
