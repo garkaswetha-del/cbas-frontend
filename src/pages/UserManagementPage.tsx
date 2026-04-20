@@ -165,7 +165,7 @@ export default function UserManagementPage() {
       assigned_sections: user.assigned_sections || [],
       class_teacher_of: user.class_teacher_of || "",
       phone: user.phone || "",
-      appraisal_qualification: user.appraisal_qualification || "",
+      appraisal_qualification: user.appraisal_qualification || user.qualification || "",
       experience: user.experience || "",
       photo: user.photo || "",
     });
@@ -637,7 +637,7 @@ export default function UserManagementPage() {
                         )}
                         <div>
                           <p className="font-medium text-gray-800">{u.name}</p>
-                          {u.appraisal_qualification && <p className="text-gray-400 text-xs">{u.appraisal_qualification}</p>}
+                          {(u.appraisal_qualification || u.qualification) && <p className="text-gray-400 text-xs">{u.appraisal_qualification || u.qualification}</p>}
                         </div>
                       </div>
                     </td>
@@ -672,7 +672,7 @@ export default function UserManagementPage() {
                       ) : "—"}
                     </td>
                     <td className="px-3 py-2.5 text-gray-700 text-xs">
-                      {u.appraisal_qualification || "—"}
+                      {u.appraisal_qualification || u.qualification || "—"}
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       <button onClick={() => setShowPassword(p => ({ ...p, [u.id]: !p[u.id] }))}
