@@ -78,6 +78,11 @@ export default function ActivitiesPage() {
   const [selectedComps, setSelectedComps] = useState<string[]>([]);
   const [rubrics, setRubrics] = useState<Record<string,{items:{name:string,max_marks:number}[]}>>({});
 
+  // Multi-grade form helpers
+  const [formGrades, setFormGrades] = useState<string[]>([]);
+  const [formSubjects, setFormSubjects] = useState<string[]>([]);
+  const [formSectionsMap, setFormSectionsMap] = useState<Record<string,string[]>>({});
+
   // Marks tab
   const [marksGrade, setMarksGrade] = useState("");
   const [marksSection, setMarksSection] = useState("");
@@ -116,6 +121,19 @@ export default function ActivitiesPage() {
   useEffect(() => { if (reportGrade) { axios.get(`${API}/students/sections/${encodeURIComponent(reportGrade)}`).then(r=>setReportSections(r.data?.sections||[])).catch(()=>{}); } }, [reportGrade]);
   useEffect(() => { if (activeTab==="report" && reportGrade && reportSection) fetchReport(); }, [activeTab, reportGrade, reportSection, academicYear]);
   useEffect(() => { fetchCompetencies(); }, [form.grade, form.subject]);
+  useEffect(() => {
+    if (!formGrades.length) { setFormSubjects([]); setFormSectionsMap({}); setCompetencies([]); return; }
+    const primary = formGrades[0];
+    axios.get(`${API}/activities/subjects-for-grade/${encodeURIComponent(primary)}`).then(r=>setFormSubjects(r.data||[])).catch(()=>setFormSubjects([]));
+    axios.get(`${API}/students?limit=2000`).then(r=>{
+      const students=r.data?.data||r.data||[];
+      const map: Record<string,string[]>={};
+      formGrades.forEach(g=>{ map[g]=([...new Set(students.filter((s:any)=>s.current_class===g).map((s:any)=>s.section).filter(Boolean))] as string[]).sort(); });
+      setFormSectionsMap(map);
+    }).catch(()=>{});
+    setForm(p=>({...p, grade:primary, sections:[], subject:"", competency_mappings:[]}));
+    setSelectedComps([]); setRubrics({}); setCompetencies([]);
+  }, [JSON.stringify(formGrades)]);
   useEffect(() => {
     if (dashTab === "school") fetchSchoolDash();
     if (dashTab === "grade" && dashGrade) fetchGradeDash();
@@ -262,7 +280,7 @@ export default function ActivitiesPage() {
   };
 
   const saveActivity = async () => {
-    if (!form.name||!form.grade||!form.subject) { setMessage("❌ Name, Grade and Subject are required"); setTimeout(()=>setMessage(""),3000); return; }
+    if (!form.name || (!editActivity && !formGrades.length) || !form.subject) { setMessage("❌ Name, Grade(s) and Subject are required"); setTimeout(()=>setMessage(""),3000); return; }
     if (!form.sections.length) { setMessage("❌ Select at least one section"); setTimeout(()=>setMessage(""),3000); return; }
     if (!selectedComps.length) { setMessage("❌ Select at least one competency"); setTimeout(()=>setMessage(""),3000); return; }
     try {
@@ -275,14 +293,21 @@ export default function ActivitiesPage() {
         await axios.put(`${API}/activities/${editActivity.id}`, {...form, academic_year:academicYear, competency_mappings:selectedComps, rubrics:rubricsArr});
         setMessage("✅ Activity updated");
       } else {
-        const res = await axios.post(`${API}/activities`, {...form, sections:form.sections, academic_year:academicYear, created_by:"admin", competency_mappings:selectedComps, rubrics:rubricsArr});
-        const skipped = res.data?.skipped_sections || [];
-        setMessage(skipped.length
-          ? `✅ Created for ${res.data.created_count} section(s). ⚠️ Skipped (already exists): ${skipped.join(", ")}`
-          : `✅ Activity created for ${res.data.created_count} section(s)`);
+        let totalCreated=0; const allSkipped: string[]=[];
+        for (const grade of formGrades) {
+          const gradeSecs=form.sections.filter(s=>(formSectionsMap[grade]||[]).includes(s));
+          if (!gradeSecs.length) continue;
+          const res=await axios.post(`${API}/activities`, {...form, grade, sections:gradeSecs, academic_year:academicYear, created_by:"admin", competency_mappings:selectedComps, rubrics:rubricsArr});
+          totalCreated+=res.data?.created_count||0;
+          allSkipped.push(...(res.data?.skipped_sections?.map((s:string)=>`${grade}-${s}`)||[]));
+        }
+        setMessage(allSkipped.length
+          ? `✅ Created ${totalCreated} activity(ies). ⚠️ Skipped: ${allSkipped.join(", ")}`
+          : `✅ Created ${totalCreated} activity(ies) across ${formGrades.length} grade(s)`);
       }
       setShowAddForm(false); setEditActivity(null); setSelectedComps([]); setRubrics({});
-      setForm(p=>({...p,name:"",description:"",sections:[],competency_mappings:[]}));
+      setFormGrades([]); setFormSubjects([]); setFormSectionsMap({});
+      setForm(p=>({...p,name:"",description:"",sections:[],grade:"",subject:"",competency_mappings:[]}));
       fetchActivities();
     } catch { setMessage("❌ Error saving"); }
     setTimeout(()=>setMessage(""),3000);
@@ -298,13 +323,10 @@ export default function ActivitiesPage() {
     setTimeout(() => setMessage(""), 3000);
   };
 
-  const resetForm = () => setForm({
-    name: "", description: "", subject: "", stage: "foundation",
-    grade: filterGrade || "", section: filterSection || "",
-    activity_type: "Individual",
-    activity_date: new Date().toISOString().split("T")[0],
-    competency_mappings: [],
-  });
+  const resetForm = () => {
+    setFormGrades([]); setFormSubjects([]); setFormSectionsMap({}); setSelectedComps([]); setRubrics({}); setCompetencies([]);
+    setForm({ name: "", description: "", subject: "", stage: "foundation", grade: "", sections: [], activity_type: "Individual", activity_date: new Date().toISOString().split("T")[0], competency_mappings: [] });
+  };
 
   // ── MARKS ENTRY ───────────────────────────────────────────────
 
@@ -422,39 +444,75 @@ export default function ActivitiesPage() {
 
           {/* Add/Edit form */}
           {showAddForm && (
-            <div className="bg-white rounded-xl shadow border border-gray-200 p-4 space-y-4">
+            <div className="bg-white rounded-xl shadow border border-gray-200 p-5 space-y-5">
               <h2 className="text-sm font-bold text-gray-700">{editActivity ? "Edit Activity" : "New Activity"}</h2>
-              <div className="grid grid-cols-3 gap-3">
-                <div><label className="text-xs text-gray-500 block mb-1">Activity Name *</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Activity Name *</label>
                   <input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} placeholder="e.g. Story Writing" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full"/></div>
-                <div><label className="text-xs text-gray-500 block mb-1">Grade *</label>
-                  <select value={form.grade} onChange={e=>setForm(p=>({...p,grade:e.target.value,sections:[],competency_mappings:[]}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                    <option value="">Select Grade</option>{CLASSES.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
-                <div><label className="text-xs text-gray-500 block mb-1">Subject *</label>
-                  <input value={form.subject} onChange={e=>setForm(p=>({...p,subject:e.target.value,competency_mappings:[]}))} placeholder="e.g. Science" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full"/></div>
-                <div><label className="text-xs text-gray-500 block mb-1">Stage</label>
-                  <select value={form.stage} onChange={e=>setForm(p=>({...p,stage:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                    {STAGES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
                 <div><label className="text-xs text-gray-500 block mb-1">Activity Type</label>
                   <select value={form.activity_type} onChange={e=>setForm(p=>({...p,activity_type:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
                     {ACTIVITY_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
                 <div><label className="text-xs text-gray-500 block mb-1">Date</label>
                   <input type="date" value={form.activity_date} onChange={e=>setForm(p=>({...p,activity_date:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full"/></div>
-                <div className="col-span-3"><label className="text-xs text-gray-500 block mb-1">Description</label>
+                <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Description</label>
                   <textarea value={form.description} onChange={e=>setForm(p=>({...p,description:e.target.value}))} rows={2} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full resize-none"/></div>
               </div>
-              {form.grade && sections.length > 0 && (
-                <div>
-                  <label className="text-xs text-gray-500 font-semibold block mb-1">Sections * ({form.sections.length} selected)
-                    <button onClick={()=>setForm(p=>({...p,sections:[...sections]}))} className="ml-2 text-indigo-600 hover:underline text-xs font-normal">All</button>
-                    <button onClick={()=>setForm(p=>({...p,sections:[]}))} className="ml-2 text-gray-400 hover:underline text-xs font-normal">Clear</button>
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {sections.map(s=>(<button key={s} onClick={()=>setForm(p=>({...p,sections:p.sections.includes(s)?p.sections.filter(x=>x!==s):[...p.sections,s]}))}
-                      className={`px-3 py-1.5 rounded-lg border text-xs font-medium ${form.sections.includes(s)?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>{s}</button>))}
+
+              {/* Grade multi-select */}
+              <div>
+                <label className="text-xs text-gray-500 font-semibold block mb-1">
+                  Grade(s) * ({formGrades.length} selected)
+                  <button onClick={()=>setFormGrades([...CLASSES])} className="ml-2 text-indigo-600 hover:underline text-xs font-normal">All</button>
+                  <button onClick={()=>setFormGrades([])} className="ml-2 text-gray-400 hover:underline text-xs font-normal">Clear</button>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {CLASSES.map(g=>(
+                    <button key={g} onClick={()=>setFormGrades(p=>p.includes(g)?p.filter(x=>x!==g):[...p,g])}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-medium ${formGrades.includes(g)?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>{g}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Subject dropdown */}
+              {formGrades.length > 0 && (
+                <div className="flex gap-4 flex-wrap items-end">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Subject *</label>
+                    <select value={form.subject} onChange={e=>setForm(p=>({...p,subject:e.target.value,competency_mappings:[]}))}
+                      className="border border-gray-300 rounded px-2 py-1.5 text-sm min-w-[180px]">
+                      <option value="">Select Subject</option>
+                      {formSubjects.map(s=><option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Stage</label>
+                    <select value={form.stage} onChange={e=>setForm(p=>({...p,stage:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+                      {STAGES.map(s=><option key={s} value={s}>{s}</option>)}
+                    </select>
                   </div>
                 </div>
               )}
+
+              {/* Sections across all selected grades */}
+              {formGrades.length > 0 && (() => {
+                const allSecs=[...new Set(Object.values(formSectionsMap).flat())].sort();
+                if (!allSecs.length) return null;
+                return (
+                  <div>
+                    <label className="text-xs text-gray-500 font-semibold block mb-1">
+                      Sections * ({form.sections.length} selected)
+                      <button onClick={()=>setForm(p=>({...p,sections:allSecs}))} className="ml-2 text-indigo-600 hover:underline text-xs font-normal">All</button>
+                      <button onClick={()=>setForm(p=>({...p,sections:[]}))} className="ml-2 text-gray-400 hover:underline text-xs font-normal">Clear</button>
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {allSecs.map(s=>(
+                        <button key={s} onClick={()=>setForm(p=>({...p,sections:p.sections.includes(s)?p.sections.filter(x=>x!==s):[...p.sections,s]}))}
+                          className={`px-3 py-1.5 rounded-lg border text-xs font-medium ${form.sections.includes(s)?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>{s}</button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               {competencies.length > 0 && (() => {
                 const domains = [...new Set(competencies.map((c:any)=>c.domain||"General"))] as string[];
                 const domColorMap: Record<string,string> = {};
