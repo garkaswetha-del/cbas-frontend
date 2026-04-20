@@ -85,7 +85,7 @@ export default function ActivitiesPage() {
   const [marksSections, setMarksSections] = useState<string[]>([]);
   const [marksSubjects, setMarksSubjects] = useState<string[]>([]);
   const [combinedMarks, setCombinedMarks] = useState<any>(null);
-  const [localMarks, setLocalMarks] = useState<Record<string,Record<string,Record<string,number|null>>>>({});
+  const [localMarks, setLocalMarks] = useState<Record<string,Record<string,Record<string,Record<string,number|null>>>>>({});
   const [saving, setSaving] = useState(false);
 
   // Dashboard tab
@@ -166,7 +166,23 @@ export default function ActivitiesPage() {
     try {
       const r = await axios.get(`${API}/activities/combined-marks/${encodeURIComponent(marksGrade)}/${encodeURIComponent(marksSection)}/${encodeURIComponent(marksSubject)}?academic_year=${academicYear}`);
       setCombinedMarks(r.data);
-      // Initialize local ratings from existing data
+      // Initialize localMarks per student per activity from saved competency_marks
+      const marksInit: Record<string, Record<string, Record<string, Record<string, number|null>>>> = {};
+      (r.data?.students || []).forEach((s: any) => {
+        marksInit[s.student_id] = {};
+        (r.data?.activities || []).forEach((act: any) => {
+          marksInit[s.student_id][act.id] = {};
+          const cm = s.activity_data?.[act.id]?.competency_marks || {};
+          Object.entries(cm).forEach(([compId, rubricMarks]: [string, any]) => {
+            marksInit[s.student_id][act.id][compId] = {};
+            Object.entries(rubricMarks || {}).forEach(([idx, val]: [string, any]) => {
+              marksInit[s.student_id][act.id][compId][idx] = val;
+            });
+          });
+        });
+      });
+      setLocalMarks(marksInit);
+      // Initialize local ratings
       const init: Record<string, Record<string, Record<string, string>>> = {};
       (r.data?.students || []).forEach((s: any) => {
         init[s.student_id] = {};
@@ -234,11 +250,13 @@ export default function ActivitiesPage() {
     setLoadingReport(false);
   };
 
-  const updateMark = (studentId: string, compId: string, rubricIdx: string, value: number|null) => {
+  const updateMark = (studentId: string, activityId: string, compId: string, rubricIdx: string, value: number|null) => {
     setLocalMarks(prev => ({
       ...prev,
       [studentId]: { ...(prev[studentId]||{}),
-        [compId]: { ...(prev[studentId]?.[compId]||{}), [rubricIdx]: value }
+        [activityId]: { ...(prev[studentId]?.[activityId]||{}),
+          [compId]: { ...(prev[studentId]?.[activityId]?.[compId]||{}), [rubricIdx]: value }
+        }
       }
     }));
   };
@@ -306,7 +324,7 @@ export default function ActivitiesPage() {
       const entries = (combinedMarks.students || []).map((s: any) => ({
         student_id: s.student_id,
         student_name: s.student_name,
-        competency_marks: localMarks[s.student_id] || {},
+        competency_marks: localMarks[s.student_id]?.[activityId] || {},
       }));
       await axios.post(`${API}/activities/${activityId}/marks`, {
         academic_year: academicYear,
@@ -605,19 +623,19 @@ export default function ActivitiesPage() {
                         <tbody>
                           {(combinedMarks.students||[]).map((s:any,idx:number)=>{
                             let obtained=0; let max=0;
-                            rubricsList.forEach((rub:any)=>{(rub.rubric_items||[]).forEach((item:any,i:number)=>{max+=+(item.max_marks||0);obtained+=+(localMarks[s.student_id]?.[rub.competency_id]?.[String(i)]||0);});});
+                            rubricsList.forEach((rub:any)=>{(rub.rubric_items||[]).forEach((item:any,i:number)=>{max+=+(item.max_marks||0);obtained+=+(localMarks[s.student_id]?.[activity.id]?.[rub.competency_id]?.[String(i)]||0);});});
                             const pct=max>0?+((obtained/max)*100).toFixed(1):0; const level=getLevel(pct);
                             return (
                               <tr key={s.student_id} className={idx%2===0?"bg-white":"bg-gray-50"}>
                                 <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
                                 {rubricsList.map((rub:any)=>{
-                                  const co=(rub.rubric_items||[]).reduce((sum:number,_:any,i:number)=>sum+(+(localMarks[s.student_id]?.[rub.competency_id]?.[String(i)]||0)),0);
+                                  const co=(rub.rubric_items||[]).reduce((sum:number,_:any,i:number)=>sum+(+(localMarks[s.student_id]?.[activity.id]?.[rub.competency_id]?.[String(i)]||0)),0);
                                   const cm=(rub.rubric_items||[]).reduce((sm:number,it:any)=>sm+(+it.max_marks||0),0);
                                   return (<>{(rub.rubric_items||[]).map((item:any,i:number)=>(
                                     <td key={i} className="px-2 py-1 text-center border-l border-gray-100">
                                       <input type="number" min={0} max={item.max_marks}
-                                        value={localMarks[s.student_id]?.[rub.competency_id]?.[String(i)]??""}
-                                        onChange={e=>{const v=e.target.value===""?null:Math.min(+e.target.value,item.max_marks);updateMark(s.student_id,rub.competency_id,String(i),v);}}
+                                        value={localMarks[s.student_id]?.[activity.id]?.[rub.competency_id]?.[String(i)]??""}
+                                        onChange={e=>{const v=e.target.value===""?null:Math.min(+e.target.value,item.max_marks);updateMark(s.student_id,activity.id,rub.competency_id,String(i),v);}}
                                         className="border border-gray-200 rounded px-1 py-0.5 w-14 text-center text-xs"/>
                                     </td>
                                   ))}
