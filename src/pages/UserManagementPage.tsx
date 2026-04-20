@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import * as XLSX from "xlsx";
 
 const API = "https://cbas-backend-production.up.railway.app";
 
@@ -51,8 +52,34 @@ function getStages(assigned_classes: string[]): { label: string; color: string }
   return STAGE_DEFS.filter(d => found.has(d.label));
 }
 
-// ── PRE-LOADED TEACHER DATA FROM EXCEL ────────────────────────────────────────
-const EXCEL_TEACHERS = [
+// ── EXCEL COLUMN NORMALISER ───────────────────────────────────────────────────
+function normaliseKey(k: string) {
+  return k.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+function pick(row: any, ...candidates: string[]) {
+  for (const c of candidates) {
+    const hit = Object.keys(row).find(k => normaliseKey(k) === normaliseKey(c));
+    if (hit && row[hit] !== undefined && row[hit] !== null && String(row[hit]).trim() !== "") return String(row[hit]).trim();
+  }
+  return "";
+}
+function parseGrade(raw: string): string[] {
+  return raw.split(/[,;]/).map(g => {
+    g = g.trim();
+    if (!g) return "";
+    if (/^(pre-?kg|lkg|ukg)$/i.test(g)) return g.toUpperCase().replace("PREKG","Pre-KG").replace("PRE-KG","Pre-KG");
+    if (/^\d+$/.test(g)) return `Grade ${g}`;
+    if (/^grade\s+\d+$/i.test(g)) return g.replace(/^grade\s+/i,"Grade ");
+    return g;
+  }).filter(Boolean);
+}
+function autoPassword(name: string): string {
+  const first = name.split(/[\s.]/)[0];
+  return first + Math.floor(100 + Math.random() * 900);
+}
+
+// ── PRE-LOADED TEACHER DATA FROM EXCEL (kept for fallback) ───────────────────
+const EXCEL_TEACHERS: any[] = [
   { name: "Chandana.K", email: "chandanasindhu12@gmail.com", password: "Chandana589", subject: "English", grade: "Grade 8, Grade 9", section: "Orion, Pegasus, Centaurus, Himalaya", class_teacher: "", appraisal_qualification: "Post Graduation with BED" },
   { name: "Deepthi.R.Sahana", email: "deepthi.r.sahana0519@gmail.com", password: "Deepthi878", subject: "Mathematics", grade: "Grade 9, Grade 10", section: "Meru, Himalaya, Vindhya, Bendre, Kuvempu, Karanth", class_teacher: "", appraisal_qualification: "Post Graduation with BED" },
   { name: "Monisha N", email: "monishanswamy261998@gmail.com", password: "Monisha122", subject: "Mathematics", grade: "Grade 8", section: "Centaurus, Orion, Pegasus", class_teacher: "Grade 8 Centaurus", appraisal_qualification: "Graduation with BED" },
@@ -124,7 +151,9 @@ export default function UserManagementPage() {
   const [importProgress, setImportProgress] = useState(0);
   const [importResults, setImportResults] = useState<any>(null);
   const [showPassword, setShowPassword] = useState<Record<string, boolean>>({});
+  const [parsedTeachers, setParsedTeachers] = useState<any[]>([]);
   const photoRef = useRef<HTMLInputElement>(null);
+  const xlsxRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [form, setForm] = useState({
@@ -242,79 +271,72 @@ export default function UserManagementPage() {
     }));
   };
 
-  // ── SYNC QUALIFICATIONS ──────────────────────────────────────
-  const syncQualifications = async () => {
-    setImporting(true);
-    setImportProgress(0);
-    let updated = 0, skipped = 0;
-    const emailToUser: Record<string, any> = {};
-    users.forEach(u => { if (u.email) emailToUser[u.email.toLowerCase()] = u; });
-
-    for (let i = 0; i < EXCEL_TEACHERS.length; i++) {
-      const t = EXCEL_TEACHERS[i];
-      setImportProgress(Math.round(((i + 1) / EXCEL_TEACHERS.length) * 100));
-      if (!t.email || !t.appraisal_qualification) { skipped++; continue; }
-      const user = emailToUser[t.email.toLowerCase()];
-      if (!user) { skipped++; continue; }
-      try {
-        await axios.patch(`${API}/users/${user.id}`, { appraisal_qualification: t.appraisal_qualification });
-        updated++;
-      } catch { skipped++; }
-      await new Promise(r => setTimeout(r, 50));
-    }
-
-    setImportResults({ success: updated, skipped, failed: 0, errors: [] });
-    setImporting(false);
-    fetchUsers();
+  // ── PARSE EXCEL FILE ─────────────────────────────────────────
+  const handleExcelFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const wb = XLSX.read(ev.target?.result, { type: "binary" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      const parsed = rows.map(row => ({
+        name: pick(row, "Name", "Teacher Name", "name"),
+        email: pick(row, "Email ID", "Email", "email"),
+        subject: pick(row, "Subject handling", "Subject", "Subjects"),
+        grade: pick(row, "Grade", "Grades", "Class"),
+        section: pick(row, "Section", "Sections"),
+        class_teacher: pick(row, "Class teacher for grade", "Class Teacher", "class teacher"),
+        appraisal_qualification: pick(row, "Appraisal qualification", "Appraisal Qualification", "Qualification"),
+        password: autoPassword(pick(row, "Name", "Teacher Name", "name")),
+      })).filter(t => t.name);
+      setParsedTeachers(parsed);
+      setImportResults(null);
+    };
+    reader.readAsBinaryString(file);
   };
 
   // ── BULK IMPORT ──────────────────────────────────────────────
   const importAllTeachers = async () => {
+    const list = parsedTeachers.length > 0 ? parsedTeachers : EXCEL_TEACHERS;
     setImporting(true);
     setImportProgress(0);
-    let success = 0, skipped = 0, failed = 0;
+    let success = 0, updated = 0, skipped = 0, failed = 0;
     const errors: string[] = [];
+    const emailToUser: Record<string, any> = {};
+    users.forEach(u => { if (u.email) emailToUser[u.email.toLowerCase()] = u; });
 
-    for (let i = 0; i < EXCEL_TEACHERS.length; i++) {
-      const t = EXCEL_TEACHERS[i];
-      setImportProgress(Math.round(((i + 1) / EXCEL_TEACHERS.length) * 100));
+    for (let i = 0; i < list.length; i++) {
+      const t = list[i];
+      setImportProgress(Math.round(((i + 1) / list.length) * 100));
       if (!t.email) { skipped++; continue; }
+      const grades = parseGrade(t.grade || "");
+      const sections = (t.section || "").split(/[,;]/).map((s: string) => s.trim().replace(/^\d+[-–]\s*/i, "").trim()).filter(Boolean);
+      const subjects = (t.subject || "").split(/[,;]/).map((s: string) => s.trim()).filter(Boolean);
+      const payload = {
+        name: t.name,
+        email: t.email,
+        password: t.password || autoPassword(t.name),
+        role: "teacher",
+        subjects,
+        assigned_classes: grades,
+        assigned_sections: sections,
+        class_teacher_of: t.class_teacher || "",
+        appraisal_qualification: t.appraisal_qualification || "",
+      };
       try {
-        await axios.post(`${API}/users`, {
-          name: t.name,
-          email: t.email,
-          password: t.password,
-          role: "teacher",
-          subjects: t.subject ? t.subject.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
-          assigned_classes: t.grade ? t.grade.split(",").map((s: string) => {
-            const g = s.trim();
-            if (!g) return '';
-            const lower = g.toLowerCase();
-            if (lower.startsWith('grade ') || lower === 'pre-kg' || lower === 'lkg' || lower === 'ukg') return g;
-            if (/^\d+$/.test(g)) return `Grade ${g}`;
-            return g;
-          }).filter(Boolean) : [],
-          assigned_sections: t.section ? t.section.split(",").map((s: string) => {
-            // Strip grade prefix like "8-Orion" → "Orion"
-            return s.trim().replace(/^\d+[-–]\s*/i, '').trim();
-          }).filter(Boolean) : [],
-          class_teacher_of: t.class_teacher,
-          appraisal_qualification: t.appraisal_qualification || "",
-        });
+        await axios.post(`${API}/users`, payload);
         success++;
       } catch (e: any) {
         const msg = e?.response?.data?.message || "";
         if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("duplicate") || e?.response?.status === 409) {
-          // Already exists — patch qualification onto existing user
-          const existing = users.find(u => u.email?.toLowerCase() === t.email.toLowerCase());
-          if (existing && t.appraisal_qualification) {
+          const existing = emailToUser[t.email.toLowerCase()];
+          if (existing) {
             try {
               await axios.patch(`${API}/users/${existing.id}`, { appraisal_qualification: t.appraisal_qualification });
-              skipped++;
+              updated++;
             } catch { skipped++; }
-          } else {
-            skipped++;
-          }
+          } else { skipped++; }
         } else {
           failed++;
           errors.push(`${t.name}: ${msg}`);
@@ -323,7 +345,7 @@ export default function UserManagementPage() {
       await new Promise(r => setTimeout(r, 80));
     }
 
-    setImportResults({ success, skipped, failed, errors });
+    setImportResults({ success, updated, skipped, failed, errors });
     setImporting(false);
     fetchUsers();
   };
@@ -352,10 +374,6 @@ export default function UserManagementPage() {
               {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
-          <button onClick={syncQualifications} disabled={importing}
-            className="px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 font-medium disabled:opacity-50">
-            🔄 Sync Qualifications
-          </button>
           <button onClick={() => setShowImport(true)}
             className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium flex items-center gap-2">
             📥 Import from Excel
@@ -377,54 +395,62 @@ export default function UserManagementPage() {
       {showImport && (
         <div className="bg-white rounded-xl shadow border border-gray-200 p-5 mb-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-gray-700">📥 Import Teachers from Excel Data</h2>
-            <button onClick={() => { setShowImport(false); setImportResults(null); }}
+            <h2 className="text-sm font-bold text-gray-700">📥 Import Teachers from Excel</h2>
+            <button onClick={() => { setShowImport(false); setImportResults(null); setParsedTeachers([]); if(xlsxRef.current) xlsxRef.current.value=""; }}
               className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
           </div>
 
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-4">
-            <p className="text-xs font-semibold text-indigo-800 mb-2">Ready to import {EXCEL_TEACHERS.length} teachers with auto-generated passwords:</p>
-            <div className="max-h-48 overflow-y-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-indigo-700 text-white">
-                    <th className="px-2 py-1 text-left">#</th>
-                    <th className="px-2 py-1 text-left">Name</th>
-                    <th className="px-2 py-1 text-left">Email</th>
-                    <th className="px-2 py-1 text-left">Password</th>
-                    <th className="px-2 py-1 text-left">Qualification</th>
-                    <th className="px-2 py-1 text-left">Subject</th>
-                    <th className="px-2 py-1 text-left">Grades</th>
-                    <th className="px-2 py-1 text-left">Sections</th>
-                    <th className="px-2 py-1 text-left">Class Teacher Of</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {EXCEL_TEACHERS.map((t, i) => (
-                    <tr key={i} className={`border-b border-indigo-100 ${i % 2 === 0 ? "bg-white" : "bg-indigo-50/50"} ${!t.email ? "opacity-50" : ""}`}>
-                      <td className="px-2 py-1 text-gray-500">{i + 1}</td>
-                      <td className="px-2 py-1 font-medium text-gray-800">{t.name}</td>
-                      <td className="px-2 py-1 text-gray-500">{t.email || <span className="text-red-400 italic">no email — will skip</span>}</td>
-                      <td className="px-2 py-1">
-                        <span className="font-mono bg-gray-100 px-1 rounded text-indigo-700">{t.password}</span>
-                      </td>
-                      <td className="px-2 py-1 text-gray-600 text-xs">{t.qualification || "—"}</td>
-                      <td className="px-2 py-1 text-gray-600">{t.subject}</td>
-                      <td className="px-2 py-1 text-blue-700 text-xs">{t.grade}</td>
-                      <td className="px-2 py-1 text-green-700 text-xs">{t.section}</td>
-                      <td className="px-2 py-1 text-purple-700 text-xs font-medium">{t.class_teacher || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {/* File picker */}
+          <div className="mb-4 p-4 border-2 border-dashed border-indigo-300 rounded-lg bg-indigo-50 flex flex-col items-center gap-2">
+            <p className="text-xs text-indigo-700 font-medium">Upload your Excel file (.xlsx / .xls)</p>
+            <p className="text-xs text-gray-500">Required columns: Name, Email ID, Appraisal qualification, Subject handling, Grade, Section, Class teacher for grade</p>
+            <input ref={xlsxRef} type="file" accept=".xlsx,.xls" onChange={handleExcelFile}
+              className="text-sm text-gray-600 file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-indigo-600 file:text-white file:text-xs file:cursor-pointer" />
           </div>
+
+          {/* Preview */}
+          {parsedTeachers.length > 0 && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-4">
+              <p className="text-xs font-semibold text-indigo-800 mb-2">
+                {parsedTeachers.length} teachers parsed — {parsedTeachers.filter(t=>!t.email).length} will be skipped (no email)
+              </p>
+              <div className="max-h-48 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-indigo-700 text-white">
+                      <th className="px-2 py-1 text-left">#</th>
+                      <th className="px-2 py-1 text-left">Name</th>
+                      <th className="px-2 py-1 text-left">Email</th>
+                      <th className="px-2 py-1 text-left">Qualification</th>
+                      <th className="px-2 py-1 text-left">Subject</th>
+                      <th className="px-2 py-1 text-left">Grade</th>
+                      <th className="px-2 py-1 text-left">Section</th>
+                      <th className="px-2 py-1 text-left">Class Teacher Of</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedTeachers.map((t, i) => (
+                      <tr key={i} className={`border-b border-indigo-100 ${i % 2 === 0 ? "bg-white" : "bg-indigo-50/50"} ${!t.email ? "opacity-40" : ""}`}>
+                        <td className="px-2 py-1 text-gray-400">{i + 1}</td>
+                        <td className="px-2 py-1 font-medium text-gray-800">{t.name}</td>
+                        <td className="px-2 py-1 text-gray-500">{t.email || <span className="text-red-400 italic">no email</span>}</td>
+                        <td className="px-2 py-1 text-indigo-700 font-medium">{t.appraisal_qualification || "—"}</td>
+                        <td className="px-2 py-1 text-gray-600">{t.subject}</td>
+                        <td className="px-2 py-1 text-blue-700">{t.grade}</td>
+                        <td className="px-2 py-1 text-green-700">{t.section}</td>
+                        <td className="px-2 py-1 text-purple-700 font-medium">{t.class_teacher || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {importing && (
             <div className="mb-3">
               <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Importing...</span>
-                <span>{importProgress}%</span>
+                <span>Importing...</span><span>{importProgress}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div className="bg-indigo-600 h-2 rounded-full transition-all" style={{ width: `${importProgress}%` }} />
@@ -435,12 +461,13 @@ export default function UserManagementPage() {
           {importResults && (
             <div className={`mb-3 p-3 rounded-lg border ${importResults.failed > 0 ? "bg-yellow-50 border-yellow-200" : "bg-green-50 border-green-200"}`}>
               <p className="text-sm font-semibold text-gray-700 mb-1">Import Complete</p>
-              <div className="flex gap-4 text-xs">
+              <div className="flex gap-4 text-xs flex-wrap">
                 <span className="text-green-700 font-bold">✅ {importResults.success} created</span>
-                <span className="text-yellow-700 font-bold">⏭ {importResults.skipped} skipped (no email or already exists)</span>
+                {importResults.updated > 0 && <span className="text-blue-700 font-bold">🔄 {importResults.updated} qualification updated</span>}
+                {importResults.skipped > 0 && <span className="text-yellow-700 font-bold">⏭ {importResults.skipped} skipped</span>}
                 {importResults.failed > 0 && <span className="text-red-700 font-bold">❌ {importResults.failed} failed</span>}
               </div>
-              {importResults.errors.length > 0 && (
+              {importResults.errors?.length > 0 && (
                 <div className="mt-2 text-xs text-red-600">
                   {importResults.errors.map((e: string, i: number) => <p key={i}>{e}</p>)}
                 </div>
@@ -448,10 +475,10 @@ export default function UserManagementPage() {
             </div>
           )}
 
-          {!importResults && (
+          {parsedTeachers.length > 0 && !importResults && (
             <button onClick={importAllTeachers} disabled={importing}
               className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold">
-              {importing ? "Importing..." : `🚀 Import All ${EXCEL_TEACHERS.length} Teachers`}
+              {importing ? "Importing..." : `🚀 Import ${parsedTeachers.filter(t=>t.email).length} Teachers`}
             </button>
           )}
         </div>
