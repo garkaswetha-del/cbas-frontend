@@ -473,16 +473,22 @@ export default function ActivitiesPage() {
                 </div>
               </div>
 
-              {/* Subject dropdown */}
+              {/* Subject + Stage */}
               {formGrades.length > 0 && (
                 <div className="flex gap-4 flex-wrap items-end">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Subject *</label>
-                    <select value={form.subject} onChange={e=>setForm(p=>({...p,subject:e.target.value,competency_mappings:[]}))}
-                      className="border border-gray-300 rounded px-2 py-1.5 text-sm min-w-[180px]">
-                      <option value="">Select Subject</option>
-                      {formSubjects.map(s=><option key={s} value={s}>{s}</option>)}
-                    </select>
+                    <input
+                      value={form.subject}
+                      onChange={e=>setForm(p=>({...p,subject:e.target.value,competency_mappings:[]}))}
+                      list="admin-subjects-list"
+                      placeholder="Type or select subject..."
+                      className="border border-gray-300 rounded px-2 py-1.5 text-sm min-w-[200px]"
+                    />
+                    <datalist id="admin-subjects-list">
+                      {formSubjects.map(s=><option key={s} value={s}/>)}
+                    </datalist>
+                    {formSubjects.length>0&&<p className="text-xs text-gray-400 mt-0.5">{formSubjects.length} suggestion(s) available</p>}
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Stage</label>
