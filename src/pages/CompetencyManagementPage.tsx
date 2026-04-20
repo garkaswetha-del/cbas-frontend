@@ -77,7 +77,7 @@ export default function CompetencyManagementPage() {
       if (filters.grade) params.append("grade", filters.grade);
       if (filters.search) params.append("search", filters.search);
       const res = await axios.get(`${API}/activities/competencies?${params}`);
-      setCompetencies(res.data);
+      setCompetencies(Array.isArray(res.data) ? res.data : (res.data?.competencies || []));
     } catch { setCompetencies([]); }
     setLoading(false);
   };
