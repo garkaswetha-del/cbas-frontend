@@ -305,7 +305,16 @@ export default function UserManagementPage() {
       } catch (e: any) {
         const msg = e?.response?.data?.message || "";
         if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("duplicate") || e?.response?.status === 409) {
-          skipped++;
+          // Already exists — patch qualification onto existing user
+          const existing = users.find(u => u.email?.toLowerCase() === t.email.toLowerCase());
+          if (existing && t.appraisal_qualification) {
+            try {
+              await axios.patch(`${API}/users/${existing.id}`, { appraisal_qualification: t.appraisal_qualification });
+              skipped++;
+            } catch { skipped++; }
+          } else {
+            skipped++;
+          }
         } else {
           failed++;
           errors.push(`${t.name}: ${msg}`);
