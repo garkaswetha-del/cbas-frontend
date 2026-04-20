@@ -256,8 +256,11 @@ export default function ActivitiesPage() {
         await axios.put(`${API}/activities/${editActivity.id}`, {...form, academic_year:academicYear, competency_mappings:selectedComps, rubrics:rubricsArr});
         setMessage("✅ Activity updated");
       } else {
-        await axios.post(`${API}/activities`, {...form, sections:form.sections, academic_year:academicYear, created_by:"admin", competency_mappings:selectedComps, rubrics:rubricsArr});
-        setMessage("✅ Activity created");
+        const res = await axios.post(`${API}/activities`, {...form, sections:form.sections, academic_year:academicYear, created_by:"admin", competency_mappings:selectedComps, rubrics:rubricsArr});
+        const skipped = res.data?.skipped_sections || [];
+        setMessage(skipped.length
+          ? `✅ Created for ${res.data.created_count} section(s). ⚠️ Skipped (already exists): ${skipped.join(", ")}`
+          : `✅ Activity created for ${res.data.created_count} section(s)`);
       }
       setShowAddForm(false); setEditActivity(null); setSelectedComps([]); setRubrics({});
       setForm(p=>({...p,name:"",description:"",sections:[],competency_mappings:[]}));

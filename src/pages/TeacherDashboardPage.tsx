@@ -1698,6 +1698,9 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
   const [savingActivity, setSavingActivity] = useState(false);
 
   // Marks entry state
+  const [marksFilterGrade, setMarksFilterGrade] = useState(allGrades[0]||"");
+  const [marksFilterSection, setMarksFilterSection] = useState("");
+  const [marksFilterSubject, setMarksFilterSubject] = useState("");
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
   const [marksData, setMarksData] = useState<any>(null);
   // { student_id: { competency_id: { rubric_index: marks } } }
@@ -1850,13 +1853,16 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
           rubric_items: rubrics[cid].items,
         };
       });
-      await axios.post(`${API}/activities`, {
+      const res = await axios.post(`${API}/activities`, {
         ...form, stage, academic_year: academicYear, created_by: user?.id,
         sections: form.sections,
         competency_mappings: selectedComps,
         rubrics: rubricsArr,
       });
-      setMsg(`✅ Activity created for ${form.sections.length} section(s)`);
+      const skipped = res.data?.skipped_sections || [];
+      setMsg(skipped.length
+        ? `✅ Created for ${res.data.created_count} section(s). ⚠️ Already exists in: ${skipped.join(", ")}`
+        : `✅ Activity created for ${res.data.created_count} section(s)`);
       setShowForm(false);
       setSelectedComps([]); setRubrics({});
       setForm(p=>({...p, name:"", description:"", sections:[], }));
@@ -2155,13 +2161,42 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
       {/* ── MARKS ENTRY ── */}
       {subTab==="marks"&&(
         <div className="space-y-4">
-          <div className="bg-white rounded-xl shadow p-4">
-            <label className="text-xs text-gray-500 block mb-2">Select Activity</label>
-            <select value={selectedActivity?.id||""} onChange={e=>{const a=activities.find(x=>x.id===e.target.value);setSelectedActivity(a||null);}}
-              className="border border-gray-300 rounded px-3 py-2 text-sm w-full max-w-md">
-              <option value="">-- Select activity --</option>
-              {activities.map(a=><option key={a.id} value={a.id}>{a.name} — {a.grade} · {a.section} · {a.subject}</option>)}
-            </select>
+          <div className="bg-white rounded-xl shadow p-4 space-y-3">
+            <div className="flex gap-3 flex-wrap items-end">
+              <div><label className="text-xs text-gray-500 block mb-1">Grade</label>
+                <select value={marksFilterGrade} onChange={e=>{setMarksFilterGrade(e.target.value);setMarksFilterSection("");setMarksFilterSubject("");setSelectedActivity(null);setMarksData(null);}}
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+                  <option value="">All Grades</option>
+                  {allGrades.map(g=><option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+              <div><label className="text-xs text-gray-500 block mb-1">Section</label>
+                <select value={marksFilterSection} onChange={e=>{setMarksFilterSection(e.target.value);setSelectedActivity(null);setMarksData(null);}}
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+                  <option value="">All Sections</option>
+                  {(sectionsByGrade[marksFilterGrade]||[]).map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div><label className="text-xs text-gray-500 block mb-1">Subject</label>
+                <select value={marksFilterSubject} onChange={e=>{setMarksFilterSubject(e.target.value);setSelectedActivity(null);setMarksData(null);}}
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+                  <option value="">All Subjects</option>
+                  {allSubjects.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Select Activity</label>
+              <select value={selectedActivity?.id||""} onChange={e=>{const a=activities.find(x=>x.id===e.target.value);setSelectedActivity(a||null);setMarksData(null);}}
+                className="border border-gray-300 rounded px-3 py-2 text-sm w-full max-w-xl">
+                <option value="">-- Select activity --</option>
+                {activities
+                  .filter(a=>(!marksFilterGrade||a.grade===marksFilterGrade)&&(!marksFilterSection||a.section===marksFilterSection)&&(!marksFilterSubject||a.subject===marksFilterSubject))
+                  .map(a=><option key={a.id} value={a.id}>
+                    {a.name} — {a.grade} · {a.section} · {a.subject}{a.created_by==="admin"?" [Admin]":""}
+                  </option>)}
+              </select>
+            </div>
           </div>
 
           {selectedActivity&&marksData&&(
