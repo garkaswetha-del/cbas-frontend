@@ -126,8 +126,8 @@ export default function ActivitiesPage() {
     const primary = formGrades[0];
     // Fetch subjects from competency mappings for this grade
     axios.get(`${API}/activities/competencies?grade=${encodeURIComponent(primary)}`).then(r=>{
-      const comps: any[] = r.data || [];
-      const uniqueSubjects = [...new Set(comps.map((c:any)=>c.subject).filter(Boolean))] as string[];
+      const comps: any[] = r.data?.competencies || (Array.isArray(r.data) ? r.data : []);
+      const uniqueSubjects = [...new Set(comps.map((c:any)=>c.subject).filter(Boolean))].sort() as string[];
       setFormSubjects(uniqueSubjects);
     }).catch(()=>setFormSubjects([]));
     // Fetch sections for all selected grades
@@ -410,8 +410,8 @@ export default function ActivitiesPage() {
       {/* ── ACTIVITIES TAB ── */}
       {activeTab === "activities" && (
         <div className="space-y-4">
-          {/* Filters */}
-          <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
+          {/* Filters — hidden when form is open */}
+          <div className={`bg-white rounded-xl shadow border border-gray-200 p-4 ${showAddForm ? "hidden" : ""}`}>
             <div className="flex gap-3 flex-wrap items-end">
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Grade</label>
