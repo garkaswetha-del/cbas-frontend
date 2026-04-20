@@ -525,11 +525,11 @@ export default function ActivitiesPage() {
                                 </td>
                                 <td className="px-3 py-2 font-mono font-bold text-indigo-700 whitespace-nowrap">{c.competency_code||c.code||"—"}</td>
                                 <td className="px-2 py-2">
-                                  <span className="px-1.5 py-0.5 rounded text-white font-medium" style={{backgroundColor:domColor,fontSize:"10px"}}>
-                                    {(c.domain||"General").slice(0,14)}
+                                  <span className="px-1.5 py-0.5 rounded text-white font-medium leading-tight" style={{backgroundColor:domColor,fontSize:"10px",wordBreak:"break-word",whiteSpace:"normal",display:"inline-block",maxWidth:"90px"}}>
+                                    {c.domain||"General"}
                                   </span>
                                 </td>
-                                <td className="px-2 py-2 text-gray-700">{(c.description||c.name||"").slice(0,70)}</td>
+                                <td className="px-2 py-2 text-gray-700" style={{minWidth:"200px"}}>{c.description||c.name||""}</td>
                                 {[0,1,2,3,4].map(i=>{
                                   const item=rub?.items?.[i]||{name:"",max_marks:0};
                                   return (
