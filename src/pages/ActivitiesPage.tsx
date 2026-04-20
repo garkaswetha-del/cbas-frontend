@@ -474,46 +474,34 @@ export default function ActivitiesPage() {
                       )}
                     </div>
                     <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
-                      <table className="text-xs border-collapse" style={{minWidth:"1000px",width:"100%"}}>
+                      <table className="text-xs border-collapse w-full">
                         <thead>
-                          <tr className="bg-indigo-700 text-white">
+                          <tr className="bg-indigo-700 text-white text-left">
                             <th className="px-2 py-2 w-8 text-center">✓</th>
-                            <th className="px-3 py-2 text-left min-w-[75px]">CG No.</th>
-                            <th className="px-2 py-2 text-left min-w-[90px]">Domain</th>
-                            <th className="px-2 py-2 text-left min-w-[180px]">Competency</th>
-                            {[1,2,3,4,5].map(n=>(
-                              <th key={n} colSpan={2} className="px-1 py-2 text-center border-l border-indigo-600 min-w-[170px]">Rubric {n}</th>
-                            ))}
+                            <th className="px-3 py-2 min-w-[75px]">CG No.</th>
+                            <th className="px-2 py-2 min-w-[100px]">Domain</th>
+                            <th className="px-2 py-2 min-w-[220px]">Competency</th>
+                            <th className="px-3 py-2 border-l border-indigo-600 min-w-[380px]">Rubrics (Name · /Max marks)</th>
                             <th className="px-2 py-2 text-center border-l border-indigo-600 min-w-[55px]">Total</th>
-                            <th className="px-2 py-2 text-center min-w-[65px]">Coverage</th>
-                          </tr>
-                          <tr className="bg-indigo-600 text-indigo-200">
-                            <th colSpan={4}></th>
-                            {[0,1,2,3,4].map(i=>(
-                              <>{
-                                <th key={`na${i}`} className="px-1 py-1 text-center border-l border-indigo-500 font-normal min-w-[110px]">Name</th>
-                              }{
-                                <th key={`mx${i}`} className="px-1 py-1 text-center font-normal min-w-[55px]">/Max</th>
-                              }</>
-                            ))}
-                            <th colSpan={2}></th>
+                            <th className="px-2 py-2 text-center min-w-[70px]">Coverage</th>
                           </tr>
                         </thead>
                         <tbody>
                           {competencies.map((c:any,idx:number)=>{
                             const checked=selectedComps.includes(c.id);
                             const rub=rubrics[c.id];
-                            const compTotal=checked?(rub?.items||[]).reduce((s,item)=>s+(+item.max_marks||0),0):0;
+                            const items=rub?.items||[];
+                            const compTotal=checked?items.reduce((s,item)=>s+(+item.max_marks||0),0):0;
                             const usedIn=activities.filter(a=>(a.rubrics||[]).some((r:any)=>r.competency_id===c.id)).length;
                             const domColor=domColorMap[c.domain||"General"]||"#6366f1";
                             return (
-                              <tr key={c.id} className={`border-b border-gray-100 ${checked?"bg-indigo-50":idx%2===0?"bg-white":"bg-gray-50"} hover:bg-indigo-50 transition-colors`}>
-                                <td className="px-2 py-2 text-center">
+                              <tr key={c.id} className={`border-b border-gray-100 align-top ${checked?"bg-indigo-50":idx%2===0?"bg-white":"bg-gray-50"} hover:bg-indigo-50 transition-colors`}>
+                                <td className="px-2 pt-3 text-center">
                                   <input type="checkbox" checked={checked}
                                     onChange={e=>{
                                       if(e.target.checked){
                                         setSelectedComps(p=>[...p,c.id]);
-                                        setRubrics(r=>({...r,[c.id]:{items:Array(5).fill(null).map(()=>({name:"",max_marks:0}))}}));
+                                        setRubrics(r=>({...r,[c.id]:{items:[{name:"",max_marks:0}]}}));
                                         setForm(p=>({...p,competency_mappings:[...p.competency_mappings,c.id]}));
                                       } else {
                                         setSelectedComps(p=>p.filter(x=>x!==c.id));
@@ -523,44 +511,45 @@ export default function ActivitiesPage() {
                                     }}
                                     className="w-4 h-4 accent-indigo-600 cursor-pointer"/>
                                 </td>
-                                <td className="px-3 py-2 font-mono font-bold text-indigo-700 whitespace-nowrap">{c.competency_code||c.code||"—"}</td>
-                                <td className="px-2 py-2">
-                                  <span className="px-1.5 py-0.5 rounded text-white font-medium leading-tight" style={{backgroundColor:domColor,fontSize:"10px",wordBreak:"break-word",whiteSpace:"normal",display:"inline-block",maxWidth:"90px"}}>
+                                <td className="px-3 pt-3 font-mono font-bold text-indigo-700 whitespace-nowrap">{c.competency_code||c.code||"—"}</td>
+                                <td className="px-2 pt-3">
+                                  <span className="px-1.5 py-0.5 rounded text-white font-medium leading-tight" style={{backgroundColor:domColor,fontSize:"10px",display:"inline-block"}}>
                                     {c.domain||"General"}
                                   </span>
                                 </td>
-                                <td className="px-2 py-2 text-gray-700" style={{minWidth:"200px"}}>{c.description||c.name||""}</td>
-                                {[0,1,2,3,4].map(i=>{
-                                  const item=rub?.items?.[i]||{name:"",max_marks:0};
-                                  return (
-                                    <>
-                                      <td key={`n${i}`} className={`px-1 py-1 border-l border-gray-100 ${!checked?"bg-gray-50":""}`}>
-                                        <input value={item.name} disabled={!checked}
-                                          onChange={e=>{
-                                            const items=[...(rub?.items||Array(5).fill(null).map(()=>({name:"",max_marks:0})))];
-                                            items[i]={...items[i],name:e.target.value};
-                                            setRubrics(r=>({...r,[c.id]:{...(r[c.id]||{items:[]}),items}}));
-                                          }}
-                                          placeholder={checked?"Rubric name":""}
-                                          className={`rounded px-1.5 py-0.5 w-[105px] text-xs ${checked?"border border-gray-300 bg-white":"border-0 bg-transparent text-gray-300 cursor-not-allowed"}`}/>
-                                      </td>
-                                      <td key={`m${i}`} className={`px-1 py-1 text-center ${!checked?"bg-gray-50":""}`}>
-                                        <input type="number" min={0} value={item.max_marks||""} disabled={!checked}
-                                          onChange={e=>{
-                                            const items=[...(rub?.items||Array(5).fill(null).map(()=>({name:"",max_marks:0})))];
-                                            items[i]={...items[i],max_marks:+e.target.value};
-                                            setRubrics(r=>({...r,[c.id]:{...(r[c.id]||{items:[]}),items}}));
-                                          }}
-                                          placeholder={checked?"0":""}
-                                          className={`rounded px-1 py-0.5 w-12 text-center text-xs ${checked?"border border-gray-300 bg-white":"border-0 bg-transparent text-gray-300 cursor-not-allowed"}`}/>
-                                      </td>
-                                    </>
-                                  );
-                                })}
-                                <td className={`px-2 py-2 text-center font-bold border-l border-gray-100 ${checked?"text-indigo-700":"text-gray-300"}`}>
+                                <td className="px-2 py-2 text-gray-700">{c.description||c.name||""}</td>
+                                <td className="px-3 py-2 border-l border-gray-100">
+                                  {checked ? (
+                                    <div className="space-y-1.5">
+                                      {items.map((item,i)=>(
+                                        <div key={i} className="flex items-center gap-1.5">
+                                          <span className="text-gray-400 w-5 shrink-0 text-right">{i+1}.</span>
+                                          <input value={item.name}
+                                            onChange={e=>{const its=[...items];its[i]={...its[i],name:e.target.value};setRubrics(r=>({...r,[c.id]:{...(r[c.id]||{items:[]}),items:its}}));}}
+                                            placeholder="Rubric name"
+                                            className="border border-gray-300 rounded px-2 py-0.5 text-xs flex-1 bg-white min-w-[140px]"/>
+                                          <input type="number" min={0} value={item.max_marks||""}
+                                            onChange={e=>{const its=[...items];its[i]={...its[i],max_marks:+e.target.value};setRubrics(r=>({...r,[c.id]:{...(r[c.id]||{items:[]}),items:its}}));}}
+                                            placeholder="0"
+                                            className="border border-gray-300 rounded px-1.5 py-0.5 text-xs w-14 text-center bg-white"/>
+                                          <span className="text-gray-400 text-xs shrink-0">marks</span>
+                                          {items.length>1&&(
+                                            <button onClick={()=>{const its=items.filter((_,j)=>j!==i);setRubrics(r=>({...r,[c.id]:{...(r[c.id]||{items:[]}),items:its}}));}}
+                                              className="text-red-400 hover:text-red-600 text-xs leading-none shrink-0">✕</button>
+                                          )}
+                                        </div>
+                                      ))}
+                                      <button onClick={()=>setRubrics(r=>({...r,[c.id]:{...(r[c.id]||{items:[]}),items:[...items,{name:"",max_marks:0}]}}))}
+                                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium mt-0.5">+ Add Rubric</button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-300 italic">— select to add rubrics —</span>
+                                  )}
+                                </td>
+                                <td className={`px-2 pt-3 text-center font-bold border-l border-gray-100 ${checked?"text-indigo-700":"text-gray-300"}`}>
                                   {checked?compTotal:"—"}
                                 </td>
-                                <td className="px-2 py-2 text-center">
+                                <td className="px-2 pt-3 text-center">
                                   {usedIn>0
                                     ?<span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium" style={{fontSize:"10px"}}>{usedIn} act.</span>
                                     :<span className="text-gray-300">—</span>}
@@ -573,7 +562,7 @@ export default function ActivitiesPage() {
                           <tfoot>
                             <tr className="bg-indigo-50 border-t-2 border-indigo-200">
                               <td colSpan={4} className="px-3 py-2 font-bold text-indigo-700 text-xs">{selectedComps.length} competency(ies) selected</td>
-                              <td colSpan={11} className="px-3 py-2 font-bold text-indigo-700 text-xs text-right">Grand Total: {grandTotal} marks</td>
+                              <td colSpan={3} className="px-3 py-2 font-bold text-indigo-700 text-xs text-right">Grand Total: {grandTotal} marks</td>
                             </tr>
                           </tfoot>
                         )}
@@ -626,7 +615,7 @@ export default function ActivitiesPage() {
                               </div></td>
                               <td className="px-3 py-2.5 text-center font-bold text-indigo-700">{a.total_max_marks||0}</td>
                               <td className="px-3 py-2.5 text-center"><div className="flex gap-1 justify-center">
-                                <button onClick={()=>{setShowAddForm(true);setEditActivity(a);setSelectedComps((a.rubrics||[]).map((r:any)=>r.competency_id));setRubrics(Object.fromEntries((a.rubrics||[]).map((r:any)=>{const items=[...(r.rubric_items||[])];while(items.length<5)items.push({name:"",max_marks:0});return [r.competency_id,{items}];})));setForm({...a,sections:a.section?[a.section]:[]});}} className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">✏️</button>
+                                <button onClick={()=>{setShowAddForm(true);setEditActivity(a);setSelectedComps((a.rubrics||[]).map((r:any)=>r.competency_id));setRubrics(Object.fromEntries((a.rubrics||[]).map((r:any)=>[r.competency_id,{items:(r.rubric_items||[]).length?r.rubric_items:[{name:"",max_marks:0}]}])));setForm({...a,sections:a.section?[a.section]:[]});}} className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">✏️</button>
                                 <button onClick={()=>deleteActivity(a.id)} className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">🗑️</button>
                               </div></td>
                             </tr>
