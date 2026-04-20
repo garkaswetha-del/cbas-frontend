@@ -53,62 +53,62 @@ function getStages(assigned_classes: string[]): { label: string; color: string }
 
 // ── PRE-LOADED TEACHER DATA FROM EXCEL ────────────────────────────────────────
 const EXCEL_TEACHERS = [
-  { name: "Chandana.K", email: "chandanasindhu12@gmail.com", password: "Chandana589", subject: "English", grade: "Grade 8, Grade 9", section: "Orion, Pegasus, Centaurus, Himalaya", class_teacher: "", qualification: "Post Graduation with BED", appraisal_qualification: "Post Graduation with BED" },
-  { name: "Deepthi.R.Sahana", email: "deepthi.r.sahana0519@gmail.com", password: "Deepthi878", subject: "Mathematics", grade: "Grade 9, Grade 10", section: "Meru, Himalaya, Vindhya, Bendre, Kuvempu, Karanth", class_teacher: "", qualification: "Post Graduation with BED", appraisal_qualification: "Post Graduation with BED" },
-  { name: "Monisha N", email: "monishanswamy261998@gmail.com", password: "Monisha122", subject: "Mathematics", grade: "Grade 8", section: "Centaurus, Orion, Pegasus", class_teacher: "Grade 8 Centaurus", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Bhavani B Karabassi", email: "bhavanimk59@gmail.com", password: "Bhavani451", subject: "English", grade: "Grade 4", section: "Ruby, Diamond, Emerald", class_teacher: "Grade 4 Ruby", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Geetha H S", email: "geethamilan2018@gmail.com", password: "geetha634", subject: "Kannada", grade: "Grade 3, Grade 4", section: "Edison, Einstein, Kalam, Raman, Ruby", class_teacher: "Grade 3 Kalam", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Chandana R", email: "chandanar2392002@gmail.com", password: "chandana694", subject: "Science", grade: "Grade 5, Grade 6", section: "Shanthi, Sathya, Vedha, Godavari", class_teacher: "Grade 6 Shanthi", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Nagashree M S", email: "msnagashree925@gmail.com", password: "Nagashree664", subject: "Kannada", grade: "Grade 9, Grade 10", section: "Vindhya, Himalaya, Meru, Bendre, Kuvempu, Karanth", class_teacher: "Grade 10 Bendre", qualification: "Post Graduation with BED", appraisal_qualification: "Post Graduation with BED" },
-  { name: "Anna George", email: "", password: "Anna309", subject: "English", grade: "Grade 7", section: "Mercury, Mars, Jupiter, Venus", class_teacher: "", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Manjula S", email: "manjulagirish434@gmail.com", password: "Manjula990", subject: "Mother Teacher", grade: "Grade 1", section: "Asteroid", class_teacher: "", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Chandana Rao", email: "raochandana16@gmail.com", password: "Chandana527", subject: "Social", grade: "Grade 7, Grade 8", section: "Mercury, Jupiter, Pegasus, Centaurus", class_teacher: "Grade 7 Mercury", qualification: "Post Graduation with BED", appraisal_qualification: "Post Graduation with BED" },
-  { name: "Trupti Naik", email: "truptinaik1018@gmail.com", password: "Trupti598", subject: "Hindi", grade: "Grade 1, Grade 2", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo", class_teacher: "", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Harshitha N M", email: "harshiharshinm@gmail.com", password: "Harshitha981", subject: "Science", grade: "Grade 4, Grade 5", section: "Emerald, Diamond, Ganga, Kaveri", class_teacher: "Grade 4 Emerald", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Akallya VS", email: "vsakallya7@gmail.com", password: "Akallya469", subject: "Science", grade: "Grade 8, Grade 9, Grade 10", section: "Orion, Pegasus, Centaurus, Himalaya, Vindhya, Meru, Bendre, Karanth, Kuvempu", class_teacher: "Grade 9 Himalaya", qualification: "Post Graduation with BED", appraisal_qualification: "Post Graduation with BED" },
-  { name: "Jayashree", email: "jayaprajwal4422@gmail.com", password: "Jayashree250", subject: "Mother Teacher", grade: "LKG", section: "Tulip", class_teacher: "LKG Tulip", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Priyanka K M", email: "priyankapriya0809@gmail.com", password: "Priyanka785", subject: "Mathematics", grade: "Grade 5", section: "Kaveri, Ganga, Godavari", class_teacher: "Grade 5 Kaveri", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Poornima N", email: "poornimasiri12@gmail.com", password: "Poornima763", subject: "Science", grade: "Grade 7", section: "Mercury, Mars, Venus, Jupiter", class_teacher: "Grade 7 Jupiter", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Nithyashree P", email: "nithyabharath23@gmail.com", password: "Nithyashree100", subject: "Mother Teacher", grade: "Grade 2", section: "Pavo", class_teacher: "Grade 2 Pavo", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Ranjitha S Naveen", email: "nvnr14@gmail.com", password: "Ranjitha690", subject: "Science (Biology)", grade: "Grade 9, Grade 10", section: "Meru, Vindhya, Himalaya, Kuvempu, Bendre, Karanth", class_teacher: "Grade 10 Karanth", qualification: "Post Graduation with BED", appraisal_qualification: "Post Graduation with BED" },
-  { name: "Nagendra G P", email: "nagendragp777@gmail.com", password: "Nagendra131", subject: "Mathematics", grade: "Grade 9, Grade 10", section: "Meru, Himalaya, Vindhya, Kuvempu, Bendre, Karanth", class_teacher: "Grade 10 Kuvempu", qualification: "Post Graduation with BED", appraisal_qualification: "Post Graduation with BED" },
-  { name: "Anitha P N", email: "ANITHA.P.NAYAK.14@gmail.com", password: "Anitha659", subject: "Mother Teacher", grade: "Grade 2", section: "Apus", class_teacher: "Grade 2 Apus", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Gracy V", email: "gracegrace58897@gmail.com", password: "Gracy473", subject: "Social Science", grade: "Grade 8, Grade 9", section: "Orion, Meru, Himalaya, Vindhya", class_teacher: "Grade 8 Orion", qualification: "Post Graduation with BED", appraisal_qualification: "Post Graduation with BED" },
-  { name: "Bhavya B M", email: "bhavyamunirajubm@gmail.com", password: "Bhavya839", subject: "English", grade: "Grade 4, Grade 5", section: "Kaveri, Godavari, Ganga, Ruby", class_teacher: "Grade 5 Kaveri", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Jyothilakshmi S", email: "jyothilakshminagendra@gmail.com", password: "Jyothilakshmi772", subject: "Kannada", grade: "Grade 4, Grade 5, Grade 6", section: "Diamond, Emerald, Kaveri, Godavari, Ganga, Vedha", class_teacher: "", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Sunita Koushik", email: "kaushiksunita1988@gmail.com", password: "sunita483", subject: "Hindi", grade: "Grade 5, Grade 6", section: "Ganga, Kaveri, Godavari, Sathya, Vedha, Shanthi", class_teacher: "", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Mamatha A M", email: "mmamatha383@gmail.com", password: "Mamatha623", subject: "Hindi", grade: "Grade 7, Grade 8", section: "Mercury, Venus, Mars, Jupiter, Pegasus, Centaurus, Orion", class_teacher: "", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Lalitha H N", email: "saralavathilalitha@gmail.com", password: "Lalitha406", subject: "Hindi", grade: "Grade 3, Grade 4", section: "Kalam, Edison, Einstein, Raman, Emerald, Ruby, Diamond", class_teacher: "", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Gagana B", email: "gaganab2107@gmail.com", password: "Gagana248", subject: "English", grade: "Grade 6", section: "Sathya, Shanthi, Vedha", class_teacher: "Grade 6 Sathya", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Sahana Y N", email: "sahanasahanayn@gmail.com", password: "sahana427", subject: "Science", grade: "Grade 3", section: "Edison, Einstein, Kalam, Raman", class_teacher: "Grade 3 Einstein", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Vidya G S", email: "vidyashreebabu28@gmail.com", password: "Vidya841", subject: "English", grade: "Grade 3", section: "Edison, Einstein, Kalam, Raman", class_teacher: "Grade 3 Edison", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Jyothi S", email: "jyothisjyo01@gmail.com", password: "Jyothi560", subject: "Social", grade: "Grade 4, Grade 5", section: "Ganga, Godavari, Emerald, Diamond", class_teacher: "Grade 5 Ganga", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Ashwini K N", email: "knashwini248@gmail.com", password: "Ashwini637", subject: "Music", grade: "Grade 1, Grade 2, Grade 3, Grade 4, Grade 5, Grade 6, Grade 7, Grade 8", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo, Edison, Einstein, Kalam, Raman, Diamond, Emerald, Ruby, Ganga, Godavari, Kaveri, Sathya, Shanthi, Vedha, Jupiter, Mars, Mercury, Venus, Centaurus, Orion, Pegasus, Himalaya, Meru, Vindhya, Bendre, Karanth, Kuvempu", class_teacher: "", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Lakshmi L", email: "shashilakshmi88@gmail.com", password: "Lakshmi507", subject: "Social Science", grade: "Grade 6, Grade 7", section: "Sathya, Shanthi, Venus, Mars", class_teacher: "Grade 7 Mars", qualification: "Post Graduation with BED", appraisal_qualification: "Post Graduation with BED" },
-  { name: "Hema S", email: "hemasuresh3355@gmail.com", password: "Hema521", subject: "Mother Teacher", grade: "Grade 1", section: "Galaxy", class_teacher: "", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Geetha Chandru H S", email: "geethachandu218@gmail.com", password: "Geetha124", subject: "Mother Teacher", grade: "Grade 1", section: "Comet", class_teacher: "", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Hepsiba", email: "kesiahepsir@gmail.com", password: "hepsiba305", subject: "Mathematics", grade: "Grade 4", section: "Diamond, Emerald, Ruby", class_teacher: "Grade 4 Diamond", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Shruti V Naik", email: "shrutivnaik1302@gmail.com", password: "Shruti777", subject: "Mother Teacher", grade: "Pre-KG", section: "Duke", class_teacher: "Pre-KG Duke", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Chaithra M", email: "chaithrayashu1@gmail.com", password: "Chaithra157", subject: "Mother Teacher", grade: "LKG", section: "Lotus", class_teacher: "LKG Lotus", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Nayana S", email: "nayanasnns@gmail.com", password: "Nayana333", subject: "Mathematics", grade: "Grade 5, Grade 6, Grade 7", section: "Kaveri, Ganga, Godavari, Sathya, Shanthi, Vedha, Mercury, Mars, Venus, Jupiter", class_teacher: "", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Kavya S", email: "kavyaraju383@gmail.com", password: "Kavya950", subject: "Mother Teacher", grade: "LKG", section: "Daisy", class_teacher: "LKG Daisy", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Aliya Tabassum", email: "aliyatabassum27@gmail.com", password: "Aliya145", subject: "Mathematics", grade: "Grade 3", section: "Raman, Edison, Einstein, Kalam", class_teacher: "Grade 3 Raman", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Sulna Gopi", email: "Sulnagopi@gmail.com", password: "Sulna147", subject: "Mother Teacher", grade: "UKG", section: "Skylark", class_teacher: "UKG Skylark", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Renuka", email: "renukaraghu.rrr@gmail.com", password: "Renuka695", subject: "Mother Teacher", grade: "UKG", section: "Robin", class_teacher: "UKG Robin", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Pallavi", email: "pallaviacharm91@gmail.com", password: "Pallavi844", subject: "Mother Teacher", grade: "UKG", section: "Eagle", class_teacher: "UKG Eagle", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Tanusha", email: "tanupeacock@gmail.com", password: "Tanusha510", subject: "Mother Teacher", grade: "Pre-KG", section: "Popeye", class_teacher: "Pre-KG Popeye", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Lilly Paul", email: "lillypaulpolachan@gmail.com", password: "Lilly355", subject: "Mother Teacher", grade: "Grade 2", section: "Volans", class_teacher: "", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Kavya M", email: "kavyamuralidhar18@gmail.com", password: "Kavya947", subject: "English", grade: "Grade 9, Grade 10", section: "Meru, Vindhya, Kuvempu, Karanth, Bendre", class_teacher: "Grade 9 Vindhya", qualification: "Post Graduation with BED", appraisal_qualification: "Post Graduation with BED" },
-  { name: "Umadevi P C", email: "pcumadevi3110@gmail.com", password: "Umadevi323", subject: "Social Science", grade: "Grade 10", section: "Bendre, Kuvempu, Karanth", class_teacher: "", qualification: "Post Graduation with BED", appraisal_qualification: "Post Graduation with BED" },
-  { name: "Sridhar P", email: "sridharpgf@gmail.com", password: "SRIDHAR580", subject: "Biology", grade: "Grade 8, Grade 9, Grade 10", section: "Pegasus, Orion, Centaurus, Himalaya, Meru, Vindhya, Kuvempu, Bendre, Karanth", class_teacher: "Grade 8 Pegasus", qualification: "Post Graduation with BED", appraisal_qualification: "Post Graduation with BED" },
-  { name: "Sahana D S", email: "sahanasmallesh@gmail.com", password: "Sahana464", subject: "Mathematics", grade: "Grade 6, Grade 7", section: "Shanthi, Sathya, Vedha, Jupiter", class_teacher: "Grade 6 Vedha", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Pooja K S", email: "", password: "Pooja123", subject: "English", grade: "Grade 7", section: "Mercury, Venus, Mars", class_teacher: "Grade 7 Venus", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Bi bi Ayesha", email: "", password: "Ayesha123", subject: "English", grade: "Grade 1, Grade 2", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo", class_teacher: "", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Pallavi M", email: "", password: "Pallavi123", subject: "Mother Teacher", grade: "Grade 2", section: "Galaxy", class_teacher: "Grade 2 Galaxy", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Vajramani D S", email: "", password: "Vajramani123", subject: "Physical Education", grade: "Grade 1, Grade 2, Grade 3, Grade 4, Grade 5", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo, Edison, Einstein, Kalam, Raman, Diamond, Emerald, Ruby, Ganga, Godavari, Kaveri", class_teacher: "", qualification: "BED", appraisal_qualification: "BED" },
-  { name: "Anusha R", email: "", password: "Anusha123", subject: "Art", grade: "Grade 1, Grade 2, Grade 3, Grade 4, Grade 5", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo, Edison, Einstein, Kalam, Raman, Diamond, Emerald, Ruby, Ganga, Godavari, Kaveri", class_teacher: "", qualification: "Graduation with BED", appraisal_qualification: "Graduation with BED" },
-  { name: "Bhawa B.M", email: "", password: "Bhawa123", subject: "Mother Teacher", grade: "Grade 1", section: "Comet", class_teacher: "Grade 1 Comet", qualification: "NTT", appraisal_qualification: "NTT" },
-  { name: "Swetha G", email: "garkaswetha@gmail.com", password: "garka1234", subject: "IT", grade: "Grade 9, Grade 10", section: "Himalaya, Meru, Vindhya, Bendre, Karanth, Kuvempu", class_teacher: "", qualification: "Post Graduation", appraisal_qualification: "Post Graduation" },
+  { name: "Chandana.K", email: "chandanasindhu12@gmail.com", password: "Chandana589", subject: "English", grade: "Grade 8, Grade 9", section: "Orion, Pegasus, Centaurus, Himalaya", class_teacher: "", appraisal_qualification: "Post Graduation with BED" },
+  { name: "Deepthi.R.Sahana", email: "deepthi.r.sahana0519@gmail.com", password: "Deepthi878", subject: "Mathematics", grade: "Grade 9, Grade 10", section: "Meru, Himalaya, Vindhya, Bendre, Kuvempu, Karanth", class_teacher: "", appraisal_qualification: "Post Graduation with BED" },
+  { name: "Monisha N", email: "monishanswamy261998@gmail.com", password: "Monisha122", subject: "Mathematics", grade: "Grade 8", section: "Centaurus, Orion, Pegasus", class_teacher: "Grade 8 Centaurus", appraisal_qualification: "Graduation with BED" },
+  { name: "Bhavani B Karabassi", email: "bhavanimk59@gmail.com", password: "Bhavani451", subject: "English", grade: "Grade 4", section: "Ruby, Diamond, Emerald", class_teacher: "Grade 4 Ruby", appraisal_qualification: "Graduation with BED" },
+  { name: "Geetha H S", email: "geethamilan2018@gmail.com", password: "geetha634", subject: "Kannada", grade: "Grade 3, Grade 4", section: "Edison, Einstein, Kalam, Raman, Ruby", class_teacher: "Grade 3 Kalam", appraisal_qualification: "Graduation with BED" },
+  { name: "Chandana R", email: "chandanar2392002@gmail.com", password: "chandana694", subject: "Science", grade: "Grade 5, Grade 6", section: "Shanthi, Sathya, Vedha, Godavari", class_teacher: "Grade 6 Shanthi", appraisal_qualification: "Graduation with BED" },
+  { name: "Nagashree M S", email: "msnagashree925@gmail.com", password: "Nagashree664", subject: "Kannada", grade: "Grade 9, Grade 10", section: "Vindhya, Himalaya, Meru, Bendre, Kuvempu, Karanth", class_teacher: "Grade 10 Bendre", appraisal_qualification: "Post Graduation with BED" },
+  { name: "Anna George", email: "", password: "Anna309", subject: "English", grade: "Grade 7", section: "Mercury, Mars, Jupiter, Venus", class_teacher: "", appraisal_qualification: "Graduation with BED" },
+  { name: "Manjula S", email: "manjulagirish434@gmail.com", password: "Manjula990", subject: "Mother Teacher", grade: "Grade 1", section: "Asteroid", class_teacher: "", appraisal_qualification: "NTT" },
+  { name: "Chandana Rao", email: "raochandana16@gmail.com", password: "Chandana527", subject: "Social", grade: "Grade 7, Grade 8", section: "Mercury, Jupiter, Pegasus, Centaurus", class_teacher: "Grade 7 Mercury", appraisal_qualification: "Post Graduation with BED" },
+  { name: "Trupti Naik", email: "truptinaik1018@gmail.com", password: "Trupti598", subject: "Hindi", grade: "Grade 1, Grade 2", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo", class_teacher: "", appraisal_qualification: "Graduation with BED" },
+  { name: "Harshitha N M", email: "harshiharshinm@gmail.com", password: "Harshitha981", subject: "Science", grade: "Grade 4, Grade 5", section: "Emerald, Diamond, Ganga, Kaveri", class_teacher: "Grade 4 Emerald", appraisal_qualification: "Graduation with BED" },
+  { name: "Akallya VS", email: "vsakallya7@gmail.com", password: "Akallya469", subject: "Science", grade: "Grade 8, Grade 9, Grade 10", section: "Orion, Pegasus, Centaurus, Himalaya, Vindhya, Meru, Bendre, Karanth, Kuvempu", class_teacher: "Grade 9 Himalaya", appraisal_qualification: "Post Graduation with BED" },
+  { name: "Jayashree", email: "jayaprajwal4422@gmail.com", password: "Jayashree250", subject: "Mother Teacher", grade: "LKG", section: "Tulip", class_teacher: "LKG Tulip", appraisal_qualification: "NTT" },
+  { name: "Priyanka K M", email: "priyankapriya0809@gmail.com", password: "Priyanka785", subject: "Mathematics", grade: "Grade 5", section: "Kaveri, Ganga, Godavari", class_teacher: "Grade 5 Kaveri", appraisal_qualification: "Graduation with BED" },
+  { name: "Poornima N", email: "poornimasiri12@gmail.com", password: "Poornima763", subject: "Science", grade: "Grade 7", section: "Mercury, Mars, Venus, Jupiter", class_teacher: "Grade 7 Jupiter", appraisal_qualification: "Graduation with BED" },
+  { name: "Nithyashree P", email: "nithyabharath23@gmail.com", password: "Nithyashree100", subject: "Mother Teacher", grade: "Grade 2", section: "Pavo", class_teacher: "Grade 2 Pavo", appraisal_qualification: "NTT" },
+  { name: "Ranjitha S Naveen", email: "nvnr14@gmail.com", password: "Ranjitha690", subject: "Science (Biology)", grade: "Grade 9, Grade 10", section: "Meru, Vindhya, Himalaya, Kuvempu, Bendre, Karanth", class_teacher: "Grade 10 Karanth", appraisal_qualification: "Post Graduation with BED" },
+  { name: "Nagendra G P", email: "nagendragp777@gmail.com", password: "Nagendra131", subject: "Mathematics", grade: "Grade 9, Grade 10", section: "Meru, Himalaya, Vindhya, Kuvempu, Bendre, Karanth", class_teacher: "Grade 10 Kuvempu", appraisal_qualification: "Post Graduation with BED" },
+  { name: "Anitha P N", email: "ANITHA.P.NAYAK.14@gmail.com", password: "Anitha659", subject: "Mother Teacher", grade: "Grade 2", section: "Apus", class_teacher: "Grade 2 Apus", appraisal_qualification: "NTT" },
+  { name: "Gracy V", email: "gracegrace58897@gmail.com", password: "Gracy473", subject: "Social Science", grade: "Grade 8, Grade 9", section: "Orion, Meru, Himalaya, Vindhya", class_teacher: "Grade 8 Orion", appraisal_qualification: "Post Graduation with BED" },
+  { name: "Bhavya B M", email: "bhavyamunirajubm@gmail.com", password: "Bhavya839", subject: "English", grade: "Grade 4, Grade 5", section: "Kaveri, Godavari, Ganga, Ruby", class_teacher: "Grade 5 Kaveri", appraisal_qualification: "Graduation with BED" },
+  { name: "Jyothilakshmi S", email: "jyothilakshminagendra@gmail.com", password: "Jyothilakshmi772", subject: "Kannada", grade: "Grade 4, Grade 5, Grade 6", section: "Diamond, Emerald, Kaveri, Godavari, Ganga, Vedha", class_teacher: "", appraisal_qualification: "Graduation with BED" },
+  { name: "Sunita Koushik", email: "kaushiksunita1988@gmail.com", password: "sunita483", subject: "Hindi", grade: "Grade 5, Grade 6", section: "Ganga, Kaveri, Godavari, Sathya, Vedha, Shanthi", class_teacher: "", appraisal_qualification: "Graduation with BED" },
+  { name: "Mamatha A M", email: "mmamatha383@gmail.com", password: "Mamatha623", subject: "Hindi", grade: "Grade 7, Grade 8", section: "Mercury, Venus, Mars, Jupiter, Pegasus, Centaurus, Orion", class_teacher: "", appraisal_qualification: "Graduation with BED" },
+  { name: "Lalitha H N", email: "saralavathilalitha@gmail.com", password: "Lalitha406", subject: "Hindi", grade: "Grade 3, Grade 4", section: "Kalam, Edison, Einstein, Raman, Emerald, Ruby, Diamond", class_teacher: "", appraisal_qualification: "Graduation with BED" },
+  { name: "Gagana B", email: "gaganab2107@gmail.com", password: "Gagana248", subject: "English", grade: "Grade 6", section: "Sathya, Shanthi, Vedha", class_teacher: "Grade 6 Sathya", appraisal_qualification: "Graduation with BED" },
+  { name: "Sahana Y N", email: "sahanasahanayn@gmail.com", password: "sahana427", subject: "Science", grade: "Grade 3", section: "Edison, Einstein, Kalam, Raman", class_teacher: "Grade 3 Einstein", appraisal_qualification: "Graduation with BED" },
+  { name: "Vidya G S", email: "vidyashreebabu28@gmail.com", password: "Vidya841", subject: "English", grade: "Grade 3", section: "Edison, Einstein, Kalam, Raman", class_teacher: "Grade 3 Edison", appraisal_qualification: "Graduation with BED" },
+  { name: "Jyothi S", email: "jyothisjyo01@gmail.com", password: "Jyothi560", subject: "Social", grade: "Grade 4, Grade 5", section: "Ganga, Godavari, Emerald, Diamond", class_teacher: "Grade 5 Ganga", appraisal_qualification: "Graduation with BED" },
+  { name: "Ashwini K N", email: "knashwini248@gmail.com", password: "Ashwini637", subject: "Music", grade: "Grade 1, Grade 2, Grade 3, Grade 4, Grade 5, Grade 6, Grade 7, Grade 8", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo, Edison, Einstein, Kalam, Raman, Diamond, Emerald, Ruby, Ganga, Godavari, Kaveri, Sathya, Shanthi, Vedha, Jupiter, Mars, Mercury, Venus, Centaurus, Orion, Pegasus, Himalaya, Meru, Vindhya, Bendre, Karanth, Kuvempu", class_teacher: "", appraisal_qualification: "Graduation with BED" },
+  { name: "Lakshmi L", email: "shashilakshmi88@gmail.com", password: "Lakshmi507", subject: "Social Science", grade: "Grade 6, Grade 7", section: "Sathya, Shanthi, Venus, Mars", class_teacher: "Grade 7 Mars", appraisal_qualification: "Post Graduation with BED" },
+  { name: "Hema S", email: "hemasuresh3355@gmail.com", password: "Hema521", subject: "Mother Teacher", grade: "Grade 1", section: "Galaxy", class_teacher: "", appraisal_qualification: "NTT" },
+  { name: "Geetha Chandru H S", email: "geethachandu218@gmail.com", password: "Geetha124", subject: "Mother Teacher", grade: "Grade 1", section: "Comet", class_teacher: "", appraisal_qualification: "NTT" },
+  { name: "Hepsiba", email: "kesiahepsir@gmail.com", password: "hepsiba305", subject: "Mathematics", grade: "Grade 4", section: "Diamond, Emerald, Ruby", class_teacher: "Grade 4 Diamond", appraisal_qualification: "Graduation with BED" },
+  { name: "Shruti V Naik", email: "shrutivnaik1302@gmail.com", password: "Shruti777", subject: "Mother Teacher", grade: "Pre-KG", section: "Duke", class_teacher: "Pre-KG Duke", appraisal_qualification: "NTT" },
+  { name: "Chaithra M", email: "chaithrayashu1@gmail.com", password: "Chaithra157", subject: "Mother Teacher", grade: "LKG", section: "Lotus", class_teacher: "LKG Lotus", appraisal_qualification: "NTT" },
+  { name: "Nayana S", email: "nayanasnns@gmail.com", password: "Nayana333", subject: "Mathematics", grade: "Grade 5, Grade 6, Grade 7", section: "Kaveri, Ganga, Godavari, Sathya, Shanthi, Vedha, Mercury, Mars, Venus, Jupiter", class_teacher: "", appraisal_qualification: "Graduation with BED" },
+  { name: "Kavya S", email: "kavyaraju383@gmail.com", password: "Kavya950", subject: "Mother Teacher", grade: "LKG", section: "Daisy", class_teacher: "LKG Daisy", appraisal_qualification: "NTT" },
+  { name: "Aliya Tabassum", email: "aliyatabassum27@gmail.com", password: "Aliya145", subject: "Mathematics", grade: "Grade 3", section: "Raman, Edison, Einstein, Kalam", class_teacher: "Grade 3 Raman", appraisal_qualification: "Graduation with BED" },
+  { name: "Sulna Gopi", email: "Sulnagopi@gmail.com", password: "Sulna147", subject: "Mother Teacher", grade: "UKG", section: "Skylark", class_teacher: "UKG Skylark", appraisal_qualification: "NTT" },
+  { name: "Renuka", email: "renukaraghu.rrr@gmail.com", password: "Renuka695", subject: "Mother Teacher", grade: "UKG", section: "Robin", class_teacher: "UKG Robin", appraisal_qualification: "NTT" },
+  { name: "Pallavi", email: "pallaviacharm91@gmail.com", password: "Pallavi844", subject: "Mother Teacher", grade: "UKG", section: "Eagle", class_teacher: "UKG Eagle", appraisal_qualification: "NTT" },
+  { name: "Tanusha", email: "tanupeacock@gmail.com", password: "Tanusha510", subject: "Mother Teacher", grade: "Pre-KG", section: "Popeye", class_teacher: "Pre-KG Popeye", appraisal_qualification: "NTT" },
+  { name: "Lilly Paul", email: "lillypaulpolachan@gmail.com", password: "Lilly355", subject: "Mother Teacher", grade: "Grade 2", section: "Volans", class_teacher: "", appraisal_qualification: "NTT" },
+  { name: "Kavya M", email: "kavyamuralidhar18@gmail.com", password: "Kavya947", subject: "English", grade: "Grade 9, Grade 10", section: "Meru, Vindhya, Kuvempu, Karanth, Bendre", class_teacher: "Grade 9 Vindhya", appraisal_qualification: "Post Graduation with BED" },
+  { name: "Umadevi P C", email: "pcumadevi3110@gmail.com", password: "Umadevi323", subject: "Social Science", grade: "Grade 10", section: "Bendre, Kuvempu, Karanth", class_teacher: "", appraisal_qualification: "Post Graduation with BED" },
+  { name: "Sridhar P", email: "sridharpgf@gmail.com", password: "SRIDHAR580", subject: "Biology", grade: "Grade 8, Grade 9, Grade 10", section: "Pegasus, Orion, Centaurus, Himalaya, Meru, Vindhya, Kuvempu, Bendre, Karanth", class_teacher: "Grade 8 Pegasus", appraisal_qualification: "Post Graduation with BED" },
+  { name: "Sahana D S", email: "sahanasmallesh@gmail.com", password: "Sahana464", subject: "Mathematics", grade: "Grade 6, Grade 7", section: "Shanthi, Sathya, Vedha, Jupiter", class_teacher: "Grade 6 Vedha", appraisal_qualification: "Graduation with BED" },
+  { name: "Pooja K S", email: "", password: "Pooja123", subject: "English", grade: "Grade 7", section: "Mercury, Venus, Mars", class_teacher: "Grade 7 Venus", appraisal_qualification: "Graduation with BED" },
+  { name: "Bi bi Ayesha", email: "", password: "Ayesha123", subject: "English", grade: "Grade 1, Grade 2", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo", class_teacher: "", appraisal_qualification: "Graduation with BED" },
+  { name: "Pallavi M", email: "", password: "Pallavi123", subject: "Mother Teacher", grade: "Grade 2", section: "Galaxy", class_teacher: "Grade 2 Galaxy", appraisal_qualification: "NTT" },
+  { name: "Vajramani D S", email: "", password: "Vajramani123", subject: "Physical Education", grade: "Grade 1, Grade 2, Grade 3, Grade 4, Grade 5", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo, Edison, Einstein, Kalam, Raman, Diamond, Emerald, Ruby, Ganga, Godavari, Kaveri", class_teacher: "", appraisal_qualification: "BED" },
+  { name: "Anusha R", email: "", password: "Anusha123", subject: "Art", grade: "Grade 1, Grade 2, Grade 3, Grade 4, Grade 5", section: "Asteroid, Galaxy, Comet, Apus, Volans, Pavo, Edison, Einstein, Kalam, Raman, Diamond, Emerald, Ruby, Ganga, Godavari, Kaveri", class_teacher: "", appraisal_qualification: "Graduation with BED" },
+  { name: "Bhawa B.M", email: "", password: "Bhawa123", subject: "Mother Teacher", grade: "Grade 1", section: "Comet", class_teacher: "Grade 1 Comet", appraisal_qualification: "NTT" },
+  { name: "Swetha G", email: "garkaswetha@gmail.com", password: "garka1234", subject: "IT", grade: "Grade 9, Grade 10", section: "Himalaya, Meru, Vindhya, Bendre, Karanth, Kuvempu", class_teacher: "", appraisal_qualification: "Post Graduation" },
 ];
 
 export default function UserManagementPage() {
@@ -131,7 +131,7 @@ export default function UserManagementPage() {
     name: "", email: "", password: "", role: "teacher",
     subjects: [] as string[], assigned_classes: [] as string[],
     assigned_sections: [] as string[], class_teacher_of: "",
-    phone: "", qualification: "", appraisal_qualification: "", experience: "", photo: "",
+    phone: "", appraisal_qualification: "", experience: "", photo: "",
   });
   const [customSubject, setCustomSubject] = useState("");
 
@@ -149,7 +149,7 @@ export default function UserManagementPage() {
   const resetForm = () => setForm({
     name: "", email: "", password: "", role: "teacher",
     subjects: [], assigned_classes: [], assigned_sections: [],
-    class_teacher_of: "", phone: "", qualification: "", appraisal_qualification: "", experience: "", photo: "",
+    class_teacher_of: "", phone: "", appraisal_qualification: "", experience: "", photo: "",
   });
 
   const openAdd = () => { resetForm(); setEditUser(null); setShowForm(true); };
@@ -165,7 +165,6 @@ export default function UserManagementPage() {
       assigned_sections: user.assigned_sections || [],
       class_teacher_of: user.class_teacher_of || "",
       phone: user.phone || "",
-      qualification: user.qualification || "",
       appraisal_qualification: user.appraisal_qualification || "",
       experience: user.experience || "",
       photo: user.photo || "",
@@ -274,7 +273,6 @@ export default function UserManagementPage() {
             return s.trim().replace(/^\d+[-–]\s*/i, '').trim();
           }).filter(Boolean) : [],
           class_teacher_of: t.class_teacher,
-          qualification: t.qualification || "",
           appraisal_qualification: t.appraisal_qualification || "",
         });
         success++;
@@ -491,20 +489,6 @@ export default function UserManagementPage() {
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Qualification</label>
-              <select value={form.qualification} onChange={e => setForm(p => ({ ...p, qualification: e.target.value }))}
-                className="border border-gray-300 rounded px-3 py-1.5 text-sm w-full">
-                <option value="">-- Select --</option>
-                <option value="NTT">NTT</option>
-                <option value="NST">NST</option>
-                <option value="DED">DED</option>
-                <option value="BED">BED</option>
-                <option value="Graduation with BED">Graduation with BED</option>
-                <option value="Post Graduation with BED">Post Graduation with BED</option>
-                <option value="Post Graduation">Post Graduation</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Appraisal Qualification</label>
               <select value={form.appraisal_qualification} onChange={e => setForm(p => ({ ...p, appraisal_qualification: e.target.value }))}
                 className="border border-gray-300 rounded px-3 py-1.5 text-sm w-full">
                 <option value="">-- Select --</option>
@@ -653,7 +637,7 @@ export default function UserManagementPage() {
                         )}
                         <div>
                           <p className="font-medium text-gray-800">{u.name}</p>
-                          {u.qualification && <p className="text-gray-400 text-xs">{u.qualification}</p>}
+                          {u.appraisal_qualification && <p className="text-gray-400 text-xs">{u.appraisal_qualification}</p>}
                         </div>
                       </div>
                     </td>
@@ -687,15 +671,8 @@ export default function UserManagementPage() {
                         <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-medium">👑 {u.class_teacher_of}</span>
                       ) : "—"}
                     </td>
-                    <td className="px-3 py-2.5">
-                      {u.qualification ? (
-                        <div>
-                          <span className="text-gray-700 text-xs block">{u.qualification}</span>
-                          {u.appraisal_qualification && u.appraisal_qualification !== u.qualification && (
-                            <span className="text-indigo-500 text-xs block">{u.appraisal_qualification}</span>
-                          )}
-                        </div>
-                      ) : "—"}
+                    <td className="px-3 py-2.5 text-gray-700 text-xs">
+                      {u.appraisal_qualification || "—"}
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       <button onClick={() => setShowPassword(p => ({ ...p, [u.id]: !p[u.id] }))}

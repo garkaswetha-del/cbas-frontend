@@ -246,8 +246,7 @@ export default function AppraisalPage() {
               const obs = (a.classroom_observations as any[])||[{},{},{},{}];
               const respCount = RESP.filter(r=>a[r.key]).length;
               const highestGrade = teacherGrades[t.teacher_id]||null;
-              // qualification is null until added to user management
-              const qualification: string|null = t.qualification||null;
+              const qualification: string|null = t.appraisal_qualification||null;
               const salary: number|null = t.salary ? +t.salary : null;
               const inc = calcIncrement(a.overall_percentage ? +a.overall_percentage : 0, respCount, salary, highestGrade, qualification);
 
