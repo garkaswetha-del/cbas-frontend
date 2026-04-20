@@ -1800,7 +1800,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
       }
       // Add with default empty rubric
       const comp = competencies.find(c=>c.id===id);
-      setRubrics(r => ({...r, [id]: { name: comp?.name||comp?.description||"", items:[{name:"",max_marks:0}] }}));
+      setRubrics(r => ({...r, [id]: { name: comp?.name||comp?.description||"", items:Array(5).fill(null).map(()=>({name:"",max_marks:0})) }}));
       return [...prev, id];
     });
   };
@@ -1832,14 +1832,11 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
     if (!selectedComps.length) {
       setMsg("❌ Select at least one competency"); setTimeout(()=>setMsg(""),3000); return;
     }
-    // Validate rubrics
+    // Validate rubrics - each selected competency needs at least one filled rubric
     for (const cid of selectedComps) {
       const rub = rubrics[cid];
-      if (!rub?.items?.length) { setMsg("❌ Each competency must have at least one rubric item"); setTimeout(()=>setMsg(""),3000); return; }
-      for (const item of rub.items) {
-        if (!item.name.trim()) { setMsg("❌ All rubric items must have a name"); setTimeout(()=>setMsg(""),3000); return; }
-        if (!item.max_marks||item.max_marks<=0) { setMsg("❌ All rubric items must have marks > 0"); setTimeout(()=>setMsg(""),3000); return; }
-      }
+      const filled=(rub?.items||[]).filter(item=>item.name.trim()&&+item.max_marks>0);
+      if (!filled.length) { setMsg("❌ Each selected competency needs at least one rubric with a name and marks > 0"); setTimeout(()=>setMsg(""),3000); return; }
     }
     setSavingActivity(true);
     try {
@@ -1850,7 +1847,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
           competency_id: cid,
           competency_code: comp?.code||comp?.competency_code||"",
           competency_name: comp?.name||comp?.description||"",
-          rubric_items: rubrics[cid].items,
+          rubric_items: (rubrics[cid]?.items||[]).filter(item=>item.name.trim()||+item.max_marks>0),
         };
       });
       const res = await axios.post(`${API}/activities`, {
@@ -1990,74 +1987,126 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                 </div>
               </div>
 
-              {/* Competency selection */}
-              <div>
-                <label className="text-xs text-gray-500 block mb-1 font-semibold">
-                  Competencies ({competencies.length} available, {selectedComps.length} selected) *
-                </label>
-                {competencies.length===0
-                  ? <p className="text-xs text-gray-400 italic">No competencies found. Add them in Admin → Competency Registry.</p>
-                  : <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
-                    {[...new Set(competencies.map((c:any)=>c.domain))].map(domain=>(
-                      <div key={domain}>
-                        {domain&&<div className="text-xs font-semibold text-indigo-700 px-1 py-0.5 mt-1">{domain}</div>}
-                        {competencies.filter((c:any)=>c.domain===domain).map((c:any)=>(
-                          <label key={c.id} className={`flex items-start gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 text-xs ${selectedComps.includes(c.id)?"bg-indigo-50":""}`}>
-                            <input type="checkbox" checked={selectedComps.includes(c.id)} onChange={()=>toggleComp(c.id)} className="accent-indigo-600 mt-0.5 shrink-0" />
-                            <span className="font-mono text-indigo-600 font-semibold shrink-0">{c.code||c.competency_code}</span>
-                            <span className="text-gray-600">{c.name||c.description}</span>
-                          </label>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                }
-              </div>
-
-              {/* Rubrics per competency */}
-              {selectedComps.length>0&&(
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs text-gray-700 font-semibold">Rubrics per Competency</label>
-                    <span className="text-xs text-indigo-600 font-bold">Total Max Marks: {totalMaxMarks}</span>
-                  </div>
-                  {selectedComps.map(cid=>{
-                    const comp = competencies.find(c=>c.id===cid);
-                    const rub = rubrics[cid];
-                    if (!rub) return null;
-                    const compMax = rub.items.reduce((s,i)=>s+(+i.max_marks||0),0);
-                    return (
-                      <div key={cid} className="border border-indigo-200 rounded-xl p-4 bg-indigo-50 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="text-xs font-bold text-indigo-700">[{comp?.code||comp?.competency_code}]</span>
-                            <span className="text-xs text-gray-700 ml-2">{comp?.name||comp?.description}</span>
-                          </div>
-                          <span className="text-xs text-indigo-600 font-bold">Max: {compMax} marks</span>
-                        </div>
-                        {rub.items.map((item,i)=>(
-                          <div key={i} className="flex gap-2 items-center">
-                            <span className="text-xs text-gray-500 w-16 shrink-0">Rubric {i+1}</span>
-                            <input value={item.name} onChange={e=>updateRubricItem(cid,i,"name",e.target.value)}
-                              placeholder="Rubric name e.g. Grammar accuracy"
-                              className="border border-gray-300 rounded px-2 py-1 text-xs flex-1" />
-                            <input type="number" min={0} value={item.max_marks||""} onChange={e=>updateRubricItem(cid,i,"max_marks",e.target.value)}
-                              placeholder="Marks"
-                              className="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center" />
-                            <span className="text-xs text-gray-400">marks</span>
-                            {rub.items.length>1&&(
-                              <button onClick={()=>removeRubricItem(cid,i)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
-                            )}
-                          </div>
-                        ))}
-                        {rub.items.length<8&&(
-                          <button onClick={()=>addRubricItem(cid)} className="text-xs text-indigo-600 hover:underline">+ Add Rubric Item</button>
+              {/* Competency & Rubric unified table */}
+              {competencies.length===0
+                ? <p className="text-xs text-gray-400 italic">No competencies found. Add them in Admin → Competency Registry.</p>
+                : (() => {
+                  const tcDomains=[...new Set(competencies.map((c:any)=>c.domain||"General"))] as string[];
+                  const tcDomColor: Record<string,string>={};
+                  const TC_COLORS=["#6366f1","#f59e0b","#10b981","#ef4444","#8b5cf6","#06b6d4","#f97316","#ec4899","#84cc16","#14b8a6"];
+                  tcDomains.forEach((d,i)=>{tcDomColor[d]=TC_COLORS[i%TC_COLORS.length];});
+                  const grandTotal=selectedComps.reduce((sum,cid)=>sum+(rubrics[cid]?.items||[]).reduce((s,item)=>s+(+item.max_marks||0),0),0);
+                  return (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-semibold text-gray-700">
+                          Competency &amp; Rubric Setup
+                          <span className="ml-2 text-gray-400 font-normal">({competencies.length} available)</span>
+                        </label>
+                        {selectedComps.length>0&&(
+                          <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
+                            {selectedComps.length} selected · Total: {grandTotal} marks
+                          </span>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
+                        <table className="text-xs border-collapse" style={{minWidth:"1000px",width:"100%"}}>
+                          <thead>
+                            <tr className="bg-indigo-700 text-white">
+                              <th className="px-2 py-2 w-8 text-center">✓</th>
+                              <th className="px-3 py-2 text-left min-w-[75px]">CG No.</th>
+                              <th className="px-2 py-2 text-left min-w-[90px]">Domain</th>
+                              <th className="px-2 py-2 text-left min-w-[180px]">Competency</th>
+                              {[1,2,3,4,5].map(n=>(
+                                <th key={n} colSpan={2} className="px-1 py-2 text-center border-l border-indigo-600 min-w-[170px]">Rubric {n}</th>
+                              ))}
+                              <th className="px-2 py-2 text-center border-l border-indigo-600 min-w-[55px]">Total</th>
+                              <th className="px-2 py-2 text-center min-w-[65px]">Coverage</th>
+                            </tr>
+                            <tr className="bg-indigo-600 text-indigo-200">
+                              <th colSpan={4}></th>
+                              {[0,1,2,3,4].map(i=>(
+                                <>{
+                                  <th key={`tna${i}`} className="px-1 py-1 text-center border-l border-indigo-500 font-normal min-w-[110px]">Name</th>
+                                }{
+                                  <th key={`tmx${i}`} className="px-1 py-1 text-center font-normal min-w-[55px]">/Max</th>
+                                }</>
+                              ))}
+                              <th colSpan={2}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {competencies.map((c:any,idx:number)=>{
+                              const checked=selectedComps.includes(c.id);
+                              const rub=rubrics[c.id];
+                              const compTotal=checked?(rub?.items||[]).reduce((s,item)=>s+(+item.max_marks||0),0):0;
+                              const usedIn=activities.filter(a=>(a.rubrics||[]).some((r:any)=>r.competency_id===c.id)).length;
+                              const domColor=tcDomColor[c.domain||"General"]||"#6366f1";
+                              return (
+                                <tr key={c.id} className={`border-b border-gray-100 ${checked?"bg-indigo-50":idx%2===0?"bg-white":"bg-gray-50"} hover:bg-indigo-50 transition-colors`}>
+                                  <td className="px-2 py-2 text-center">
+                                    <input type="checkbox" checked={checked} onChange={()=>toggleComp(c.id)} className="w-4 h-4 accent-indigo-600 cursor-pointer"/>
+                                  </td>
+                                  <td className="px-3 py-2 font-mono font-bold text-indigo-700 whitespace-nowrap">{c.code||c.competency_code||"—"}</td>
+                                  <td className="px-2 py-2">
+                                    <span className="px-1.5 py-0.5 rounded text-white font-medium" style={{backgroundColor:domColor,fontSize:"10px"}}>
+                                      {(c.domain||"General").slice(0,14)}
+                                    </span>
+                                  </td>
+                                  <td className="px-2 py-2 text-gray-700">{(c.name||c.description||"").slice(0,70)}</td>
+                                  {[0,1,2,3,4].map(i=>{
+                                    const item=rub?.items?.[i]||{name:"",max_marks:0};
+                                    return (
+                                      <>
+                                        <td key={`tn${i}`} className={`px-1 py-1 border-l border-gray-100 ${!checked?"bg-gray-50":""}`}>
+                                          <input value={item.name} disabled={!checked}
+                                            onChange={e=>{
+                                              const items=[...(rub?.items||Array(5).fill(null).map(()=>({name:"",max_marks:0})))];
+                                              items[i]={...items[i],name:e.target.value};
+                                              setRubrics(r=>({...r,[c.id]:{...(r[c.id]||{name:"",items:[]}),items}}));
+                                            }}
+                                            placeholder={checked?"Rubric name":""}
+                                            className={`rounded px-1.5 py-0.5 w-[105px] text-xs ${checked?"border border-gray-300 bg-white":"border-0 bg-transparent text-gray-300 cursor-not-allowed"}`}/>
+                                        </td>
+                                        <td key={`tm${i}`} className={`px-1 py-1 text-center ${!checked?"bg-gray-50":""}`}>
+                                          <input type="number" min={0} value={item.max_marks||""} disabled={!checked}
+                                            onChange={e=>{
+                                              const items=[...(rub?.items||Array(5).fill(null).map(()=>({name:"",max_marks:0})))];
+                                              items[i]={...items[i],max_marks:+e.target.value};
+                                              setRubrics(r=>({...r,[c.id]:{...(r[c.id]||{name:"",items:[]}),items}}));
+                                            }}
+                                            placeholder={checked?"0":""}
+                                            className={`rounded px-1 py-0.5 w-12 text-center text-xs ${checked?"border border-gray-300 bg-white":"border-0 bg-transparent text-gray-300 cursor-not-allowed"}`}/>
+                                        </td>
+                                      </>
+                                    );
+                                  })}
+                                  <td className={`px-2 py-2 text-center font-bold border-l border-gray-100 ${checked?"text-indigo-700":"text-gray-300"}`}>
+                                    {checked?compTotal:"—"}
+                                  </td>
+                                  <td className="px-2 py-2 text-center">
+                                    {usedIn>0
+                                      ?<span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium" style={{fontSize:"10px"}}>{usedIn} act.</span>
+                                      :<span className="text-gray-300">—</span>}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          {selectedComps.length>0&&(
+                            <tfoot>
+                              <tr className="bg-indigo-50 border-t-2 border-indigo-200">
+                                <td colSpan={4} className="px-3 py-2 font-bold text-indigo-700 text-xs">{selectedComps.length} competency(ies) selected</td>
+                                <td colSpan={11} className="px-3 py-2 font-bold text-indigo-700 text-xs text-right">Grand Total: {grandTotal} marks</td>
+                              </tr>
+                            </tfoot>
+                          )}
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()
+              }
 
               <div><label className="text-xs text-gray-500 block mb-1">Description (optional)</label>
                 <textarea value={form.description} onChange={e=>setForm(p=>({...p,description:e.target.value}))} rows={2} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
