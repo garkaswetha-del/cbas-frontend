@@ -242,6 +242,32 @@ export default function UserManagementPage() {
     }));
   };
 
+  // ── SYNC QUALIFICATIONS ──────────────────────────────────────
+  const syncQualifications = async () => {
+    setImporting(true);
+    setImportProgress(0);
+    let updated = 0, skipped = 0;
+    const emailToUser: Record<string, any> = {};
+    users.forEach(u => { if (u.email) emailToUser[u.email.toLowerCase()] = u; });
+
+    for (let i = 0; i < EXCEL_TEACHERS.length; i++) {
+      const t = EXCEL_TEACHERS[i];
+      setImportProgress(Math.round(((i + 1) / EXCEL_TEACHERS.length) * 100));
+      if (!t.email || !t.appraisal_qualification) { skipped++; continue; }
+      const user = emailToUser[t.email.toLowerCase()];
+      if (!user) { skipped++; continue; }
+      try {
+        await axios.patch(`${API}/users/${user.id}`, { appraisal_qualification: t.appraisal_qualification });
+        updated++;
+      } catch { skipped++; }
+      await new Promise(r => setTimeout(r, 50));
+    }
+
+    setImportResults({ success: updated, skipped, failed: 0, errors: [] });
+    setImporting(false);
+    fetchUsers();
+  };
+
   // ── BULK IMPORT ──────────────────────────────────────────────
   const importAllTeachers = async () => {
     setImporting(true);
@@ -317,6 +343,10 @@ export default function UserManagementPage() {
               {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
+          <button onClick={syncQualifications} disabled={importing}
+            className="px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 font-medium disabled:opacity-50">
+            🔄 Sync Qualifications
+          </button>
           <button onClick={() => setShowImport(true)}
             className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium flex items-center gap-2">
             📥 Import from Excel
