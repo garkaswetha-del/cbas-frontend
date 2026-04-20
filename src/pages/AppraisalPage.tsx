@@ -5,6 +5,23 @@ const API = "https://cbas-backend-production.up.railway.app";
 const ACADEMIC_YEAR = "2025-26";
 
 const GRADE_ORDER = ["Nursery","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
+
+const STAGE_GRADES: Record<string,string[]> = {
+  Foundation:   ["Pre-KG","LKG","UKG","Nursery","Grade 1","Grade 2"],
+  Preparatory:  ["Grade 3","Grade 4","Grade 5"],
+  Middle:       ["Grade 6","Grade 7","Grade 8"],
+  Secondary:    ["Grade 9","Grade 10"],
+};
+const STAGE_ORDER_LIST = ["Foundation","Preparatory","Middle","Secondary"];
+function primaryStageOrder(assigned_classes: string[]): number {
+  if (!assigned_classes?.length) return 99;
+  let min = 99;
+  assigned_classes.forEach(cls => {
+    const idx = STAGE_ORDER_LIST.findIndex(s => STAGE_GRADES[s]?.includes(cls));
+    if (idx !== -1 && idx < min) min = idx;
+  });
+  return min;
+}
 // Accepted qualifications per grade — exact match against dropdown values
 const GRADE_CAPS: Record<string,{quals:string[],cap:number}> = {
   "Nursery":  {quals:["NTT","NST"],                                                    cap:17000},
@@ -112,7 +129,10 @@ export default function AppraisalPage() {
   const fetchData = async () => {
     try {
       const res = await axios.get(`${API}/appraisal?academic_year=${ACADEMIC_YEAR}`);
-      setTeachers(res.data);
+      const sorted = [...res.data].sort((a:any,b:any) =>
+        primaryStageOrder(a.assigned_classes) - primaryStageOrder(b.assigned_classes)
+      );
+      setTeachers(sorted);
       const map:Record<string,any> = {};
       res.data.forEach((t:any)=>{ map[t.teacher_id] = t.appraisal||{}; });
       setAppraisals(map);

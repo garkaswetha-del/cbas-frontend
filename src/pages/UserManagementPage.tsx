@@ -350,13 +350,26 @@ export default function UserManagementPage() {
     fetchUsers();
   };
 
+  const STAGE_ORDER_LIST = ["Foundation", "Preparatory", "Middle", "Secondary"];
+  function primaryStageOrder(assigned_classes: string[]): number {
+    if (!assigned_classes?.length) return 99;
+    let min = 99;
+    assigned_classes.forEach(cls => {
+      const def = STAGE_DEFS.find(d => d.grades.includes(cls));
+      if (def) { const i = STAGE_ORDER_LIST.indexOf(def.label); if (i < min) min = i; }
+    });
+    return min;
+  }
+
   const teachers = users.filter(u => u.role === "teacher");
   const admins = users.filter(u => u.role === "admin");
-  const filtered = teachers.filter(u =>
-    u.name?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase()) ||
-    (u.subjects || []).join(" ").toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = teachers
+    .filter(u =>
+      u.name?.toLowerCase().includes(search.toLowerCase()) ||
+      u.email?.toLowerCase().includes(search.toLowerCase()) ||
+      (u.subjects || []).join(" ").toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => primaryStageOrder(a.assigned_classes) - primaryStageOrder(b.assigned_classes));
 
   return (
     <div className="p-3 sm:p-6">
