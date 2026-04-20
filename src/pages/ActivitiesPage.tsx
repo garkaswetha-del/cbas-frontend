@@ -124,7 +124,13 @@ export default function ActivitiesPage() {
   useEffect(() => {
     if (!formGrades.length) { setFormSubjects([]); setFormSectionsMap({}); setCompetencies([]); return; }
     const primary = formGrades[0];
-    axios.get(`${API}/activities/subjects-for-grade/${encodeURIComponent(primary)}`).then(r=>setFormSubjects(r.data||[])).catch(()=>setFormSubjects([]));
+    // Fetch subjects from competency mappings for this grade
+    axios.get(`${API}/activities/competencies?grade=${encodeURIComponent(primary)}`).then(r=>{
+      const comps: any[] = r.data || [];
+      const uniqueSubjects = [...new Set(comps.map((c:any)=>c.subject).filter(Boolean))] as string[];
+      setFormSubjects(uniqueSubjects);
+    }).catch(()=>setFormSubjects([]));
+    // Fetch sections for all selected grades
     axios.get(`${API}/students?limit=2000`).then(r=>{
       const students=r.data?.data||r.data||[];
       const map: Record<string,string[]>={};
@@ -478,17 +484,11 @@ export default function ActivitiesPage() {
                 <div className="flex gap-4 flex-wrap items-end">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Subject *</label>
-                    <input
-                      value={form.subject}
-                      onChange={e=>setForm(p=>({...p,subject:e.target.value,competency_mappings:[]}))}
-                      list="admin-subjects-list"
-                      placeholder="Type or select subject..."
-                      className="border border-gray-300 rounded px-2 py-1.5 text-sm min-w-[200px]"
-                    />
-                    <datalist id="admin-subjects-list">
-                      {formSubjects.map(s=><option key={s} value={s}/>)}
-                    </datalist>
-                    {formSubjects.length>0&&<p className="text-xs text-gray-400 mt-0.5">{formSubjects.length} suggestion(s) available</p>}
+                    <select value={form.subject} onChange={e=>setForm(p=>({...p,subject:e.target.value,competency_mappings:[]}))}
+                      className="border border-gray-300 rounded px-2 py-1.5 text-sm min-w-[200px]">
+                      <option value="">{formSubjects.length ? "Select Subject" : "No subjects mapped for this grade"}</option>
+                      {formSubjects.map(s=><option key={s} value={s}>{s}</option>)}
+                    </select>
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Stage</label>
