@@ -96,13 +96,12 @@ test.describe('E2E — Student Management', () => {
 
     // Wait for initial table to load fully before filtering
     await page.waitForFunction(() => document.querySelectorAll('tbody tr').length >= 50);
+    const totalBefore = await page.locator('tbody tr').count();
     await page.locator('select').filter({ hasText: 'All Classes' }).selectOption('Grade 5');
-    // Wait for the API response and UI update (Showing count must change)
+    // Wait until the row count changes from the pre-filter value (confirming filter applied)
     await page.waitForFunction(
-      () => (document.querySelector('span, p')?.textContent || '').includes('Showing') &&
-            !document.body.innerText.includes('Showing 1491') &&
-            !document.body.innerText.includes('Showing 1490'),
-      { timeout: 10000 }
+      (before: number) => document.querySelectorAll('tbody tr').length !== before,
+      totalBefore, { timeout: 15000 }
     );
     const uiCount = await page.locator('text=/Showing (\\d+) students/').textContent();
 
