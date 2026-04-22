@@ -94,8 +94,16 @@ test.describe('E2E — Student Management', () => {
     await login(page);
     await goToStudents(page);
 
+    // Wait for initial table to load fully before filtering
+    await page.waitForFunction(() => document.querySelectorAll('tbody tr').length >= 50);
     await page.locator('select').filter({ hasText: 'All Classes' }).selectOption('Grade 5');
-    await page.waitForTimeout(1500);
+    // Wait for the API response and UI update (Showing count must change)
+    await page.waitForFunction(
+      () => (document.querySelector('span, p')?.textContent || '').includes('Showing') &&
+            !document.body.innerText.includes('Showing 1491') &&
+            !document.body.innerText.includes('Showing 1490'),
+      { timeout: 10000 }
+    );
     const uiCount = await page.locator('text=/Showing (\\d+) students/').textContent();
 
     // ── BACKEND VERIFY ──
@@ -112,7 +120,10 @@ test.describe('E2E — Student Management', () => {
 
     await page.waitForFunction(() => document.querySelectorAll('tbody tr').length > 5);
     await page.fill('input[placeholder="Search by name..."]', 'E2E Student');
-    await page.waitForTimeout(1500);
+    // Wait until table updates to only show the matching student
+    await page.waitForFunction(
+      () => document.querySelectorAll('tbody tr').length <= 5, { timeout: 10000 }
+    );
     const rows = await page.locator('tbody tr').count();
 
     // ── BACKEND VERIFY ──
@@ -127,7 +138,13 @@ test.describe('E2E — Student Management', () => {
     await goToStudents(page);
 
     await page.fill('input[placeholder="Search by name..."]', TEST_STUDENT.name);
-    await page.waitForTimeout(1500);
+    // Wait until exactly 1 row is shown — confirming the right student is displayed
+    await page.waitForFunction(
+      () => document.querySelectorAll('tbody tr').length === 1, { timeout: 10000 }
+    );
+    // Verify the correct student name is in the first row before clicking Edit
+    const rowText = await page.locator('tbody tr').first().textContent();
+    expect(rowText).toContain(TEST_STUDENT.name);
     await page.locator('button:has-text("Edit")').first().click();
     await expect(page.getByText('✏️ Edit Student')).toBeVisible();
 
@@ -168,7 +185,12 @@ test.describe('E2E — Student Management', () => {
     await goToStudents(page);
 
     await page.fill('input[placeholder="Search by name..."]', TEST_STUDENT.name);
-    await page.waitForTimeout(1500);
+    // Wait until exactly 1 row is shown — the test student
+    await page.waitForFunction(
+      () => document.querySelectorAll('tbody tr').length === 1, { timeout: 10000 }
+    );
+    const tcRowText = await page.locator('tbody tr').first().textContent();
+    expect(tcRowText).toContain(TEST_STUDENT.name);
 
     // Get student ID from backend before TC
     const studentBefore = await getTestStudent();
