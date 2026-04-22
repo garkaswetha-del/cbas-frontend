@@ -320,7 +320,7 @@ export default function AppraisalPage() {
               ];
               return (
                 <tr key={t.teacher_id} className={idx%2===0?"bg-white":"bg-gray-50"}>
-                  <td className={`${td} font-semibold text-gray-800 sticky left-0 bg-white z-10 min-w-[160px]`}>
+                  <td className={`${td} font-semibold text-gray-800 sticky left-0 bg-white z-10 min-w-[140px]`}>
                     <div className="flex items-center justify-between gap-2">
                       <span>{t.teacher_name}</span>
                       <button onClick={()=>save(t.teacher_id,t.teacher_name)} disabled={saving===t.teacher_id}
@@ -416,20 +416,12 @@ export default function AppraisalPage() {
                     {a.is_shared?<span className="text-green-600 font-semibold text-xs">✅ Shared</span>:<span className="text-gray-400 text-xs">No</span>}
                   </td>
                   <td className={`${td} text-center`}>
-                    <div className="flex flex-col gap-1 items-center">
-                      <button onClick={()=>save(t.teacher_id,t.teacher_name)} disabled={saving===t.teacher_id}
-                        className="px-2 py-0.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50 w-full">
-                        {saving===t.teacher_id?"...":"Save"}
+                    {a.id&&!a.is_shared&&(
+                      <button onClick={()=>share(a.id,t.teacher_name)} disabled={sharing===a.id}
+                        className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:opacity-50">
+                        {sharing===a.id?"...":"Share"}
                       </button>
-                      {a.is_shared
-                        ? <span className="text-green-600 font-semibold text-xs">✅ Shared</span>
-                        : <button onClick={()=>a.id&&share(a.id,t.teacher_name)} disabled={!a.id||sharing===a.id}
-                            title={!a.id?"Save first":"Share with teacher"}
-                            className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:opacity-40 w-full">
-                            {sharing===a.id?"...":"Share"}
-                          </button>
-                      }
-                    </div>
+                    )}
                   </td>
                 </tr>
               );
