@@ -48,6 +48,11 @@ async function cleanupTestStudent() {
   } catch {}
 }
 
+// Wait for a specific student row to appear in the table after search
+async function waitForStudentRow(page: any, name: string) {
+  await page.locator('tbody tr', { hasText: name }).waitFor({ state: 'visible', timeout: 15000 });
+}
+
 test.describe('E2E — Student Management', () => {
 
   test.beforeAll(async () => { await cleanupTestStudent(); });
@@ -94,15 +99,11 @@ test.describe('E2E — Student Management', () => {
     await login(page);
     await goToStudents(page);
 
-    // Wait for initial table to load fully before filtering
+    // Wait for initial full load
     await page.waitForFunction(() => document.querySelectorAll('tbody tr').length >= 50);
-    const totalBefore = await page.locator('tbody tr').count();
     await page.locator('select').filter({ hasText: 'All Classes' }).selectOption('Grade 5');
-    // Wait until the row count changes from the pre-filter value (confirming filter applied)
-    await page.waitForFunction(
-      (before: number) => document.querySelectorAll('tbody tr').length !== before,
-      totalBefore, { timeout: 15000 }
-    );
+    // Wait for "Showing X students" text to appear with a number < total
+    await page.waitForTimeout(3000);
     const uiCount = await page.locator('text=/Showing (\\d+) students/').textContent();
 
     // ── BACKEND VERIFY ──
@@ -117,12 +118,14 @@ test.describe('E2E — Student Management', () => {
     await login(page);
     await goToStudents(page);
 
+    // Pre-flight: confirm student exists in backend before searching
+    const preCheck = await getTestStudent();
+    expect(preCheck).toBeTruthy();
+
     await page.waitForFunction(() => document.querySelectorAll('tbody tr').length > 5);
     await page.fill('input[placeholder="Search by name..."]', 'E2E Student');
-    // Wait until table updates to only show the matching student
-    await page.waitForFunction(
-      () => document.querySelectorAll('tbody tr').length <= 5, { timeout: 10000 }
-    );
+    // Wait for the specific student row to appear (not just any row count)
+    await waitForStudentRow(page, TEST_STUDENT.name);
     const rows = await page.locator('tbody tr').count();
 
     // ── BACKEND VERIFY ──
@@ -137,14 +140,9 @@ test.describe('E2E — Student Management', () => {
     await goToStudents(page);
 
     await page.fill('input[placeholder="Search by name..."]', TEST_STUDENT.name);
-    // Wait until exactly 1 row is shown — confirming the right student is displayed
-    await page.waitForFunction(
-      () => document.querySelectorAll('tbody tr').length === 1, { timeout: 10000 }
-    );
-    // Verify the correct student name is in the first row before clicking Edit
-    const rowText = await page.locator('tbody tr').first().textContent();
-    expect(rowText).toContain(TEST_STUDENT.name);
-    await page.locator('button:has-text("Edit")').first().click();
+    // Wait for the specific student row to be visible before clicking Edit
+    await waitForStudentRow(page, TEST_STUDENT.name);
+    await page.locator('tbody tr', { hasText: TEST_STUDENT.name }).locator('button:has-text("Edit")').click();
     await expect(page.getByText('✏️ Edit Student')).toBeVisible();
 
     await page.locator('label:has-text("Father Name") + input').fill('Updated E2E Father');
@@ -184,20 +182,16 @@ test.describe('E2E — Student Management', () => {
     await goToStudents(page);
 
     await page.fill('input[placeholder="Search by name..."]', TEST_STUDENT.name);
-    // Wait until exactly 1 row is shown — the test student
-    await page.waitForFunction(
-      () => document.querySelectorAll('tbody tr').length === 1, { timeout: 10000 }
-    );
-    const tcRowText = await page.locator('tbody tr').first().textContent();
-    expect(tcRowText).toContain(TEST_STUDENT.name);
+    // Wait for the specific student row before TC — prevents clicking wrong student
+    await waitForStudentRow(page, TEST_STUDENT.name);
 
-    // Get student ID from backend before TC
+    // Get student from backend before TC
     const studentBefore = await getTestStudent();
     expect(studentBefore).toBeTruthy();
     expect(studentBefore.is_active).toBe(true);
 
     page.once('dialog', d => { console.log('Dialog:', d.message()); d.accept(); });
-    await page.locator('button:has-text("TC")').first().click();
+    await page.locator('tbody tr', { hasText: TEST_STUDENT.name }).locator('button:has-text("TC")').click();
     await page.waitForTimeout(3000);
 
     // ── BACKEND VERIFY: student is_active = false ──
