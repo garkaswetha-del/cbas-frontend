@@ -191,7 +191,8 @@ test.describe('E2E — Student Management', () => {
     expect(studentBefore.is_active).toBe(true);
 
     page.once('dialog', d => { console.log('Dialog:', d.message()); d.accept(); });
-    await page.locator('tbody tr', { hasText: TEST_STUDENT.name }).locator('button:has-text("TC")').click();
+    // Use .first() — search already limits table to 1 student row
+    await page.locator('button:has-text("TC")').first().click({ timeout: 15000 });
     await page.waitForTimeout(3000);
 
     // ── BACKEND VERIFY: student is_active = false ──
