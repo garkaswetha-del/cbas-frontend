@@ -679,8 +679,9 @@ export default function BaselinePage() {
   const [prevRoundScores, setPrevRoundScores] = useState<Record<string,Record<string,string>>>({});
   const [prevRoundLabel, setPrevRoundLabel] = useState("");
 
-  // ── GAP #12: round lock (persisted in localStorage) ─────────────
+  // ── round lock (DB-persisted, per year/round/grade/section) ──────
   const [lockedRounds, setLockedRounds] = useState<Set<string>>(new Set());
+  const [lockSaving, setLockSaving] = useState(false);
 
   // ── GAP #5/#16: section completion status ────────────────────────
   const [sectionStatus, setSectionStatus] = useState<Record<string,boolean>>({});
@@ -690,9 +691,10 @@ export default function BaselinePage() {
   const [compareSchoolData, setCompareSchoolData] = useState<any>(null);
   const [showComparison, setShowComparison] = useState(false);
 
-  // ── GAP #20/#21: configurable thresholds ────────────────────────
+  // ── configurable thresholds (DB-persisted per year+round) ───────
   const [gapThreshold, setGapThreshold] = useState(60);
   const [promotionThreshold, setPromotionThreshold] = useState(80);
+  const [thresholdDirty, setThresholdDirty] = useState(false);
 
   useEffect(() => { if (grade) fetchSections(); }, [grade]);
   useEffect(() => { if (grade && section) fetchStudents(); }, [grade, section, academicYear, round]);
@@ -705,13 +707,47 @@ export default function BaselinePage() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
 
-  // GAP #12: restore locked rounds from localStorage on mount
+  // Load thresholds from DB when year/round changes
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('baseline_locked');
-      if (stored) setLockedRounds(new Set(JSON.parse(stored)));
-    } catch {}
-  }, []);
+    const load = async () => {
+      try {
+        const r = await axios.get(`${API}/baseline/config?academic_year=${academicYear}&round=${round}`);
+        setGapThreshold(+r.data.gap_threshold || 60);
+        setPromotionThreshold(+r.data.promotion_threshold || 80);
+        setThresholdDirty(false);
+      } catch {}
+    };
+    load();
+  }, [academicYear, round]);
+
+  // Load lock for current grade/section/round/year from DB
+  useEffect(() => {
+    if (!grade || !section) return;
+    const load = async () => {
+      try {
+        const r = await axios.get(`${API}/baseline/config?academic_year=${academicYear}&round=${round}&grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}`);
+        const key = `${grade}_${section}_${round}_${academicYear}`;
+        setLockedRounds(prev => {
+          const next = new Set(prev);
+          if (r.data.is_locked) next.add(key); else next.delete(key);
+          return next;
+        });
+      } catch {}
+    };
+    load();
+  }, [grade, section, round, academicYear]);
+
+  // Auto-save thresholds to DB (debounced 800ms)
+  useEffect(() => {
+    if (!thresholdDirty) return;
+    const t = setTimeout(async () => {
+      try {
+        await axios.patch(`${API}/baseline/config`, { academic_year: academicYear, round, gap_threshold: gapThreshold, promotion_threshold: promotionThreshold });
+        setThresholdDirty(false);
+      } catch {}
+    }, 800);
+    return () => clearTimeout(t);
+  }, [gapThreshold, promotionThreshold, thresholdDirty, academicYear, round]);
 
   // GAP #5/#16: fetch section status when grade/round/year changes
   useEffect(() => { if (grade && sections.length) fetchSectionStatus(); }, [grade, sections, round, academicYear]);
@@ -844,14 +880,18 @@ export default function BaselinePage() {
     try { const r = await axios.get(`${API}/users?role=teacher`); setTeachers(r.data||[]); } catch {}
   };
 
-  // GAP #12: lock/unlock current round for this section
   const isCurrentLocked = () => lockedRounds.has(`${grade}_${section}_${round}_${academicYear}`);
-  const toggleLock = () => {
+  const toggleLock = async () => {
     const key = `${grade}_${section}_${round}_${academicYear}`;
+    const newLocked = !lockedRounds.has(key);
     const newSet = new Set(lockedRounds);
-    if (newSet.has(key)) newSet.delete(key); else newSet.add(key);
+    if (newLocked) newSet.add(key); else newSet.delete(key);
     setLockedRounds(newSet);
-    try { localStorage.setItem('baseline_locked', JSON.stringify([...newSet])); } catch {}
+    setLockSaving(true);
+    try {
+      await axios.patch(`${API}/baseline/config`, { academic_year: academicYear, round, grade, section, is_locked: newLocked });
+    } catch { setMessage('❌ Failed to save lock state'); setTimeout(() => setMessage(''), 3000); }
+    finally { setLockSaving(false); }
   };
 
   // GAP #6: download blank Excel template in the correct import format
@@ -1303,9 +1343,9 @@ export default function BaselinePage() {
                   className="px-3 py-2 bg-cyan-600 text-white text-sm rounded-lg hover:bg-cyan-700 font-medium">
                   📤 Export
                 </button>
-                <button onClick={toggleLock} title={isCurrentLocked() ? "Unlock this round" : "Lock this round to prevent edits"}
-                  className={`px-3 py-2 text-sm rounded-lg font-medium ${isCurrentLocked() ? "bg-red-100 text-red-700 border border-red-300 hover:bg-red-200" : "bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"}`}>
-                  {isCurrentLocked() ? "🔒 Locked" : "🔓 Lock"}
+                <button onClick={toggleLock} disabled={lockSaving} title={isCurrentLocked() ? "Unlock this round" : "Lock this round to prevent edits"}
+                  className={`px-3 py-2 text-sm rounded-lg font-medium ${isCurrentLocked() ? "bg-red-100 text-red-700 border border-red-300 hover:bg-red-200" : "bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"} disabled:opacity-50`}>
+                  {lockSaving ? "⏳..." : isCurrentLocked() ? "🔒 Locked" : "🔓 Lock"}
                 </button>
                 <input ref={xlFileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleXlUpload} />
                 <button onClick={() => xlFileRef.current?.click()} disabled={xlParsing}
@@ -1334,13 +1374,13 @@ export default function BaselinePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
               <div className="flex items-center gap-3">
                 <label className="text-xs text-gray-600 font-semibold whitespace-nowrap">Gap Threshold (%):</label>
-                <input type="number" min={1} max={99} value={gapThreshold} onChange={e => setGapThreshold(Number(e.target.value))}
+                <input type="number" min={1} max={99} value={gapThreshold} onChange={e => { setGapThreshold(Number(e.target.value)); setThresholdDirty(true); }}
                   className="w-16 text-center text-sm border border-orange-300 rounded px-2 py-1 font-bold text-orange-700" />
                 <span className="text-xs text-gray-400">Below this % = gap</span>
               </div>
               <div className="flex items-center gap-3">
                 <label className="text-xs text-gray-600 font-semibold whitespace-nowrap">Promotion Threshold (%):</label>
-                <input type="number" min={1} max={100} value={promotionThreshold} onChange={e => setPromotionThreshold(Number(e.target.value))}
+                <input type="number" min={1} max={100} value={promotionThreshold} onChange={e => { setPromotionThreshold(Number(e.target.value)); setThresholdDirty(true); }}
                   className="w-16 text-center text-sm border border-green-300 rounded px-2 py-1 font-bold text-green-700" />
                 <span className="text-xs text-gray-400">At or above this % = L4</span>
               </div>
