@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, LineChart, Line, Cell,
 } from "recharts";
 
@@ -194,7 +194,7 @@ function parseBaselineExcel(ws: XLSX.WorkSheet): {
 }
 
 // ── TeacherBaselineEntry component ────────────────────────────────
-function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAssessmentDate, API: apiUrl }: any) {
+function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAssessmentDate, API: apiUrl, globalRound }: any) {
   const LIT_DOMAINS = ["Listening","Speaking","Reading","Writing"];
   const NUM_DOMAINS = ["Operations","Base 10","Measurement","Geometry"];
   const TROUNDS = [
@@ -206,13 +206,16 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
   ];
   const STAGE_ORDER = ["foundation","preparatory","middle","secondary"];
 
-  const [round, setRound] = useState("baseline_1");
+  const [round, setRound] = useState(globalRound || "baseline_1");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   // Per-teacher entry: { [tid]: { subjects, lit_stage, num_stage, litScores, numScores, lit_max, num_max } }
   const [entries, setEntries] = useState<Record<string, any>>({});
   const [existingData, setExistingData] = useState<Record<string, any[]>>({});
+
+  // GAP #19: sync with global round when it changes
+  useEffect(() => { if (globalRound) setRound(globalRound); }, [globalRound]);
 
   useEffect(() => { loadExistingRounds(); }, [round, academicYear]);
 
@@ -265,11 +268,11 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
           const nextNumIdx = STAGE_ORDER.indexOf(prevNumStage) + (numPromoted ? 1 : 0);
           const nextLitStage = STAGE_ORDER[Math.min(nextLitIdx, STAGE_ORDER.length - 1)] || prevLitStage;
           const nextNumStage = STAGE_ORDER[Math.min(nextNumIdx, STAGE_ORDER.length - 1)] || prevNumStage;
+          const savedSubjects = (() => { try { return localStorage.getItem(`teacher_subjects_${t.id}`) || ""; } catch { return ""; } })();
           setEntries(prev => ({ ...prev, [t.id]: {
-            subjects: prev[t.id]?.subjects || "both",
+            subjects: savedSubjects || prev[t.id]?.subjects || "both",
             lit_stage: nextLitStage,
             num_stage: nextNumStage,
-            // Always empty for a new round
             litScores: {}, numScores: {}, litMax: {}, numMax: {},
           }}));
         }
@@ -296,6 +299,10 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
 
   const updateEntry = (tid: string, field: string, value: string) => {
     setEntries(prev => ({ ...prev, [tid]: { ...getEntry(tid), [field]: value } }));
+    // GAP #14: persist subject selection per teacher
+    if (field === "subjects") {
+      try { localStorage.setItem(`teacher_subjects_${tid}`, value); } catch {}
+    }
   };
 
   // Calculate % using per-teacher max marks
@@ -651,9 +658,63 @@ export default function BaselinePage() {
   const [gradeDashTab, setGradeDashTab] = useState<"overall"|"literacy"|"numeracy">("overall");
   const [teacherDashTab, setTeacherDashTab] = useState<"overall"|"literacy"|"numeracy">("overall");
 
+  // ── GAP #3: unsaved-data tracking ───────────────────────────────
+  const [isDirty, setIsDirty] = useState(false);
+
+  // ── GAP #9/#18: search / filter / sort ──────────────────────────
+  const [searchFilter, setSearchFilter] = useState("");
+  const [levelFilter, setLevelFilter] = useState("");
+  const [sortKey, setSortKey] = useState<"name"|"overall"|"lit"|"num"|"">("");
+  const [sortDir, setSortDir] = useState<"asc"|"desc">("asc");
+
+  // ── GAP #10: absent tracking ─────────────────────────────────────
+  const [absentStudents, setAbsentStudents] = useState<Set<string>>(new Set());
+
+  // ── GAP #11: notes per student ───────────────────────────────────
+  const [studentNotes, setStudentNotes] = useState<Record<string,string>>({});
+  const [showNoteFor, setShowNoteFor] = useState<string|null>(null);
+
+  // ── GAP #7: previous round comparison ───────────────────────────
+  const [showPrevRound, setShowPrevRound] = useState(false);
+  const [prevRoundScores, setPrevRoundScores] = useState<Record<string,Record<string,string>>>({});
+  const [prevRoundLabel, setPrevRoundLabel] = useState("");
+
+  // ── GAP #12: round lock (persisted in localStorage) ─────────────
+  const [lockedRounds, setLockedRounds] = useState<Set<string>>(new Set());
+
+  // ── GAP #5/#16: section completion status ────────────────────────
+  const [sectionStatus, setSectionStatus] = useState<Record<string,boolean>>({});
+
+  // ── GAP #15: dashboard round comparison ─────────────────────────
+  const [compareRound, setCompareRound] = useState("baseline_1");
+  const [compareSchoolData, setCompareSchoolData] = useState<any>(null);
+  const [showComparison, setShowComparison] = useState(false);
+
+  // ── GAP #20/#21: configurable thresholds ────────────────────────
+  const [gapThreshold, setGapThreshold] = useState(60);
+  const [promotionThreshold, setPromotionThreshold] = useState(80);
+
   useEffect(() => { if (grade) fetchSections(); }, [grade]);
   useEffect(() => { if (grade && section) fetchStudents(); }, [grade, section, academicYear, round]);
   useEffect(() => { fetchTeachers(); }, []);
+
+  // GAP #3: warn before page unload if unsaved
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => { if (isDirty) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  // GAP #12: restore locked rounds from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('baseline_locked');
+      if (stored) setLockedRounds(new Set(JSON.parse(stored)));
+    } catch {}
+  }, []);
+
+  // GAP #5/#16: fetch section status when grade/round/year changes
+  useEffect(() => { if (grade && sections.length) fetchSectionStatus(); }, [grade, sections, round, academicYear]);
   useEffect(() => {
     if (activeTab === "dashboard") {
       if (dashTab === "school") fetchSchoolDash();
@@ -673,23 +734,44 @@ export default function BaselinePage() {
     } catch {}
   };
 
+  // GAP #5/#16: check which sections have data for current round
+  const fetchSectionStatus = async () => {
+    if (!sections.length) return;
+    const results: Record<string,boolean> = {};
+    await Promise.all(sections.map(async (sec) => {
+      try {
+        const r = await axios.get(`${API}/baseline/section?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(sec)}&academic_year=${academicYear}&round=${round}`);
+        results[sec] = (r.data||[]).some((st:any) => st.assessment);
+      } catch { results[sec] = false; }
+    }));
+    setSectionStatus(results);
+  };
+
   const fetchStudents = async () => {
     setLoadingStudents(true);
+    setIsDirty(false);
+    setAbsentStudents(new Set());
+    setStudentNotes({});
+    setPrevRoundScores({});
+    setPrevRoundLabel("");
     try {
       const r = await axios.get(`${API}/baseline/section?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}&academic_year=${academicYear}&round=${round}`);
       const data = r.data || [];
       setEntryStudents(data);
-      // Pre-fill scores from existing data
-      const newScores: Record<string, Record<string, string>> = {};
-      const newMaxMarks: Record<string, string> = {};
-      let detectedLitDomains: string[] | null = null;
-      let detectedNumDomains: string[] | null = null;
+
+      const newScores: Record<string,Record<string,string>> = {};
+      const newMaxMarks: Record<string,string> = {};
+      const newAbsent = new Set<string>();
+      const newNotes: Record<string,string> = {};
+      let detectedLitDomains: string[]|null = null;
+      let detectedNumDomains: string[]|null = null;
+      let hasCurrentRoundData = false;
 
       data.forEach((st: any) => {
-        const sc: Record<string, string> = {};
+        const sc: Record<string,string> = {};
         if (st.assessment) {
+          hasCurrentRoundData = true;
           const a = st.assessment;
-          // Restore domains from saved data
           if (a.literacy_scores) Object.entries(a.literacy_scores).forEach(([d, v]) => { sc[d] = String(v); });
           if (a.numeracy_scores) Object.entries(a.numeracy_scores).forEach(([d, v]) => { sc[d] = String(v); });
           if (a.max_marks && !Object.keys(newMaxMarks).length) {
@@ -699,11 +781,57 @@ export default function BaselinePage() {
           }
           if (!detectedLitDomains && a.literacy_scores) detectedLitDomains = Object.keys(a.literacy_scores);
           if (!detectedNumDomains && a.numeracy_scores) detectedNumDomains = Object.keys(a.numeracy_scores);
+          if (a.is_absent) newAbsent.add(st.student_id);
+          if (a.notes) newNotes[st.student_id] = a.notes;
         }
         newScores[st.student_id] = sc;
       });
 
+      // GAP #1/#2: carry forward max marks + domains from most recent prior round
+      if (!hasCurrentRoundData) {
+        const ROUND_VALS = ROUNDS.map(rv => rv.value);
+        const curIdx = ROUND_VALS.indexOf(round);
+        for (let i = curIdx - 1; i >= 0; i--) {
+          try {
+            const pr = await axios.get(`${API}/baseline/section?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}&academic_year=${academicYear}&round=${ROUND_VALS[i]}`);
+            const prev = pr.data || [];
+            const prevWithData = prev.find((st:any) => st.assessment);
+            if (prevWithData) {
+              const a = prevWithData.assessment;
+              if (a.max_marks) Object.entries(a.max_marks).forEach(([d,v]) => { if (parseFloat(String(v)) > 0) newMaxMarks[d] = String(v); });
+              if (a.literacy_scores && !detectedLitDomains) detectedLitDomains = Object.keys(a.literacy_scores);
+              if (a.numeracy_scores && !detectedNumDomains) detectedNumDomains = Object.keys(a.numeracy_scores);
+              break;
+            }
+          } catch {}
+        }
+      }
+
+      // GAP #7: load previous round scores for comparison column
+      const ROUND_VALS2 = ROUNDS.map(rv => rv.value);
+      const curIdx2 = ROUND_VALS2.indexOf(round);
+      if (curIdx2 > 0) {
+        const prevRound = ROUND_VALS2[curIdx2 - 1];
+        try {
+          const pr = await axios.get(`${API}/baseline/section?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}&academic_year=${academicYear}&round=${prevRound}`);
+          const prevData = pr.data || [];
+          const prevMap: Record<string,Record<string,string>> = {};
+          prevData.forEach((st:any) => {
+            if (st.assessment) {
+              const sc: Record<string,string> = {};
+              if (st.assessment.literacy_scores) Object.entries(st.assessment.literacy_scores).forEach(([d,v]) => { sc[d] = String(v); });
+              if (st.assessment.numeracy_scores) Object.entries(st.assessment.numeracy_scores).forEach(([d,v]) => { sc[d] = String(v); });
+              prevMap[st.student_id] = sc;
+            }
+          });
+          setPrevRoundScores(prevMap);
+          setPrevRoundLabel(`R${curIdx2}`);
+        } catch {}
+      }
+
       setScores(newScores);
+      setAbsentStudents(newAbsent);
+      setStudentNotes(newNotes);
       if (Object.keys(newMaxMarks).length) setMaxMarks(newMaxMarks);
       if (detectedLitDomains && detectedLitDomains.length) setLitDomains(detectedLitDomains);
       if (detectedNumDomains && detectedNumDomains.length) setNumDomains(detectedNumDomains);
@@ -714,6 +842,59 @@ export default function BaselinePage() {
 
   const fetchTeachers = async () => {
     try { const r = await axios.get(`${API}/users?role=teacher`); setTeachers(r.data||[]); } catch {}
+  };
+
+  // GAP #12: lock/unlock current round for this section
+  const isCurrentLocked = () => lockedRounds.has(`${grade}_${section}_${round}_${academicYear}`);
+  const toggleLock = () => {
+    const key = `${grade}_${section}_${round}_${academicYear}`;
+    const newSet = new Set(lockedRounds);
+    if (newSet.has(key)) newSet.delete(key); else newSet.add(key);
+    setLockedRounds(newSet);
+    try { localStorage.setItem('baseline_locked', JSON.stringify([...newSet])); } catch {}
+  };
+
+  // GAP #6: download blank Excel template in the correct import format
+  const downloadTemplate = () => {
+    const litH = litDomains.map(d => `${d} (Literacy)`);
+    const numH = numDomains.map(d => `${d} (Numeracy)`);
+    const headers = [["Student Name", ...litH, ...numH]];
+    const maxRow = ["MAX MARKS", ...litDomains.map(() => ""), ...numDomains.map(() => "")];
+    const sampleRows = [1,2,3].map(i => [`Student ${i}`, ...litDomains.map(() => ""), ...numDomains.map(() => "")]);
+    const sheetData = [headers[0], maxRow, ...sampleRows];
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    const wb = XLSX.utils.book_new();
+    const sheetName = `G${grade.replace("Grade ","").replace("Pre-KG","pkg").replace("LKG","lkg").replace("UKG","ukg")} ${section||"A"}`;
+    XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0,31));
+    XLSX.writeFile(wb, `baseline_template_${grade.replace(/ /g,"_")}_${academicYear}.xlsx`);
+  };
+
+  // GAP #8: export current entry table to Excel
+  const exportEntryTable = () => {
+    const rows = filteredStudents.map(st => {
+      const sc = scores[st.student_id] || {};
+      const litAvg = calcLiveAvg(st.student_id, litDomains);
+      const numAvg = calcLiveAvg(st.student_id, numDomains);
+      const overall = calcOverall(st.student_id);
+      const level = getLevelLabel(overall);
+      const row: Record<string,any> = {
+        Name: st.student_name,
+        Stage: GRADE_TO_STAGE[grade] || "",
+        Absent: absentStudents.has(st.student_id) ? "Yes" : "No",
+      };
+      litDomains.forEach(d => { row[`${d} (Lit)`] = sc[d] ?? ""; });
+      row["Lit %"] = litAvg !== null ? litAvg.toFixed(1) : "";
+      numDomains.forEach(d => { row[`${d} (Num)`] = sc[d] ?? ""; });
+      row["Num %"] = numAvg !== null ? numAvg.toFixed(1) : "";
+      row["Overall %"] = overall !== null ? overall.toFixed(1) : "";
+      row["Level"] = level || "";
+      row["Notes"] = studentNotes[st.student_id] || "";
+      return row;
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Baseline");
+    XLSX.writeFile(wb, `baseline_${grade.replace(/ /g,"_")}_${section}_${round}_${academicYear}.xlsx`);
   };
 
   const fetchSchoolDash = async () => {
@@ -768,11 +949,42 @@ export default function BaselinePage() {
 
   const getLevelLabel = (score: number|null) => {
     if (score === null) return null;
-    if (score >= 80) return "L4 – Exceeding";
-    if (score >= 60) return "L3 – Meeting";
+    if (score >= promotionThreshold) return "L4 – Exceeding";
+    if (score >= gapThreshold) return "L3 – Meeting";
     if (score >= 40) return "L2 – Approaching";
     return "L1 – Beginning";
   };
+
+  const filteredStudents = useMemo(() => {
+    let list = [...entryStudents];
+    if (searchFilter) {
+      const f = searchFilter.toLowerCase();
+      list = list.filter(st => st.student_name?.toLowerCase().includes(f));
+    }
+    if (levelFilter) {
+      list = list.filter(st => {
+        const level = getLevelLabel(calcOverall(st.student_id));
+        return level?.startsWith(levelFilter);
+      });
+    }
+    if (sortKey) {
+      list.sort((a, b) => {
+        if (sortKey === "name") {
+          const cmp = (a.student_name||"").localeCompare(b.student_name||"");
+          return sortDir === "asc" ? cmp : -cmp;
+        }
+        const va = sortKey === "lit" ? (calcLiveAvg(a.student_id, litDomains) ?? -1)
+                 : sortKey === "num" ? (calcLiveAvg(a.student_id, numDomains) ?? -1)
+                 : (calcOverall(a.student_id) ?? -1);
+        const vb = sortKey === "lit" ? (calcLiveAvg(b.student_id, litDomains) ?? -1)
+                 : sortKey === "num" ? (calcLiveAvg(b.student_id, numDomains) ?? -1)
+                 : (calcOverall(b.student_id) ?? -1);
+        return sortDir === "asc" ? va - vb : vb - va;
+      });
+    }
+    return list;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryStudents, searchFilter, levelFilter, sortKey, sortDir, scores, maxMarks, litDomains, numDomains, gapThreshold, promotionThreshold]);
 
   const scoreCellBg = (val: string, domain: string) => {
     const raw = parseFloat(val);
@@ -788,26 +1000,31 @@ export default function BaselinePage() {
 
   // ── Save ─────────────────────────────────────────────────────
   const saveScores = async () => {
+    // GAP #12: block save if round is locked
+    if (isCurrentLocked()) { setMessage("🔒 This round is locked. Unlock it first to make changes."); setTimeout(()=>setMessage(""),4000); return; }
     setSaving(true);
     try {
       const stage = GRADE_TO_STAGE[grade] || "foundation";
       const assessments = entryStudents
         .map(st => {
+          const isAbsent = absentStudents.has(st.student_id);
           const sc = scores[st.student_id] || {};
           const litScores: Record<string,number> = {};
           const numScores: Record<string,number> = {};
           const mm: Record<string,number> = {};
 
-          litDomains.forEach(d => {
-            const v = parseFloat(sc[d]||"");
-            if (!isNaN(v)) { litScores[d] = v; mm[d] = parseFloat(maxMarks[d]||"0") || 0; }
-          });
-          numDomains.forEach(d => {
-            const v = parseFloat(sc[d]||"");
-            if (!isNaN(v)) { numScores[d] = v; mm[d] = parseFloat(maxMarks[d]||"0") || 0; }
-          });
+          if (!isAbsent) {
+            litDomains.forEach(d => {
+              const v = parseFloat(sc[d]||"");
+              if (!isNaN(v)) { litScores[d] = v; mm[d] = parseFloat(maxMarks[d]||"0") || 0; }
+            });
+            numDomains.forEach(d => {
+              const v = parseFloat(sc[d]||"");
+              if (!isNaN(v)) { numScores[d] = v; mm[d] = parseFloat(maxMarks[d]||"0") || 0; }
+            });
+          }
 
-          const hasAny = Object.keys(litScores).length > 0 || Object.keys(numScores).length > 0;
+          const hasAny = isAbsent || Object.keys(litScores).length > 0 || Object.keys(numScores).length > 0;
           if (!hasAny) return null;
 
           return {
@@ -817,6 +1034,8 @@ export default function BaselinePage() {
             literacy_scores: litScores,
             numeracy_scores: numScores,
             max_marks: mm,
+            is_absent: isAbsent,
+            notes: studentNotes[st.student_id] || null,
           };
         })
         .filter(Boolean);
@@ -827,7 +1046,9 @@ export default function BaselinePage() {
         grade, section, academic_year: academicYear, round, assessment_date: assessmentDate, assessments,
       });
       setMessage(`✅ Saved ${assessments.length} students`);
+      setIsDirty(false); // GAP #3: clear dirty flag after save
       fetchStudents();
+      fetchSectionStatus(); // refresh section status indicators
     } catch { setMessage("❌ Error saving"); }
     setSaving(false);
     setTimeout(() => setMessage(""), 3000);
@@ -1065,10 +1286,27 @@ export default function BaselinePage() {
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Section</label>
                 <select value={section} onChange={e => setSection(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                  {sections.map(s => <option key={s} value={s}>{s}</option>)}
+                  {sections.map(s => (
+                    <option key={s} value={s}>
+                      {sectionStatus[s] === true ? "✓ " : sectionStatus[s] === false ? "⏳ " : ""}{s}
+                    </option>
+                  ))}
                 </select>
               </div>
+              {isDirty && <span className="text-xs text-orange-600 font-semibold bg-orange-50 border border-orange-200 px-2 py-1 rounded">⚠️ Unsaved changes</span>}
               <div className="ml-auto flex gap-2 items-center flex-wrap">
+                <button onClick={downloadTemplate} title="Download blank Excel template"
+                  className="px-3 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 font-medium">
+                  📥 Template
+                </button>
+                <button onClick={exportEntryTable} title="Export current table to Excel"
+                  className="px-3 py-2 bg-cyan-600 text-white text-sm rounded-lg hover:bg-cyan-700 font-medium">
+                  📤 Export
+                </button>
+                <button onClick={toggleLock} title={isCurrentLocked() ? "Unlock this round" : "Lock this round to prevent edits"}
+                  className={`px-3 py-2 text-sm rounded-lg font-medium ${isCurrentLocked() ? "bg-red-100 text-red-700 border border-red-300 hover:bg-red-200" : "bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"}`}>
+                  {isCurrentLocked() ? "🔒 Locked" : "🔓 Lock"}
+                </button>
                 <input ref={xlFileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleXlUpload} />
                 <button onClick={() => xlFileRef.current?.click()} disabled={xlParsing}
                   className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center gap-2">
@@ -1093,6 +1331,20 @@ export default function BaselinePage() {
           {/* Domain config */}
           <div className="bg-white rounded-xl shadow border border-indigo-100 p-4">
             <h3 className="text-xs font-bold text-indigo-800 mb-3">⚙️ Domain Configuration — {grade} · {section}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
+              <div className="flex items-center gap-3">
+                <label className="text-xs text-gray-600 font-semibold whitespace-nowrap">Gap Threshold (%):</label>
+                <input type="number" min={1} max={99} value={gapThreshold} onChange={e => setGapThreshold(Number(e.target.value))}
+                  className="w-16 text-center text-sm border border-orange-300 rounded px-2 py-1 font-bold text-orange-700" />
+                <span className="text-xs text-gray-400">Below this % = gap</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="text-xs text-gray-600 font-semibold whitespace-nowrap">Promotion Threshold (%):</label>
+                <input type="number" min={1} max={100} value={promotionThreshold} onChange={e => setPromotionThreshold(Number(e.target.value))}
+                  className="w-16 text-center text-sm border border-green-300 rounded px-2 py-1 font-bold text-green-700" />
+                <span className="text-xs text-gray-400">At or above this % = L4</span>
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-xs font-semibold text-blue-700 mb-2">📚 Literacy Domains</p>
@@ -1200,6 +1452,45 @@ export default function BaselinePage() {
             </div>
           )}
 
+          {/* Search / filter / sort bar */}
+          {entryStudents.length > 0 && (
+            <div className="bg-white rounded-xl shadow border border-gray-100 px-4 py-3 flex gap-3 flex-wrap items-center">
+              <input
+                type="text" placeholder="Search student name..."
+                value={searchFilter} onChange={e => setSearchFilter(e.target.value)}
+                className="border border-gray-300 rounded px-2 py-1.5 text-xs flex-1 min-w-[160px]"
+              />
+              <select value={levelFilter} onChange={e => setLevelFilter(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs">
+                <option value="">All Levels</option>
+                <option value="L4">L4 – Exceeding</option>
+                <option value="L3">L3 – Meeting</option>
+                <option value="L2">L2 – Approaching</option>
+                <option value="L1">L1 – Beginning</option>
+              </select>
+              <div className="flex items-center gap-1">
+                <label className="text-xs text-gray-500">Sort:</label>
+                <select value={sortKey} onChange={e => setSortKey(e.target.value as any)} className="border border-gray-300 rounded px-2 py-1.5 text-xs">
+                  <option value="">Default</option>
+                  <option value="name">Name</option>
+                  <option value="overall">Overall%</option>
+                  <option value="lit">Lit%</option>
+                  <option value="num">Num%</option>
+                </select>
+                <button onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+                  className="px-2 py-1 text-xs border border-gray-300 rounded bg-gray-50 hover:bg-gray-100">
+                  {sortDir === "asc" ? "↑" : "↓"}
+                </button>
+              </div>
+              {(prevRoundLabel) && (
+                <button onClick={() => setShowPrevRound(p => !p)}
+                  className={`px-3 py-1.5 text-xs rounded-lg border font-medium ${showPrevRound ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-indigo-600 border-indigo-300 hover:bg-indigo-50"}`}>
+                  {showPrevRound ? "Hide" : "Show"} R{ROUNDS.findIndex(r=>r.value===round)} Comparison
+                </button>
+              )}
+              <span className="text-xs text-gray-400 ml-auto">{filteredStudents.length} of {entryStudents.length} students</span>
+            </div>
+          )}
+
           {/* Main entry table */}
           {loadingStudents ? (
             <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Loading students...</div>
@@ -1208,12 +1499,12 @@ export default function BaselinePage() {
               <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-bold text-gray-700">{grade} — {section} — {ROUNDS.find(r=>r.value===round)?.label}</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">{entryStudents.length} students · Enter raw marks · Set max marks row below for % conversion</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{filteredStudents.length} students shown · Enter raw marks · Set max marks row below for % conversion</p>
                 </div>
                 {xlImported && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">📂 Excel data loaded</span>}
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse" style={{ minWidth: `${300 + allDomains.length*80}px` }}>
+                <table className="w-full text-xs border-collapse" style={{ minWidth: `${340 + allDomains.length*80 + (showPrevRound?80:0)}px` }}>
                   <thead>
                     <tr className="bg-indigo-700 text-white">
                       <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[180px]">Name</th>
@@ -1225,12 +1516,14 @@ export default function BaselinePage() {
                       <th className="px-2 py-2 text-center border-l border-indigo-500 min-w-[70px]">Overall</th>
                       <th className="px-2 py-2 text-center min-w-[100px]">Level</th>
                       <th className="px-2 py-2 text-left min-w-[120px]">Gaps</th>
+                      {showPrevRound && <th className="px-2 py-2 text-center border-l border-indigo-400 bg-indigo-800 min-w-[70px]" title={`Round ${prevRoundLabel} overall`}>{prevRoundLabel}%</th>}
+                      <th className="px-2 py-2 text-center min-w-[50px]">Note</th>
+                      <th className="px-2 py-2 text-center min-w-[60px]">Absent</th>
                     </tr>
                     {/* Max marks row — must match column order exactly */}
                     <tr className="bg-amber-50 border-b-2 border-amber-300">
                       <td className="px-3 py-1.5 text-xs font-bold text-amber-800 sticky left-0 bg-amber-50">📐 Max Marks</td>
                       <td className="px-2 py-1 text-center text-xs text-amber-500 italic">—</td>
-                      {/* Literacy domain inputs */}
                       {litDomains.map(d => (
                         <td key={`litmax-${d}`} className="px-1 py-1 text-center border-l border-amber-200">
                           <input
@@ -1242,9 +1535,7 @@ export default function BaselinePage() {
                           />
                         </td>
                       ))}
-                      {/* Empty cell for Lit% column */}
                       <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">—</td>
-                      {/* Numeracy domain inputs */}
                       {numDomains.map(d => (
                         <td key={`nummax-${d}`} className="px-1 py-1 text-center border-l border-amber-200">
                           <input
@@ -1256,51 +1547,68 @@ export default function BaselinePage() {
                           />
                         </td>
                       ))}
-                      {/* Empty cells for Num%, Overall, Level columns */}
                       <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">—</td>
                       <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">—</td>
+                      <td className="px-1 py-1 text-center text-xs text-amber-400">—</td>
+                      {showPrevRound && <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">—</td>}
+                      <td className="px-1 py-1 text-center text-xs text-amber-400">—</td>
                       <td className="px-1 py-1 text-center text-xs text-amber-400">—</td>
                     </tr>
                   </thead>
                   <tbody>
-                    {entryStudents.map((st, idx) => {
+                    {filteredStudents.map((st, idx) => {
                       const sc = scores[st.student_id] || {};
-                      const litAvg = calcLiveAvg(st.student_id, litDomains);
-                      const numAvg = calcLiveAvg(st.student_id, numDomains);
-                      const overall = calcOverall(st.student_id);
+                      const isAbsent = absentStudents.has(st.student_id);
+                      const litAvg = isAbsent ? null : calcLiveAvg(st.student_id, litDomains);
+                      const numAvg = isAbsent ? null : calcLiveAvg(st.student_id, numDomains);
+                      const overall = isAbsent ? null : calcOverall(st.student_id);
                       const level = getLevelLabel(overall);
                       const bg = idx % 2 === 0 ? "bg-white" : "bg-gray-50";
                       const stage = GRADE_TO_STAGE[grade] || "foundation";
+                      const prevSc = prevRoundScores[st.student_id] || {};
+                      const prevOverall = calcOverall(st.student_id); // We'll compute from prev data below
+                      const prevLitAvg = (() => {
+                        const vals = litDomains.map(d => { const v = parseFloat(prevSc[d]||""); const m = parseFloat(maxMarks[d]||"0"); return isNaN(v)?null:m>0?(v/m)*100:v; }).filter(v=>v!==null) as number[];
+                        return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+                      })();
+                      const prevNumAvg = (() => {
+                        const vals = numDomains.map(d => { const v = parseFloat(prevSc[d]||""); const m = parseFloat(maxMarks[d]||"0"); return isNaN(v)?null:m>0?(v/m)*100:v; }).filter(v=>v!==null) as number[];
+                        return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+                      })();
+                      const prevTotal = prevLitAvg !== null && prevNumAvg !== null ? (prevLitAvg+prevNumAvg)/2 : prevLitAvg ?? prevNumAvg;
 
                       return (
-                        <tr key={st.student_id} className={`border-b border-gray-100 ${bg}`}>
+                        <tr key={st.student_id} className={`border-b border-gray-100 ${bg} ${isAbsent?"opacity-60":""}`}>
                           <td className={`px-3 py-1.5 font-medium text-gray-800 sticky left-0 z-10 border-r border-gray-200 ${bg}`}>
                             {st.student_name}
                             {st.assessment && <span className="ml-1 text-xs text-green-500" title="Has saved data">✓</span>}
                           </td>
                           <td className="px-1 py-1 text-center text-xs text-gray-500">{stage.charAt(0).toUpperCase()+stage.slice(1)}</td>
-                          {litDomains.map(d => (
+                          {litDomains.map((d, di) => (
                             <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
                               <input
                                 type="number" min={0} step={0.5}
                                 value={sc[d] ?? ""}
-                                onChange={e => setScores(prev => ({...prev,[st.student_id]:{...(prev[st.student_id]||{}),[d]:e.target.value}}))}
+                                disabled={isAbsent}
+                                onChange={e => { setScores(prev => ({...prev,[st.student_id]:{...(prev[st.student_id]||{}),[d]:e.target.value}})); setIsDirty(true); }}
+                                onKeyDown={e => { if (e.key==="Tab") { /* natural tab order */ } }}
                                 placeholder="—"
-                                className={`w-14 text-center text-xs border rounded px-1 py-0.5 ${scoreCellBg(sc[d]||"",d)}`}
+                                className={`w-14 text-center text-xs border rounded px-1 py-0.5 ${isAbsent?"bg-gray-100 border-gray-200 text-gray-300":scoreCellBg(sc[d]||"",d)}`}
                               />
                             </td>
                           ))}
                           <td className="px-2 py-1.5 text-center border-l border-gray-200">
                             {litAvg !== null ? <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(litAvg)}`}>{litAvg.toFixed(1)}%</span> : <span className="text-gray-300">—</span>}
                           </td>
-                          {numDomains.map(d => (
+                          {numDomains.map((d, di) => (
                             <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
                               <input
                                 type="number" min={0} step={0.5}
                                 value={sc[d] ?? ""}
-                                onChange={e => setScores(prev => ({...prev,[st.student_id]:{...(prev[st.student_id]||{}),[d]:e.target.value}}))}
+                                disabled={isAbsent}
+                                onChange={e => { setScores(prev => ({...prev,[st.student_id]:{...(prev[st.student_id]||{}),[d]:e.target.value}})); setIsDirty(true); }}
                                 placeholder="—"
-                                className={`w-14 text-center text-xs border rounded px-1 py-0.5 ${scoreCellBg(sc[d]||"",d)}`}
+                                className={`w-14 text-center text-xs border rounded px-1 py-0.5 ${isAbsent?"bg-gray-100 border-gray-200 text-gray-300":scoreCellBg(sc[d]||"",d)}`}
                               />
                             </td>
                           ))}
@@ -1308,27 +1616,74 @@ export default function BaselinePage() {
                             {numAvg !== null ? <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(numAvg)}`}>{numAvg.toFixed(1)}%</span> : <span className="text-gray-300">—</span>}
                           </td>
                           <td className="px-2 py-1.5 text-center">
-                            {overall !== null ? <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(overall)}`}>{overall.toFixed(1)}%</span> : <span className="text-gray-300">—</span>}
+                            {overall !== null ? <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(overall)}`}>{overall.toFixed(1)}%</span> : isAbsent ? <span className="text-xs text-gray-400">Absent</span> : <span className="text-gray-300">—</span>}
                           </td>
                           <td className="px-2 py-1.5 text-center">
                             {level ? <span className={`text-xs px-1.5 py-0.5 rounded ${levelBg(level)}`}>{level.split("–")[0].trim()}</span> : <span className="text-gray-300">—</span>}
                           </td>
                           <td className="px-2 py-1.5 text-left min-w-[120px]">
-                            {(() => {
-                              const sc = scores[st.student_id] || {};
+                            {!isAbsent && (() => {
                               const gaps: string[] = [];
                               [...litDomains, ...numDomains].forEach(d => {
                                 const raw = parseFloat(sc[d]||"");
                                 const max = parseFloat(maxMarks[d]||"0");
                                 if (!isNaN(raw) && raw >= 0) {
                                   const pct = max > 0 ? (raw/max)*100 : raw;
-                                  if (pct < 60) gaps.push(d);
+                                  if (pct < gapThreshold) gaps.push(d);
                                 }
                               });
                               return gaps.length > 0
                                 ? <div className="flex flex-wrap gap-1">{gaps.map(g => <span key={g} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">⚠️ {g}</span>)}</div>
                                 : overall !== null ? <span className="text-xs text-green-600">✅ No gaps</span> : null;
                             })()}
+                          </td>
+                          {showPrevRound && (
+                            <td className="px-2 py-1.5 text-center border-l border-gray-200">
+                              {prevTotal !== null
+                                ? <div>
+                                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(prevTotal)}`}>{prevTotal.toFixed(1)}%</span>
+                                    {overall !== null && <div className={`text-xs mt-0.5 font-bold ${overall-prevTotal>0?"text-green-600":overall-prevTotal<0?"text-red-500":"text-gray-400"}`}>
+                                      {overall-prevTotal>0?"+":""}{(overall-prevTotal).toFixed(1)}
+                                    </div>}
+                                  </div>
+                                : <span className="text-gray-300">—</span>}
+                            </td>
+                          )}
+                          <td className="px-2 py-1.5 text-center">
+                            <button
+                              onClick={() => setShowNoteFor(showNoteFor === st.student_id ? null : st.student_id)}
+                              title={studentNotes[st.student_id] ? "View/edit note" : "Add note"}
+                              className={`text-xs px-1.5 py-0.5 rounded border ${studentNotes[st.student_id] ? "bg-yellow-100 text-yellow-700 border-yellow-300" : "bg-gray-100 text-gray-400 border-gray-200 hover:bg-yellow-50"}`}>
+                              {studentNotes[st.student_id] ? "📝" : "+"}
+                            </button>
+                            {showNoteFor === st.student_id && (
+                              <div className="absolute z-20 mt-1 right-0 bg-white border border-gray-300 rounded-lg shadow-xl p-3 w-64" style={{position:"fixed",zIndex:1000}}>
+                                <textarea
+                                  autoFocus
+                                  rows={3}
+                                  value={studentNotes[st.student_id] || ""}
+                                  onChange={e => { setStudentNotes(prev => ({...prev,[st.student_id]:e.target.value})); setIsDirty(true); }}
+                                  placeholder={`Note for ${st.student_name}...`}
+                                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs resize-none"
+                                />
+                                <div className="flex justify-between mt-2">
+                                  <button onClick={() => { setStudentNotes(prev => { const n={...prev}; delete n[st.student_id]; return n; }); setShowNoteFor(null); setIsDirty(true); }}
+                                    className="text-xs text-red-500 hover:text-red-700">Clear</button>
+                                  <button onClick={() => setShowNoteFor(null)} className="text-xs text-indigo-600 font-bold hover:text-indigo-800">Done</button>
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 text-center">
+                            <input type="checkbox" checked={isAbsent}
+                              onChange={e => {
+                                const newSet = new Set(absentStudents);
+                                if (e.target.checked) newSet.add(st.student_id); else newSet.delete(st.student_id);
+                                setAbsentStudents(newSet);
+                                setIsDirty(true);
+                              }}
+                              className="w-4 h-4 accent-red-500 cursor-pointer"
+                            />
                           </td>
                         </tr>
                       );
@@ -1350,6 +1705,7 @@ export default function BaselinePage() {
         <TeacherBaselineEntry
           teachers={teachers} academicYear={academicYear}
           assessmentDate={assessmentDate} setAssessmentDate={setAssessmentDate} API={API}
+          globalRound={round}
         />
       )}
 
@@ -1497,6 +1853,48 @@ export default function BaselinePage() {
                   ))}
                 </div>
               )}
+
+              {/* GAP #15: Round-over-round comparison */}
+              <div className="bg-white rounded-xl shadow p-4">
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                  <h3 className="text-sm font-semibold text-gray-700">📈 Round-over-Round Comparison</h3>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-500">Compare with:</label>
+                    <select value={compareRound} onChange={e => { setCompareRound(e.target.value); setCompareSchoolData(null); }}
+                      className="border border-gray-300 rounded px-2 py-1 text-xs">
+                      {ROUNDS.filter(r => r.value !== round).map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    </select>
+                    <button onClick={async () => {
+                      try {
+                        const r = await axios.get(`${API}/baseline/dashboard/school?academic_year=${academicYear}&round=${compareRound}`);
+                        setCompareSchoolData(r.data);
+                        setShowComparison(true);
+                      } catch {}
+                    }} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700">Compare</button>
+                  </div>
+                </div>
+                {showComparison && compareSchoolData && schoolData && (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={schoolData.gradeWise?.map((g:any) => {
+                      const cg = compareSchoolData.gradeWise?.find((c:any) => c.grade === g.grade);
+                      return {
+                        name: g.grade.replace("Grade ","G"),
+                        [ROUNDS.find(r=>r.value===round)?.label || round]: g.overallAvg,
+                        [ROUNDS.find(r=>r.value===compareRound)?.label || compareRound]: cg?.overallAvg ?? 0,
+                      };
+                    })||[]}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" tick={{fontSize:10}} />
+                      <YAxis domain={[0,100]} tick={{fontSize:10}} />
+                      <Tooltip />
+                      <Legend wrapperStyle={{fontSize:11}} />
+                      <Bar dataKey={ROUNDS.find(r=>r.value===round)?.label || round} fill="#6366f1" radius={[4,4,0,0]} />
+                      <Bar dataKey={ROUNDS.find(r=>r.value===compareRound)?.label || compareRound} fill="#a3e635" radius={[4,4,0,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+                {!showComparison && <p className="text-xs text-gray-400 text-center py-6">Select a round and click Compare to see grade-wise progress.</p>}
+              </div>
             </div>
           )}
 
@@ -1813,7 +2211,7 @@ export default function BaselinePage() {
                       <tr className="bg-indigo-700 text-white">
                         <th className="px-3 py-2 text-left min-w-[160px]">Teacher</th>
                         <th className="px-3 py-2 text-center">Subject</th>
-                        {ROUNDS.slice(0,6).map(r => (
+                        {ROUNDS.map(r => (
                           <th key={r.value} className="px-2 py-2 text-center min-w-[80px]">{r.label}</th>
                         ))}
                       </tr>
@@ -1824,7 +2222,7 @@ export default function BaselinePage() {
                           <tr key={t.teacher_id+"lit"} className={i%2===0?"bg-white":"bg-gray-50"}>
                             <td className="px-3 py-2 font-medium text-gray-800" rowSpan={2}>{t.teacher_name}</td>
                             <td className="px-3 py-2 text-center"><span className="text-blue-600 font-bold text-xs">📖 Lit</span></td>
-                            {ROUNDS.slice(0,6).map(r => {
+                            {ROUNDS.map(r => {
                               const rd = t.rounds?.[r.value];
                               return (
                                 <td key={r.value} className="px-2 py-1.5 text-center">
@@ -1840,7 +2238,7 @@ export default function BaselinePage() {
                           </tr>
                           <tr key={t.teacher_id+"num"} className={i%2===0?"bg-white":"bg-gray-50"}>
                             <td className="px-3 py-2 text-center"><span className="text-purple-600 font-bold text-xs">🔢 Num</span></td>
-                            {ROUNDS.slice(0,6).map(r => {
+                            {ROUNDS.map(r => {
                               const rd = t.rounds?.[r.value];
                               return (
                                 <td key={r.value} className="px-2 py-1.5 text-center">
@@ -1857,7 +2255,7 @@ export default function BaselinePage() {
                         </>
                       ))}
                       {(!teacherDashData.teacherStageProgression?.length) && (
-                        <tr><td colSpan={8} className="px-3 py-6 text-center text-gray-400">No stage data yet. Save teacher assessments first.</td></tr>
+                        <tr><td colSpan={12} className="px-3 py-6 text-center text-gray-400">No stage data yet. Save teacher assessments first.</td></tr>
                       )}
                     </tbody>
                   </table>

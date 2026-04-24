@@ -3,8 +3,14 @@ import axios from "axios";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 const API = "https://cbas-backend-production.up.railway.app";
-const ACADEMIC_YEAR = "2025-26";
-const ROUNDS = [{ value: "baseline_1", label: "Baseline 1" }, { value: "baseline_2", label: "Baseline 2" }];
+const ROUNDS = [
+  { value: "baseline_1", label: "Baseline 1" }, { value: "baseline_2", label: "Baseline 2" },
+  { value: "baseline_3", label: "Baseline 3" }, { value: "baseline_4", label: "Baseline 4" },
+  { value: "baseline_5", label: "Baseline 5" }, { value: "baseline_6", label: "Baseline 6" },
+  { value: "baseline_7", label: "Baseline 7" }, { value: "baseline_8", label: "Baseline 8" },
+  { value: "baseline_9", label: "Baseline 9" }, { value: "baseline_10", label: "Baseline 10" },
+];
+const ACADEMIC_YEARS = (() => { const y=[]; for(let i=2025;i<=2035;i++) y.push(`${i}-${String(i+1).slice(2)}`); return y; })();
 const CLASSES = ["Pre-KG", "LKG", "UKG", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10"];
 const LEVEL_COLORS_ARR = ["#ef4444", "#f59e0b", "#22c55e", "#a855f7"];
 
@@ -35,6 +41,7 @@ const getDomainColor = (score: number) => {
 
 export default function BaselineDashboard() {
   const [activeTab, setActiveTab] = useState<"school" | "grade" | "teachers">("school");
+  const [academicYear, setAcademicYear] = useState("2025-26");
   const [round, setRound] = useState("baseline_1");
   const [selectedGrade, setSelectedGrade] = useState("Grade 1");
   const [schoolData, setSchoolData] = useState<any>(null);
@@ -46,12 +53,12 @@ export default function BaselineDashboard() {
     if (activeTab === "school") fetchSchool();
     if (activeTab === "grade") fetchGrade();
     if (activeTab === "teachers") fetchTeachers();
-  }, [activeTab, round, selectedGrade]);
+  }, [activeTab, round, selectedGrade, academicYear]);
 
   const fetchSchool = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/baseline/dashboard/school?academic_year=${ACADEMIC_YEAR}&round=${round}`);
+      const res = await axios.get(`${API}/baseline/dashboard/school?academic_year=${academicYear}&round=${round}`);
       setSchoolData(res.data);
     } catch { }
     setLoading(false);
@@ -60,7 +67,7 @@ export default function BaselineDashboard() {
   const fetchGrade = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/baseline/dashboard/grade/${encodeURIComponent(selectedGrade)}?academic_year=${ACADEMIC_YEAR}&round=${round}`);
+      const res = await axios.get(`${API}/baseline/dashboard/grade/${encodeURIComponent(selectedGrade)}?academic_year=${academicYear}&round=${round}`);
       setGradeData(res.data);
     } catch { }
     setLoading(false);
@@ -69,7 +76,7 @@ export default function BaselineDashboard() {
   const fetchTeachers = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/baseline/dashboard/teachers?academic_year=${ACADEMIC_YEAR}&round=${round}`);
+      const res = await axios.get(`${API}/baseline/dashboard/teachers?academic_year=${academicYear}&round=${round}`);
       setTeacherData(res.data);
     } catch { }
     setLoading(false);
@@ -79,11 +86,18 @@ export default function BaselineDashboard() {
     <div className="p-3 sm:p-6">
       <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-800">Baseline Assessment Dashboard</h1>
-        <p className="text-sm text-gray-500">School-wide competency overview — {ACADEMIC_YEAR}</p>
+        <p className="text-sm text-gray-500">School-wide competency overview — {academicYear}</p>
       </div>
 
       {/* Controls */}
       <div className="flex gap-3 mb-5 flex-wrap items-end">
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Academic Year</label>
+          <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}
+            className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+            {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Round</label>
           <select value={round} onChange={e => setRound(e.target.value)}
