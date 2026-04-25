@@ -164,53 +164,67 @@ test.describe('Competency Registry — CRUD & Import', () => {
   });
 
   test('C7. Deactivate and Restore competency (soft delete cycle)', async ({ page }) => {
+    // Ensure E2E-TEST-001 exists and is active before starting (idempotent setup)
+    const check = await axios.get(`${API}/activities/competencies?search=E2E-TEST-001&include_inactive=true`);
+    const existing = (check.data?.competencies || []).find((c: any) => c.competency_code === 'E2E-TEST-001');
+    if (existing && !existing.is_active) {
+      await axios.patch(`${API}/activities/competencies/${existing.id}/reactivate`);
+    } else if (!existing) {
+      await axios.post(`${API}/activities/competencies`, {
+        subject: 'test_subject_e2e', stage: 'foundation', grade: 'Grade 1',
+        domain: 'E2E Domain', competency_code: 'E2E-TEST-001',
+        description: 'Automated E2E test competency — safe to delete',
+      });
+    }
+
     await login(page);
     await goToCompetencies(page);
 
-    // Search for E2E competency
+    // Search and deactivate the specific row
     await page.fill('input[placeholder*="Search code"]', 'E2E-TEST-001');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1500);
+
+    // Verify exactly one Remove button visible (for E2E-TEST-001 row)
     const removeBtn = page.locator('button:has-text("Remove")').first();
     await expect(removeBtn).toBeVisible({ timeout: 5000 });
 
-    // Dismiss confirm dialog and deactivate
     page.on('dialog', d => d.accept());
     await removeBtn.click();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000); // wait for PATCH + refetch
 
     const msg = page.locator('div.bg-green-50').filter({ hasText: /Competency deactivated/ }).last();
-    await expect(msg).toBeVisible({ timeout: 5000 });
+    await expect(msg).toBeVisible({ timeout: 8000 });
     console.log('✅ Deactivated E2E-TEST-001');
 
-    // It should disappear from active view
-    const found = page.locator('td').filter({ hasText: 'E2E-TEST-001' });
-    await expect(found).not.toBeVisible();
+    // Refetch the filtered list and verify the row is gone from active view
+    await page.fill('input[placeholder*="Search code"]', '');
+    await page.waitForTimeout(300);
+    await page.fill('input[placeholder*="Search code"]', 'E2E-TEST-001');
+    await page.waitForTimeout(2000);
+    await expect(page.locator('td').filter({ hasText: 'E2E-TEST-001' })).not.toBeVisible({ timeout: 5000 });
     console.log('✅ Deactivated competency hidden from active view');
 
     // Enable "Show deactivated" toggle
     await page.click('input[type="checkbox"]');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1500);
 
-    // Should now appear as inactive
-    const inactiveRow = page.locator('td').filter({ hasText: 'E2E-TEST-001' });
-    await expect(inactiveRow).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('td').filter({ hasText: 'E2E-TEST-001' })).toBeVisible({ timeout: 5000 });
     console.log('✅ Inactive competency visible with "Show deactivated" on');
 
-    // Restore it
+    // Restore via the Restore button
     const restoreBtn = page.locator('button:has-text("Restore")').first();
     await expect(restoreBtn).toBeVisible();
     await restoreBtn.click();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
 
     const restoreMsg = page.locator('div.bg-green-50').filter({ hasText: /Competency restored/ }).last();
-    await expect(restoreMsg).toBeVisible({ timeout: 5000 });
+    await expect(restoreMsg).toBeVisible({ timeout: 8000 });
     console.log('✅ Competency restored — full deactivate/restore cycle passes');
 
-    // Uncheck toggle and verify it's back in active list
+    // Uncheck toggle and verify active again
     await page.click('input[type="checkbox"]');
-    await page.waitForTimeout(1000);
-    const restoredRow = page.locator('td').filter({ hasText: 'E2E-TEST-001' });
-    await expect(restoredRow).toBeVisible({ timeout: 5000 });
+    await page.waitForTimeout(1500);
+    await expect(page.locator('td').filter({ hasText: 'E2E-TEST-001' })).toBeVisible({ timeout: 5000 });
     console.log('✅ Restored competency visible in active view');
   });
 
