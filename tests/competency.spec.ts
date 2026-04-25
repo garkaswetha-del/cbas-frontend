@@ -202,14 +202,14 @@ test.describe('Competency Registry — CRUD & Import', () => {
     await page.waitForTimeout(300);
     await page.fill('input[placeholder*="Search code"]', 'E2E-TEST-001');
     await page.waitForTimeout(2000);
-    await expect(page.locator('td').filter({ hasText: 'E2E-TEST-001' })).not.toBeVisible({ timeout: 5000 });
+    await expect(page.locator('td').filter({ hasText: 'E2E-TEST-001' }).first()).not.toBeVisible({ timeout: 5000 });
     console.log('✅ Deactivated competency hidden from active view');
 
     // Enable "Show deactivated" toggle
     await page.click('input[type="checkbox"]');
     await page.waitForTimeout(1500);
 
-    await expect(page.locator('td').filter({ hasText: 'E2E-TEST-001' })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('td').filter({ hasText: 'E2E-TEST-001' }).first()).toBeVisible({ timeout: 5000 });
     console.log('✅ Inactive competency visible with "Show deactivated" on');
 
     // Restore via the Restore button
@@ -225,7 +225,7 @@ test.describe('Competency Registry — CRUD & Import', () => {
     // Uncheck toggle and verify active again
     await page.click('input[type="checkbox"]');
     await page.waitForTimeout(1500);
-    await expect(page.locator('td').filter({ hasText: 'E2E-TEST-001' })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('td').filter({ hasText: 'E2E-TEST-001' }).first()).toBeVisible({ timeout: 5000 });
     console.log('✅ Restored competency visible in active view');
   });
 
