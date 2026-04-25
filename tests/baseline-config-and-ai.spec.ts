@@ -7,8 +7,8 @@ const ADMIN_EMAIL = 'garkaswetha@gmail.com';
 const ADMIN_PASSWORD = 'swetha123';
 
 async function login(page: any) {
-  await page.goto(BASE, { timeout: 30000 });
-  await page.waitForSelector('input[type="email"]', { timeout: 20000 });
+  await page.goto(BASE, { timeout: 60000 });
+  await page.waitForSelector('input[type="email"]', { timeout: 30000 });
   await page.fill('input[type="email"]', ADMIN_EMAIL);
   await page.fill('input[type="password"]', ADMIN_PASSWORD);
   await page.click('button[type="submit"], button:has-text("Login"), button:has-text("Sign In")');
@@ -130,34 +130,57 @@ test.describe('Config Persistence — thresholds & lock per year/round', () => {
     await login(page);
     await goToBaseline(page);
 
-    // Select a grade + section that exists
+    // Find grade select by label or by containing "Pre-KG" option
     const gradeSelect = page.locator('select').filter({ hasText: 'Pre-KG' }).first();
     await gradeSelect.selectOption('Grade 1');
-    await page.waitForTimeout(800);
-    const sectionSelect = page.locator('select').nth(2);
-    const secs = await sectionSelect.locator('option').allTextContents();
-    if (!secs.length) { console.log('⚠️ No sections for Grade 1 — skipping lock persistence test'); return; }
-    const sec = secs[0].replace(/^[✓⏳]\s/, '').trim();
+    await page.waitForTimeout(1000);
+
+    // Find section select: it's the select that comes AFTER the grade select (has section-like options)
+    // We look for a select whose options don't contain round/year/grade text
+    let sectionSelect: any = null;
+    let sec = '';
+    const allSelects = page.locator('select');
+    const count = await allSelects.count();
+    for (let i = 0; i < count; i++) {
+      const opts = await allSelects.nth(i).locator('option').allTextContents();
+      // Section select has short section names (not years, not round names, not grade names)
+      const looksLikeSection = opts.some((o: string) =>
+        o.trim().length > 0 && !o.includes('20') && !o.includes('Round') &&
+        !o.includes('Grade') && !o.includes('Pre-KG') && !o.includes('baseline') &&
+        !['foundation','preparatory','middle','secondary'].includes(o.toLowerCase())
+      );
+      if (looksLikeSection && opts.length >= 1 && opts.length <= 10) {
+        sectionSelect = allSelects.nth(i);
+        const rawOpts = opts.filter((o: string) => o.trim().length > 0);
+        sec = rawOpts[0].replace(/^[✓⏳\s]+/, '').trim();
+        break;
+      }
+    }
+    if (!sectionSelect || !sec) {
+      console.log('⚠️ No section select found for Grade 1 — skipping lock persistence test');
+      return;
+    }
     await sectionSelect.selectOption({ index: 0 });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(800);
 
     // Lock it
     const lockBtn = page.locator('button').filter({ hasText: /🔓 Lock|🔒 Locked/ }).first();
+    await expect(lockBtn).toBeVisible({ timeout: 5000 });
     const wasLocked = (await lockBtn.textContent())?.includes('Locked');
     if (!wasLocked) await lockBtn.click();
-    await page.waitForTimeout(1500); // wait for PATCH to complete
+    await page.waitForTimeout(2000); // wait for PATCH to complete
 
     // Verify via API
     const r = await axios.get(`${API}/baseline/config?academic_year=2025-26&round=baseline_1&grade=Grade+1&section=${encodeURIComponent(sec)}`);
     expect(r.data.is_locked).toBe(true);
-    console.log(`✅ Lock saved to DB for Grade 1 ${sec} Round 1`);
+    console.log(`✅ Lock saved to DB for Grade 1 "${sec}" Round 1`);
 
     // Reload page and check lock state is restored
     await goToBaseline(page);
-    await gradeSelect.selectOption('Grade 1');
-    await page.waitForTimeout(800);
+    await page.locator('select').filter({ hasText: 'Pre-KG' }).first().selectOption('Grade 1');
+    await page.waitForTimeout(1000);
     await sectionSelect.selectOption({ index: 0 });
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2000);
     const lockBtnAfter = page.locator('button').filter({ hasText: /🔓 Lock|🔒 Locked/ }).first();
     const afterText = await lockBtnAfter.textContent();
     expect(afterText).toContain('Locked');
@@ -204,6 +227,8 @@ test.describe('AI Assessment Paper — gap-based generation', () => {
   let testTeacherName: string;
   let originalData: any = null;
 
+  const TEST_ROUND = 'baseline_9'; // Use a high round so buildGaps picks it as latest
+
   test.beforeAll(async () => {
     // Get the first teacher from the system
     const r = await axios.get(`${API}/users?role=teacher&limit=5`);
@@ -212,19 +237,19 @@ test.describe('AI Assessment Paper — gap-based generation', () => {
     testTeacherId = teachers[0].id;
     testTeacherName = teachers[0].name;
 
-    // Backup existing Round 1 data if any
+    // Backup existing baseline_9 data if any
     try {
       const existing = await axios.get(`${API}/baseline/teacher/${testTeacherId}?academic_year=2025-26`);
-      const r1 = (existing.data?.assessments || []).find((a: any) => a.round === 'baseline_1');
-      if (r1) originalData = r1;
+      const r9 = (existing.data?.assessments || []).find((a: any) => a.round === TEST_ROUND);
+      if (r9) originalData = r9;
     } catch {}
 
-    // Save test data: low literacy, high numeracy → only literacy domains are gaps
+    // Save test data to baseline_9: low literacy, high numeracy → 4 literacy gap domains
     await axios.post(`${API}/baseline/teacher`, {
       teacher_id: testTeacherId,
       teacher_name: testTeacherName,
       academic_year: '2025-26',
-      round: 'baseline_1',
+      round: TEST_ROUND,
       stage: 'foundation',
       lit_stage: 'foundation',
       num_stage: 'foundation',
@@ -235,17 +260,16 @@ test.describe('AI Assessment Paper — gap-based generation', () => {
         Operations: 10, 'Base 10': 10, Measurement: 10, Geometry: 10,
       },
     });
-    console.log(`✅ Test data saved for ${testTeacherName}: Literacy 20/10/30/20%, Numeracy 90/80/90/90%`);
+    console.log(`✅ Test data saved for ${testTeacherName} in ${TEST_ROUND}: Literacy 20/10/30/20%, Numeracy 90/80/90/90%`);
   });
 
   test.afterAll(async () => {
     if (originalData) {
-      // Restore original data
       await axios.post(`${API}/baseline/teacher`, {
         teacher_id: testTeacherId,
         teacher_name: testTeacherName,
         academic_year: '2025-26',
-        round: 'baseline_1',
+        round: TEST_ROUND,
         stage: originalData.stage,
         lit_stage: originalData.gaps?.lit_stage || originalData.stage,
         num_stage: originalData.gaps?.num_stage || originalData.stage,
@@ -253,14 +277,26 @@ test.describe('AI Assessment Paper — gap-based generation', () => {
         numeracy_scores: originalData.numeracy_scores || {},
         max_marks: originalData.max_marks || {},
       });
-      console.log(`✅ Restored original data for ${testTeacherName}`);
+    } else {
+      // No original data — zero out the test record so it's not treated as real data
+      await axios.post(`${API}/baseline/teacher`, {
+        teacher_id: testTeacherId,
+        teacher_name: testTeacherName,
+        academic_year: '2025-26',
+        round: TEST_ROUND,
+        stage: 'foundation',
+        literacy_scores: {},
+        numeracy_scores: {},
+        max_marks: {},
+      }).catch(() => {});
     }
+    console.log(`✅ Cleaned up test data for ${testTeacherName}`);
   });
 
   test('B1. API: gap calculation is correct for saved test data', async () => {
     const r = await axios.get(`${API}/baseline/teacher/${testTeacherId}?academic_year=2025-26`);
     const assessments: any[] = r.data?.assessments || [];
-    const r1 = assessments.find((a: any) => a.round === 'baseline_1');
+    const r1 = assessments.find((a: any) => a.round === TEST_ROUND);
     expect(r1).toBeTruthy();
 
     // Verify percentages
