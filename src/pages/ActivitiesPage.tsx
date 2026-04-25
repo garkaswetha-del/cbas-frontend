@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -36,6 +36,9 @@ const getLevel = (pct: number): string => {
   if (pct>=51) return "Meeting"; if (pct>=36) return "Approaching";
   if (pct>=21) return "Developing"; return "Beginning";
 };
+const displaySubject = (s: string) =>
+  s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
 const scoreBg = (pct: number) =>
   pct>=76?"bg-green-100 text-green-800":pct>=51?"bg-blue-100 text-blue-800":pct>=36?"bg-yellow-100 text-yellow-800":pct>0?"bg-red-100 text-red-800":"bg-gray-100 text-gray-400";
 
@@ -91,7 +94,9 @@ export default function ActivitiesPage() {
   const [marksSubjects, setMarksSubjects] = useState<string[]>([]);
   const [combinedMarks, setCombinedMarks] = useState<any>(null);
   const [localMarks, setLocalMarks] = useState<Record<string,Record<string,Record<string,Record<string,number|null>>>>>({});
-  const [saving, setSaving] = useState(false);
+  const [savingActivities, setSavingActivities] = useState<Set<string>>(new Set());
+  const [dirtyActivities, setDirtyActivities] = useState<Set<string>>(new Set());
+  const [localRatings, setLocalRatings] = useState<Record<string, Record<string, Record<string, string>>>>({});
   const [expandedMarkActivity, setExpandedMarkActivity] = useState<string|null>(null);
   const [viewModeActivities, setViewModeActivities] = useState<Set<string>>(new Set());
 
@@ -111,6 +116,9 @@ export default function ActivitiesPage() {
   const [coverageData, setCoverageData] = useState<any>(null);
   const [longitudinalData, setLongitudinalData] = useState<any>(null);
   const [selectedStudentId, setSelectedStudentId] = useState("");
+
+  // Prevents the formGrades effect from resetting form/rubrics when entering edit mode
+  const formGradesEffectSkip = useRef(false);
 
   // ── EFFECTS ───────────────────────────────────────────────────
 
@@ -142,8 +150,11 @@ export default function ActivitiesPage() {
       formGrades.forEach(g=>{ map[g]=([...new Set(students.filter((s:any)=>s.current_class===g).map((s:any)=>s.section).filter(Boolean))] as string[]).sort(); });
       setFormSectionsMap(map);
     }).catch(()=>{});
-    setForm(p=>({...p, grade:primary, sections:[], subject:"", competency_mappings:[]}));
-    setSelectedComps([]); setRubrics({}); setCompetencies([]);
+    if (!formGradesEffectSkip.current) {
+      setForm(p=>({...p, grade:primary, sections:[], subject:"", competency_mappings:[]}));
+      setSelectedComps([]); setRubrics({}); setCompetencies([]);
+    }
+    formGradesEffectSkip.current = false;
   }, [JSON.stringify(formGrades)]);
   useEffect(() => {
     if (dashTab === "school") fetchSchoolDash();
@@ -294,6 +305,7 @@ export default function ActivitiesPage() {
         }
       }
     }));
+    setDirtyActivities(prev => { const n = new Set(prev); n.add(activityId); return n; });
   };
 
   const saveActivity = async () => {
@@ -359,22 +371,31 @@ export default function ActivitiesPage() {
 
   const saveActivityMarks = async (activityId: string) => {
     if (!combinedMarks) return;
-    setSaving(true);
+    setSavingActivities(prev => { const n = new Set(prev); n.add(activityId); return n; });
     try {
-      const entries = (combinedMarks.students || []).map((s: any) => ({
-        student_id: s.student_id,
-        student_name: s.student_name,
-        competency_marks: localMarks[s.student_id]?.[activityId] || {},
-      }));
+      // Only send students who have at least one mark entered
+      const entries = (combinedMarks.students || [])
+        .filter((s: any) => {
+          const actMarks = localMarks[s.student_id]?.[activityId] || {};
+          return Object.values(actMarks).some((compMarks: any) =>
+            compMarks && Object.values(compMarks as Record<string, any>).some(v => v !== null && v !== undefined)
+          );
+        })
+        .map((s: any) => ({
+          student_id: s.student_id,
+          student_name: s.student_name,
+          competency_marks: localMarks[s.student_id]?.[activityId] || {},
+        }));
       await axios.post(`${API}/activities/${activityId}/marks`, {
         academic_year: academicYear,
         entries,
       });
       setMessage("✅ Marks saved");
       setViewModeActivities(prev => { const n = new Set(prev); n.add(activityId); return n; });
+      setDirtyActivities(prev => { const n = new Set(prev); n.delete(activityId); return n; });
       fetchCombinedMarks();
     } catch { setMessage("❌ Error saving marks"); }
-    setSaving(false);
+    setSavingActivities(prev => { const n = new Set(prev); n.delete(activityId); return n; });
     setTimeout(() => setMessage(""), 3000);
   };
 
@@ -449,7 +470,7 @@ export default function ActivitiesPage() {
                   <select value={filterSubject} onChange={e => setFilterSubject(e.target.value)}
                     className="border border-gray-300 rounded px-2 py-1.5 text-sm">
                     <option value="">All Subjects</option>
-                    {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+                    {subjects.map(s => <option key={s} value={s}>{displaySubject(s)}</option>)}
                   </select>
                 </div>
               )}
@@ -499,7 +520,7 @@ export default function ActivitiesPage() {
                     <select value={form.subject} onChange={e=>setForm(p=>({...p,subject:e.target.value,competency_mappings:[]}))}
                       className="border border-gray-300 rounded px-2 py-1.5 text-sm min-w-[200px]">
                       <option value="">{formSubjects.length ? "Select Subject" : "No subjects mapped for this grade"}</option>
-                      {formSubjects.map(s=><option key={s} value={s}>{s}</option>)}
+                      {formSubjects.map(s=><option key={s} value={s}>{displaySubject(s)}</option>)}
                     </select>
                   </div>
                   <div>
@@ -668,7 +689,7 @@ export default function ActivitiesPage() {
                   {Object.entries(bySubject).map(([subject,acts]:[string,any[]])=>(
                     <div key={subject}>
                       <div className="px-4 py-2 bg-indigo-50 border-y border-indigo-100 flex items-center justify-between">
-                        <span className="text-xs font-bold text-indigo-700 uppercase">{subject}</span>
+                        <span className="text-xs font-bold text-indigo-700 uppercase">{displaySubject(subject)}</span>
                         <span className="text-xs text-indigo-500">{acts.length} activities</span>
                       </div>
                       <table className="w-full text-xs border-collapse">
@@ -691,7 +712,7 @@ export default function ActivitiesPage() {
                               </div></td>
                               <td className="px-3 py-2.5 text-center font-bold text-indigo-700">{a.total_max_marks||0}</td>
                               <td className="px-3 py-2.5 text-center"><div className="flex gap-1 justify-center">
-                                <button onClick={()=>{setShowAddForm(true);setEditActivity(a);setSelectedComps((a.rubrics||[]).map((r:any)=>r.competency_id));setRubrics(Object.fromEntries((a.rubrics||[]).map((r:any)=>[r.competency_id,{items:(r.rubric_items||[]).length?r.rubric_items:[{name:"",max_marks:0}]}])));setForm({...a,sections:a.section?[a.section]:[]});}} className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">✏️</button>
+                                <button onClick={()=>{setShowAddForm(true);setEditActivity(a);setSelectedComps((a.rubrics||[]).map((r:any)=>r.competency_id));setRubrics(Object.fromEntries((a.rubrics||[]).map((r:any)=>[r.competency_id,{items:(r.rubric_items||[]).length?r.rubric_items:[{name:"",max_marks:0}]}])));setForm({...a,sections:a.section?[a.section]:[]});formGradesEffectSkip.current=true;setFormGrades(a.grade?[a.grade]:[]);}} className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">✏️</button>
                                 <button onClick={()=>deleteActivity(a.id)} className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">🗑️</button>
                               </div></td>
                             </tr>
@@ -720,7 +741,7 @@ export default function ActivitiesPage() {
                 <option value="">Select Section</option>{marksSections.map(s=><option key={s} value={s}>{s}</option>)}</select></div>}
             {marksSection&&<div><label className="text-xs text-gray-500 block mb-1">Subject</label>
               <select value={marksSubject} onChange={e=>setMarksSubject(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                <option value="">Select Subject</option>{marksSubjects.map(s=><option key={s} value={s}>{s}</option>)}</select></div>}
+                <option value="">Select Subject</option>{marksSubjects.map(s=><option key={s} value={s}>{displaySubject(s)}</option>)}</select></div>}
           </div>
 
           {combinedMarks&&(
@@ -814,8 +835,10 @@ export default function ActivitiesPage() {
                                       <button onClick={()=>setViewModeActivities(prev=>{const n=new Set(prev);n.delete(activity.id);return n;})}
                                         className="px-2 py-0.5 bg-indigo-500 hover:bg-indigo-400 rounded whitespace-nowrap shrink-0">✏️ Edit</button>
                                     ):(
-                                      <button onClick={()=>saveActivityMarks(activity.id)} disabled={saving}
-                                        className="px-2 py-0.5 bg-green-500 hover:bg-green-400 disabled:opacity-50 rounded whitespace-nowrap shrink-0">{saving?"...":"💾 Save"}</button>
+                                      <button onClick={()=>saveActivityMarks(activity.id)} disabled={savingActivities.has(activity.id)}
+                                        className="px-2 py-0.5 bg-green-500 hover:bg-green-400 disabled:opacity-50 rounded whitespace-nowrap shrink-0">
+                                        {savingActivities.has(activity.id)?"...":dirtyActivities.has(activity.id)?"💾 Save*":"💾 Save"}
+                                      </button>
                                     )}
                                   </div>
                                 </th>
