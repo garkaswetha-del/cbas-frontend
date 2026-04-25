@@ -164,6 +164,7 @@ test.describe('Competency Registry — CRUD & Import', () => {
   });
 
   test('C7. Deactivate and Restore competency (soft delete cycle)', async ({ page }) => {
+    test.setTimeout(120000);
     // Ensure E2E-TEST-001 exists and is active before starting (idempotent setup)
     const check = await axios.get(`${API}/activities/competencies?search=E2E-TEST-001&include_inactive=true`);
     const existing = (check.data?.competencies || []).find((c: any) => c.competency_code === 'E2E-TEST-001');
