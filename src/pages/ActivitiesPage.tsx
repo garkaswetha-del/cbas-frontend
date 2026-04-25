@@ -119,7 +119,10 @@ export default function ActivitiesPage() {
   useEffect(() => { if (filterGrade) fetchSubjects(filterGrade); }, [filterGrade]);
   useEffect(() => { if (marksGrade) fetchSections(marksGrade, setMarksSections); }, [marksGrade]);
   useEffect(() => { if (marksGrade) { axios.get(`${API}/activities/subjects-for-grade/${encodeURIComponent(marksGrade)}`).then(r => setMarksSubjects(r.data || [])).catch(() => {}); } }, [marksGrade]);
-  useEffect(() => { if (marksGrade && marksSection && marksSubject) fetchCombinedMarks(); }, [marksGrade, marksSection, marksSubject, academicYear]);
+  useEffect(() => {
+    setLocalMarks({});
+    if (marksGrade && marksSection && marksSubject) fetchCombinedMarks();
+  }, [marksGrade, marksSection, marksSubject, academicYear]);
   useEffect(() => { if (reportGrade) { axios.get(`${API}/students/sections/${encodeURIComponent(reportGrade)}`).then(r=>setReportSections(r.data?.sections||[])).catch(()=>{}); } }, [reportGrade]);
   useEffect(() => { if (activeTab==="report" && reportGrade && reportSection) fetchReport(); }, [activeTab, reportGrade, reportSection, academicYear]);
   useEffect(() => { fetchCompetencies(); }, [form.grade, form.subject]);

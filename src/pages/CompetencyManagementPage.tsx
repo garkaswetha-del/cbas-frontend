@@ -49,6 +49,8 @@ export default function CompetencyManagementPage() {
   const PAGE_SIZE = 50;
   const fileRef = useRef<HTMLInputElement>(null);
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
+  const [showInactive, setShowInactive] = useState(false);
+  const [fetchError, setFetchError] = useState("");
 
   const [form, setForm] = useState({
     subject: "", stage: "foundation", grade: "Grade 1",
@@ -56,7 +58,7 @@ export default function CompetencyManagementPage() {
   });
 
   useEffect(() => { fetchStats(); }, []);
-  useEffect(() => { fetchCompetencies(); setPage(1); }, [filters]);
+  useEffect(() => { fetchCompetencies(); setPage(1); }, [filters, showInactive]);
 
   const fetchStats = async () => {
     try {
@@ -65,20 +67,22 @@ export default function CompetencyManagementPage() {
       if (res.data.subjects?.length > 0) {
         setAvailableSubjects(res.data.subjects.sort());
       }
-    } catch { }
+    } catch { setFetchError("⚠️ Could not load stats — check your connection"); }
   };
 
   const fetchCompetencies = async () => {
     setLoading(true);
+    setFetchError("");
     try {
       const params = new URLSearchParams();
       if (filters.subject) params.append("subject", filters.subject);
       if (filters.stage) params.append("stage", filters.stage);
       if (filters.grade) params.append("grade", filters.grade);
       if (filters.search) params.append("search", filters.search);
+      if (showInactive) params.append("include_inactive", "true");
       const res = await axios.get(`${API}/activities/competencies?${params}`);
       setCompetencies(Array.isArray(res.data) ? res.data : (res.data?.competencies || []));
-    } catch { setCompetencies([]); }
+    } catch { setCompetencies([]); setFetchError("⚠️ Failed to load competencies"); }
     setLoading(false);
   };
 
@@ -101,6 +105,11 @@ export default function CompetencyManagementPage() {
   };
 
   const handleUpdate = async () => {
+    if (!editItem.subject?.trim() || !editItem.description?.trim()) {
+      setMessage("❌ Subject and Description are required");
+      setTimeout(() => setMessage(""), 3000);
+      return;
+    }
     try {
       await axios.put(`${API}/activities/competencies/${editItem.id}`, {
         ...editItem,
@@ -123,6 +132,15 @@ export default function CompetencyManagementPage() {
     setTimeout(() => setMessage(""), 3000);
   };
 
+  const handleReactivate = async (id: string) => {
+    try {
+      await axios.patch(`${API}/activities/competencies/${id}/reactivate`);
+      setMessage("✅ Competency restored");
+      fetchCompetencies(); fetchStats();
+    } catch { setMessage("❌ Error restoring competency"); }
+    setTimeout(() => setMessage(""), 3000);
+  };
+
   const handleImport = async () => {
     const file = fileRef.current?.files?.[0];
     if (!file) { setMessage("❌ Please select a file"); return; }
@@ -131,11 +149,12 @@ export default function CompetencyManagementPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("subject", ""); // subject comes from the file itself
+      formData.append("subject", "");
       const res = await axios.post(`${API}/activities/competencies/import`, formData);
       setImportResult(res.data);
       fetchCompetencies();
       fetchStats();
+      if (fileRef.current) fileRef.current.value = "";
     } catch (err: any) {
       const errMsg = err?.response?.data?.message || err?.message || "Unknown error";
       setMessage(`❌ Import failed: ${errMsg}`);
@@ -145,7 +164,7 @@ export default function CompetencyManagementPage() {
   };
 
   const paginated = competencies.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const totalPages = Math.ceil(competencies.length / PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(competencies.length / PAGE_SIZE));
 
   return (
     <div className="p-3 sm:p-6">
@@ -208,6 +227,11 @@ export default function CompetencyManagementPage() {
           {message}
         </div>
       )}
+      {fetchError && (
+        <div className="mb-4 px-4 py-2 rounded text-sm border bg-yellow-50 border-yellow-300 text-yellow-800">
+          {fetchError}
+        </div>
+      )}
 
       {/* ── VIEW TAB ── */}
       {activeTab === "view" && (
@@ -248,6 +272,11 @@ export default function CompetencyManagementPage() {
               className="px-3 py-1.5 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-50">
               Clear
             </button>
+            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none ml-2">
+              <input type="checkbox" checked={showInactive} onChange={e => { setShowInactive(e.target.checked); setPage(1); }}
+                className="rounded" />
+              Show deactivated
+            </label>
           </div>
 
           <div className="flex items-center justify-between mb-2">
@@ -282,9 +311,12 @@ export default function CompetencyManagementPage() {
                   <tr><td colSpan={8} className="text-center py-8 text-gray-400">No competencies found. Import from Excel or add manually.</td></tr>
                 )}
                 {paginated.map((c, i) => (
-                  <tr key={c.id} className={i % 2 === 0 ? "bg-white hover:bg-indigo-50" : "bg-gray-50 hover:bg-indigo-50"}>
+                  <tr key={c.id} className={`${!c.is_active ? "opacity-60 bg-gray-100" : i % 2 === 0 ? "bg-white hover:bg-indigo-50" : "bg-gray-50 hover:bg-indigo-50"}`}>
                     <td className="px-3 py-2 text-gray-400 text-xs">{(page - 1) * PAGE_SIZE + i + 1}</td>
-                    <td className="px-3 py-2 font-mono text-xs font-bold text-indigo-700 whitespace-nowrap">{c.competency_code}</td>
+                    <td className="px-3 py-2 font-mono text-xs font-bold text-indigo-700 whitespace-nowrap">
+                      {c.competency_code}
+                      {!c.is_active && <span className="ml-1 text-xs text-red-500 font-normal">(inactive)</span>}
+                    </td>
                     <td className="px-3 py-2">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${subjectColor(c.subject)}`}>
                         {c.subject?.replace(/_/g, ' ')}
@@ -298,14 +330,23 @@ export default function CompetencyManagementPage() {
                     </td>
                     <td className="px-3 py-2 text-center">
                       <div className="flex gap-1 justify-center">
-                        <button onClick={() => { setEditItem({ ...c }); setShowEditModal(true); }}
-                          className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded hover:bg-indigo-200">
-                          Edit
-                        </button>
-                        <button onClick={() => handleDelete(c.id)}
-                          className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200">
-                          Remove
-                        </button>
+                        {c.is_active ? (
+                          <>
+                            <button onClick={() => { setEditItem({ ...c }); setShowEditModal(true); }}
+                              className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded hover:bg-indigo-200">
+                              Edit
+                            </button>
+                            <button onClick={() => handleDelete(c.id)}
+                              className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200">
+                              Remove
+                            </button>
+                          </>
+                        ) : (
+                          <button onClick={() => handleReactivate(c.id)}
+                            className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded hover:bg-green-200">
+                            Restore
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -435,7 +476,14 @@ export default function CompetencyManagementPage() {
                 <p className="text-green-700">✅ Inserted: <strong>{importResult.inserted}</strong> new competencies</p>
                 <p className="text-gray-600">⏭ Skipped (already exist): <strong>{importResult.skipped}</strong></p>
                 {importResult.errors?.length > 0 && (
-                  <p className="text-red-600">❌ Errors: <strong>{importResult.errors.length}</strong></p>
+                  <div className="mt-2">
+                    <p className="text-red-600 font-medium">❌ Errors on {importResult.errors.length} row(s):</p>
+                    <ul className="mt-1 max-h-40 overflow-y-auto text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2 space-y-0.5">
+                      {importResult.errors.map((e: string, i: number) => (
+                        <li key={i} className="font-mono">{e}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
             </div>
