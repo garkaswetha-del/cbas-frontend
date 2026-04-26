@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
 const API = "https://cbas-backend-production.up.railway.app";
@@ -67,8 +67,10 @@ function ExamConfigTab({ academicYear }: any) {
   const [selectedComps, setSelectedComps] = useState<any[]>([]);
   const [grades, setGrades] = useState<string[]>([]);
   const [filterGrade, setFilterGrade] = useState("");
+  const maxMarksHistoryRef = useRef<Record<string,number>>({});
 
-  useEffect(() => { fetchConfigs(); fetchGrades(); }, [academicYear]);
+  useEffect(() => { fetchGrades(); }, []);
+  useEffect(() => { fetchConfigs(); }, [academicYear, filterGrade]);
 
   const fetchGrades = async () => {
     try {
@@ -80,7 +82,7 @@ function ExamConfigTab({ academicYear }: any) {
   const fetchConfigs = async () => {
     setLoading(true);
     try {
-      const r = await axios.get(`${API}/pasa/config/section?grade=&section=&academic_year=${academicYear}`);
+      const r = await axios.get(`${API}/pasa/config/section?grade=${encodeURIComponent(filterGrade)}&section=&academic_year=${academicYear}`);
       setConfigs(r.data?.configs||[]);
     } catch {}
     setLoading(false);
@@ -104,8 +106,12 @@ function ExamConfigTab({ academicYear }: any) {
   const toggleComp = (comp: any) => {
     setSelectedComps(prev => {
       const exists = prev.find((c:any)=>c.competency_id===comp.id);
-      if (exists) return prev.filter((c:any)=>c.competency_id!==comp.id);
-      return [...prev,{competency_id:comp.id,competency_code:comp.code,competency_name:comp.name,max_marks:10}];
+      if (exists) {
+        maxMarksHistoryRef.current[comp.id] = exists.max_marks;
+        return prev.filter((c:any)=>c.competency_id!==comp.id);
+      }
+      const savedMax = maxMarksHistoryRef.current[comp.id] || 10;
+      return [...prev,{competency_id:comp.id,competency_code:comp.code,competency_name:comp.name,max_marks:savedMax}];
     });
   };
 
@@ -118,7 +124,10 @@ function ExamConfigTab({ academicYear }: any) {
     setSaving(true);
     try {
       const r = await axios.post(`${API}/pasa/config`,{...form,academic_year:academicYear,competencies:selectedComps});
-      if (r.data?.success){setMsg("✅ Saved!");setShowForm(false);setSelectedComps([]);fetchConfigs();}
+      if (r.data?.success){
+        setMsg(r.data.message==="Config updated"?"✅ Updated (overwrote existing config)":"✅ Config saved!");
+        setShowForm(false);setSelectedComps([]);maxMarksHistoryRef.current={};fetchConfigs();
+      }
     } catch {setMsg("❌ Save failed");}
     setSaving(false); setTimeout(()=>setMsg(""),3000);
   };
@@ -136,10 +145,12 @@ function ExamConfigTab({ academicYear }: any) {
           <option value="">All Grades</option>
           {grades.map(g=><option key={g} value={g}>{g}</option>)}
         </select>
-        <span className="px-3 py-1.5 bg-gray-100 text-gray-500 text-xs rounded-lg">Exams are created by teachers in their login</span>
+        <button onClick={()=>setShowForm(s=>!s)} className={`px-4 py-2 text-sm rounded-lg font-medium ${showForm?"bg-gray-200 text-gray-700 hover:bg-gray-300":"bg-indigo-600 text-white hover:bg-indigo-700"}`}>
+          {showForm?"✕ Cancel":"+ Create Config"}
+        </button>
       </div>
       {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
-      {false&&(
+      {showForm&&(
         <div className="bg-white rounded-xl shadow border border-gray-200 p-5 space-y-4">
           <h3 className="text-sm font-bold text-gray-700">New Exam Configuration</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -271,7 +282,7 @@ function MarksEntryTab({ academicYear }: any) {
   };
 
   const selectConfig=async(cfg:any)=>{
-    setSelectedConfig(cfg);setLoadingStudents(true);setStudents([]);
+    setSelectedConfig(cfg);setMarks({});setAbsent({});setLoadingStudents(true);setStudents([]);
     try{
       const r=await axios.get(`${API}/pasa/marks/entry?exam_config_id=${cfg.id}&grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}`);
       const sl=r.data?.students||[];
@@ -293,10 +304,13 @@ function MarksEntryTab({ academicYear }: any) {
   };
 
   const calcTotal=(sid:string)=>{
-    if(absent[sid]||!selectedConfig)return{total:0,pct:0};
-    let total=0;
-    (selectedConfig.competencies as any[]).forEach((c:any)=>{total+=+(marks[sid]?.[c.competency_id]||0);});
-    return{total,pct:selectedConfig.total_marks>0?+((total/selectedConfig.total_marks)*100).toFixed(1):0};
+    if(absent[sid]||!selectedConfig)return{total:0,pct:0,hasAnyMark:false};
+    let total=0;let hasAnyMark=false;
+    (selectedConfig.competencies as any[]).forEach((c:any)=>{
+      const m=marks[sid]?.[c.competency_id];
+      if(m!==null&&m!==undefined){hasAnyMark=true;total+=+m;}
+    });
+    return{total,pct:selectedConfig.total_marks>0?+((total/selectedConfig.total_marks)*100).toFixed(1):0,hasAnyMark};
   };
 
   const saveMarks=async()=>{
@@ -409,9 +423,9 @@ function MarksEntryTab({ academicYear }: any) {
                 </thead>
                 <tbody>
                   {students.map((s:any,i:number)=>{
-                    const {total,pct}=calcTotal(s.student_id);
+                    const {total,pct,hasAnyMark}=calcTotal(s.student_id);
                     const isAbs=absent[s.student_id];
-                    const band=pct>0?getBand(pct):null;
+                    const band=hasAnyMark?getBand(pct):null;
                     return (
                       <tr key={s.student_id} className={i%2===0?"bg-white":"bg-gray-50"}>
                         <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
@@ -430,9 +444,9 @@ function MarksEntryTab({ academicYear }: any) {
                           </td>
                         ))}
                         <td className="px-2 py-2 text-center font-bold text-gray-700">
-                          {isAbs?<span className="text-red-500 text-xs">Absent</span>:total}</td>
+                          {isAbs?<span className="text-red-500 text-xs">Absent</span>:hasAnyMark?total:<span className="text-gray-300 font-normal">—</span>}</td>
                         <td className="px-2 py-2 text-center">
-                          {!isAbs&&pct>0&&band&&<span className={`px-1.5 py-0.5 rounded text-xs font-bold ${band.color}`}>{pct}%</span>}</td>
+                          {!isAbs&&hasAnyMark&&band&&<span className={`px-1.5 py-0.5 rounded text-xs font-bold ${band.color}`}>{pct}%</span>}</td>
                       </tr>
                     );
                   })}
@@ -599,9 +613,9 @@ function PASADashboardTab({ academicYear }: any) {
       {!loading&&dashTab==="student"&&(
         <StudentDashTab grade={grade} section={section} academicYear={academicYear} />
       )}
-      {!loading&&dashTab==="alerts"&&data&&(
+      {!loading&&dashTab==="alerts"&&Array.isArray(data?.alerts)&&(
         <div className="space-y-3">
-          {data.alerts?.length===0?(
+          {data.alerts.length===0?(
             <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400"><p className="text-2xl mb-2">✅</p><p className="text-sm">No consecutive decline alerts.</p></div>
           ):(
             <>

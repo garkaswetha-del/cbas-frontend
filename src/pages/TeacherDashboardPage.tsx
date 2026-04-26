@@ -570,8 +570,8 @@ function StudentsTab({ user, mappings, academicYear }: any) {
       const examData: Record<string, any> = {};
       await Promise.all(EXAM_TYPES.map(async exam => {
         try {
-          const r = await axios.get(`${API}/pasa/analysis/section?academic_year=${academicYear}&exam_type=${exam}&grade=${encodeURIComponent(selectedGrade)}&section=${encodeURIComponent(selectedSection)}`);
-          if (r.data?.students_ranked?.length) examData[exam] = r.data;
+          const r = await axios.get(`${API}/pasa/dashboard/section?grade=${encodeURIComponent(selectedGrade)}&section=${encodeURIComponent(selectedSection)}&academic_year=${academicYear}&exam_type=${exam}`);
+          if (r.data?.subjectSummary?.length) examData[exam] = r.data;
         } catch { }
       }));
       setSectionData(examData);
@@ -659,7 +659,7 @@ function ClassTab({ user, mappings, academicYear }: any) {
     try {
       const [sr, pr, br] = await Promise.all([
         axios.get(`${API}/students?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`),
-        axios.get(`${API}/pasa/analysis/section?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}&academic_year=${academicYear}`).catch(() => ({ data: {} })),
+        axios.get(`${API}/pasa/dashboard/section?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}&academic_year=${academicYear}`).catch(() => ({ data: {} })),
         axios.get(`${API}/baseline/section/rounds?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}&academic_year=${academicYear}`).catch(() => ({ data: null })),
       ]);
       const studs = (sr.data?.data || sr.data || []).filter((s: any) => s.is_active !== false);
@@ -1334,18 +1334,19 @@ function PASATab({ user, mappings, academicYear }: any) {
         description:configForm.description, academic_year:academicYear,
         competencies:selectedComps,
       });
-      if(r.data?.success){setMsg("✅ Config saved!");setShowConfigForm(false);setSelectedComps([]);fetchConfigs();}
+      if(r.data?.success){
+        setMsg(r.data.message==="Config updated"?"✅ Updated (overwrote existing config)":"✅ Config saved!");
+        setShowConfigForm(false);setSelectedComps([]);fetchConfigs();
+      }
     } catch {setMsg("❌ Save failed");}
     setSavingConfig(false);setTimeout(()=>setMsg(""),3000);
   };
 
   const loadEntryStudents = async (config:any) => {
-    setSelectedConfig(config);setLoadingEntry(true);setEntryStudents([]);
+    setSelectedConfig(config);setMarks({});setAbsent({});setLoadingEntry(true);setEntryStudents([]);
     try {
-      // Use grade/section from config itself — works for both class and subject teachers
-      const entryGrade = config.grade || classGrade;
-      const entrySection = config.section || classSection;
-      const r = await axios.get(`${API}/pasa/marks/entry?exam_config_id=${config.id}&grade=${encodeURIComponent(entryGrade)}&section=${encodeURIComponent(entrySection)}`);
+      // Always use grade/section from config — it is always set and may differ from classGrade for subject teachers
+      const r = await axios.get(`${API}/pasa/marks/entry?exam_config_id=${config.id}&grade=${encodeURIComponent(config.grade)}&section=${encodeURIComponent(config.section)}`);
       const sl = r.data?.students||[];
       setEntryStudents(sl);
       const im:Record<string,Record<string,number|null>>={};
@@ -1388,8 +1389,8 @@ function PASATab({ user, mappings, academicYear }: any) {
       }));
       await axios.post(`${API}/pasa/marks`,{
         exam_config_id:selectedConfig.id,
-        grade:selectedConfig.grade||classGrade,
-        section:selectedConfig.section||classSection,
+        grade:selectedConfig.grade,
+        section:selectedConfig.section,
         subject:selectedConfig.subject, exam_type:selectedConfig.exam_type,
         academic_year:academicYear, teacher_id:user.id, entries,
       });
@@ -1409,9 +1410,20 @@ function PASATab({ user, mappings, academicYear }: any) {
   };
 
   if (!classGrade||!classSection) {
+    const assignedSections = [...new Map(allMappingsPasa.map((m:any)=>[`${m.grade}__${m.section}`,m])).values()].filter((m:any)=>m.grade&&m.section);
+    if (!assignedSections.length) return (
+      <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
+        <p className="text-2xl mb-2">📋</p>
+        <p className="text-sm font-medium">No section assigned yet.</p>
+        <p className="text-xs mt-1">Contact your admin to assign you as a class teacher or subject teacher to a section.</p>
+      </div>
+    );
     return (
       <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
-        <p className="text-sm">PA/SA marks are available for class teachers and subject teachers with assigned sections.</p>
+        <p className="text-2xl mb-2">📝</p>
+        <p className="text-sm font-medium">You are a subject teacher for {assignedSections.length} section(s).</p>
+        <p className="text-xs mt-1 text-indigo-600">Switch to the <strong>⚙️ Exam Config</strong> or <strong>✏️ Marks Entry</strong> sub-tabs to manage your subjects.</p>
+        <p className="text-xs mt-1">If you need class-level dashboards, contact admin to assign you as the class teacher.</p>
       </div>
     );
   }
