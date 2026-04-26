@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+
+const API = import.meta.env.VITE_API_URL || 'https://cbas-backend-production.up.railway.app';
 import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/LoginPage';
 import UserManagementPage from './pages/UserManagementPage';
@@ -19,10 +22,25 @@ function App() {
 
   useEffect(() => {
     const stored = localStorage.getItem("cbas_user");
-    if (stored) {
-      try { setUser(JSON.parse(stored)); } catch { localStorage.removeItem("cbas_user"); }
+    if (!stored) { setChecking(false); return; }
+    let parsed: any = null;
+    try { parsed = JSON.parse(stored); } catch { localStorage.removeItem("cbas_user"); setChecking(false); return; }
+    setUser(parsed);
+
+    // Refresh from DB so section re-assignments are immediately visible without re-login
+    if (parsed?.email && parsed.role !== 'principal') {
+      axios.get(`${API}/users/me?email=${encodeURIComponent(parsed.email)}`)
+        .then(res => {
+          const fresh = res.data;
+          const merged = { ...parsed, ...fresh };
+          localStorage.setItem("cbas_user", JSON.stringify(merged));
+          setUser(merged);
+        })
+        .catch(() => { /* silently keep cached version on network error */ })
+        .finally(() => setChecking(false));
+    } else {
+      setChecking(false);
     }
-    setChecking(false);
   }, []);
 
   const handleLogin = (userData: any) => {

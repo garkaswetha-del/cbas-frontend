@@ -41,7 +41,7 @@ const scoreBg = (pct: number) => pct >= 80 ? "bg-green-100 text-green-800" : pct
 const emptyRow = (name: string) => ({
   teacher_name: name,
   observation_date: new Date().toISOString().split("T")[0],
-  grade_observed: "Grade 1", subject_observed: "", block_number: "",
+  grade_observed: "Grade 1", section_observed: "", subject_observed: "", block_number: "",
   number_of_students: "", classroom_norms_discussed: false,
   lesson_plan_available: false, observed_by: "",
   preparation: "not_done", purposeful_class: "not_done", action: "not_done",
@@ -307,6 +307,7 @@ export default function ClassObservationPage() {
                   <th className="px-3 py-3 text-left sticky left-0 z-30 bg-indigo-700 border-r border-indigo-600 min-w-[170px]">Teacher</th>
                   <th className="px-2 py-3 text-center min-w-[115px]">Date</th>
                   <th className="px-2 py-3 text-center min-w-[100px]">Grade</th>
+                  <th className="px-2 py-3 text-center min-w-[80px]">Section</th>
                   <th className="px-2 py-3 text-center min-w-[95px]">Subject</th>
                   <th className="px-2 py-3 text-center min-w-[65px]">Block</th>
                   <th className="px-2 py-3 text-center min-w-[60px]">Stdnts</th>
@@ -378,6 +379,12 @@ export default function ClassObservationPage() {
                             className="border border-gray-300 rounded px-1 py-1 text-xs w-full">
                             {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
+                        </td>
+                        <td className={`px-1 py-1.5 ${bg}`}>
+                          <input value={row.section_observed || ""}
+                            onChange={e => updateRow(name, "section_observed", e.target.value.toUpperCase())}
+                            placeholder="Section"
+                            className="border border-gray-300 rounded px-1 py-1 text-xs w-full" />
                         </td>
                         <td className={`px-1 py-1.5 ${bg}`}>
                           <input value={row.subject_observed}
@@ -470,6 +477,7 @@ export default function ClassObservationPage() {
                                       <th className="px-3 py-2">#</th>
                                       <th className="px-3 py-2">Date</th>
                                       <th className="px-3 py-2">Grade</th>
+                                      <th className="px-3 py-2">Section</th>
                                       <th className="px-3 py-2">Subject</th>
                                       <th className="px-3 py-2">Block</th>
                                       <th className="px-3 py-2">Stdnts</th>
@@ -494,6 +502,7 @@ export default function ClassObservationPage() {
                                         <td className="px-3 py-2 text-gray-400">{i + 1}</td>
                                         <td className="px-3 py-2 whitespace-nowrap">{o.observation_date}</td>
                                         <td className="px-3 py-2">{o.grade_observed}</td>
+                                        <td className="px-3 py-2">{o.section_observed || "—"}</td>
                                         <td className="px-3 py-2">{o.subject_observed}</td>
                                         <td className="px-3 py-2">{o.block_number || "—"}</td>
                                         <td className="px-3 py-2 text-center">{o.number_of_students || "—"}</td>

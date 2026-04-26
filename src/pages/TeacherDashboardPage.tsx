@@ -40,7 +40,7 @@ export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
     } catch { }
   };
 
-  const isClassTeacher = !!(mappings?.is_class_teacher || user?.class_teacher_of);
+  const isClassTeacher = !!(mappings?.is_class_teacher);
 
   const CLASS_TABS = [
     { id: "students",       label: "👥 My Students",      show: true },
@@ -647,10 +647,8 @@ function ClassTab({ user, mappings, academicYear }: any) {
   const [baselineData, setBaselineData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const rawCTO = (mappings?.class_teacher_of || user?.class_teacher_of || "").trim();
-  const ctoParts = rawCTO.split(' ').filter(Boolean);
-  const classGrade = mappings?.class_grade || (ctoParts.length >= 3 ? ctoParts.slice(0,-1).join(' ') : ctoParts.length === 2 ? ctoParts[0] : "");
-  const classSection = mappings?.class_section || (ctoParts.length >= 2 ? ctoParts[ctoParts.length-1] : "");
+  const classGrade = mappings?.class_grade || "";
+  const classSection = mappings?.class_section || "";
 
   useEffect(() => {
     if (classGrade && classSection) fetchAll();
@@ -1241,7 +1239,7 @@ function PASATab({ user, mappings, academicYear }: any) {
 
   const allMappingsPasa: any[] = mappings?.mappings || [];
   const teacherSubjects: string[] = [...new Set(allMappingsPasa.map((m:any) => m.subject).filter(Boolean))] as string[];
-  const isClassTeacher = !!(mappings?.is_class_teacher || user?.class_teacher_of);
+  const isClassTeacher = !!(mappings?.is_class_teacher);
   const classGrade = mappings?.class_grade || "";
   const classSection = mappings?.class_section || "";
 
@@ -5597,7 +5595,7 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
 
   // Determine teacher's subjects and type
-  const isClassTeacher = !!(mappings?.is_class_teacher || user?.class_teacher_of);
+  const isClassTeacher = !!(mappings?.is_class_teacher);
   const teacherSubjects: string[] = mappings?.subjects || user?.subjects || [];
   const isEnglishTeacher = teacherSubjects.some((s: string) => s.toLowerCase().includes("english") || s.toLowerCase().includes("literacy"));
   const isMathTeacher = teacherSubjects.some((s: string) => s.toLowerCase().includes("math") || s.toLowerCase().includes("numeracy") || s.toLowerCase().includes("maths"));
@@ -5620,17 +5618,8 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
     setLoadingStudents(true);
     try {
       let allStudents: any[] = [];
-      // Try class teacher mapping first
-      const cg = mappings?.class_grade;
-      const cs = mappings?.class_section;
-      // Fallback: parse from user.class_teacher_of
-      let fallbackGrade = cg, fallbackSection = cs;
-      if (!cg && user?.class_teacher_of) {
-        const parts = user.class_teacher_of.trim().split(' ').filter(Boolean);
-        fallbackSection = parts[parts.length - 1];
-        fallbackGrade = parts.slice(0, -1).join(' ');
-        if (/^\d+$/.test(fallbackGrade)) fallbackGrade = `Grade ${fallbackGrade}`;
-      }
+      const fallbackGrade = mappings?.class_grade;
+      const fallbackSection = mappings?.class_section;
       if (fallbackGrade && fallbackSection) {
         const r = await axios.get(`${API}/students?grade=${encodeURIComponent(fallbackGrade)}&section=${encodeURIComponent(fallbackSection)}`);
         allStudents = r.data?.data || r.data || [];
@@ -5940,14 +5929,9 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
 function PromotionTab({ user, mappings }: any) {
   const GRADE_ORDER = ["Pre-KG","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
 
-  // Derive class teacher info
-  const rawCTO = (mappings?.class_teacher_of || user?.class_teacher_of || "").trim();
-  const ctoParts = rawCTO.split(' ').filter(Boolean);
-  const rawGrade = mappings?.class_grade || (ctoParts.length >= 3 ? ctoParts.slice(0,-1).join(' ') : ctoParts.length === 2 ? ctoParts[0] : "");
-  const rawSection = mappings?.class_section || (ctoParts.length >= 2 ? ctoParts[ctoParts.length-1] : "");
-  const classGrade = rawGrade && !/^grade\s/i.test(rawGrade) && !["Pre-KG","LKG","UKG"].includes(rawGrade) && /^\d+$/.test(rawGrade.trim()) ? `Grade ${rawGrade.trim()}` : rawGrade;
-  const classSection = rawSection;
-  const isClassTeacher = !!(classGrade && classSection);
+  const classGrade = mappings?.class_grade || "";
+  const classSection = mappings?.class_section || "";
+  const isClassTeacher = !!(mappings?.is_class_teacher);
 
   const nextGradeIdx = GRADE_ORDER.indexOf(classGrade) + 1;
   const nextGrade = nextGradeIdx < GRADE_ORDER.length ? GRADE_ORDER[nextGradeIdx] : null;
@@ -6677,10 +6661,8 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
     { value: "baseline_3", label: "Round 3" },
   ];
 
-  const rawCTO = (mappings?.class_teacher_of || user?.class_teacher_of || "").trim();
-  const ctoParts = rawCTO.split(' ').filter(Boolean);
-  const classGrade = mappings?.class_grade || (ctoParts.length >= 3 ? ctoParts.slice(0,-1).join(' ') : ctoParts.length === 2 ? ctoParts[0] : "");
-  const classSection = mappings?.class_section || (ctoParts.length >= 2 ? ctoParts[ctoParts.length-1] : "");
+  const classGrade = mappings?.class_grade || "";
+  const classSection = mappings?.class_section || "";
   const myGrades = [...new Set((mappings?.mappings || []).map((m: any) => m.grade).filter(Boolean))] as string[];
 
   const [dashTab, setDashTab] = useState<"section"|"grade"|"alerts">("section");
@@ -6999,8 +6981,8 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
     "Grade 9":"secondary","Grade 10":"secondary",
   };
 
-  const classGrade = mappings?.class_grade || (user?.class_teacher_of||"").trim().split(' ').slice(0,-1).join(' ');
-  const classSection = mappings?.class_section || (user?.class_teacher_of||"").trim().split(' ').pop();
+  const classGrade = mappings?.class_grade || "";
+  const classSection = mappings?.class_section || "";
   const stage = GRADE_TO_STAGE[classGrade] || "foundation";
 
   const [sectionData, setSectionData] = useState<any>(null);
