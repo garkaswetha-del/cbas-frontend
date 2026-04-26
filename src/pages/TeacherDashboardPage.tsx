@@ -26,7 +26,7 @@ interface TeacherDashboardProps {
 
 export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
   const [activeGroup, setActiveGroup] = useState<"class" | "self">("class");
-  const [activeTab, setActiveTab] = useState<"students" | "classview" | "pasa" | "examconfig" | "activities" | "baseline_entry" | "baseline_dash" | "student_ai" | "alerts" | "promotion" | "profile" | "self_baseline" | "appraisal" | "self_ai" | "homework" | "portfolio" | "ai_tools">("students");
+  const [activeTab, setActiveTab] = useState<"students" | "classview" | "pasa" | "examconfig" | "activities" | "baseline_entry" | "baseline_dash" | "student_ai" | "alerts" | "promotion" | "profile" | "self_baseline" | "appraisal" | "self_ai" | "homework" | "portfolio" | "ai_tools" | "observations">("students");
   const [academicYear, setAcademicYear] = useState("2025-26");
   const [mappings, setMappings] = useState<any>(null);
 
@@ -59,6 +59,7 @@ export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
     { id: "profile",        label: "👤 My Profile",       show: true },
     { id: "self_baseline",  label: "📈 My Baseline",      show: true },
     { id: "appraisal",      label: "📋 My Appraisal",     show: true },
+    { id: "observations",   label: "🔍 My Observations",  show: true },
     { id: "self_ai",        label: "🤖 AI Learning",      show: true },
     { id: "learning_res",   label: "📚 Learning Resources", show: true },
   ];
@@ -135,6 +136,7 @@ export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
       {activeTab === "profile"        && <ProfileTab user={user} />}
       {activeTab === "self_baseline"  && <BaselineTab user={user} academicYear={academicYear} />}
       {activeTab === "appraisal"      && <AppraisalTab user={user} academicYear={academicYear} />}
+      {activeTab === "observations"   && <ObservationsTab user={user} />}
       {activeTab === "self_ai"        && <SelfAITab user={user} academicYear={academicYear} />}
       {activeTab === "learning_res"   && <LearningResourcesTab user={user} academicYear={academicYear} />}
       {activeTab === "homework"       && <HomeworkTab user={user} mappings={mappings} academicYear={academicYear} />}
@@ -7493,6 +7495,138 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TAB: MY OBSERVATIONS (shared class observations)
+// ─────────────────────────────────────────────────────────────────
+const OBS_CRITERIA = [
+  { key: "preparation", label: "Prep", color: "#6366f1" },
+  { key: "purposeful_class", label: "Purpose", color: "#f59e0b" },
+  { key: "action", label: "Action", color: "#10b981" },
+  { key: "analysis", label: "Analysis", color: "#ef4444" },
+  { key: "application", label: "Apply", color: "#8b5cf6" },
+  { key: "assessment", label: "Assess", color: "#06b6d4" },
+  { key: "super_teacher", label: "Super", color: "#f97316" },
+  { key: "high_energy", label: "Energy", color: "#ec4899" },
+];
+const OBS_SCORE_LABELS: Record<string, string> = {
+  not_done: "Not Done", attempted: "Attempted", done: "Done", well_done: "Well Done",
+};
+const OBS_SCORE_VAL: Record<string, number> = {
+  not_done: 0, attempted: 1, done: 2, well_done: 3,
+};
+
+function ObservationsTab({ user }: { user: any }) {
+  const [obs, setObs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  useEffect(() => { fetchObs(); }, []);
+
+  const fetchObs = async () => {
+    setLoading(true);
+    try {
+      const email = user?.email || "";
+      if (!email) { setObs([]); setLoading(false); return; }
+      const r = await axios.get(`${API}/observation/shared?teacher_email=${encodeURIComponent(email)}`);
+      setObs(Array.isArray(r.data) ? r.data : []);
+    } catch { setObs([]); }
+    setLoading(false);
+  };
+
+  if (loading) return (
+    <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400">
+      <p className="text-sm">Loading observations...</p>
+    </div>
+  );
+
+  if (obs.length === 0) return (
+    <div className="bg-white rounded-xl shadow p-10 text-center">
+      <p className="text-4xl mb-3">🔍</p>
+      <p className="text-sm font-semibold text-gray-600">No shared observations yet</p>
+      <p className="text-xs text-gray-400 mt-1">When an admin shares a class observation for you, it will appear here.</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl shadow p-4 border-l-4 border-indigo-500">
+        <h2 className="text-sm font-bold text-gray-700 mb-1">My Class Observations</h2>
+        <p className="text-xs text-gray-400">{obs.length} observation{obs.length !== 1 ? "s" : ""} shared with you</p>
+      </div>
+
+      {obs.map((o: any) => {
+        const total = OBS_CRITERIA.reduce((sum, c) => sum + (OBS_SCORE_VAL[o[c.key]] || 0), 0);
+        const pct = +((total / 24) * 100).toFixed(1);
+        const isExpanded = expanded === o.id;
+        const pctBg = pct >= 80 ? "bg-green-100 text-green-800" : pct >= 60 ? "bg-blue-100 text-blue-800" : pct >= 40 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800";
+        const pctColor = pct >= 80 ? "text-green-600" : pct >= 60 ? "text-blue-600" : pct >= 40 ? "text-yellow-600" : "text-red-500";
+
+        return (
+          <div key={o.id} className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+            <button
+              onClick={() => setExpanded(isExpanded ? null : o.id)}
+              className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors text-left">
+              <div className="flex items-center gap-4 flex-wrap">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{o.observation_date || "—"}</p>
+                  <p className="text-xs text-gray-500">{o.grade_observed} · {o.subject_observed}</p>
+                </div>
+                <div className="text-xs text-gray-500">Observer: <span className="font-medium text-gray-700">{o.observed_by || "—"}</span></div>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg}`}>{pct}%</span>
+                <span className={`text-sm font-bold ${pctColor}`}>{total}/24</span>
+              </div>
+              <span className="text-gray-400 text-sm ml-2">{isExpanded ? "▲" : "▼"}</span>
+            </button>
+
+            {isExpanded && (
+              <div className="border-t border-gray-100 px-5 pb-5 pt-4 space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {OBS_CRITERIA.map(c => {
+                    const val = o[c.key] || "not_done";
+                    const score = OBS_SCORE_VAL[val];
+                    const bg = score === 0 ? "bg-red-50 border-red-200" : score === 1 ? "bg-orange-50 border-orange-200" : score === 2 ? "bg-blue-50 border-blue-200" : "bg-green-50 border-green-200";
+                    const textCol = score === 0 ? "text-red-700" : score === 1 ? "text-orange-700" : score === 2 ? "text-blue-700" : "text-green-700";
+                    return (
+                      <div key={c.key} className={`rounded-lg border p-3 ${bg}`}>
+                        <p className="text-xs font-semibold" style={{ color: c.color }}>{c.label}</p>
+                        <p className={`text-sm font-bold mt-1 ${textCol}`}>{score}/3</p>
+                        <p className="text-xs text-gray-500">{OBS_SCORE_LABELS[val]}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {(o.what_went_well || o.what_could_be_better || o.action_steps) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                    {o.what_went_well && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <p className="text-xs font-bold text-green-700 mb-1">What Went Well</p>
+                        <p className="text-xs text-gray-700">{o.what_went_well}</p>
+                      </div>
+                    )}
+                    {o.what_could_be_better && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p className="text-xs font-bold text-red-700 mb-1">What Could Be Better</p>
+                        <p className="text-xs text-gray-700">{o.what_could_be_better}</p>
+                      </div>
+                    )}
+                    {o.action_steps && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-xs font-bold text-blue-700 mb-1">Action Steps</p>
+                        <p className="text-xs text-gray-700">{o.action_steps}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

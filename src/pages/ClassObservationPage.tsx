@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -7,7 +7,7 @@ import {
 } from "recharts";
 
 const API = "https://cbas-backend-production.up.railway.app";
-const ACADEMIC_YEAR = "2025-26";
+const ACADEMIC_YEARS = ["2025-26", "2024-25", "2026-27"];
 
 const CRITERIA = [
   { key: "preparation", label: "Prep", color: "#6366f1" },
@@ -52,34 +52,53 @@ const emptyRow = (name: string) => ({
 
 export default function ClassObservationPage() {
   const [activeTab, setActiveTab] = useState<"table" | "dashboard">("table");
+  const [academicYear, setAcademicYear] = useState("2025-26");
   const [allTeachers, setAllTeachers] = useState<string[]>([]);
+  const [teacherEmails, setTeacherEmails] = useState<Record<string, string>>({});
   const [dashboard, setDashboard] = useState<any>(null);
+  const [dashLoading, setDashLoading] = useState(false);
   const [newRows, setNewRows] = useState<Record<string, any>>({});
   const [expandedTeacher, setExpandedTeacher] = useState<string | null>(null);
+  const [expandLoading, setExpandLoading] = useState<string | null>(null);
   const [dashTeacher, setDashTeacher] = useState<string | null>(null);
   const [teacherObs, setTeacherObs] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); }, [academicYear]);
+
+  const showMsg = (msg: string) => {
+    if (msgTimerRef.current) clearTimeout(msgTimerRef.current);
+    setMessage(msg);
+    msgTimerRef.current = setTimeout(() => setMessage(""), 3000);
+  };
 
   const fetchAll = async () => {
+    setDashLoading(true);
     try {
       const [tRes, dRes] = await Promise.all([
         axios.get(`${API}/observation/teachers`),
-        axios.get(`${API}/observation/dashboard?academic_year=${ACADEMIC_YEAR}`),
+        axios.get(`${API}/observation/dashboard?academic_year=${academicYear}`),
       ]);
-      const names: string[] = (tRes.data || []).map((t: any) => t.name);
+      const emailMap: Record<string, string> = {};
+      const names: string[] = (tRes.data || []).map((t: any) => {
+        emailMap[t.name] = t.email || "";
+        return t.name;
+      });
       const observedNames: string[] = (dRes.data?.teachers || []).map((t: any) => t.teacher_name);
       const extra = observedNames.filter((n: string) => !names.includes(n));
+      setTeacherEmails(emailMap);
       setAllTeachers([...names, ...extra]);
       setDashboard(dRes.data);
     } catch { }
+    setDashLoading(false);
   };
 
   const fetchTeacherObs = async (name: string) => {
     try {
-      const res = await axios.get(`${API}/observation/teacher/${encodeURIComponent(name)}?academic_year=${ACADEMIC_YEAR}`);
+      const res = await axios.get(`${API}/observation/teacher/${encodeURIComponent(name)}?academic_year=${academicYear}`);
       setTeacherObs(prev => ({ ...prev, [name]: res.data }));
       return res.data;
     } catch { return null; }
@@ -96,44 +115,57 @@ export default function ClassObservationPage() {
 
   const handleSave = async (name: string) => {
     const row = getRow(name);
-    if (!row.subject_observed) {
-      setMessage("❌ Subject is required");
-      setTimeout(() => setMessage(""), 3000);
-      return;
-    }
+    if (!row.subject_observed) { showMsg("❌ Subject is required"); return; }
+    if (!row.observation_date) { showMsg("❌ Date is required"); return; }
+    if (!row.observed_by?.trim()) { showMsg("❌ Observer name is required"); return; }
     setSaving(name);
     try {
-      await axios.post(`${API}/observation`, { ...row, academic_year: ACADEMIC_YEAR });
-      setMessage("✅ Observation saved for " + name);
+      await axios.post(`${API}/observation`, {
+        ...row,
+        teacher_email: teacherEmails[name] || "",
+        academic_year: academicYear,
+      });
+      showMsg("✅ Observation saved for " + name);
       setNewRows(prev => ({ ...prev, [name]: emptyRow(name) }));
       await fetchAll();
       setExpandedTeacher(name);
       await fetchTeacherObs(name);
-    } catch { setMessage("❌ Error saving"); }
+    } catch { showMsg("❌ Error saving"); }
     setSaving(null);
-    setTimeout(() => setMessage(""), 3000);
   };
 
   const handleDelete = async (id: string, teacherName: string) => {
     if (!confirm("Delete this observation?")) return;
+    setDeleting(id);
     try {
       await axios.delete(`${API}/observation/${id}`);
-      setMessage("✅ Deleted");
+      showMsg("✅ Deleted");
       await fetchAll();
       await fetchTeacherObs(teacherName);
-    } catch { setMessage("❌ Error"); }
-    setTimeout(() => setMessage(""), 3000);
+    } catch { showMsg("❌ Error deleting"); }
+    setDeleting(null);
   };
 
   const handleExpand = async (name: string) => {
     if (expandedTeacher === name) { setExpandedTeacher(null); return; }
     setExpandedTeacher(name);
+    setExpandLoading(name);
     await fetchTeacherObs(name);
+    setExpandLoading(null);
   };
 
   const handleDashTeacher = async (name: string) => {
     setDashTeacher(name);
-    await Promise.all([fetchTeacherObs(name), fetchAll()]);
+    await fetchTeacherObs(name);
+    await fetchAll();
+  };
+
+  const handleShare = async (id: string, currentShared: boolean, teacherName: string) => {
+    try {
+      await axios.patch(`${API}/observation/${id}/share`, { is_shared: !currentShared });
+      showMsg(currentShared ? "✅ Share removed" : "✅ Observation shared with teacher");
+      await fetchTeacherObs(teacherName);
+    } catch { showMsg("❌ Error updating share"); }
   };
 
   const ScoreBtn = ({ name, cKey }: { name: string; cKey: string }) => {
@@ -222,12 +254,19 @@ export default function ClassObservationPage() {
 
   return (
     <div className="p-3 sm:p-6">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Class Observation — Module 5</h1>
           <p className="text-sm text-gray-500">
             Direct table entry · Name and scores fixed · scroll horizontally for all fields
           </p>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Academic Year</label>
+          <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}
+            className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+            {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
         </div>
       </div>
 
@@ -418,6 +457,9 @@ export default function ClassObservationPage() {
                         <tr key={`exp-${name}`}>
                           <td colSpan={22} className="p-0 border-b border-indigo-200">
                             <div className="bg-white border-l-4 border-indigo-500 p-4">
+                              {expandLoading === name ? (
+                                <p className="text-xs text-indigo-500 py-4 text-center">Loading observations...</p>
+                              ) : (<>
                               <p className="text-xs font-bold text-indigo-700 mb-2 uppercase tracking-wide">
                                 All {obs.length} Observations — {name}
                               </p>
@@ -442,6 +484,7 @@ export default function ClassObservationPage() {
                                       <th className="px-3 py-2 text-center">Start</th>
                                       <th className="px-3 py-2 text-center font-bold">Total</th>
                                       <th className="px-3 py-2 text-center font-bold">%</th>
+                                      <th className="px-3 py-2 text-center">Share</th>
                                       <th className="px-3 py-2 text-center">Del</th>
                                     </tr>
                                   </thead>
@@ -478,9 +521,16 @@ export default function ClassObservationPage() {
                                           <span className={`font-bold px-2 py-0.5 rounded-full text-xs ${scoreBg(+o.percentage)}`}>{o.percentage}%</span>
                                         </td>
                                         <td className="px-3 py-2 text-center">
+                                          <button onClick={() => handleShare(o.id, !!o.is_shared, name)}
+                                            className={`px-2 py-1 text-xs rounded font-medium transition-all ${o.is_shared ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-600 hover:bg-indigo-100 hover:text-indigo-700"}`}>
+                                            {o.is_shared ? "Shared ✓" : "Share"}
+                                          </button>
+                                        </td>
+                                        <td className="px-3 py-2 text-center">
                                           <button onClick={() => handleDelete(o.id, name)}
-                                            className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">
-                                            Del
+                                            disabled={deleting === o.id}
+                                            className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50">
+                                            {deleting === o.id ? "..." : "Del"}
                                           </button>
                                         </td>
                                       </tr>
@@ -507,12 +557,13 @@ export default function ClassObservationPage() {
                                         <td className="px-3 py-2 text-center">
                                           <span className={`font-bold px-2 py-0.5 rounded-full text-xs ${scoreBg(td?.avg_percentage || 0)}`}>{td?.avg_percentage}%</span>
                                         </td>
-                                        <td />
+                                        <td /><td />
                                       </tr>
                                     )}
                                   </tbody>
                                 </table>
                               </div>
+                              </>)}
                             </div>
                           </td>
                         </tr>
@@ -527,7 +578,19 @@ export default function ClassObservationPage() {
       )}
 
       {/* DASHBOARD */}
-      {activeTab === "dashboard" && dashboard && (
+      {activeTab === "dashboard" && dashLoading && (
+        <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400">
+          <p className="text-sm">Loading dashboard...</p>
+        </div>
+      )}
+      {activeTab === "dashboard" && !dashLoading && !dashboard && (
+        <div className="bg-white rounded-xl shadow p-10 text-center">
+          <p className="text-4xl mb-3">📊</p>
+          <p className="text-sm font-semibold text-gray-600">No observations recorded for {academicYear}</p>
+          <p className="text-xs text-gray-400 mt-1">Add observations in the Entry tab to see data here.</p>
+        </div>
+      )}
+      {activeTab === "dashboard" && !dashLoading && dashboard && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {[
