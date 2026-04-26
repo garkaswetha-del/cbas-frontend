@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import axios from 'axios';
 
-const BASE = 'http://localhost:5173';
+const BASE = 'http://localhost:5174';
 const API  = 'https://cbas-backend-production.up.railway.app';
 const ADMIN_EMAIL    = 'garkaswetha@gmail.com';
 const ADMIN_PASSWORD = 'swetha123';
@@ -11,22 +11,30 @@ const ACADEMIC_YEAR  = '2025-26';
 
 async function login(page: any) {
   await page.goto(`${BASE}/login`);
+  await page.waitForSelector('input[type="email"]', { timeout: 10000 });
   await page.fill('input[type="email"]', ADMIN_EMAIL);
   await page.fill('input[type="password"]', ADMIN_PASSWORD);
   await page.click('button[type="submit"]');
-  await page.waitForURL(`${BASE}/**`, { timeout: 15000 });
+  // Wait for navigation AWAY from the login page (URL must no longer contain 'login')
+  await page.waitForURL((url: URL) => !url.pathname.includes('login'), { timeout: 30000 });
 }
 
 async function goToObservation(page: any) {
   await page.goto(`${BASE}/observation`);
-  await page.waitForSelector('text=Class Observation', { timeout: 10000 });
+  // If redirected to login (auth guard), wait out and retry once
+  await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+  if (page.url().includes('login')) {
+    await login(page);
+    await page.goto(`${BASE}/observation`);
+  }
+  await page.waitForSelector('h1', { timeout: 15000 });
 }
 
 // Cache a teacher name & id from API for use in tests
 let _teacher: { name: string; email: string; id: string } | null = null;
 async function getTeacher() {
   if (_teacher) return _teacher;
-  const r = await axios.get(`${API}/observation/teachers`, { timeout: 10000 });
+  const r = await axios.get(`${API}/observation/teachers`, { timeout: 30000 });
   const list: any[] = r.data || [];
   const t = list[0];
   _teacher = { name: t?.name || 'Test Teacher', email: t?.email || '', id: t?.id || '' };
@@ -42,10 +50,12 @@ test.describe('A — Observation Entry Tab', () => {
   });
 
   test('A1. Page loads and shows Observation Entry tab by default', async ({ page }) => {
-    const header = await page.locator('h1').first().textContent();
-    expect(header).toContain('Class Observation');
+    // Entry tab button is the definitive marker we're on the right page
     const entryBtn = page.locator('button', { hasText: 'Observation Entry' });
-    await expect(entryBtn).toBeVisible();
+    await expect(entryBtn).toBeVisible({ timeout: 5000 });
+    // Module heading is somewhere on the page (not necessarily the first h1 — layout has school name h1)
+    const hasTitle = await page.locator('text=Class Observation').first().isVisible();
+    expect(hasTitle).toBe(true);
     console.log('✅ A1: Class Observation page loaded, Entry tab active by default');
   });
 
@@ -244,8 +254,14 @@ test.describe('C — Share Feature (Admin)', () => {
     const expandBtns = await page.locator('button', { hasText: '▼' }).count();
     if (expandBtns > 0) {
       await page.locator('button', { hasText: '▼' }).first().click();
-      await page.waitForTimeout(2000);
-      const hasShare = await page.locator('button', { hasText: 'Share' }).first().isVisible().catch(() => false);
+      // Wait for expand loading spinner to disappear (loading = "Loading observations...")
+      await page.waitForFunction(
+        () => !document.querySelector('p.text-indigo-500'),
+        { timeout: 10000 }
+      ).catch(() => {});
+      // Now the table should be visible — wait for Share button
+      const hasShare = await page.locator('button').filter({ hasText: /^Share$/ }).first()
+        .waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
       const hasShared = await page.locator('button', { hasText: 'Shared ✓' }).first().isVisible().catch(() => false);
       expect(hasShare || hasShared).toBe(true);
       console.log(`✅ C2: Share button visible — currently ${hasShared ? 'shared' : 'unshared'}`);
@@ -297,7 +313,7 @@ test.describe('D — Backend API Direct Tests', () => {
   let createdObsId: string | null = null;
 
   test('D1. GET /observation/teachers returns active teachers', async () => {
-    const r = await axios.get(`${API}/observation/teachers`, { timeout: 10000 });
+    const r = await axios.get(`${API}/observation/teachers`, { timeout: 30000 });
     expect(r.status).toBe(200);
     expect(Array.isArray(r.data)).toBe(true);
     const count = r.data.length;
@@ -331,13 +347,13 @@ test.describe('D — Backend API Direct Tests', () => {
     expect(r.status).toBe(201);
     expect(r.data.id).toBeTruthy();
     expect(r.data.teacher_email).toBe(teacher.email);
-    expect(r.data.total_score).toBeGreaterThan(0);
+    expect(+r.data.total_score).toBeGreaterThan(0);
     createdObsId = r.data.id;
     console.log(`✅ D2: POST /observation created id=${r.data.id} score=${r.data.total_score}/24 (${r.data.percentage}%)`);
   });
 
   test('D3. GET /observation/dashboard returns valid structure', async () => {
-    const r = await axios.get(`${API}/observation/dashboard?academic_year=${ACADEMIC_YEAR}`, { timeout: 10000 });
+    const r = await axios.get(`${API}/observation/dashboard?academic_year=${ACADEMIC_YEAR}`, { timeout: 30000 });
     expect(r.status).toBe(200);
     expect(r.data.total_teachers).toBeDefined();
     expect(r.data.total_observations).toBeDefined();
