@@ -35,8 +35,15 @@ const SUBJECTS = [
 ];
 
 const QUALIFICATIONS = [
-  "NTT", "NST", "DED", "BED",
-  "Graduation with BED", "Post Graduation with BED", "Post Graduation",
+  "POST GRADUATION",
+  "GRADUATION",
+  "POST GRADUATION WITH BED",
+  "GRADUATION WITH BED",
+  "NTT",
+  "POST GRADUATION WITH DED",
+  "DED",
+  "PTT",
+  "GRADUATION WITH DED",
 ];
 
 const STAGE_DEFS = [
@@ -448,7 +455,7 @@ export default function UserManagementPage() {
     const effectiveClasses = assignment?.assigned_classes || u.assigned_classes || [];
     const matchSubject = !filterSubject || effectiveSubjects.some((s: string) => s.toLowerCase().includes(filterSubject.toLowerCase()));
     const matchGrade = !filterGrade || effectiveClasses.includes(filterGrade);
-    const matchQual = !filterQualification || u.appraisal_qualification === filterQualification;
+    const matchQual = !filterQualification || (u.appraisal_qualification || '').toUpperCase() === filterQualification.toUpperCase();
     return matchSearch && matchSubject && matchGrade && matchQual;
   }).sort((a, b) => {
     const aClasses = (assignments[a.id]?.assigned_classes || a.assigned_classes || []);
