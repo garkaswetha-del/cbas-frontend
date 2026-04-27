@@ -485,21 +485,27 @@ export default function UserManagementPage() {
 
       {/* ── STATS BAR ── */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
-            <p className="text-2xl font-bold text-indigo-700">{stats.total}</p>
-            <p className="text-xs text-gray-500 mt-0.5">Active Teachers</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
-            <p className="text-2xl font-bold text-red-500">{stats.inactive}</p>
-            <p className="text-xs text-gray-500 mt-0.5">Deactivated</p>
-          </div>
-          {(stats.byQualification || []).slice(0, 2).map((q: any) => (
-            <div key={q.qualification} className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
-              <p className="text-2xl font-bold text-green-700">{q.count}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{q.qualification}</p>
+        <div className="space-y-3 mb-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
+              <p className="text-2xl font-bold text-indigo-700">{stats.total}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Active Teachers</p>
             </div>
-          ))}
+            <div className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
+              <p className="text-2xl font-bold text-red-500">{stats.inactive}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Deactivated</p>
+            </div>
+          </div>
+          {(stats.byQualification || []).length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {(stats.byQualification || []).map((q: any) => (
+                <div key={q.qualification} className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
+                  <p className="text-2xl font-bold text-green-700">{q.count}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{q.qualification}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
