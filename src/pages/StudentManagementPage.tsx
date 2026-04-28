@@ -65,10 +65,7 @@ export default function StudentManagementPage() {
   const [profileStudent, setProfileStudent] = useState<any>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const parentFileRef = useRef<HTMLInputElement>(null);
   const [parentAnalytics, setParentAnalytics] = useState<any>(null);
-  const [parentImporting, setParentImporting] = useState(false);
-  const [parentImportResult, setParentImportResult] = useState<any>(null);
   const [parentFilterGrade, setParentFilterGrade] = useState("");
   const [parentFilterSection, setParentFilterSection] = useState("");
 
@@ -124,66 +121,20 @@ export default function StudentManagementPage() {
     } catch { setParentAnalytics(null); }
   };
 
-  const downloadParentTemplate = () => {
-    const rows = [
-      {
-        "Admission No": "ADM001",
-        "Student Name": "Ravi Kumar",
-        "Grade": "Grade 5",
-        "Section": "ASTEROID",
-        "Father Qualification": "Graduate",
-        "Mother Qualification": "Non-Graduate",
-        "Father Working Status": "Working",
-        "Mother Working Status": "Not Working",
-      },
-    ];
+  const downloadStudentTemplate = () => {
+    const rows = [{
+      "Name": "Ravi Kumar", "Admission No": "ADM001", "Class": "Grade 5", "Section": "ASTEROID",
+      "Gender": "Male", "DOB": "2015-06-15", "Admission Year": "2022", "Phone": "9876543210",
+      "Father Name": "Suresh Kumar", "Mother Name": "Priya Kumar", "Parent Phone": "9876543211",
+      "Father Qualification": "Graduate", "Mother Qualification": "Non-Graduate",
+      "Father Working Status": "Working", "Mother Working Status": "Not Working",
+      "Address": "123 Main St, City",
+    }];
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{ wch: 14 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 22 }];
+    ws['!cols'] = new Array(16).fill({ wch: 20 });
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Parent Data Template");
-    XLSX.writeFile(wb, "parent_data_template.xlsx");
-  };
-
-  const handleParentFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setParentImporting(true); setParentImportResult(null);
-    try {
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer);
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows: any[] = XLSX.utils.sheet_to_json(ws, { header: 1 });
-      const header: string[] = (rows[0] || []).map((h: any) => String(h).trim().toLowerCase());
-      const col = (row: any[], ...names: string[]) => {
-        for (const n of names) {
-          const idx = header.findIndex(h => h.includes(n.toLowerCase()));
-          if (idx !== -1 && row[idx] !== undefined && String(row[idx]).trim() !== '') return String(row[idx]).trim();
-        }
-        return '';
-      };
-      const records: any[] = [];
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        const admission_no = col(row, 'admission no', 'adm no', 'admission');
-        const name = col(row, 'student name', 'name');
-        if (!admission_no && !name) continue;
-        records.push({
-          admission_no, name,
-          grade: col(row, 'grade', 'class'),
-          father_qualification: col(row, 'father qualification', 'father qual'),
-          mother_qualification: col(row, 'mother qualification', 'mother qual'),
-          father_working_status: col(row, 'father working', 'father status'),
-          mother_working_status: col(row, 'mother working', 'mother status'),
-        });
-      }
-      const res = await axios.post(`${API}/students/parent-bulk-update`, { records });
-      setParentImportResult(res.data);
-      fetchParentAnalytics();
-    } catch (e: any) {
-      showMsg(`❌ Import failed: ${e.message}`);
-    }
-    setParentImporting(false);
-    if (parentFileRef.current) parentFileRef.current.value = '';
+    XLSX.utils.book_append_sheet(wb, ws, "Student Import Template");
+    XLSX.writeFile(wb, "student_import_template.xlsx");
   };
 
   const fetchAllSections = async () => {
@@ -377,6 +328,10 @@ export default function StudentManagementPage() {
           parent_phone: col(row, "parent phone", "parent contact", "parent mobile"),
           phone: col(row, "phone", "mobile", "contact"),
           address: col(row, "address"),
+          father_qualification: col(row, "father qualification", "father qual"),
+          mother_qualification: col(row, "mother qualification", "mother qual"),
+          father_working_status: col(row, "father working status", "father working", "father status"),
+          mother_working_status: col(row, "mother working status", "mother working", "mother status"),
         });
       }
 
@@ -415,6 +370,10 @@ export default function StudentManagementPage() {
             className="px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 font-medium">
             📤 Export Excel
           </button>
+          <button onClick={downloadStudentTemplate}
+            className="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 border border-gray-300 font-medium">
+            📄 Template
+          </button>
           <button onClick={() => fileRef.current?.click()} disabled={importing}
             className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
             {importing ? "Importing..." : "📥 Import Excel"}
@@ -438,7 +397,7 @@ export default function StudentManagementPage() {
       {importResult && (
         <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded text-sm">
           <p className="font-semibold text-blue-800">Import Complete</p>
-          <p className="text-blue-700">✅ {importResult.success} created · ⏭ {importResult.failed} skipped</p>
+          <p className="text-blue-700">✅ {importResult.created ?? importResult.success ?? 0} created · 🔄 {importResult.updated ?? 0} updated</p>
           {importResult.errors?.length > 0 && (
             <div className="mt-2 overflow-x-auto">
               <table className="text-xs w-full border border-blue-200 rounded">
@@ -815,20 +774,33 @@ export default function StudentManagementPage() {
       )}
 
       {/* ── PARENT ANALYTICS TAB ── */}
-      {activeTab === "parent" && (
-        <div>
-          {/* Controls */}
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <button onClick={downloadParentTemplate}
-              className="px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 font-medium">
-              📄 Download Template
-            </button>
-            <button onClick={() => parentFileRef.current?.click()} disabled={parentImporting}
-              className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
-              {parentImporting ? "Importing..." : "📥 Import Parent Data"}
-            </button>
-            <input ref={parentFileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleParentFileImport} />
-            <div className="ml-auto flex gap-2 flex-wrap">
+      {activeTab === "parent" && (() => {
+        const QUAL_ROWS = [
+          { label: "Both Graduate", fq: "Graduate", mq: "Graduate", color: "bg-green-50 text-green-800 border-green-200" },
+          { label: "Father Graduate Only", fq: "Graduate", mq: "Non-Graduate", color: "bg-blue-50 text-blue-800 border-blue-200" },
+          { label: "Mother Graduate Only", fq: "Non-Graduate", mq: "Graduate", color: "bg-purple-50 text-purple-800 border-purple-200" },
+          { label: "Neither Graduate", fq: "Non-Graduate", mq: "Non-Graduate", color: "bg-orange-50 text-orange-800 border-orange-200" },
+        ];
+        const WORK_COLS = [
+          { label: "Both Working", fw: "Working", mw: "Working" },
+          { label: "Father Working Only", fw: "Working", mw: "Not Working" },
+          { label: "Mother Working Only", fw: "Not Working", mw: "Working" },
+          { label: "Neither Working", fw: "Not Working", mw: "Not Working" },
+        ];
+        const score = (v: any) => v != null
+          ? <span className={`font-semibold text-xs ${Number(v) >= 70 ? 'text-green-600' : Number(v) >= 50 ? 'text-yellow-600' : 'text-red-500'}`}>{v}%</span>
+          : <span className="text-gray-300 text-xs">—</span>;
+        const getCell = (fq: string, mq: string, fw: string, mw: string) =>
+          (parentAnalytics?.profiles || []).find((p: any) =>
+            p.father_qualification === fq && p.mother_qualification === mq &&
+            p.father_working_status === fw && p.mother_working_status === mw
+          ) || { student_count: 0, avg_baseline: null, avg_exam: null, avg_activity: null };
+
+        return (
+          <div>
+            {/* Filter + tip */}
+            <div className="flex items-center gap-3 mb-4 flex-wrap">
+              <p className="text-xs text-gray-400 mr-auto">Parent data is imported via the student Excel import (use the 📄 Template button above).</p>
               <select value={parentFilterGrade} onChange={e => { setParentFilterGrade(e.target.value); setParentFilterSection(""); }}
                 className="border border-gray-300 rounded px-3 py-1.5 text-sm">
                 <option value="">All Classes</option>
@@ -842,113 +814,74 @@ export default function StudentManagementPage() {
                 ))}
               </select>
             </div>
-          </div>
 
-          {/* Import result */}
-          {parentImportResult && (
-            <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded text-sm">
-              <p className="font-semibold text-blue-800">Import Complete</p>
-              <p className="text-blue-700">✅ {parentImportResult.updated} updated · ⏭ {parentImportResult.skipped} skipped</p>
-              {parentImportResult.errors?.length > 0 && (
-                <p className="text-xs text-blue-600 mt-1">{parentImportResult.errors.slice(0, 5).join(' · ')}</p>
-              )}
-              <button onClick={() => setParentImportResult(null)} className="text-xs text-blue-500 mt-1">Dismiss</button>
-            </div>
-          )}
-
-          {!parentAnalytics ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
-              <p className="text-4xl mb-3">📊</p>
-              <p className="font-medium">Loading analytics...</p>
-            </div>
-          ) : parentAnalytics.profiles?.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-              <p className="text-4xl mb-3">📂</p>
-              <p className="font-medium text-gray-600">No parent data yet</p>
-              <p className="text-sm text-gray-400 mt-1">Download the template, fill parent details, and import to see analytics.</p>
-            </div>
-          ) : (
-            <>
-              {/* Summary cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
-                {[
-                  { label: "Both Graduate", value: parentAnalytics.summary.both_graduate, color: "bg-green-50 border-green-200 text-green-800" },
-                  { label: "Only Father Graduate", value: parentAnalytics.summary.only_father_graduate, color: "bg-blue-50 border-blue-200 text-blue-800" },
-                  { label: "Only Mother Graduate", value: parentAnalytics.summary.only_mother_graduate, color: "bg-purple-50 border-purple-200 text-purple-800" },
-                  { label: "Neither Graduate", value: parentAnalytics.summary.neither_graduate, color: "bg-orange-50 border-orange-200 text-orange-800" },
-                  { label: "Both Working", value: parentAnalytics.summary.both_working, color: "bg-teal-50 border-teal-200 text-teal-800" },
-                  { label: "Missing Data", value: parentAnalytics.summary.missing_data, color: "bg-gray-50 border-gray-200 text-gray-500" },
-                ].map(card => (
-                  <div key={card.label} className={`rounded-lg border px-4 py-3 ${card.color}`}>
-                    <p className="text-xs opacity-75">{card.label}</p>
-                    <p className="text-2xl font-bold mt-0.5">{card.value ?? 0}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Breakdown table */}
-              <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-700">Parent Profile vs Student Performance</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Avg scores across all baseline rounds and exams. — means no score data yet.</p>
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+              {[
+                { label: "Both Graduate", value: parentAnalytics?.summary?.both_graduate, color: "bg-green-50 border-green-200 text-green-800" },
+                { label: "Father Grad Only", value: parentAnalytics?.summary?.only_father_graduate, color: "bg-blue-50 border-blue-200 text-blue-800" },
+                { label: "Mother Grad Only", value: parentAnalytics?.summary?.only_mother_graduate, color: "bg-purple-50 border-purple-200 text-purple-800" },
+                { label: "Neither Graduate", value: parentAnalytics?.summary?.neither_graduate, color: "bg-orange-50 border-orange-200 text-orange-800" },
+                { label: "Both Working", value: parentAnalytics?.summary?.both_working, color: "bg-teal-50 border-teal-200 text-teal-800" },
+                { label: "Missing Data", value: parentAnalytics?.summary?.missing_data, color: "bg-gray-50 border-gray-200 text-gray-500" },
+              ].map(c => (
+                <div key={c.label} className={`rounded-lg border px-4 py-3 ${c.color}`}>
+                  <p className="text-xs opacity-75">{c.label}</p>
+                  <p className="text-2xl font-bold mt-0.5">{c.value ?? 0}</p>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="bg-gray-50 text-gray-500">
-                      <tr>
-                        <th className="px-3 py-2 text-left">Father Qual.</th>
-                        <th className="px-3 py-2 text-left">Mother Qual.</th>
-                        <th className="px-3 py-2 text-left">Father Working</th>
-                        <th className="px-3 py-2 text-left">Mother Working</th>
-                        <th className="px-3 py-2 text-center">Students</th>
-                        <th className="px-3 py-2 text-center">Avg Baseline %</th>
-                        <th className="px-3 py-2 text-center">Avg Exam %</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {parentAnalytics.profiles.map((row: any, i: number) => (
-                        <tr key={i} className={`border-t border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                          <td className="px-3 py-2">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${row.father_qualification === 'Graduate' ? 'bg-green-100 text-green-700' : row.father_qualification === 'Non-Graduate' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
-                              {row.father_qualification}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${row.mother_qualification === 'Graduate' ? 'bg-green-100 text-green-700' : row.mother_qualification === 'Non-Graduate' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
-                              {row.mother_qualification}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${row.father_working_status === 'Working' ? 'bg-blue-100 text-blue-700' : row.father_working_status === 'Not Working' ? 'bg-gray-100 text-gray-600' : 'bg-gray-100 text-gray-400'}`}>
-                              {row.father_working_status}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${row.mother_working_status === 'Working' ? 'bg-blue-100 text-blue-700' : row.mother_working_status === 'Not Working' ? 'bg-gray-100 text-gray-600' : 'bg-gray-100 text-gray-400'}`}>
-                              {row.mother_working_status}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-center font-semibold text-gray-700">{row.student_count}</td>
-                          <td className="px-3 py-2 text-center">
-                            {row.avg_baseline != null
-                              ? <span className={`font-semibold ${Number(row.avg_baseline) >= 70 ? 'text-green-600' : Number(row.avg_baseline) >= 50 ? 'text-yellow-600' : 'text-red-500'}`}>{row.avg_baseline}%</span>
-                              : <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            {row.avg_exam != null
-                              ? <span className={`font-semibold ${Number(row.avg_exam) >= 70 ? 'text-green-600' : Number(row.avg_exam) >= 50 ? 'text-yellow-600' : 'text-red-500'}`}>{row.avg_exam}%</span>
-                              : <span className="text-gray-300">—</span>}
-                          </td>
-                        </tr>
+              ))}
+            </div>
+
+            {/* 4×4 permutation grid */}
+            <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-700">All Parent Profile Combinations vs Student Performance</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Every row = education profile · Every column = working status · Scores: Baseline · PA/SA · Activities</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="px-3 py-2 text-left text-gray-600 font-semibold border border-gray-200 w-40">Education Profile</th>
+                      {WORK_COLS.map(w => (
+                        <th key={w.label} className="px-3 py-2 text-center text-gray-600 font-semibold border border-gray-200">
+                          {w.label}
+                        </th>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {QUAL_ROWS.map(q => (
+                      <tr key={q.label}>
+                        <td className={`px-3 py-2 font-semibold border border-gray-200 ${q.color}`}>{q.label}</td>
+                        {WORK_COLS.map(w => {
+                          const cell = getCell(q.fq, q.mq, w.fw, w.mw);
+                          return (
+                            <td key={w.label} className="px-3 py-2 border border-gray-200 text-center align-top">
+                              {Number(cell.student_count) === 0 ? (
+                                <span className="text-gray-300">—</span>
+                              ) : (
+                                <div className="space-y-1">
+                                  <div className="font-bold text-gray-700 text-sm">{cell.student_count} <span className="text-gray-400 font-normal text-xs">students</span></div>
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="text-gray-400 text-xs">Baseline: {score(cell.avg_baseline)}</span>
+                                    <span className="text-gray-400 text-xs">PA/SA: {score(cell.avg_exam)}</span>
+                                    <span className="text-gray-400 text-xs">Activity: {score(cell.avg_activity)}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </>
-          )}
-        </div>
-      )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── TC MODAL ── */}
       {tcTarget && (
