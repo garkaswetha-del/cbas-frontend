@@ -10,6 +10,8 @@ const CLASSES = [
 ];
 const GENDERS = ["Male", "Female", "Other"];
 const GRADE_ORDER = ["Pre-KG","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
+const PARENT_QUALIFICATIONS = ["Graduate", "Non-Graduate"];
+const PARENT_WORKING_STATUS = ["Working", "Not Working"];
 
 const emptyForm = {
   name: "", admission_no: "", current_class: "", section: "",
@@ -22,7 +24,7 @@ const emptyForm = {
 function today() { return new Date().toISOString().split("T")[0]; }
 
 export default function StudentManagementPage() {
-  const [activeTab, setActiveTab] = useState<"active" | "tc" | "alumni">("active");
+  const [activeTab, setActiveTab] = useState<"active" | "tc" | "alumni" | "parent">("active");
   const [students, setStudents] = useState<any[]>([]);
   const [tcStudents, setTcStudents] = useState<any[]>([]);
   const [alumni, setAlumni] = useState<any[]>([]);
@@ -63,10 +65,17 @@ export default function StudentManagementPage() {
   const [profileStudent, setProfileStudent] = useState<any>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const parentFileRef = useRef<HTMLInputElement>(null);
+  const [parentAnalytics, setParentAnalytics] = useState<any>(null);
+  const [parentImporting, setParentImporting] = useState(false);
+  const [parentImportResult, setParentImportResult] = useState<any>(null);
+  const [parentFilterGrade, setParentFilterGrade] = useState("");
+  const [parentFilterSection, setParentFilterSection] = useState("");
 
   useEffect(() => { fetchStudents(); fetchStats(); fetchAllSections(); }, [filterGrade, filterSection, search]);
   useEffect(() => { if (activeTab === "tc") fetchTCRegister(); }, [activeTab]);
   useEffect(() => { if (activeTab === "alumni") fetchAlumni(); }, [activeTab, alumniYear]);
+  useEffect(() => { if (activeTab === "parent") fetchParentAnalytics(); }, [activeTab, parentFilterGrade, parentFilterSection]);
 
   const showMsg = (msg: string) => { setMessage(msg); setTimeout(() => setMessage(""), 4000); };
 
@@ -103,6 +112,78 @@ export default function StudentManagementPage() {
       const res = await axios.get(`${API}/students/alumni`, { params });
       setAlumni(res.data?.alumni || []);
     } catch { }
+  };
+
+  const fetchParentAnalytics = async () => {
+    try {
+      const params: any = {};
+      if (parentFilterGrade) params.grade = parentFilterGrade;
+      if (parentFilterSection) params.section = parentFilterSection;
+      const res = await axios.get(`${API}/students/parent-analytics`, { params });
+      setParentAnalytics(res.data);
+    } catch { setParentAnalytics(null); }
+  };
+
+  const downloadParentTemplate = () => {
+    const rows = [
+      {
+        "Admission No": "ADM001",
+        "Student Name": "Ravi Kumar",
+        "Grade": "Grade 5",
+        "Section": "ASTEROID",
+        "Father Qualification": "Graduate",
+        "Mother Qualification": "Non-Graduate",
+        "Father Working Status": "Working",
+        "Mother Working Status": "Not Working",
+      },
+    ];
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 14 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 22 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Parent Data Template");
+    XLSX.writeFile(wb, "parent_data_template.xlsx");
+  };
+
+  const handleParentFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setParentImporting(true); setParentImportResult(null);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      const header: string[] = (rows[0] || []).map((h: any) => String(h).trim().toLowerCase());
+      const col = (row: any[], ...names: string[]) => {
+        for (const n of names) {
+          const idx = header.findIndex(h => h.includes(n.toLowerCase()));
+          if (idx !== -1 && row[idx] !== undefined && String(row[idx]).trim() !== '') return String(row[idx]).trim();
+        }
+        return '';
+      };
+      const records: any[] = [];
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const admission_no = col(row, 'admission no', 'adm no', 'admission');
+        const name = col(row, 'student name', 'name');
+        if (!admission_no && !name) continue;
+        records.push({
+          admission_no, name,
+          grade: col(row, 'grade', 'class'),
+          father_qualification: col(row, 'father qualification', 'father qual'),
+          mother_qualification: col(row, 'mother qualification', 'mother qual'),
+          father_working_status: col(row, 'father working', 'father status'),
+          mother_working_status: col(row, 'mother working', 'mother status'),
+        });
+      }
+      const res = await axios.post(`${API}/students/parent-bulk-update`, { records });
+      setParentImportResult(res.data);
+      fetchParentAnalytics();
+    } catch (e: any) {
+      showMsg(`❌ Import failed: ${e.message}`);
+    }
+    setParentImporting(false);
+    if (parentFileRef.current) parentFileRef.current.value = '';
   };
 
   const fetchAllSections = async () => {
@@ -424,10 +505,6 @@ export default function StudentManagementPage() {
               { label: "Father Name", key: "father_name", type: "text" },
               { label: "Mother Name", key: "mother_name", type: "text" },
               { label: "Parent Phone", key: "parent_phone", type: "text" },
-              { label: "Father Qualification", key: "father_qualification", type: "text" },
-              { label: "Mother Qualification", key: "mother_qualification", type: "text" },
-              { label: "Father Working Status", key: "father_working_status", type: "text" },
-              { label: "Mother Working Status", key: "mother_working_status", type: "text" },
             ].map(f => (
               <div key={f.key}>
                 <label className="text-xs text-gray-500 mb-1 block">{f.label}</label>
@@ -436,6 +513,38 @@ export default function StudentManagementPage() {
                   className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" />
               </div>
             ))}
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Father Qualification</label>
+              <select value={form.father_qualification} onChange={e => setForm({ ...form, father_qualification: e.target.value })}
+                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm">
+                <option value="">-- Select --</option>
+                {PARENT_QUALIFICATIONS.map(q => <option key={q} value={q}>{q}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Mother Qualification</label>
+              <select value={form.mother_qualification} onChange={e => setForm({ ...form, mother_qualification: e.target.value })}
+                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm">
+                <option value="">-- Select --</option>
+                {PARENT_QUALIFICATIONS.map(q => <option key={q} value={q}>{q}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Father Working Status</label>
+              <select value={form.father_working_status} onChange={e => setForm({ ...form, father_working_status: e.target.value })}
+                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm">
+                <option value="">-- Select --</option>
+                {PARENT_WORKING_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Mother Working Status</label>
+              <select value={form.mother_working_status} onChange={e => setForm({ ...form, mother_working_status: e.target.value })}
+                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm">
+                <option value="">-- Select --</option>
+                {PARENT_WORKING_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Class</label>
               <select value={form.current_class}
@@ -506,6 +615,10 @@ export default function StudentManagementPage() {
         <button onClick={() => setActiveTab("alumni")}
           className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === "alumni" ? "bg-green-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-green-400"}`}>
           Alumni
+        </button>
+        <button onClick={() => setActiveTab("parent")}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === "parent" ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-blue-400"}`}>
+          Parent Analytics
         </button>
       </div>
 
@@ -697,6 +810,142 @@ export default function StudentManagementPage() {
                 </tbody>
               </table>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ── PARENT ANALYTICS TAB ── */}
+      {activeTab === "parent" && (
+        <div>
+          {/* Controls */}
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <button onClick={downloadParentTemplate}
+              className="px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 font-medium">
+              📄 Download Template
+            </button>
+            <button onClick={() => parentFileRef.current?.click()} disabled={parentImporting}
+              className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+              {parentImporting ? "Importing..." : "📥 Import Parent Data"}
+            </button>
+            <input ref={parentFileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleParentFileImport} />
+            <div className="ml-auto flex gap-2 flex-wrap">
+              <select value={parentFilterGrade} onChange={e => { setParentFilterGrade(e.target.value); setParentFilterSection(""); }}
+                className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+                <option value="">All Classes</option>
+                {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select value={parentFilterSection} onChange={e => setParentFilterSection(e.target.value)}
+                className="border border-gray-300 rounded px-3 py-1.5 text-sm">
+                <option value="">All Sections</option>
+                {(parentFilterGrade && sections[parentFilterGrade] ? sections[parentFilterGrade] : []).map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Import result */}
+          {parentImportResult && (
+            <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded text-sm">
+              <p className="font-semibold text-blue-800">Import Complete</p>
+              <p className="text-blue-700">✅ {parentImportResult.updated} updated · ⏭ {parentImportResult.skipped} skipped</p>
+              {parentImportResult.errors?.length > 0 && (
+                <p className="text-xs text-blue-600 mt-1">{parentImportResult.errors.slice(0, 5).join(' · ')}</p>
+              )}
+              <button onClick={() => setParentImportResult(null)} className="text-xs text-blue-500 mt-1">Dismiss</button>
+            </div>
+          )}
+
+          {!parentAnalytics ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
+              <p className="text-4xl mb-3">📊</p>
+              <p className="font-medium">Loading analytics...</p>
+            </div>
+          ) : parentAnalytics.profiles?.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+              <p className="text-4xl mb-3">📂</p>
+              <p className="font-medium text-gray-600">No parent data yet</p>
+              <p className="text-sm text-gray-400 mt-1">Download the template, fill parent details, and import to see analytics.</p>
+            </div>
+          ) : (
+            <>
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+                {[
+                  { label: "Both Graduate", value: parentAnalytics.summary.both_graduate, color: "bg-green-50 border-green-200 text-green-800" },
+                  { label: "Only Father Graduate", value: parentAnalytics.summary.only_father_graduate, color: "bg-blue-50 border-blue-200 text-blue-800" },
+                  { label: "Only Mother Graduate", value: parentAnalytics.summary.only_mother_graduate, color: "bg-purple-50 border-purple-200 text-purple-800" },
+                  { label: "Neither Graduate", value: parentAnalytics.summary.neither_graduate, color: "bg-orange-50 border-orange-200 text-orange-800" },
+                  { label: "Both Working", value: parentAnalytics.summary.both_working, color: "bg-teal-50 border-teal-200 text-teal-800" },
+                  { label: "Missing Data", value: parentAnalytics.summary.missing_data, color: "bg-gray-50 border-gray-200 text-gray-500" },
+                ].map(card => (
+                  <div key={card.label} className={`rounded-lg border px-4 py-3 ${card.color}`}>
+                    <p className="text-xs opacity-75">{card.label}</p>
+                    <p className="text-2xl font-bold mt-0.5">{card.value ?? 0}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Breakdown table */}
+              <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700">Parent Profile vs Student Performance</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Avg scores across all baseline rounds and exams. — means no score data yet.</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 text-gray-500">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Father Qual.</th>
+                        <th className="px-3 py-2 text-left">Mother Qual.</th>
+                        <th className="px-3 py-2 text-left">Father Working</th>
+                        <th className="px-3 py-2 text-left">Mother Working</th>
+                        <th className="px-3 py-2 text-center">Students</th>
+                        <th className="px-3 py-2 text-center">Avg Baseline %</th>
+                        <th className="px-3 py-2 text-center">Avg Exam %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parentAnalytics.profiles.map((row: any, i: number) => (
+                        <tr key={i} className={`border-t border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                          <td className="px-3 py-2">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${row.father_qualification === 'Graduate' ? 'bg-green-100 text-green-700' : row.father_qualification === 'Non-Graduate' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+                              {row.father_qualification}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${row.mother_qualification === 'Graduate' ? 'bg-green-100 text-green-700' : row.mother_qualification === 'Non-Graduate' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+                              {row.mother_qualification}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${row.father_working_status === 'Working' ? 'bg-blue-100 text-blue-700' : row.father_working_status === 'Not Working' ? 'bg-gray-100 text-gray-600' : 'bg-gray-100 text-gray-400'}`}>
+                              {row.father_working_status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${row.mother_working_status === 'Working' ? 'bg-blue-100 text-blue-700' : row.mother_working_status === 'Not Working' ? 'bg-gray-100 text-gray-600' : 'bg-gray-100 text-gray-400'}`}>
+                              {row.mother_working_status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-center font-semibold text-gray-700">{row.student_count}</td>
+                          <td className="px-3 py-2 text-center">
+                            {row.avg_baseline != null
+                              ? <span className={`font-semibold ${Number(row.avg_baseline) >= 70 ? 'text-green-600' : Number(row.avg_baseline) >= 50 ? 'text-yellow-600' : 'text-red-500'}`}>{row.avg_baseline}%</span>
+                              : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {row.avg_exam != null
+                              ? <span className={`font-semibold ${Number(row.avg_exam) >= 70 ? 'text-green-600' : Number(row.avg_exam) >= 50 ? 'text-yellow-600' : 'text-red-500'}`}>{row.avg_exam}%</span>
+                              : <span className="text-gray-300">—</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
           )}
         </div>
       )}
