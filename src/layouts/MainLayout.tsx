@@ -1,18 +1,23 @@
-import { useState } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 
-const NAV_ITEMS = [
-  { path: '/users',         label: 'User Management',      icon: '👥' },
-  { path: '/students',      label: 'Student Management',   icon: '🎓' },
-  { path: '/appraisal',     label: 'Teachers Appraisal',   icon: '📋' },
-  { path: '/baseline',      label: 'Baseline Entry',       icon: '📈' },
-  { path: '/competencies',  label: 'Competency Registry',  icon: '🗂️' },
-  { path: '/activities',    label: 'Activities & Marks',   icon: '🎯' },
-  { path: '/pasa',          label: 'PA/SA Marks',          icon: '📝' },
-  { path: '/observation',   label: 'Class Observation',    icon: '👁' },
-  { path: '/student-parent',label: 'Student / Parent',     icon: '👨‍👩‍👧' },
-  { path: '/sections',      label: 'Section Management',   icon: '🏫' },  
+const ADMINISTRATIVE_NAV = [
+  { path: '/users',    label: 'User Management',   icon: '👥' },
+  { path: '/students', label: 'Student Management', icon: '🎓' },
+  { path: '/sections', label: 'Section Management', icon: '🏫' },
+  { path: '/appraisal',label: 'Teachers Appraisal', icon: '📋' },
 ];
+
+const ACADEMIC_NAV = [
+  { path: '/baseline',     label: 'Baseline Entry',      icon: '📈' },
+  { path: '/competencies', label: 'Competency Registry',  icon: '🗂️' },
+  { path: '/activities',   label: 'Activities & Marks',   icon: '🎯' },
+  { path: '/pasa',         label: 'PA/SA Marks',          icon: '📝' },
+  { path: '/observation',  label: 'Class Observation',    icon: '👁' },
+];
+
+const ADMIN_PATHS = ADMINISTRATIVE_NAV.map(n => n.path);
+const ACADEMIC_PATHS = ACADEMIC_NAV.map(n => n.path);
 
 interface MainLayoutProps {
   user: any;
@@ -21,10 +26,43 @@ interface MainLayoutProps {
 
 export default function MainLayout({ user, onLogout }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  const detectTab = (pathname: string) =>
+    ACADEMIC_PATHS.some(p => pathname.startsWith(p)) ? 'academic' : 'administrative';
+
+  const [navTab, setNavTab] = useState<'administrative' | 'academic'>(() => detectTab(location.pathname));
+
+  useEffect(() => {
+    setNavTab(detectTab(location.pathname));
+  }, [location.pathname]);
+
+  const currentNav = navTab === 'administrative' ? ADMINISTRATIVE_NAV : ACADEMIC_NAV;
+
+  const TabSwitcher = () => (
+    <div className="flex mx-3 mb-2 rounded-lg overflow-hidden border border-indigo-700">
+      <button
+        onClick={() => setNavTab('administrative')}
+        className={`flex-1 py-1.5 text-xs font-semibold transition-all ${
+          navTab === 'administrative' ? 'bg-indigo-600 text-white' : 'text-indigo-400 hover:text-white hover:bg-indigo-800'
+        }`}
+      >
+        Administrative
+      </button>
+      <button
+        onClick={() => setNavTab('academic')}
+        className={`flex-1 py-1.5 text-xs font-semibold transition-all ${
+          navTab === 'academic' ? 'bg-indigo-600 text-white' : 'text-indigo-400 hover:text-white hover:bg-indigo-800'
+        }`}
+      >
+        Academic
+      </button>
+    </div>
+  );
 
   const NavItems = () => (
     <>
-      {NAV_ITEMS.map(item => (
+      {currentNav.map(item => (
         <NavLink
           key={item.path}
           to={item.path}
@@ -44,39 +82,46 @@ export default function MainLayout({ user, onLogout }: MainLayoutProps) {
     </>
   );
 
+  const UserFooter = () => (
+    <div className="border-t border-indigo-700 p-4">
+      <div className="flex items-center gap-3 mb-3">
+        {user?.photo ? (
+          <img src={user.photo} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-indigo-400" />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+            {user?.name?.[0]?.toUpperCase()}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-white text-xs font-semibold truncate">{user?.name}</p>
+          <p className="text-indigo-300 text-xs capitalize">{user?.role}</p>
+        </div>
+      </div>
+      <button
+        onClick={onLogout}
+        className="w-full flex items-center justify-center gap-2 bg-indigo-700 hover:bg-red-600 text-white text-xs py-2 rounded-lg transition-all font-medium"
+      >
+        <span>🚪</span> Sign Out
+      </button>
+    </div>
+  );
+
   return (
     <div className="flex h-screen bg-gray-100">
 
       {/* ── DESKTOP SIDEBAR ── */}
       <div className="hidden md:flex w-64 bg-indigo-900 flex-col flex-shrink-0">
-        <div className="px-4 py-5 border-b border-indigo-700">
+        <div className="px-4 py-4 border-b border-indigo-700">
           <h1 className="text-white text-sm font-bold leading-tight">Wisdom Techno School</h1>
           <p className="text-indigo-300 text-xs mt-0.5">CBAS Portal</p>
         </div>
-        <nav className="flex-1 overflow-y-auto py-3">
+        <div className="pt-3 pb-1">
+          <TabSwitcher />
+        </div>
+        <nav className="flex-1 overflow-y-auto">
           <NavItems />
         </nav>
-        <div className="border-t border-indigo-700 p-4">
-          <div className="flex items-center gap-3 mb-3">
-            {user?.photo ? (
-              <img src={user.photo} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-indigo-400" />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
-                {user?.name?.[0]?.toUpperCase()}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-xs font-semibold truncate">{user?.name}</p>
-              <p className="text-indigo-300 text-xs capitalize">{user?.role}</p>
-            </div>
-          </div>
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-700 hover:bg-red-600 text-white text-xs py-2 rounded-lg transition-all font-medium"
-          >
-            <span>🚪</span> Sign Out
-          </button>
-        </div>
+        <UserFooter />
       </div>
 
       {/* ── MOBILE OVERLAY ── */}
@@ -89,37 +134,20 @@ export default function MainLayout({ user, onLogout }: MainLayoutProps) {
 
       {/* ── MOBILE DRAWER ── */}
       <div className={`fixed top-0 left-0 h-full w-72 bg-indigo-900 z-50 flex flex-col transform transition-transform duration-300 md:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="px-4 py-5 border-b border-indigo-700 flex items-center justify-between">
+        <div className="px-4 py-4 border-b border-indigo-700 flex items-center justify-between">
           <div>
             <h1 className="text-white text-sm font-bold leading-tight">Wisdom Techno School</h1>
             <p className="text-indigo-300 text-xs mt-0.5">CBAS Portal</p>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="text-indigo-300 hover:text-white text-xl p-1">✕</button>
         </div>
-        <nav className="flex-1 overflow-y-auto py-3">
+        <div className="pt-3 pb-1">
+          <TabSwitcher />
+        </div>
+        <nav className="flex-1 overflow-y-auto">
           <NavItems />
         </nav>
-        <div className="border-t border-indigo-700 p-4">
-          <div className="flex items-center gap-3 mb-3">
-            {user?.photo ? (
-              <img src={user.photo} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-indigo-400" />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
-                {user?.name?.[0]?.toUpperCase()}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-xs font-semibold truncate">{user?.name}</p>
-              <p className="text-indigo-300 text-xs capitalize">{user?.role}</p>
-            </div>
-          </div>
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-700 hover:bg-red-600 text-white text-xs py-2 rounded-lg transition-all font-medium"
-          >
-            <span>🚪</span> Sign Out
-          </button>
-        </div>
+        <UserFooter />
       </div>
 
       {/* ── MAIN CONTENT ── */}
@@ -148,4 +176,3 @@ export default function MainLayout({ user, onLogout }: MainLayoutProps) {
     </div>
   );
 }
-
