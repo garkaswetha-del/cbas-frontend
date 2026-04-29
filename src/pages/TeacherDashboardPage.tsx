@@ -5805,6 +5805,7 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
           placeholder={showAlumni ? "Search alumni by name or admission no..." : "Search student by name or admission no..."}
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500" />
         <button onClick={() => { setShowAlumni(v => !v); setSearch(""); }} className={`px-3 py-2 text-xs rounded-lg font-medium border transition-all whitespace-nowrap ${showAlumni ? "bg-purple-600 text-white border-purple-600" : "bg-white border-gray-300 text-gray-600 hover:bg-purple-50"}`}>{showAlumni ? "🎓 Alumni" : "🎓 Alumni Search"}</button>
+      </div>
 
       {loadingStudents ? (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">Loading students...</div>
