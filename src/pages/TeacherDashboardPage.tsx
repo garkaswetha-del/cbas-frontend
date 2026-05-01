@@ -46,7 +46,7 @@ interface TeacherDashboardProps {
 
 export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
   const [activeGroup, setActiveGroup] = useState<"class" | "self">("class");
-  const [activeTab, setActiveTab] = useState<"students" | "classview" | "pasa" | "examconfig" | "activities" | "baseline_entry" | "baseline_dash" | "student_ai" | "alerts" | "promotion" | "profile" | "self_baseline" | "appraisal" | "self_ai" | "homework" | "portfolio" | "ai_tools" | "observations">("students");
+  const [activeTab, setActiveTab] = useState<"students" | "classview" | "pasa" | "examconfig" | "activities" | "baseline_entry" | "baseline_dash" | "alerts" | "promotion" | "profile" | "self_baseline" | "appraisal" | "self_ai" | "homework" | "portfolio" | "ai_tools" | "observations">("students");
   const [academicYear, setAcademicYear] = useState("2025-26");
   const [mappings, setMappings] = useState<any>(null);
 
@@ -4622,13 +4622,6 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
   const [difficulty, setDifficulty] = useState("Mixed");
   const [qTypes, setQTypes] = useState<string[]>(["Multiple Choice (MCQ)","Short Answer","Case-Based Short Answer"]);
   const [paperOutput, setPaperOutput] = useState("");
-
-  // Weekly â€” class-level gap-aware
-  const [weeklyTopic, setWeeklyTopic] = useState("");
-  const [classGaps, setClassGaps] = useState<any[]>([]);
-  const [loadingClassGaps, setLoadingClassGaps] = useState(false);
-  const [weeklyOutput, setWeeklyOutput] = useState("");
-
   // Parent suggestions
   const [selectedParentStudent, setSelectedParentStudent] = useState<any>(null);
   const [parentContext, setParentContext] = useState("");
@@ -4643,7 +4636,6 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
   // Auto-loads
   useEffect(() => { if (selectedSubject) fetchCompetencies(); }, [selectedSubject, classGrade]);
   useEffect(() => { if (allMappings.length > 0) fetchStudents(); }, [mappings]);
-  useEffect(() => { if (classGrade) fetchExamTypes(); }, [classGrade, academicYear]);
   useEffect(() => { if ((subTab==="practice"||subTab==="assessment") && selectedStudent) fetchStudentGaps(); }, [selectedStudent, gapSource, selectedExam, selectedSubject]);
   useEffect(() => { if (subTab==="history") fetchHistory(); }, [subTab, historyFilter]);
   useEffect(() => { if (subTab==="parent" && selectedParentStudent) fetchActivityGaps(selectedParentStudent.id); }, [selectedParentStudent]);
@@ -4715,13 +4707,6 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
     } catch {}
   };
 
-  const fetchExamTypes = async () => {
-    try {
-      const r = await axios.get(`${API}/pasa/exam-types?academic_year=${academicYear}&grade=${encodeURIComponent(classGrade)}`);
-      setExamTypes(r.data?.examTypes || []);
-    } catch {}
-  };
-
   const fetchStudentGaps = async () => {
     if (!selectedStudent) return;
     setLoadingGaps(true); setStudentGaps([]);
@@ -4729,11 +4714,12 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
       if (gapSource === "pasa") {
         const r = await axios.get(`${API}/pasa/student/${selectedStudent.id}/analysis?academic_year=${academicYear}`);
         if (!r.data) { setLoadingGaps(false); return; }
+        setExamTypes([...new Set((r.data.examSummary||[]).map((e:any)=>e.exam).filter(Boolean))]);
         const gaps: any[] = [];
         (r.data.examSummary || []).forEach((exam: any) => {
           if (selectedExam && exam.exam !== selectedExam) return;
           Object.entries(exam.subjects || {}).forEach(([sub, sd]: [string, any]) => {
-            if (selectedSubject && sub !== selectedSubject) return;
+            if (selectedSubject && sub.toLowerCase() !== selectedSubject.toLowerCase()) return;
             (sd.competency_scores || []).forEach((cs: any) => {
               if (cs.marks_obtained !== null && cs.max_marks > 0 && (cs.marks_obtained / cs.max_marks) * 100 < 60) {
                 gaps.push({ subject: sub, code: cs.competency_code, name: cs.competency_name, score: +((cs.marks_obtained/cs.max_marks)*100).toFixed(0), exam: exam.exam });
@@ -4759,24 +4745,6 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
       }
     } catch {}
     setLoadingGaps(false);
-  };
-
-  const fetchClassGaps = async () => {
-    if (!classGrade || !classSection) return;
-    setLoadingClassGaps(true); setClassGaps([]);
-    try {
-      const et = selectedExam ? `&exam_type=${selectedExam}` : "";
-      const r = await axios.get(`${API}/pasa/dashboard/section?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}&academic_year=${academicYear}${et}`);
-      const weakComps: any[] = [];
-      (r.data?.subjectSummary || []).forEach((s: any) => {
-        if (selectedSubject && s.subject !== selectedSubject) return;
-        (s.competency_avgs || []).forEach((c: any) => {
-          if (c.avg < 60) weakComps.push({ subject: s.subject, code: c.code, avg: c.avg });
-        });
-      });
-      setClassGaps(weakComps.sort((a,b) => a.avg - b.avg));
-    } catch {}
-    setLoadingClassGaps(false);
   };
 
   const callGroq = async (prompt: string, maxTokens = 2500): Promise<string> => {
@@ -4863,50 +4831,6 @@ Title: ${type} Paper â€” ${selectedStudent.name} â€” ${selectedSubject
   };
 
   // Generate gap-aware weekly homework
-  const generateWeekly = async () => {
-    setGenerating(true); setWeeklyOutput(""); setMsg("");
-    try {
-      const hasGaps = classGaps.length > 0;
-      const gapBlock = classGaps.slice(0,6).map((g:any) =>
-        `- [${g.code}] ${g.subject} â€” Class avg: ${g.avg?.toFixed(0)}%`
-      ).join("\n");
-      const prompt = `You are an experienced teacher creating a 5-day weekly homework plan for ${selectedSubject||"general subjects"}, Grade ${classGrade}.
-${weeklyTopic ? `This week's topic: ${weeklyTopic}` : ""}
-Mode: ${hasGaps ? "REMEDIAL â€” class has weak areas to address" : "ENRICHMENT â€” class is performing well"}
-${hasGaps ? `
-Class weak competencies (below 60%):
-${gapBlock}` : ""}
-
-Create a structured Monday-to-Friday homework plan:
-- ${hasGaps ? "Focus questions on the weak competency areas above" : "Enrichment and extension activities"}
-- Each day: 3-4 questions or activities, varied types
-- Progressively build across the week (easy â†’ challenging)
-- Friday: 5-question mini-review with answer key
-- End with a Parent Note: what to observe and how to support
-
-Format exactly as:
-ðŸ“… MONDAY â€” [Day theme]
-[Questions/activities]
-
-ðŸ“… TUESDAY â€” [Day theme]
-[Questions/activities]
-
-ðŸ“… WEDNESDAY â€” [Day theme]
-[Questions/activities]
-
-ðŸ“… THURSDAY â€” [Day theme]
-[Questions/activities]
-
-ðŸ“… FRIDAY â€” MINI REVIEW
-[5 review questions + answers]
-
-ðŸ‘¨â€ðŸ‘©â€ðŸ‘§ PARENT NOTE
-[Practical guidance for parents â€” what to look for, how to help at home]`;
-      setWeeklyOutput(await callGroq(prompt, 3000));
-    } catch { setMsg("âŒ Generation failed. Check API key."); }
-    setGenerating(false);
-  };
-
   // Generate parent suggestion
   const generateParent = async () => {
     if (!selectedParentStudent) { setMsg("âŒ Select a student first"); return; }
@@ -6336,19 +6260,30 @@ function HomeworkTab({ user, mappings, academicYear }: any) {
     }
   }, [mappings]);
 
-  // Load students when grade/subject changes
+  // Load students when grade changes — only for teacher's assigned sections
   useEffect(() => {
-    if (!grade) return;
+    if (!grade || !mappings) return;
     const fetchStudents = async () => {
       try {
-        const r = await axios.get(`${API}/students?limit=2000`);
-        const st = r.data?.data || r.data || [];
-        const names = st.filter((s: any) => s.current_class === grade).map((s: any) => s.name).filter(Boolean).sort();
-        setStudentList(names);
+        const sections: string[] = [...new Set(
+          (mappings?.mappings || [])
+            .filter((m: any) => m.grade === grade && m.section)
+            .map((m: any) => m.section as string)
+        )];
+        const allNames = new Set<string>();
+        const targets = sections.length
+          ? sections.map(s => `${API}/students?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(s)}`)
+          : [`${API}/students?grade=${encodeURIComponent(grade)}`];
+        for (const url of targets) {
+          const r = await axios.get(url);
+          const st = r.data?.data || r.data || [];
+          st.filter((s: any) => s.is_active !== false).forEach((s: any) => { if (s.name) allNames.add(s.name); });
+        }
+        setStudentList([...allNames].sort());
       } catch { }
     };
     fetchStudents();
-  }, [grade]);
+  }, [grade, mappings]);
 
   const toggleStudent = (name: string) => {
     setSelectedStudents(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
