@@ -264,8 +264,9 @@ test.describe('A — Dashboard Shell', () => {
 
   test('A1. Teacher login succeeds and lands on dashboard', async ({ page }) => {
     await loginAsTeacher(page);
-    await expect(page.locator('button:has-text("Class Management")')).toBeVisible();
-    await expect(page.locator('button:has-text("Self Management")')).toBeVisible();
+    // Sidebar always shows first class tab and first self tab
+    await expect(page.locator('button:has-text("My Students")')).toBeVisible();
+    await expect(page.locator('button:has-text("My Profile")')).toBeVisible();
     console.log('✅ A1: Teacher dashboard loaded');
   });
 
