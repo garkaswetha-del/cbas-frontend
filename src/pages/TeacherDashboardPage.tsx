@@ -6744,8 +6744,8 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
                         .map((s: any, i: number) => (
                         <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                           <td className="px-3 py-2 font-medium text-gray-800">{s.name}</td>
-                          <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.lit)}`}>{s.lit.toFixed(1)}%</span></td>
-                          <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.num)}`}>{s.num.toFixed(1)}%</span></td>
+                          <td className="px-3 py-2 text-center">{s.lit != null ? <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.lit)}`}>{s.lit.toFixed(1)}%</span> : <span className="text-gray-300">—</span>}</td>
+                          <td className="px-3 py-2 text-center">{s.num != null ? <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.num)}`}>{s.num.toFixed(1)}%</span> : <span className="text-gray-300">—</span>}</td>
                           <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.overall)}`}>{s.overall.toFixed(1)}%</span></td>
                           <td className="px-3 py-2 text-center">
                             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.overall)}`}>{s.level}</span>
