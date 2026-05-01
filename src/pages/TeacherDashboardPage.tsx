@@ -36,7 +36,7 @@ const toCompetencySubject = (s: string): string => {
 };
 // Convert stored subject key (lowercase/underscore) to display-friendly title
 const fmtSubject = (s: string): string => {
-  if (!s) return "â€”";
+  if (!s) return "—";
   return COMPETENCY_TO_DISPLAY[s] || s.replace(/_/g," ").replace(/\b\w/g, c => c.toUpperCase());
 };
 
@@ -151,7 +151,7 @@ function ProfileTab({ user }: { user: any }) {
         const u = JSON.parse(stored);
         localStorage.setItem("cbas_user", JSON.stringify({ ...u, ...form, photo }));
       }
-      setMsg("âœ… Profile saved successfully");
+      setMsg("✅ Profile saved successfully");
     } catch { setMsg("âŒ Error saving profile"); }
     setSaving(false);
     setTimeout(() => setMsg(""), 3000);
@@ -162,7 +162,7 @@ function ProfileTab({ user }: { user: any }) {
     if (pwForm.newPw.length < 6) { setPwMsg("âŒ Password must be at least 6 characters"); setTimeout(() => setPwMsg(""), 3000); return; }
     try {
       await axios.patch(`${API}/users/${user.id}`, { password: pwForm.newPw });
-      setPwMsg("âœ… Password changed successfully");
+      setPwMsg("✅ Password changed successfully");
       setPwForm({ current: "", newPw: "", confirm: "" });
     } catch { setPwMsg("âŒ Error changing password"); }
     setTimeout(() => setPwMsg(""), 3000);
@@ -216,10 +216,10 @@ function ProfileTab({ user }: { user: any }) {
             </div>
           </div>
         </div>
-        {msg && <p className={`text-sm mb-3 ${msg.startsWith("âœ…") ? "text-green-600" : "text-red-600"}`}>{msg}</p>}
+        {msg && <p className={`text-sm mb-3 ${msg.startsWith("✅") ? "text-green-600" : "text-red-600"}`}>{msg}</p>}
         <button onClick={saveProfile} disabled={saving}
           className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-          {saving ? "Saving..." : "ðŸ’¾ Save Profile"}
+          {saving ? "Saving..." : "💾 Save Profile"}
         </button>
       </div>
 
@@ -238,9 +238,9 @@ function ProfileTab({ user }: { user: any }) {
               className="border border-gray-300 rounded px-3 py-2 text-sm w-full" />
           </div>
         </div>
-        {pwMsg && <p className={`text-sm mt-2 mb-2 ${pwMsg.startsWith("âœ…") ? "text-green-600" : "text-red-600"}`}>{pwMsg}</p>}
+        {pwMsg && <p className={`text-sm mt-2 mb-2 ${pwMsg.startsWith("✅") ? "text-green-600" : "text-red-600"}`}>{pwMsg}</p>}
         <button onClick={changePassword} className="mt-3 px-5 py-2 bg-gray-700 text-white text-sm rounded-lg hover:bg-gray-800 font-medium">
-          ðŸ”’ Change Password
+          🔒 Change Password
         </button>
       </div>
     </div>
@@ -248,7 +248,7 @@ function ProfileTab({ user }: { user: any }) {
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Student detail modal â€” Fix #7
+// Student detail modal — Fix #7
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StudentDetailModal({ student, academicYear, onClose }: any) {
   const [pasaData, setPasaData] = useState<any>(null);
@@ -277,7 +277,7 @@ function StudentDetailModal({ student, academicYear, onClose }: any) {
             <h2 className="text-sm font-bold text-gray-800">{student.name}</h2>
             <p className="text-xs text-gray-400">{student.current_class} Â· {student.section}{student.admission_no ? ` Â· ${student.admission_no}` : ""}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl font-bold p-1 leading-none">âœ•</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl font-bold p-1 leading-none">✕</button>
         </div>
         <div className="overflow-y-auto flex-1 p-5 space-y-5">
           {loading ? (
@@ -346,7 +346,7 @@ function StudentDetailModal({ student, academicYear, onClose }: any) {
 function StudentAnalysisView({ students, subjects, baselineData, activitiesData, academicYear, grade, section }: any) {
   const [subTab, setSubTab] = useState<"pasa" | "baseline" | "activities">("pasa");
   const [selectedExam, setSelectedExam] = useState("PA1");
-  // Fix #4: lazy PASA cache â€” only fetch on demand, one exam at a time
+  // Fix #4: lazy PASA cache — only fetch on demand, one exam at a time
   const [pasaCache, setPasaCache] = useState<Record<string, any>>({});
   const [pasaLoading, setPasaLoading] = useState(false);
   // Fix #6: search filter
@@ -384,14 +384,14 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
   const matchSearch = (name: string) => !searchLower || name?.toLowerCase().includes(searchLower);
 
   const SUB_TABS = [
-    { id: "pasa",       label: "ðŸ“Š PA/SA Marks" },
-    { id: "baseline",   label: `ðŸ“ˆ Baseline${assessedBaseline.length ? ` (${assessedBaseline.length})` : ""}` },
-    { id: "activities", label: `ðŸŽ¯ Activities${activitiesData?.length ? ` (${activitiesData.length})` : ""}` },
+    { id: "pasa",       label: "📊 PA/SA Marks" },
+    { id: "baseline",   label: `📈 Baseline${assessedBaseline.length ? ` (${assessedBaseline.length})` : ""}` },
+    { id: "activities", label: `🎯 Activities${activitiesData?.length ? ` (${activitiesData.length})` : ""}` },
   ];
 
   return (
     <div className="space-y-4">
-      {/* Sub-tab bar + search â€” Fix #6 */}
+      {/* Sub-tab bar + search — Fix #6 */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex gap-2 flex-wrap">
           {SUB_TABS.map(t => (
@@ -408,7 +408,7 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
         />
       </div>
 
-      {/* â”€â”€ PA/SA Sub-tab â€” Fix #4 lazy load â”€â”€ */}
+      {/* â”€â”€ PA/SA Sub-tab — Fix #4 lazy load â”€â”€ */}
       {subTab === "pasa" && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
@@ -429,7 +429,7 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
                 {[
                   { label: "Students", value: examData.total_students || students.length, color: "border-indigo-500" },
                   { label: "Section Avg", value: fmtPct(n(examData.section_avg)), color: "border-green-500" },
-                  { label: "Subjects", value: subjects?.length || examData.subjects?.length || "â€”", color: "border-blue-500" },
+                  { label: "Subjects", value: subjects?.length || examData.subjects?.length || "—", color: "border-blue-500" },
                   { label: "Exam", value: selectedExam, color: "border-orange-500" },
                 ].map(s => (
                   <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
@@ -444,7 +444,7 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-white rounded-xl shadow p-4 border-t-4 border-green-400">
                     <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      ðŸ“ˆ Advancing
+                      📈 Advancing
                       <span className="ml-auto bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">{examData.advancing?.length}</span>
                     </h3>
                     <div className="space-y-1 max-h-40 overflow-y-auto">
@@ -458,7 +458,7 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
                   </div>
                   <div className="bg-white rounded-xl shadow p-4 border-t-4 border-red-400">
                     <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      ðŸ“‰ Retracting
+                      📉 Retracting
                       <span className="ml-auto bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">{examData.retracting?.length}</span>
                     </h3>
                     <div className="space-y-1 max-h-40 overflow-y-auto">
@@ -473,9 +473,9 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
                 </div>
               )}
 
-              {/* Student rankings table â€” Fix #7 click to open modal */}
+              {/* Student rankings table — Fix #7 click to open modal */}
               <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Student Rankings â€” {selectedExam}</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Student Rankings — {selectedExam}</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs border-collapse" style={{ minWidth: `${350 + (examData.subjects?.length || 0) * 100}px` }}>
                     <thead>
@@ -513,12 +513,12 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
                                   <td key={sub} className="px-2 py-2 text-center border-l border-gray-100">
                                     {sd?.is_absent ? <span className="text-red-400 font-bold">AB</span>
                                       : sd?.percentage != null ? <span className={`px-1 py-0.5 rounded ${scoreBg(n(sd.percentage))}`}>{n(sd.percentage).toFixed(0)}%</span>
-                                      : <span className="text-gray-300">â€”</span>}
+                                      : <span className="text-gray-300">—</span>}
                                   </td>
                                 );
                               })}
                               <td className="px-3 py-2 text-center border-l border-gray-100">
-                                <span className={`font-bold px-2 py-0.5 rounded-full ${scoreBg(n(s.grand_percentage))}`}>{s.grand_percentage ? fmtPct(n(s.grand_percentage)) : "â€”"}</span>
+                                <span className={`font-bold px-2 py-0.5 rounded-full ${scoreBg(n(s.grand_percentage))}`}>{s.grand_percentage ? fmtPct(n(s.grand_percentage)) : "—"}</span>
                               </td>
                               <td className="px-3 py-2 text-center">
                                 {s.band && <span className="font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: BAND_COLORS[s.band] + "20", color: BAND_COLORS[s.band] }}>{s.band}</span>}
@@ -558,13 +558,13 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
         </div>
       )}
 
-      {/* â”€â”€ Baseline Sub-tab â€” Fix #1 field mapping, #3 empty rows, #6 search, #7 click â”€â”€ */}
+      {/* â”€â”€ Baseline Sub-tab — Fix #1 field mapping, #3 empty rows, #6 search, #7 click â”€â”€ */}
       {subTab === "baseline" && (
         <div className="space-y-4">
           {assessedBaseline.length > 0 ? (
             <div className="bg-white rounded-xl shadow p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-1">
-                Baseline Assessments â€” {assessedBaseline.length} of {students.length || (baselineData || []).length} students assessed
+                Baseline Assessments — {assessedBaseline.length} of {students.length || (baselineData || []).length} students assessed
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs border-collapse">
@@ -593,19 +593,19 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
                             className={`${i % 2 === 0 ? "bg-white" : "bg-gray-50"} ${stuObj ? "cursor-pointer hover:bg-indigo-50" : ""} transition-colors`}
                             onClick={() => stuObj && setSelectedStudent(stuObj)}>
                             <td className="px-3 py-2 font-medium text-gray-800">{b.student_name}</td>
-                            <td className="px-3 py-2 text-center text-gray-500">{a?.round?.replace("baseline_", "R") || "â€”"}</td>
-                            <td className="px-3 py-2 text-center text-gray-500 capitalize">{a?.stage || "â€”"}</td>
+                            <td className="px-3 py-2 text-center text-gray-500">{a?.round?.replace("baseline_", "R") || "—"}</td>
+                            <td className="px-3 py-2 text-center text-gray-500 capitalize">{a?.stage || "—"}</td>
                             <td className="px-3 py-2 text-center">
-                              {lit > 0 ? <span className={`font-bold px-2 py-0.5 rounded-full ${scoreBg(lit)}`}>{lit.toFixed(0)}%</span> : <span className="text-gray-300">â€”</span>}
+                              {lit > 0 ? <span className={`font-bold px-2 py-0.5 rounded-full ${scoreBg(lit)}`}>{lit.toFixed(0)}%</span> : <span className="text-gray-300">—</span>}
                             </td>
                             <td className="px-3 py-2 text-center">
-                              {num > 0 ? <span className={`font-bold px-2 py-0.5 rounded-full ${scoreBg(num)}`}>{num.toFixed(0)}%</span> : <span className="text-gray-300">â€”</span>}
+                              {num > 0 ? <span className={`font-bold px-2 py-0.5 rounded-full ${scoreBg(num)}`}>{num.toFixed(0)}%</span> : <span className="text-gray-300">—</span>}
                             </td>
                             <td className="px-3 py-2 text-center">
                               <span className={`font-bold px-2 py-0.5 rounded-full ${scoreBg(overall)}`}>{overall.toFixed(0)}%</span>
                             </td>
                             <td className="px-3 py-2 text-center">
-                              <span className="font-semibold px-2 py-0.5 rounded bg-purple-100 text-purple-700">{a?.level || "â€”"}</span>
+                              <span className="font-semibold px-2 py-0.5 rounded bg-purple-100 text-purple-700">{a?.level || "—"}</span>
                             </td>
                           </tr>
                         );
@@ -623,13 +623,13 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
         </div>
       )}
 
-      {/* â”€â”€ Activities Sub-tab â€” Fix #2 show activity definitions â”€â”€ */}
+      {/* â”€â”€ Activities Sub-tab — Fix #2 show activity definitions â”€â”€ */}
       {subTab === "activities" && (
         <div className="space-y-4">
           {activitiesData?.length > 0 ? (
             <div className="bg-white rounded-xl shadow p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                Activities â€” {activitiesData.length} created for this section
+                Activities — {activitiesData.length} created for this section
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs border-collapse">
@@ -646,15 +646,15 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
                   <tbody>
                     {activitiesData.map((a: any, i: number) => (
                       <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                        <td className="px-3 py-2 font-medium text-gray-800">{a.name || "â€”"}</td>
+                        <td className="px-3 py-2 font-medium text-gray-800">{a.name || "—"}</td>
                         <td className="px-3 py-2 text-center">{fmtSubject(a.subject)}</td>
                         <td className="px-3 py-2 text-center text-gray-500">
-                          {a.activity_date ? new Date(a.activity_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "â€”"}
+                          {a.activity_date ? new Date(a.activity_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "—"}
                         </td>
-                        <td className="px-3 py-2 text-center">{a.activity_type || "â€”"}</td>
-                        <td className="px-3 py-2 text-center font-bold">{a.total_max_marks || "â€”"}</td>
+                        <td className="px-3 py-2 text-center">{a.activity_type || "—"}</td>
+                        <td className="px-3 py-2 text-center font-bold">{a.total_max_marks || "—"}</td>
                         <td className="px-3 py-2 text-center text-indigo-600 font-semibold">
-                          {a.competency_mappings?.length ?? a.rubrics?.length ?? "â€”"}
+                          {a.competency_mappings?.length ?? a.rubrics?.length ?? "—"}
                         </td>
                       </tr>
                     ))}
@@ -756,7 +756,7 @@ function StudentsTab({ user, mappings, academicYear }: any) {
             <button key={`${c.grade}-${c.section}`}
               onClick={() => { setSelectedGrade(c.grade); setSelectedSection(c.section); }}
               className={`px-3 py-2 text-xs rounded-lg font-medium border transition-all ${selectedGrade === c.grade && selectedSection === c.section ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
-              {c.grade} â€” {c.section}
+              {c.grade} — {c.section}
               <span className="block text-xs opacity-75">{c.subjects.join(", ")}</span>
             </button>
           ))}
@@ -827,7 +827,7 @@ function ClassTab({ user, mappings, academicYear }: any) {
   return (
     <div className="space-y-4">
       <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-indigo-800">ðŸ› My Class â€” {classGrade} Â· {classSection}</h3>
+        <h3 className="text-sm font-bold text-indigo-800">🏛 My Class — {classGrade} Â· {classSection}</h3>
         <p className="text-xs text-indigo-600 mt-0.5">{students.length} students</p>
       </div>
       <StudentAnalysisView
@@ -864,7 +864,7 @@ function AppraisalTab({ user, academicYear }: any) {
   if (loading) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400"><p className="text-sm">Loading...</p></div>;
   if (!data) return (
     <div className="bg-white rounded-xl shadow p-10 text-center">
-      <p className="text-4xl mb-3">ðŸ“‹</p>
+      <p className="text-4xl mb-3">📋</p>
       <p className="text-sm font-semibold text-gray-600">No appraisal found for {academicYear}</p>
       <p className="text-xs text-gray-400 mt-1">Your appraisal will appear here once the principal completes your evaluation.</p>
     </div>
@@ -882,7 +882,7 @@ function AppraisalTab({ user, academicYear }: any) {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-base font-bold text-gray-800">{user?.name}</h2>
-            <p className="text-sm text-gray-500">Appraisal Report â€” {academicYear}</p>
+            <p className="text-sm text-gray-500">Appraisal Report — {academicYear}</p>
           </div>
           <div className="text-center">
             <p className="text-3xl font-bold" style={{ color: pct >= 80 ? "#10b981" : pct >= 60 ? "#6366f1" : pct >= 40 ? "#f59e0b" : "#ef4444" }}>{score}%</p>
@@ -981,7 +981,7 @@ function BaselineTab({ user, academicYear }: any) {
   if (loading) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Loading...</div>;
   if (!data?.assessments?.length) return (
     <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400">
-      <p className="text-2xl mb-2">ðŸ“Š</p>
+      <p className="text-2xl mb-2">📊</p>
       <p className="text-sm font-medium">No baseline data found for {academicYear}.</p>
       <p className="text-xs mt-1">Your administrator will enter your assessment scores.</p>
     </div>
@@ -1007,7 +1007,7 @@ function BaselineTab({ user, academicYear }: any) {
   // Get domain names dynamically
   const LIT_LABELS = latest?.literacy_scores ? Object.keys(latest.literacy_scores) : ["Listening","Speaking","Reading","Writing"];
   const NUM_LABELS = latest?.numeracy_scores ? Object.keys(latest.numeracy_scores) : ["Operations","Base 10","Measurement","Geometry"];
-  const LIT_DOMAINS = LIT_LABELS; // same â€” now using names directly
+  const LIT_DOMAINS = LIT_LABELS; // same — now using names directly
   const NUM_DOMAINS = NUM_LABELS;
 
   const litStage = (latestLit?.gaps as any)?.lit_stage || latestLit?.stage || latest?.stage || "foundation";
@@ -1015,7 +1015,7 @@ function BaselineTab({ user, academicYear }: any) {
   const litGrade = STAGE_GRADE[litStage];
   const numGrade = STAGE_GRADE[numStage];
 
-  // Subject-wise promotion â€” read from gaps JSONB where we stored lit_promoted / num_promoted
+  // Subject-wise promotion — read from gaps JSONB where we stored lit_promoted / num_promoted
   const litPromotedInfo = (latestLit?.gaps as any) || {};
   const numPromotedInfo = (latestNum?.gaps as any) || {};
   const litPromoted = litPromotedInfo.lit_promoted === true || latestLit?.promoted === true;
@@ -1093,7 +1093,7 @@ function BaselineTab({ user, academicYear }: any) {
                 hasStage ? "bg-gray-200 text-gray-600 border-gray-300" :
                 "bg-gray-50 text-gray-300 border-gray-200"
               }`}>
-                {STAGE_LABELS[s]} {wasPromoted ? "âœ“" : isCurrentStage ? "â† now" : ""}
+                {STAGE_LABELS[s]} {wasPromoted ? "✓" : isCurrentStage ? "← now" : ""}
               </span>
             );
           })}
@@ -1102,7 +1102,7 @@ function BaselineTab({ user, academicYear }: any) {
         {/* Promotion banner */}
         {promoted && (
           <div className="bg-green-50 border border-green-300 rounded-xl p-3 flex items-center gap-3">
-            <span className="text-2xl">ðŸŽ‰</span>
+            <span className="text-2xl">🎉</span>
             <div>
               <p className="text-sm font-bold text-green-800">Stage Promoted!</p>
               <p className="text-xs text-green-600">Promoted to <strong>{STAGE_LABELS[promotedTo]||promotedTo}</strong> stage Â· Next assessment: {STAGE_GRADE[promotedTo?.toLowerCase()||"foundation"]} competencies</p>
@@ -1110,17 +1110,17 @@ function BaselineTab({ user, academicYear }: any) {
           </div>
         )}
 
-        {/* Domain scores â€” latest round */}
+        {/* Domain scores — latest round */}
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h4 className="text-xs font-bold text-gray-600 mb-3">Latest Round â€” {STAGE_LABELS[currentStage]||currentStage} Stage (Assessed on {currentGrade} competencies)</h4>
+          <h4 className="text-xs font-bold text-gray-600 mb-3">Latest Round — {STAGE_LABELS[currentStage]||currentStage} Stage (Assessed on {currentGrade} competencies)</h4>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {labels.map((label:string) => {
               const val = +(pctObj[label] ?? 0);
               return (
                 <div key={label} className={`rounded-lg p-3 text-center ${scoreBadge(val)}`}>
-                  <div className="text-lg font-bold">{val > 0 ? val.toFixed(1)+"%" : "â€”"}</div>
+                  <div className="text-lg font-bold">{val > 0 ? val.toFixed(1)+"%" : "—"}</div>
                   <div className="text-xs mt-0.5">{label}</div>
-                  {val > 0 && val < 60 && <div className="text-xs mt-0.5">âš ï¸ gap</div>}
+                  {val > 0 && val < 60 && <div className="text-xs mt-0.5">⚠️ gap</div>}
                 </div>
               );
             })}
@@ -1128,12 +1128,12 @@ function BaselineTab({ user, academicYear }: any) {
           <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
             <span className="text-xs text-gray-500">Subject Average</span>
             <span className={`text-sm font-bold px-3 py-1 rounded-lg ${scoreBadge(avg)}`}>
-              {avg > 0 ? avg.toFixed(1)+"%" : "â€”"} {avg >= 80 ? "ðŸŽ‰" : ""}
+              {avg > 0 ? avg.toFixed(1)+"%" : "—"} {avg >= 80 ? "🎉" : ""}
             </span>
           </div>
         </div>
 
-        {/* Trend chart â€” only if 2+ rounds */}
+        {/* Trend chart — only if 2+ rounds */}
         {trend.length >= 2 && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <h4 className="text-xs font-bold text-gray-600 mb-3">Score Trend Across Rounds</h4>
@@ -1188,20 +1188,20 @@ function BaselineTab({ user, academicYear }: any) {
       {/* Header with refresh */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold text-gray-700">ðŸ“Š My Baseline Assessment</h3>
+          <h3 className="text-sm font-bold text-gray-700">📊 My Baseline Assessment</h3>
           {lastUpdated && <p className="text-xs text-gray-400">Last synced: {lastUpdated}</p>}
         </div>
         <button onClick={fetchData} disabled={loading}
           className="px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-1 disabled:opacity-50">
-          {loading ? "â³" : "ðŸ”„"} Refresh
+          {loading ? "â³" : "🔄"} Refresh
         </button>
       </div>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label:"Overall", val: overall > 0 ? overall.toFixed(1)+"%" : "â€”", color: scoreBadge(overall) },
-          { label:"Lit Avg", val: litAvg !== null ? litAvg.toFixed(1)+"%" : "â€”", color: scoreBadge(litAvg||0) },
-          { label:"Num Avg", val: numAvg !== null ? numAvg.toFixed(1)+"%" : "â€”", color: scoreBadge(numAvg||0) },
+          { label:"Overall", val: overall > 0 ? overall.toFixed(1)+"%" : "—", color: scoreBadge(overall) },
+          { label:"Lit Avg", val: litAvg !== null ? litAvg.toFixed(1)+"%" : "—", color: scoreBadge(litAvg||0) },
+          { label:"Num Avg", val: numAvg !== null ? numAvg.toFixed(1)+"%" : "—", color: scoreBadge(numAvg||0) },
           { label:"Gaps", val: [...litGaps,...numGaps].length, color:"bg-orange-50 text-orange-800" },
         ].map(k => (
           <div key={k.label} className={`rounded-xl p-3 text-center border ${k.color}`}>
@@ -1217,24 +1217,24 @@ function BaselineTab({ user, academicYear }: any) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {hasLit && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="text-xs text-blue-600 font-semibold mb-1">ðŸ“– Literacy</div>
+              <div className="text-xs text-blue-600 font-semibold mb-1">📖 Literacy</div>
               <div className="text-sm font-bold text-blue-800">{STAGE_LABELS[litStage]} Stage</div>
               <div className="text-xs text-blue-600">Assessed on {litGrade} competencies</div>
               {litPromoted && (
                 <div className="text-xs text-green-700 font-bold mt-1 bg-green-50 rounded px-2 py-0.5">
-                  ðŸŽ‰ Promoted to {litPromotedTo ? STAGE_LABELS[litPromotedTo] || litPromotedTo : "next stage"}
+                  🎉 Promoted to {litPromotedTo ? STAGE_LABELS[litPromotedTo] || litPromotedTo : "next stage"}
                 </div>
               )}
             </div>
           )}
           {hasNum && (
             <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-              <div className="text-xs text-purple-600 font-semibold mb-1">ðŸ”¢ Numeracy</div>
+              <div className="text-xs text-purple-600 font-semibold mb-1">🔢 Numeracy</div>
               <div className="text-sm font-bold text-purple-800">{STAGE_LABELS[numStage]} Stage</div>
               <div className="text-xs text-purple-600">Assessed on {numGrade} competencies</div>
               {numPromoted && (
                 <div className="text-xs text-green-700 font-bold mt-1 bg-green-50 rounded px-2 py-0.5">
-                  ðŸŽ‰ Promoted to {numPromotedTo ? STAGE_LABELS[numPromotedTo] || numPromotedTo : "next stage"}
+                  🎉 Promoted to {numPromotedTo ? STAGE_LABELS[numPromotedTo] || numPromotedTo : "next stage"}
                 </div>
               )}
             </div>
@@ -1242,10 +1242,10 @@ function BaselineTab({ user, academicYear }: any) {
         </div>
       </div>
 
-      {/* Stage progression timeline â€” all rounds */}
+      {/* Stage progression timeline — all rounds */}
       {allRounds.length > 1 && (
         <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
-          <h3 className="text-sm font-bold text-gray-700 mb-3">ðŸ“ˆ Stage Progression</h3>
+          <h3 className="text-sm font-bold text-gray-700 mb-3">📈 Stage Progression</h3>
           <div className="overflow-x-auto">
             <table className="text-xs border-collapse w-full" style={{minWidth:"400px"}}>
               <thead>
@@ -1258,7 +1258,7 @@ function BaselineTab({ user, academicYear }: any) {
               </thead>
               <tbody>
                 <tr className="bg-blue-50">
-                  <td className="px-3 py-2 font-bold text-blue-700">ðŸ“– Literacy</td>
+                  <td className="px-3 py-2 font-bold text-blue-700">📖 Literacy</td>
                   {allRounds.map((r:any, i:number) => {
                     const rGaps = (r.gaps as any) || {};
                     const stage = rGaps.lit_stage || r.stage || "foundation";
@@ -1269,13 +1269,13 @@ function BaselineTab({ user, academicYear }: any) {
                       <td key={r.round} className="px-2 py-2 text-center">
                         <div className="text-xs capitalize font-medium text-blue-700">{STAGE_LABELS[stage]||stage}</div>
                         {pct !== null && <div className={`text-xs font-bold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${pct>=80?"bg-green-100 text-green-700":pct>=60?"bg-blue-100 text-blue-700":pct>=40?"bg-yellow-100 text-yellow-700":"bg-red-100 text-red-700"}`}>{pct.toFixed(1)}%</div>}
-                        {promoted && <div className="text-green-600 font-bold text-xs mt-0.5">ðŸŽ‰ â†’ {STAGE_LABELS[promotedTo]||promotedTo}</div>}
+                        {promoted && <div className="text-green-600 font-bold text-xs mt-0.5">🎉 â†’ {STAGE_LABELS[promotedTo]||promotedTo}</div>}
                       </td>
                     );
                   })}
                 </tr>
                 <tr className="bg-purple-50">
-                  <td className="px-3 py-2 font-bold text-purple-700">ðŸ”¢ Numeracy</td>
+                  <td className="px-3 py-2 font-bold text-purple-700">🔢 Numeracy</td>
                   {allRounds.map((r:any, i:number) => {
                     const rGaps = (r.gaps as any) || {};
                     const stage = rGaps.num_stage || r.stage || "foundation";
@@ -1286,7 +1286,7 @@ function BaselineTab({ user, academicYear }: any) {
                       <td key={r.round} className="px-2 py-2 text-center">
                         <div className="text-xs capitalize font-medium text-purple-700">{STAGE_LABELS[stage]||stage}</div>
                         {pct !== null && <div className={`text-xs font-bold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${pct>=80?"bg-green-100 text-green-700":pct>=60?"bg-blue-100 text-blue-700":pct>=40?"bg-yellow-100 text-yellow-700":"bg-red-100 text-red-700"}`}>{pct.toFixed(1)}%</div>}
-                        {promoted && <div className="text-green-600 font-bold text-xs mt-0.5">ðŸŽ‰ â†’ {STAGE_LABELS[promotedTo]||promotedTo}</div>}
+                        {promoted && <div className="text-green-600 font-bold text-xs mt-0.5">🎉 â†’ {STAGE_LABELS[promotedTo]||promotedTo}</div>}
                       </td>
                     );
                   })}
@@ -1300,10 +1300,10 @@ function BaselineTab({ user, academicYear }: any) {
       {/* Gap analysis */}
       {(litGaps.length > 0 || numGaps.length > 0) && (
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
-          <h3 className="text-sm font-bold text-orange-800 mb-2">âš ï¸ Gap Areas (below subject average)</h3>
+          <h3 className="text-sm font-bold text-orange-800 mb-2">⚠️ Gap Areas (below subject average)</h3>
           <div className="flex flex-wrap gap-2">
-            {litGaps.map(g => <span key={g} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">ðŸ“– {g}</span>)}
-            {numGaps.map(g => <span key={g} className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">ðŸ”¢ {g}</span>)}
+            {litGaps.map(g => <span key={g} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">📖 {g}</span>)}
+            {numGaps.map(g => <span key={g} className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">🔢 {g}</span>)}
           </div>
           <p className="text-xs text-orange-600 mt-2">These domains are below your subject average. Use AI Practice Paper to improve.</p>
         </div>
@@ -1315,7 +1315,7 @@ function BaselineTab({ user, academicYear }: any) {
           {["literacy","numeracy"].map(s => (
             <button key={s} onClick={()=>setActiveSubj(s as any)}
               className={`px-4 py-2 text-sm rounded-lg font-medium border ${activeSubj===s?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
-              {s === "literacy" ? "ðŸ“– Literacy" : "ðŸ”¢ Numeracy"}
+              {s === "literacy" ? "📖 Literacy" : "🔢 Numeracy"}
             </button>
           ))}
         </div>
@@ -1354,14 +1354,14 @@ function BaselineTab({ user, academicYear }: any) {
                   return (
                     <tr key={a.id||i} className={`border-b border-gray-100 ${i%2===0?"bg-white":"bg-gray-50"}`}>
                       <td className="px-3 py-2 font-medium">{a.round?.replace("baseline_","R")}</td>
-                      <td className="px-3 py-2 text-center">{a.subject==="literacy"?"ðŸ“– Literacy":"ðŸ”¢ Numeracy"}</td>
+                      <td className="px-3 py-2 text-center">{a.subject==="literacy"?"📖 Literacy":"🔢 Numeracy"}</td>
                       <td className="px-3 py-2 text-center capitalize">{STAGE_LABELS[a.stage]||a.stage}</td>
-                      <td className="px-3 py-2 text-center text-gray-500">{a.assessment_date||"â€”"}</td>
+                      <td className="px-3 py-2 text-center text-gray-500">{a.assessment_date||"—"}</td>
                       <td className="px-3 py-2 text-center">
-                        <span className={`px-2 py-0.5 rounded font-bold ${scoreBadge(avg)}`}>{avg>0?avg.toFixed(1)+"%":"â€”"}</span>
+                        <span className={`px-2 py-0.5 rounded font-bold ${scoreBadge(avg)}`}>{avg>0?avg.toFixed(1)+"%":"—"}</span>
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {a.promoted ? <span className="text-green-700 font-bold">ðŸŽ‰ â†’ {a.promoted_to_stage}</span> : <span className="text-gray-400">â€”</span>}
+                        {a.promoted ? <span className="text-green-700 font-bold">🎉 â†’ {a.promoted_to_stage}</span> : <span className="text-gray-400">—</span>}
                       </td>
                     </tr>
                   );
@@ -1375,7 +1375,7 @@ function BaselineTab({ user, academicYear }: any) {
   );
 }
 
-// PA/SA TAB â€” Marks Entry + Full Analysis (teacher's subjects only)
+// PA/SA TAB — Marks Entry + Full Analysis (teacher's subjects only)
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function PASATab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
@@ -1488,7 +1488,7 @@ function PASATab({ user, mappings, academicYear }: any) {
         competencies:selectedComps,
       });
       if(r.data?.success){
-        setMsg(r.data.message==="Config updated"?"âœ… Updated (overwrote existing config)":"âœ… Config saved!");
+        setMsg(r.data.message==="Config updated"?"✅ Updated (overwrote existing config)":"✅ Config saved!");
         setShowConfigForm(false);setSelectedComps([]);fetchConfigs();
       }
     } catch {setMsg("âŒ Save failed");}
@@ -1498,7 +1498,7 @@ function PASATab({ user, mappings, academicYear }: any) {
   const loadEntryStudents = async (config:any) => {
     setSelectedConfig(config);setMarks({});setAbsent({});setLoadingEntry(true);setEntryStudents([]);
     try {
-      // Always use grade/section from config â€” it is always set and may differ from classGrade for subject teachers
+      // Always use grade/section from config — it is always set and may differ from classGrade for subject teachers
       const r = await axios.get(`${API}/pasa/marks/entry?exam_config_id=${config.id}&grade=${encodeURIComponent(config.grade)}&section=${encodeURIComponent(config.section)}`);
       const sl = r.data?.students||[];
       setEntryStudents(sl);
@@ -1547,7 +1547,7 @@ function PASATab({ user, mappings, academicYear }: any) {
         subject:selectedConfig.subject, exam_type:selectedConfig.exam_type,
         academic_year:academicYear, teacher_id:user.id, entries,
       });
-      setMsg("âœ… Marks saved!");
+      setMsg("✅ Marks saved!");
     } catch {setMsg("âŒ Save failed.");}
     setSavingMarks(false);setTimeout(()=>setMsg(""),3000);
   };
@@ -1587,7 +1587,7 @@ function PASATab({ user, mappings, academicYear }: any) {
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"config",label:"âš™ï¸ Exam Config"},{id:"entry",label:"âœï¸ Marks Entry"},{id:"dashboard",label:"ðŸ“Š Dashboard"}].map(t=>(
+        {[{id:"config",label:"âš™ï¸ Exam Config"},{id:"entry",label:"✏ï¸ Marks Entry"},{id:"dashboard",label:"📊 Dashboard"}].map(t=>(
           <button key={t.id} onClick={()=>setSubTab(t.id as any)}
             className={`px-4 py-2 text-sm rounded-lg font-medium ${subTab===t.id?"bg-indigo-600 text-white":"bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
             {t.label}
@@ -1595,7 +1595,7 @@ function PASATab({ user, mappings, academicYear }: any) {
         ))}
       </div>
 
-      {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("âœ…")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+      {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
       {/* CONFIG TAB */}
       {subTab==="config"&&(
@@ -1603,7 +1603,7 @@ function PASATab({ user, mappings, academicYear }: any) {
           <div className="flex justify-between items-center">
             <p className="text-xs text-gray-500">{configs.length} exam configurations (all your sections)</p>
             <button onClick={()=>setShowConfigForm(!showConfigForm)} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
-              {showConfigForm?"âœ• Cancel":"+ New Config"}
+              {showConfigForm?"✕ Cancel":"+ New Config"}
             </button>
           </div>
 
@@ -1659,7 +1659,7 @@ function PASATab({ user, mappings, academicYear }: any) {
                 )}
               </div>
               <button onClick={saveConfig} disabled={savingConfig} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
-                {savingConfig?"Saving...":"ðŸ’¾ Save Config"}
+                {savingConfig?"Saving...":"💾 Save Config"}
               </button>
             </div>
           )}
@@ -1680,7 +1680,7 @@ function PASATab({ user, mappings, academicYear }: any) {
                     </div>
                     <button onClick={()=>loadEntryStudents(c)} disabled={loadingEntry}
                       className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50">
-                      {loadingEntry?"Loading...":"âœï¸ Enter Marks"}
+                      {loadingEntry?"Loading...":"✏ï¸ Enter Marks"}
                     </button>
                   </div>
                 ))}
@@ -1695,11 +1695,11 @@ function PASATab({ user, mappings, academicYear }: any) {
         <div className="space-y-3">
           <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2">
             <div>
-              <p className="text-sm font-bold text-indigo-800">{selectedConfig.exam_type} â€” {selectedConfig.subject}</p>
+              <p className="text-sm font-bold text-indigo-800">{selectedConfig.exam_type} — {selectedConfig.subject}</p>
               <p className="text-xs text-indigo-600">{(selectedConfig.competencies as any[]).length} competencies Â· {selectedConfig.total_marks} total marks</p>
             </div>
             <button onClick={saveMarks} disabled={savingMarks} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
-              {savingMarks?"Saving...":"ðŸ’¾ Save Marks"}
+              {savingMarks?"Saving...":"💾 Save Marks"}
             </button>
           </div>
           <div className="bg-white rounded-xl shadow overflow-hidden">
@@ -1753,7 +1753,7 @@ function PASATab({ user, mappings, academicYear }: any) {
             </div>
           </div>
           <button onClick={saveMarks} disabled={savingMarks} className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
-            {savingMarks?"Saving...":"ðŸ’¾ Save Marks"}
+            {savingMarks?"Saving...":"💾 Save Marks"}
           </button>
         </div>
       )}
@@ -1776,7 +1776,7 @@ function PASATab({ user, mappings, academicYear }: any) {
                 {EXAM_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            <button onClick={fetchDashboard} className="px-3 py-1.5 bg-white border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">ðŸ”„ Refresh</button>
+            <button onClick={fetchDashboard} className="px-3 py-1.5 bg-white border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">🔄 Refresh</button>
           </div>
           {loadingDash?(
             <div className="bg-white rounded-xl shadow p-8 text-center"><div className="inline-block w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>
@@ -1812,7 +1812,7 @@ function PASATab({ user, mappings, academicYear }: any) {
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ACTIVITIES TAB â€” Create + Marks Entry + Coverage + Analysis
+// ACTIVITIES TAB — Create + Marks Entry + Coverage + Analysis
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ActivitiesTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
@@ -1989,7 +1989,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
     try {
       const entries=(teacherCombined.students||[]).map((s:any)=>({student_id:s.student_id,student_name:s.student_name,competency_marks:teacherLocalMarks[s.student_id]?.[activityId]||{}}));
       await axios.post(`${API}/activities/${activityId}/marks`,{academic_year:academicYear,entries});
-      setMsg("âœ… Marks saved");
+      setMsg("✅ Marks saved");
       setTeacherViewModeSet(prev=>{const n=new Set(prev);n.add(activityId);return n;});
       fetchTeacherCombined();
     } catch { setMsg("âŒ Error saving"); }
@@ -2076,8 +2076,8 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
       });
       const skipped = res.data?.skipped_sections || [];
       setMsg(skipped.length
-        ? `âœ… Created for ${res.data.created_count} section(s). âš ï¸ Already exists in: ${skipped.join(", ")}`
-        : `âœ… Activity created for ${res.data.created_count} section(s)`);
+        ? `✅ Created for ${res.data.created_count} section(s). ⚠️ Already exists in: ${skipped.join(", ")}`
+        : `✅ Activity created for ${res.data.created_count} section(s)`);
       setShowForm(false);
       setSelectedComps([]); setRubrics({});
       setForm(p=>({...p, name:"", description:"", sections:[], }));
@@ -2098,7 +2098,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
 
     const deleteActivity = async (id: string) => {
     if (!confirm("Delete this activity?")) return;
-    try { await axios.delete(`${API}/activities/${id}`); setMsg("âœ… Deleted"); fetchActivities(); } catch { setMsg("âŒ Error"); }
+    try { await axios.delete(`${API}/activities/${id}`); setMsg("✅ Deleted"); fetchActivities(); } catch { setMsg("âŒ Error"); }
     setTimeout(()=>setMsg(""),3000);
   };
 
@@ -2145,7 +2145,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
         competency_marks: localMarks[s.student.id] || {},
       }));
       await axios.post(`${API}/activities/${selectedActivity.id}/marks`, { academic_year: academicYear, entries });
-      setMsg("âœ… Marks saved!"); fetchMarksData();
+      setMsg("✅ Marks saved!"); fetchMarksData();
       setMarksViewMode(true);
     } catch { setMsg("âŒ Error saving marks"); }
     setSavingMarks(false);
@@ -2157,19 +2157,19 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
   return (
     <div className="space-y-4">
       <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
-        {[{id:"create",label:"ðŸ“‹ Activities"},{id:"marks",label:"âœï¸ Marks Entry"},{id:"report",label:"ðŸ“‘ Subject Report"},{id:"coverage",label:"ðŸ“Š Coverage"},{id:"analysis",label:"ðŸ“ˆ Analysis"}].map(t=>(
+        {[{id:"create",label:"📋 Activities"},{id:"marks",label:"✏ï¸ Marks Entry"},{id:"report",label:"📑 Subject Report"},{id:"coverage",label:"📊 Coverage"},{id:"analysis",label:"📈 Analysis"}].map(t=>(
           <button key={t.id} onClick={()=>setSubTab(t.id as any)}
             className={`px-4 py-2 text-sm rounded-lg font-medium border ${subTab===t.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>{t.label}</button>
         ))}
       </div>
-      {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("âœ…")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+      {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
       {/* â”€â”€ CREATE â”€â”€ */}
       {subTab==="create"&&(
         <div className="space-y-4">
           <div className="flex justify-end">
             <button onClick={()=>setShowForm(!showForm)} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
-              {showForm?"âœ• Cancel":"+ Create Activity"}
+              {showForm?"✕ Cancel":"+ Create Activity"}
             </button>
           </div>
           {showForm&&(
@@ -2232,7 +2232,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                         <table className="text-xs border-collapse w-full">
                           <thead>
                             <tr className="bg-indigo-700 text-white text-left">
-                              <th className="px-2 py-2 w-8 text-center">âœ“</th>
+                              <th className="px-2 py-2 w-8 text-center">✓</th>
                               <th className="px-3 py-2 min-w-[75px]">CG No.</th>
                               <th className="px-2 py-2 min-w-[100px]">Domain</th>
                               <th className="px-2 py-2 min-w-[220px]">Competency</th>
@@ -2254,7 +2254,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                                   <td className="px-2 pt-3 text-center">
                                     <input type="checkbox" checked={checked} onChange={()=>toggleComp(c.id)} className="w-4 h-4 accent-indigo-600 cursor-pointer"/>
                                   </td>
-                                  <td className="px-3 pt-3 font-mono font-bold text-indigo-700 whitespace-nowrap">{c.code||c.competency_code||"â€”"}</td>
+                                  <td className="px-3 pt-3 font-mono font-bold text-indigo-700 whitespace-nowrap">{c.code||c.competency_code||"—"}</td>
                                   <td className="px-2 pt-3">
                                     <span className="px-1.5 py-0.5 rounded text-white font-medium leading-tight" style={{backgroundColor:domColor,fontSize:"10px",display:"inline-block"}}>
                                       {c.domain||"General"}
@@ -2278,7 +2278,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                                             <span className="text-gray-400 text-xs shrink-0">marks</span>
                                             {items.length>1&&(
                                               <button onClick={()=>{const its=items.filter((_,j)=>j!==i);setRubrics(r=>({...r,[c.id]:{...(r[c.id]||{name:"",items:[]}),items:its}}));}}
-                                                className="text-red-400 hover:text-red-600 text-xs leading-none shrink-0">âœ•</button>
+                                                className="text-red-400 hover:text-red-600 text-xs leading-none shrink-0">✕</button>
                                             )}
                                           </div>
                                         ))}
@@ -2286,16 +2286,16 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                                           className="text-xs text-indigo-600 hover:text-indigo-800 font-medium mt-0.5">+ Add Rubric</button>
                                       </div>
                                     ) : (
-                                      <span className="text-gray-300 italic">â€” select to add rubrics â€”</span>
+                                      <span className="text-gray-300 italic">— select to add rubrics —</span>
                                     )}
                                   </td>
                                   <td className={`px-2 pt-3 text-center font-bold border-l border-gray-100 ${checked?"text-indigo-700":"text-gray-300"}`}>
-                                    {checked?compTotal:"â€”"}
+                                    {checked?compTotal:"—"}
                                   </td>
                                   <td className="px-2 pt-3 text-center">
                                     {usedIn>0
                                       ?<span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium" style={{fontSize:"10px"}}>{usedIn} act.</span>
-                                      :<span className="text-gray-300">â€”</span>}
+                                      :<span className="text-gray-300">—</span>}
                                   </td>
                                 </tr>
                               );
@@ -2321,17 +2321,17 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
 
               <div className="flex gap-2 pt-2 border-t border-gray-100">
                 <button onClick={saveActivity} disabled={savingActivity} className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-semibold disabled:opacity-50">
-                  {savingActivity?"Saving...":"ðŸ’¾ Save Activity"}
+                  {savingActivity?"Saving...":"💾 Save Activity"}
                 </button>
                 <button onClick={()=>setShowForm(false)} className="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Cancel</button>
               </div>
             </div>
           )}
 
-          {/* Activities list â€” table grouped by subject */}
+          {/* Activities list — table grouped by subject */}
           <div className="bg-white rounded-xl shadow overflow-hidden">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-700">Activities â€” {activities.length} total</h3>
+              <h3 className="text-sm font-semibold text-gray-700">Activities — {activities.length} total</h3>
               <div className="flex gap-2 text-xs text-gray-500">
                 <span>{[...new Set(activities.map((a:any)=>a.grade))].join(", ")}</span>
               </div>
@@ -2396,9 +2396,9 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                                   <td className="px-3 py-2.5 text-center">
                                     <div className="flex gap-1 justify-center">
                                       <button onClick={()=>{setSelectedActivity(a);setSubTab("marks");}}
-                                        className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 font-medium">âœï¸ Marks</button>
+                                        className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 font-medium">✏ï¸ Marks</button>
                                       <button onClick={()=>deleteActivity(a.id)}
-                                        className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">ðŸ—‘ï¸</button>
+                                        className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">🗑ï¸</button>
                                     </div>
                                   </td>
                                 </tr>
@@ -2451,7 +2451,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                 {/* Combined marks table */}
                 <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
                   <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-200">
-                    <p className="text-sm font-bold text-indigo-800">Marks Entry â€” {marksFilterSubject} Â· {marksFilterGrade} Â· {marksFilterSection}</p>
+                    <p className="text-sm font-bold text-indigo-800">Marks Entry — {marksFilterSubject} Â· {marksFilterGrade} Â· {marksFilterSection}</p>
                     <p className="text-xs text-indigo-600">{sortedActs.length} activities Â· {(teacherCombined.students||[]).length} students Â· Most recent first Â· Student name is frozen</p>
                   </div>
                   <div className="overflow-x-auto">
@@ -2469,10 +2469,10 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                                   <span className="text-indigo-300 whitespace-nowrap shrink-0">{activity.activity_date}</span>
                                   {isView?(
                                     <button onClick={()=>setTeacherViewModeSet(prev=>{const n=new Set(prev);n.delete(activity.id);return n;})}
-                                      className="px-2 py-0.5 bg-indigo-500 hover:bg-indigo-400 rounded whitespace-nowrap shrink-0">âœï¸ Edit</button>
+                                      className="px-2 py-0.5 bg-indigo-500 hover:bg-indigo-400 rounded whitespace-nowrap shrink-0">✏ï¸ Edit</button>
                                   ):(
                                     <button onClick={()=>saveTeacherActivityMarks(activity.id)} disabled={!!savingActivityId}
-                                      className="px-2 py-0.5 bg-green-500 hover:bg-green-400 disabled:opacity-50 rounded whitespace-nowrap shrink-0">{isSaving?"...":"ðŸ’¾ Save"}</button>
+                                      className="px-2 py-0.5 bg-green-500 hover:bg-green-400 disabled:opacity-50 rounded whitespace-nowrap shrink-0">{isSaving?"...":"💾 Save"}</button>
                                   )}
                                 </div>
                               </th>
@@ -2534,7 +2534,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                                             return (
                                               <td key={`b-${activity.id}-${rub.competency_id}-${i}`} className="px-1.5 py-1 text-center border-l border-gray-100">
                                                 {isView?(
-                                                  <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${val!==null&&val!==undefined?pctBg(cellPct):"bg-gray-100 text-gray-400"}`}>{val!==null&&val!==undefined?val:"â€”"}</span>
+                                                  <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${val!==null&&val!==undefined?pctBg(cellPct):"bg-gray-100 text-gray-400"}`}>{val!==null&&val!==undefined?val:"—"}</span>
                                                 ):(
                                                   <input type="number" min={0} max={item.max_marks} value={val??""}
                                                     onChange={e=>{const v=e.target.value===""?null:Math.min(+e.target.value,item.max_marks);updateTeacherMark(s.student_id,activity.id,rub.competency_id,String(i),v);}}
@@ -2583,7 +2583,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                   return (
                     <div className="bg-white rounded-xl shadow border border-purple-200 overflow-hidden">
                       <div className="px-4 py-3 bg-purple-50 border-b border-purple-200">
-                        <h3 className="text-sm font-bold text-purple-800">Competency Analysis â€” {marksFilterSubject} Â· {marksFilterGrade} Â· {marksFilterSection}</h3>
+                        <h3 className="text-sm font-bold text-purple-800">Competency Analysis — {marksFilterSubject} Â· {marksFilterGrade} Â· {marksFilterSection}</h3>
                         <p className="text-xs text-purple-600">Average % per competency across all activities</p>
                       </div>
                       <div className="overflow-x-auto">
@@ -2601,9 +2601,9 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                                   <td className="px-3 py-2 font-mono text-purple-700 font-bold whitespace-nowrap">{row.code}</td>
                                   <td className="px-3 py-2 text-gray-700">{row.name}</td>
                                   <td className="px-2 py-2 text-center text-gray-500">{row.activities}</td>
-                                  <td className="px-2 py-2 text-center">{row.avgPct>0?<span className={`px-2 py-0.5 rounded-full font-bold ${pctBg(row.avgPct)}`}>{row.avgPct}%</span>:<span className="text-gray-300">â€”</span>}</td>
+                                  <td className="px-2 py-2 text-center">{row.avgPct>0?<span className={`px-2 py-0.5 rounded-full font-bold ${pctBg(row.avgPct)}`}>{row.avgPct}%</span>:<span className="text-gray-300">—</span>}</td>
                                   <td className="px-2 py-2 text-center">{row.avgPct>0&&<span className={`px-2 py-0.5 rounded-full text-xs font-bold ${LEVEL_COLOR[level]||""}`}>{level}</span>}</td>
-                                  <td className="px-2 py-2 text-center">{row.atRisk>0?<span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">{row.atRisk} student{row.atRisk>1?"s":""}</span>:<span className="text-gray-300">â€”</span>}</td>
+                                  <td className="px-2 py-2 text-center">{row.atRisk>0?<span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">{row.atRisk} student{row.atRisk>1?"s":""}</span>:<span className="text-gray-300">—</span>}</td>
                                 </tr>
                               );
                             })}
@@ -2636,7 +2636,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
             </div>
             <button onClick={()=>fetchReport(reportGrade,(reportSection||(sectionsByGrade[reportGrade]||[])[0]||""))}
               className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
-              ðŸ”„ Refresh
+              🔄 Refresh
             </button>
           </div>
 
@@ -2789,7 +2789,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                 </div>
                 {covComps.length>0&&(
                   <div className="mb-3">
-                    <div className="text-xs font-semibold text-green-700 mb-2">âœ… Covered ({covComps.length})</div>
+                    <div className="text-xs font-semibold text-green-700 mb-2">✅ Covered ({covComps.length})</div>
                     <div className="space-y-1 max-h-40 overflow-y-auto">
                       {covComps.map((c:any)=>(
                         <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
@@ -2927,7 +2927,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
       </div>
 
       <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
-        {[{id:"grade",label:"ðŸ“Š Grade"},{id:"section",label:"ðŸ« Section"},{id:"student",label:"ðŸ‘¤ Student"},{id:"alerts",label:"âš ï¸ Alerts"},{id:"coverage",label:"ðŸ“‹ Coverage"},{id:"competency",label:"ðŸŽ¯ Competency"}].map(t=>(
+        {[{id:"grade",label:"📊 Grade"},{id:"section",label:"🏫 Section"},{id:"student",label:"👤 Student"},{id:"alerts",label:"⚠️ Alerts"},{id:"coverage",label:"📋 Coverage"},{id:"competency",label:"🎯 Competency"}].map(t=>(
           <button key={t.id} onClick={()=>setDashTab(t.id as any)}
             className={`px-4 py-2 text-sm rounded-lg font-medium border ${dashTab===t.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>{t.label}</button>
         ))}
@@ -3074,7 +3074,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
               )}
               {sectionDash.weakest?.length>0&&(
                 <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">âš ï¸ Weakest Competencies (below 60%)</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">⚠️ Weakest Competencies (below 60%)</h3>
                   <div className="space-y-2">
                     {sectionDash.weakest.map((c:any)=>{const p=toP(c.avg);return(
                       <div key={c.competency_id} className="flex items-center justify-between p-2 bg-red-50 rounded border border-red-100">
@@ -3143,7 +3143,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
                             <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
                             {(sectionDash.domains||[]).map((d:any)=>{const val=toP(s.domain_avgs?.[d.domain]||0);return(
                               <td key={d.domain} className="px-3 py-2 text-center border-l border-gray-100">
-                                {val>0?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${pctBg(val)}`}>{val.toFixed(1)}%</span>:<span className="text-gray-300">â€”</span>}
+                                {val>0?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${pctBg(val)}`}>{val.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
                               </td>
                             );})}
                             <td className="px-3 py-2 text-center border-l border-gray-200">
@@ -3157,7 +3157,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
                 </div>
               )}
             </>
-          ):<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No data for {dashGrade} â€” {dashSection}.</div>}
+          ):<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No data for {dashGrade} — {dashSection}.</div>}
         </div>
       )}
 
@@ -3176,7 +3176,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
             <div className="space-y-4">
               <div className="bg-white rounded-xl shadow p-4 border-l-4 border-indigo-500">
                 <p className="text-lg font-bold text-gray-800">{studentDash.student?.name}</p>
-                <p className="text-sm text-gray-500">{studentDash.student?.current_class} â€” {studentDash.student?.section}</p>
+                <p className="text-sm text-gray-500">{studentDash.student?.current_class} — {studentDash.student?.section}</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {studentDash.subjectSummary?.length>0&&(
@@ -3253,7 +3253,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
       {!loading&&dashTab==="alerts"&&(
         <div className="space-y-4">
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-            <h3 className="text-sm font-bold text-yellow-800 mb-1">âš ï¸ Consecutive Decline Alert</h3>
+            <h3 className="text-sm font-bold text-yellow-800 mb-1">⚠️ Consecutive Decline Alert</h3>
             <p className="text-xs text-yellow-600">Students whose activity scores dropped in 3 consecutive activities.</p>
           </div>
           <div className="bg-white rounded-xl shadow p-4">
@@ -3263,7 +3263,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
                 {alerts.map((s:any,i:number)=>(
                   <div key={i} className="bg-red-50 border border-red-200 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <div><span className="text-sm font-bold text-red-800">{s.student_name}</span><span className="text-xs text-gray-500 ml-2">{s.grade} â€” {s.section}</span></div>
+                      <div><span className="text-sm font-bold text-red-800">{s.student_name}</span><span className="text-xs text-gray-500 ml-2">{s.grade} — {s.section}</span></div>
                       <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">Declining</span>
                     </div>
                     <div className="flex gap-2 flex-wrap">
@@ -3320,7 +3320,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
               )}
               {coverageData.covered_competencies?.length>0&&(
                 <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-green-700 mb-2">âœ… Covered ({coverageData.covered_competencies.length})</h3>
+                  <h3 className="text-sm font-semibold text-green-700 mb-2">✅ Covered ({coverageData.covered_competencies.length})</h3>
                   <div className="flex flex-wrap gap-1">
                     {coverageData.covered_competencies.map((c:any)=>(
                       <span key={c.id} className="px-2 py-1 bg-green-50 border border-green-200 rounded text-xs text-green-700">{c.competency_code}</span>
@@ -3388,7 +3388,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
               <div className="bg-white rounded-xl shadow border border-purple-200 overflow-hidden">
                 <div className="px-4 py-3 bg-purple-50 border-b border-purple-200 flex items-center justify-between flex-wrap gap-2">
                   <div>
-                    <h3 className="text-sm font-bold text-purple-800">Competency-wise Analysis â€” {compTabSubject} Â· {dashGrade} Â· {dashSection}</h3>
+                    <h3 className="text-sm font-bold text-purple-800">Competency-wise Analysis — {compTabSubject} Â· {dashGrade} Â· {dashSection}</h3>
                     <p className="text-xs text-purple-600">{rows.length} competencies Â· {(compTabCombined.activities||[]).length} activities Â· {(compTabCombined.students||[]).length} students</p>
                   </div>
                   <div className="flex gap-2">
@@ -3421,13 +3421,13 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
                             <td className="px-3 py-2 text-gray-700">{row.name}</td>
                             <td className="px-2 py-2 text-center text-gray-500">{row.activities}</td>
                             <td className="px-2 py-2 text-center">
-                              {row.avgPct>0?(<span className={`px-2 py-0.5 rounded-full font-bold ${pctBg(row.avgPct)}`}>{row.avgPct}%</span>):(<span className="text-gray-300">â€”</span>)}
+                              {row.avgPct>0?(<span className={`px-2 py-0.5 rounded-full font-bold ${pctBg(row.avgPct)}`}>{row.avgPct}%</span>):(<span className="text-gray-300">—</span>)}
                             </td>
                             <td className="px-2 py-2 text-center">
                               {row.avgPct>0&&<span className={`px-2 py-0.5 rounded-full text-xs font-bold ${LEVEL_COLOR[level]||""}`}>{level}</span>}
                             </td>
                             <td className="px-2 py-2 text-center">
-                              {row.atRisk>0?<span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">{row.atRisk} student{row.atRisk>1?"s":""}</span>:<span className="text-gray-300">â€”</span>}
+                              {row.atRisk>0?<span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">{row.atRisk} student{row.atRisk>1?"s":""}</span>:<span className="text-gray-300">—</span>}
                             </td>
                           </tr>
                         );
@@ -3513,7 +3513,7 @@ function MarksEntryPanel({ activity, combinedMarks, localRatings, updateRating, 
         competency_ratings: ratings[s.id] || {},
       }));
       await axios.post(`${API}/activities/${activity.id}/marks`, { academic_year: academicYear, entries });
-      setMsg("âœ… Marks saved successfully");
+      setMsg("✅ Marks saved successfully");
     } catch { setMsg("âŒ Error saving marks"); }
     setLocalSaving(false);
     setTimeout(() => setMsg(""), 3000);
@@ -3525,15 +3525,15 @@ function MarksEntryPanel({ activity, combinedMarks, localRatings, updateRating, 
     <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
         <div>
-          <h3 className="text-sm font-bold text-gray-700">{activity.name} â€” {activity.grade} Â· {activity.section}</h3>
+          <h3 className="text-sm font-bold text-gray-700">{activity.name} — {activity.grade} Â· {activity.section}</h3>
           <p className="text-xs text-gray-500 mt-0.5">{students.length} students Â· {competencies.length} competencies</p>
         </div>
         <button onClick={saveMarks} disabled={localSaving}
           className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold">
-          {localSaving ? "Saving..." : "ðŸ’¾ Save Marks"}
+          {localSaving ? "Saving..." : "💾 Save Marks"}
         </button>
       </div>
-      {msg && <div className={`px-4 py-2 text-sm ${msg.startsWith("âœ…") ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>{msg}</div>}
+      {msg && <div className={`px-4 py-2 text-sm ${msg.startsWith("✅") ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>{msg}</div>}
       {competencies.length === 0 ? (
         <div className="p-6 text-center text-gray-400 text-sm">No competencies mapped to this activity. Edit the activity to add competencies.</div>
       ) : (
@@ -3561,7 +3561,7 @@ function MarksEntryPanel({ activity, combinedMarks, localRatings, updateRating, 
                       <td key={c.id} className="px-2 py-1 text-center border-l border-gray-100">
                         <select value={current} onChange={e => updateLocalRating(student.id, c.id, e.target.value)}
                           className={`text-xs rounded px-1 py-0.5 border w-full ${current ? RATING_COLORS[current] : "border-gray-200 bg-white"}`}>
-                          <option value="">â€”</option>
+                          <option value="">—</option>
                           <option value="beginning">Beginning</option>
                           <option value="approaching">Approaching</option>
                           <option value="meeting">Meeting</option>
@@ -3580,7 +3580,7 @@ function MarksEntryPanel({ activity, combinedMarks, localRatings, updateRating, 
   );
 }
 
-// Sub-component: Analytics panel â€” class averages, level distribution, domain charts
+// Sub-component: Analytics panel — class averages, level distribution, domain charts
 function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS, NUMERACY_DOMAINS, getLevel, calcAvg, grade, section }: any) {
   if (!sectionData?.students?.length || !sectionData?.rounds?.length) return null;
 
@@ -3665,12 +3665,12 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
         <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;color:#d97706">${getRndNumAvg(r).toFixed(1)}%</td>
         <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700">${getRndOverall(r).toFixed(1)}%</td>
         <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${lv.label}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;color:${r.promoted?"#16a34a":"#6b7280"}">${r.promoted?"ðŸŽ‰ Promoted":"In progress"}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;color:${r.promoted?"#16a34a":"#6b7280"}">${r.promoted?"🎉 Promoted":"In progress"}</td>
       </tr>`;
     }).join("");
 
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-    <title>Baseline Report â€” ${grade} ${section} Round ${activeRoundIdx+1}</title>
+    <title>Baseline Report — ${grade} ${section} Round ${activeRoundIdx+1}</title>
     <style>body{font-family:Arial,sans-serif;max-width:1100px;margin:30px auto;color:#111}
     h1{color:#4338ca}table{width:100%;border-collapse:collapse;font-size:13px}
     th{background:#4338ca;color:white;padding:10px 8px;text-align:center}
@@ -3681,7 +3681,7 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
     .kpi-card .lbl{font-size:12px;color:#6b7280}
     </style></head><body>
     <h1>Baseline Assessment Report</h1>
-    <p style="color:#6b7280">${grade} â€” ${section} &nbsp;Â·&nbsp; Round ${activeRoundIdx+1} &nbsp;Â·&nbsp; ${new Date().toLocaleDateString()}</p>
+    <p style="color:#6b7280">${grade} — ${section} &nbsp;Â·&nbsp; Round ${activeRoundIdx+1} &nbsp;Â·&nbsp; ${new Date().toLocaleDateString()}</p>
     <div class="kpi">
       <div class="kpi-card"><div class="val">${assessed.length}</div><div class="lbl">Students Assessed</div></div>
       <div class="kpi-card"><div class="val">${classLitAvg}%</div><div class="lbl">Class Literacy Avg</div></div>
@@ -3691,11 +3691,11 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
     </div>
     <table><thead><tr>
       <th style="text-align:left">Student</th>
-      ${litDomains.map((d: string) => `<th>${d.substring(0,5)}</th>`).join("")}<th>ðŸ“–%</th>
-      ${numDomains.map((d: string) => `<th>${d.substring(0,5)}</th>`).join("")}<th>ðŸ”¢%</th>
+      ${litDomains.map((d: string) => `<th>${d.substring(0,5)}</th>`).join("")}<th>📖%</th>
+      ${numDomains.map((d: string) => `<th>${d.substring(0,5)}</th>`).join("")}<th>🔢%</th>
       <th>Overall</th><th>Level</th><th>Status</th>
     </tr></thead><tbody>${rows}</tbody></table>
-    <p style="margin-top:30px;color:#9ca3af;font-size:12px">Generated by CBAS â€” Wisdom Techno School</p>
+    <p style="margin-top:30px;color:#9ca3af;font-size:12px">Generated by CBAS — Wisdom Techno School</p>
     </body></html>`;
     const blob = new Blob([html],{type:"text/html"});
     const url = URL.createObjectURL(blob);
@@ -3708,7 +3708,7 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
   return (
     <div className="space-y-4 mt-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-gray-700">ðŸ“Š Analytics â€” Round {activeRoundIdx+1}</h3>
+        <h3 className="text-sm font-bold text-gray-700">📊 Analytics — Round {activeRoundIdx+1}</h3>
         <div className="flex gap-2">
           <button onClick={downloadReport} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">â¬‡ï¸ CSV</button>
           <button onClick={downloadHTMLReport} className="px-3 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium">â¬‡ï¸ Report Card</button>
@@ -3769,7 +3769,7 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
 
       {progressData.length > 1 && (
         <div className="bg-white rounded-xl shadow p-4">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">ðŸ“ˆ Class Progress Across Rounds</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">📈 Class Progress Across Rounds</h4>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={progressData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -3787,15 +3787,15 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
       )}
 
       <div className="bg-white rounded-xl shadow p-4">
-        <h4 className="text-sm font-semibold text-gray-700 mb-3">Student Rankings â€” Round {activeRoundIdx+1}</h4>
+        <h4 className="text-sm font-semibold text-gray-700 mb-3">Student Rankings — Round {activeRoundIdx+1}</h4>
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-indigo-700 text-white">
                 <th className="px-3 py-2 text-center w-10">Rank</th>
                 <th className="px-3 py-2 text-left min-w-[150px]">Student</th>
-                <th className="px-3 py-2 text-center">ðŸ“– Literacy</th>
-                <th className="px-3 py-2 text-center">ðŸ”¢ Numeracy</th>
+                <th className="px-3 py-2 text-center">📖 Literacy</th>
+                <th className="px-3 py-2 text-center">🔢 Numeracy</th>
                 <th className="px-3 py-2 text-center">Overall</th>
                 <th className="px-3 py-2 text-center">Level</th>
                 <th className="px-3 py-2 text-center">Status</th>
@@ -3822,7 +3822,7 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
                       <td className="px-3 py-2 text-center text-xs text-gray-600">{lv.label}</td>
                       <td className="px-3 py-2 text-center text-xs">
                         {r.promoted
-                          ? <span className="text-green-600 font-bold">ðŸŽ‰ Promoted</span>
+                          ? <span className="text-green-600 font-bold">🎉 Promoted</span>
                           : <span className="text-gray-400">In progress</span>}
                       </td>
                     </tr>
@@ -3854,10 +3854,10 @@ function MarksTable({ students, roundKey, roundIdx, isEditing, localMarks, updat
         <thead>
           <tr className="bg-indigo-700 text-white">
             <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[160px]">Student</th>
-            {litDomains.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[65px] bg-blue-700"><span className="text-blue-200">ðŸ“–</span> {d.substring(0,5)}</th>)}
-            <th className="px-2 py-2 text-center border-l border-indigo-500 bg-blue-800 min-w-[55px]">ðŸ“– Avg</th>
-            {numDomains.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[65px] bg-purple-700"><span className="text-orange-200">ðŸ”¢</span> {d.substring(0,5)}</th>)}
-            <th className="px-2 py-2 text-center border-l border-indigo-500 bg-purple-800 min-w-[55px]">ðŸ”¢ Avg</th>
+            {litDomains.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[65px] bg-blue-700"><span className="text-blue-200">📖</span> {d.substring(0,5)}</th>)}
+            <th className="px-2 py-2 text-center border-l border-indigo-500 bg-blue-800 min-w-[55px]">📖 Avg</th>
+            {numDomains.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-indigo-600 min-w-[65px] bg-purple-700"><span className="text-orange-200">🔢</span> {d.substring(0,5)}</th>)}
+            <th className="px-2 py-2 text-center border-l border-indigo-500 bg-purple-800 min-w-[55px]">🔢 Avg</th>
             <th className="px-2 py-2 text-center border-l border-indigo-500 min-w-[65px]">Overall</th>
           </tr>
         </thead>
@@ -3879,7 +3879,7 @@ function MarksTable({ students, roundKey, roundIdx, isEditing, localMarks, updat
                 </td>
                 {litDomains.map((d: string) => (
                   <td key={d} className="px-2 py-1 text-center border-l border-gray-100">
-                    <span className="text-gray-700">{rnd?.exists ? getLitVal(rnd,d) : "â€”"}</span>
+                    <span className="text-gray-700">{rnd?.exists ? getLitVal(rnd,d) : "—"}</span>
                   </td>
                 ))}
                 <td className="px-2 py-2 text-center border-l border-blue-100 bg-blue-50">
@@ -3887,7 +3887,7 @@ function MarksTable({ students, roundKey, roundIdx, isEditing, localMarks, updat
                 </td>
                 {numDomains.map((d: string) => (
                   <td key={d} className="px-2 py-1 text-center border-l border-gray-100">
-                    <span className="text-gray-700">{rnd?.exists ? getNumVal(rnd,d) : "â€”"}</span>
+                    <span className="text-gray-700">{rnd?.exists ? getNumVal(rnd,d) : "—"}</span>
                   </td>
                 ))}
                 <td className="px-2 py-2 text-center border-l border-orange-100 bg-orange-50">
@@ -3895,7 +3895,7 @@ function MarksTable({ students, roundKey, roundIdx, isEditing, localMarks, updat
                 </td>
                 <td className="px-2 py-2 text-center border-l border-gray-100">
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv.bg} ${lv.color}`}>{overall.toFixed(1)}%</span>
-                  {rnd?.promoted && <div className="text-xs text-green-600 font-bold">ðŸŽ‰ Promoted</div>}
+                  {rnd?.promoted && <div className="text-xs text-green-600 font-bold">🎉 Promoted</div>}
                 </td>
               </tr>
             );
@@ -3916,10 +3916,10 @@ function NewRoundTable({ students, localMarks, updateMark, LITERACY_DOMAINS, NUM
         <thead>
           <tr className="bg-blue-700 text-white">
             <th className="px-3 py-2 text-left sticky left-0 bg-blue-700 min-w-[160px]">Student</th>
-            {LITERACY_DOMAINS.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-blue-600 min-w-[70px]">ðŸ“– {d.substring(0,5)}</th>)}
-            <th className="px-2 py-2 text-center border-l border-blue-500 min-w-[55px]">ðŸ“–%</th>
-            {NUMERACY_DOMAINS.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-blue-600 min-w-[70px]">ðŸ”¢ {d.substring(0,5)}</th>)}
-            <th className="px-2 py-2 text-center border-l border-blue-500 min-w-[55px]">ðŸ”¢%</th>
+            {LITERACY_DOMAINS.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-blue-600 min-w-[70px]">📖 {d.substring(0,5)}</th>)}
+            <th className="px-2 py-2 text-center border-l border-blue-500 min-w-[55px]">📖%</th>
+            {NUMERACY_DOMAINS.map((d: string) => <th key={d} className="px-2 py-2 text-center border-l border-blue-600 min-w-[70px]">🔢 {d.substring(0,5)}</th>)}
+            <th className="px-2 py-2 text-center border-l border-blue-500 min-w-[55px]">🔢%</th>
             <th className="px-2 py-2 text-center border-l border-blue-500 min-w-[65px]">Overall</th>
           </tr>
         </thead>
@@ -3960,7 +3960,7 @@ function NewRoundTable({ students, localMarks, updateMark, LITERACY_DOMAINS, NUM
                 </td>
                 <td className="px-2 py-2 text-center border-l border-gray-100">
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv.bg} ${lv.color}`}>{overall.toFixed(0)}%</span>
-                  {overall >= 80 && <div className="text-xs text-green-600 font-bold">ðŸŽ‰ Will promote</div>}
+                  {overall >= 80 && <div className="text-xs text-green-600 font-bold">🎉 Will promote</div>}
                 </td>
               </tr>
             );
@@ -3988,8 +3988,8 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
   const strengths: string[] = [], weaknesses: string[] = [];
   Object.entries(domainAvgs).forEach(([d, vals]) => {
     const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-    if (avg >= 80) strengths.push(`${d} â€” ${avg.toFixed(0)}%`);
-    else if (avg < 60) weaknesses.push(`${d} â€” ${avg.toFixed(0)}%`);
+    if (avg >= 80) strengths.push(`${d} — ${avg.toFixed(0)}%`);
+    else if (avg < 60) weaknesses.push(`${d} — ${avg.toFixed(0)}%`);
   });
 
   const lastRound = rounds[rounds.length - 1];
@@ -4009,10 +4009,10 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
   return (
     <div className="bg-white rounded-xl shadow border border-gray-200 p-4 space-y-4">
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium">â† Back</button>
+        <button onClick={onBack} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium">← Back</button>
         <h3 className="text-base font-bold text-gray-800">{student.student_name}</h3>
         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv.bg} ${lv.color}`}>{lv.label}</span>
-        {lastRound?.promoted && <span className="text-xs text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full">ðŸŽ‰ Promoted â†’ {lastRound.promoted_to_stage}</span>}
+        {lastRound?.promoted && <span className="text-xs text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full">🎉 Promoted â†’ {lastRound.promoted_to_stage}</span>}
       </div>
 
       {rounds.length === 0 ? (
@@ -4023,8 +4023,8 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: "Rounds", value: rounds.length, color: "border-indigo-500" },
-              { label: "ðŸ“– Literacy", value: `${litAvg.toFixed(1)}%`, color: "border-blue-500" },
-              { label: "ðŸ”¢ Numeracy", value: `${numAvg.toFixed(1)}%`, color: "border-orange-500" },
+              { label: "📖 Literacy", value: `${litAvg.toFixed(1)}%`, color: "border-blue-500" },
+              { label: "🔢 Numeracy", value: `${numAvg.toFixed(1)}%`, color: "border-orange-500" },
               { label: "Overall", value: `${overall.toFixed(1)}%`, color: "border-green-500" },
             ].map(k => (
               <div key={k.label} className={`bg-gray-50 rounded-xl p-3 border-l-4 ${k.color}`}>
@@ -4038,7 +4038,7 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
           {rounds.length > 1 && (
             <>
               <div className="bg-gray-50 rounded-xl p-4">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">ðŸ“ˆ Overall Progress</h4>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">📈 Overall Progress</h4>
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -4065,7 +4065,7 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
                 });
                 return (
                   <div key={subj} className="bg-gray-50 rounded-xl p-4">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3">{subj === "literacy" ? "ðŸ“– Literacy" : "ðŸ”¢ Numeracy"} â€” Domain-wise</h4>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">{subj === "literacy" ? "📖 Literacy" : "🔢 Numeracy"} — Domain-wise</h4>
                     <ResponsiveContainer width="100%" height={200}>
                       <LineChart data={domData}>
                         <CartesianGrid strokeDasharray="3 3" />
@@ -4088,30 +4088,30 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
           {/* Strengths & Weaknesses */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-              <h4 className="text-sm font-semibold text-green-800 mb-2">âœ¨ Strengths (â‰¥80%)</h4>
+              <h4 className="text-sm font-semibold text-green-800 mb-2">✨ Strengths (â‰¥80%)</h4>
               {strengths.length > 0 ? strengths.map((s, i) => (
                 <div key={i} className="text-xs text-green-700 bg-white rounded-lg px-3 py-1.5 mb-1 border border-green-100">{s}</div>
-              )) : <p className="text-xs text-green-600">Keep working â€” strengths will appear here!</p>}
+              )) : <p className="text-xs text-green-600">Keep working — strengths will appear here!</p>}
             </div>
             <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <h4 className="text-sm font-semibold text-red-800 mb-2">ðŸ“Œ Needs Improvement (&lt;60%)</h4>
+              <h4 className="text-sm font-semibold text-red-800 mb-2">📌 Needs Improvement (&lt;60%)</h4>
               {weaknesses.length > 0 ? weaknesses.map((w, i) => (
                 <div key={i} className="text-xs text-red-700 bg-white rounded-lg px-3 py-1.5 mb-1 border border-red-100">{w}</div>
-              )) : <div className="text-xs text-green-600 bg-white rounded-lg px-3 py-1.5 border border-green-100">No weak areas â€” great job! ðŸŽ‰</div>}
+              )) : <div className="text-xs text-green-600 bg-white rounded-lg px-3 py-1.5 border border-green-100">No weak areas — great job! 🎉</div>}
             </div>
           </div>
 
           {/* Assessment history table */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">ðŸ“‹ Assessment History</h4>
+            <h4 className="text-sm font-semibold text-gray-700 mb-2">📋 Assessment History</h4>
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-indigo-700 text-white">
                   <th className="px-3 py-2">Round</th>
                   <th className="px-3 py-2">Date</th>
                   <th className="px-3 py-2">Stage</th>
-                  <th className="px-3 py-2">ðŸ“– Literacy</th>
-                  <th className="px-3 py-2">ðŸ”¢ Numeracy</th>
+                  <th className="px-3 py-2">📖 Literacy</th>
+                  <th className="px-3 py-2">🔢 Numeracy</th>
                   <th className="px-3 py-2">Overall</th>
                   <th className="px-3 py-2">Status</th>
                 </tr>
@@ -4130,7 +4130,7 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv2.bg} ${lv2.color}`}>{r.overall?.toFixed(1)}%</span>
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {r.promoted ? <span className="text-green-600 font-bold text-xs">ðŸŽ‰ Promoted â†’ {r.promoted_to_stage}</span> : <span className="text-gray-400 text-xs">In progress</span>}
+                        {r.promoted ? <span className="text-green-600 font-bold text-xs">🎉 Promoted â†’ {r.promoted_to_stage}</span> : <span className="text-gray-400 text-xs">In progress</span>}
                       </td>
                     </tr>
                   );
@@ -4263,13 +4263,13 @@ function SelfAITab({ user, academicYear }: any) {
 
     if (mode === "gap") {
       const gaps = await buildGapContext();
-      const selectedGaps = focusGap === "All my gaps" ? gaps : gaps.filter(g=>`${g.domain} â€“ ${g.sub}`===focusGap);
+      const selectedGaps = focusGap === "All my gaps" ? gaps : gaps.filter(g=>`${g.domain} – ${g.sub}`===focusGap);
 
       const compBlock = selectedGaps.map((g:any) => {
         const compLines = g.competencies.length
           ? g.competencies.map((c:any)=>`  - [${c.competency_code}]: ${c.description||c.desc||""}`).join("\n")
           : "  - General competencies";
-        return `DOMAIN: ${g.domain} â€“ ${g.sub} | Stage: ${g.stage} | Grade: ${g.grade} | Score: ${g.score.toFixed(0)}%\nCompetencies:\n${compLines}`;
+        return `DOMAIN: ${g.domain} – ${g.sub} | Stage: ${g.stage} | Grade: ${g.grade} | Score: ${g.score.toFixed(0)}%\nCompetencies:\n${compLines}`;
       }).join("\n\n");
 
       const diffNote: Record<string,string> = {
@@ -4287,28 +4287,28 @@ Create a ${ppMode === "practice" ? "PRACTICE PAPER" : "ASSESSMENT PAPER"} for te
 
 TEACHER: ${user?.name}
 Overall: ${overallAvg.toFixed(1)}%
-Literacy Stage: ${latestRound?.gaps?.lit_stage||latestRound?.stage||"â€”"} (Grade: ${STAGE_GRADE[latestRound?.gaps?.lit_stage||latestRound?.stage||"foundation"]||"â€”"})
-Numeracy Stage: ${latestRound?.gaps?.num_stage||latestRound?.stage||"â€”"} (Grade: ${STAGE_GRADE[latestRound?.gaps?.num_stage||latestRound?.stage||"foundation"]||"â€”"})
+Literacy Stage: ${latestRound?.gaps?.lit_stage||latestRound?.stage||"—"} (Grade: ${STAGE_GRADE[latestRound?.gaps?.lit_stage||latestRound?.stage||"foundation"]||"—"})
+Numeracy Stage: ${latestRound?.gaps?.num_stage||latestRound?.stage||"—"} (Grade: ${STAGE_GRADE[latestRound?.gaps?.num_stage||latestRound?.stage||"foundation"]||"—"})
 
 FOCUS COMPETENCIES (from gap analysis):
-${compBlock || "General competencies â€” no specific gaps identified"}
+${compBlock || "General competencies — no specific gaps identified"}
 
 PAPER REQUIREMENTS:
 - Exactly ${numQ} questions
 - Question types: ${qtStr}
-- Difficulty: ${difficulty} â€” ${diffNote[difficulty]||"Mixed difficulty"}
+- Difficulty: ${difficulty} — ${diffNote[difficulty]||"Mixed difficulty"}
 - Tag every question with its competency code [CODE]
 - Test both THEORETICAL KNOWLEDGE and CLASSROOM APPLICATION
 - Include complete Answer Key with explanations
 
 QUESTION FORMAT:
-[MCQ] 4 options A/B/C/D, mark correct with âœ“, 1-line reason
+[MCQ] 4 options A/B/C/D, mark correct with ✓, 1-line reason
 [SA] Short Answer: model answer 2-3 sentences
 [LA] Long Answer: model answer 5-8 sentences
 [TF] True/False: answer + explanation
 [Case-Based] 4-5 line classroom scenario + question + model answer
 
-Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper â€” ${user?.name} â€” ${new Date().toLocaleDateString()}`;
+Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.name} — ${new Date().toLocaleDateString()}`;
 
     } else {
       // Custom topic mode
@@ -4341,7 +4341,7 @@ PAPER REQUIREMENTS:
 - Test THEORETICAL KNOWLEDGE and CLASSROOM APPLICATION
 - Include complete Answer Key
 
-Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper â€” ${user?.name} â€” ${custSubj} â€” ${custDomain} â€” ${new Date().toLocaleDateString()}`;
+Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.name} — ${custSubj} — ${custDomain} — ${new Date().toLocaleDateString()}`;
     }
 
     try {
@@ -4360,10 +4360,10 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper â€” ${use
   const assessments = baselineData?.assessments || [];
   const latestA = [...assessments].sort((a:any,b:any)=>a.round>b.round?1:-1).slice(-1)[0];
 
-  // Compute gaps for display â€” domains below 60%
+  // Compute gaps for display — domains below 60%
   const gapList: string[] = [];
-  if (latestA?.literacy_pct) Object.entries(latestA.literacy_pct).forEach(([d,v]:any) => { if (+v < 60) gapList.push(`Literacy â€“ ${d}`); });
-  if (latestA?.numeracy_pct) Object.entries(latestA.numeracy_pct).forEach(([d,v]:any) => { if (+v < 60) gapList.push(`Numeracy â€“ ${d}`); });
+  if (latestA?.literacy_pct) Object.entries(latestA.literacy_pct).forEach(([d,v]:any) => { if (+v < 60) gapList.push(`Literacy – ${d}`); });
+  if (latestA?.numeracy_pct) Object.entries(latestA.numeracy_pct).forEach(([d,v]:any) => { if (+v < 60) gapList.push(`Numeracy – ${d}`); });
 
   const custDomains = custSubj === "literacy" ? LIT_DOMAINS : NUM_DOMAINS;
 
@@ -4371,7 +4371,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper â€” ${use
     <div className="space-y-4 w-full max-w-3xl">
       <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
         <h3 className="text-sm font-bold text-indigo-800 mb-1">âœï¸ AI Practice & Assessment Paper</h3>
-        <p className="text-xs text-indigo-600">Questions mapped to your exact competency framework â€” tagged with competency codes.</p>
+        <p className="text-xs text-indigo-600">Questions mapped to your exact competency framework — tagged with competency codes.</p>
       </div>
 
       {!assessments.length ? (
@@ -4381,7 +4381,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper â€” ${use
           {/* Paper type */}
           <div className="bg-white rounded-xl shadow p-4 space-y-3">
             <div className="flex gap-2">
-              {[{id:"practice",label:"âœï¸ Practice Paper"},{id:"assessment",label:"ðŸ“‹ Assessment Paper"}].map(p=>(
+              {[{id:"practice",label:"âœï¸ Practice Paper"},{id:"assessment",label:"📋 Assessment Paper"}].map(p=>(
                 <button key={p.id} onClick={()=>setPpMode(p.id as any)}
                   className={`px-4 py-2 text-xs rounded-lg border font-medium ${ppMode===p.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
                   {p.label}
@@ -4391,7 +4391,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper â€” ${use
 
             {/* Mode */}
             <div className="flex gap-2">
-              {[{id:"gap",label:"ðŸ“Œ Based on My Gaps"},{id:"custom",label:"ðŸŽ¯ Custom Topic"}].map(m=>(
+              {[{id:"gap",label:"📌 Based on My Gaps"},{id:"custom",label:"🎯 Custom Topic"}].map(m=>(
                 <button key={m.id} onClick={()=>setMode(m.id as any)}
                   className={`px-4 py-2 text-xs rounded-lg border font-medium ${mode===m.id?"bg-purple-600 text-white border-purple-600":"bg-white text-gray-600 border-gray-300 hover:bg-purple-50"}`}>
                   {m.label}
@@ -4403,13 +4403,13 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper â€” ${use
           {mode === "gap" && (
             <div className="bg-white rounded-xl shadow p-4 space-y-3">
               {gapList.length === 0 ? (
-                <div className="text-sm text-green-700 bg-green-50 rounded-lg p-3">ðŸŽ‰ No gaps found â€” you're above average in all domains! Switch to Custom Topic to practise any area.</div>
+                <div className="text-sm text-green-700 bg-green-50 rounded-lg p-3">🎉 No gaps found — you're above average in all domains! Switch to Custom Topic to practise any area.</div>
               ) : (
                 <>
                   <div>
                     <label className="text-xs text-gray-500 font-semibold block mb-1">Gap Areas (below subject average)</label>
                     <div className="flex flex-wrap gap-2">
-                      {gapList.map(g=><span key={g} className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">âš ï¸ {g}</span>)}
+                      {gapList.map(g=><span key={g} className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">⚠️ {g}</span>)}
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -4455,8 +4455,8 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper â€” ${use
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Subject</label>
                   <select value={custSubj} onChange={e=>{setCustSubj(e.target.value);setCustDomain(e.target.value==="literacy"?"Listening":"Operations");}} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
-                    <option value="literacy">ðŸ“– Literacy</option>
-                    <option value="numeracy">ðŸ”¢ Numeracy</option>
+                    <option value="literacy">📖 Literacy</option>
+                    <option value="numeracy">🔢 Numeracy</option>
                   </select>
                 </div>
                 <div>
@@ -4517,9 +4517,9 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper â€” ${use
 
           <button onClick={generate} disabled={generating||!GROQ_KEY2}
             className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-bold rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50">
-            {generating ? "â³ Generating..." : `ðŸŽ¯ Generate ${ppMode==="practice"?"Practice":"Assessment"} Paper (${numQ} questions)`}
+            {generating ? "â³ Generating..." : `🎯 Generate ${ppMode==="practice"?"Practice":"Assessment"} Paper (${numQ} questions)`}
           </button>
-          {!GROQ_KEY2 && <p className="text-xs text-amber-600 text-center">âš ï¸ VITE_GROQ_API_KEY not set in .env</p>}
+          {!GROQ_KEY2 && <p className="text-xs text-amber-600 text-center">⚠️ VITE_GROQ_API_KEY not set in .env</p>}
 
           {output && (
             <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
@@ -4527,7 +4527,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper â€” ${use
                 <h4 className="text-sm font-bold text-gray-800">Generated Paper</h4>
                 <button onClick={()=>{const b=new Blob([output],{type:"text/plain"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=`Paper_${user?.name?.replace(/\s+/g,"_")}_${new Date().toISOString().split("T")[0]}.txt`;a.click();URL.revokeObjectURL(u);}}
                   className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700">
-                  ðŸ“¥ Download .txt
+                  📥 Download .txt
                 </button>
               </div>
               <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-800 whitespace-pre-wrap font-mono leading-relaxed max-h-[600px] overflow-y-auto border border-gray-200">
@@ -4542,7 +4542,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper â€” ${use
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// PROMOTION TAB â€” class teacher only
+// PROMOTION TAB — class teacher only
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function AIToolsTab({ user, mappings, academicYear }: any) {
@@ -4568,7 +4568,7 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
   const [loadingComp, setLoadingComp] = useState(false);
   const [generatedAME, setGeneratedAME] = useState<{a:string;m:string;e:string}|null>(null);
 
-  // Practice / Assessment â€” individual student gap-based
+  // Practice / Assessment — individual student gap-based
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [gapSource, setGapSource] = useState<"pasa"|"baseline">("pasa");
@@ -4748,7 +4748,7 @@ Make each question clear, age-appropriate, directly testing the competency.`;
     setGenerating(true); setPaperOutput(""); setMsg("");
     try {
       const gapBlock = studentGaps.slice(0,8).map((g:any) =>
-        `- ${g.subject||""} [${g.code||g.domain||""}] ${g.name||g.domain||""} â€” Score: ${g.score}%`
+        `- ${g.subject||""} [${g.code||g.domain||""}] ${g.name||g.domain||""} — Score: ${g.score}%`
       ).join("\n");
       const diffNote: Record<string,string> = {
         Easy:"All questions: recall and basic application only.",
@@ -4770,19 +4770,19 @@ ${gapBlock}
 REQUIREMENTS:
 - Exactly ${qCount} questions
 - Question types: ${type==="Practice"?qTypes.join(", "):"MCQ, Short Answer, Long Answer"}
-- Difficulty: ${difficulty} â€” ${diffNote[difficulty]}
+- Difficulty: ${difficulty} — ${diffNote[difficulty]}
 - Tag each question with competency code [CODE]
 - Include complete Answer Key with explanations${marksNote}
 - Age-appropriate language for Grade ${classGrade}
 
 FORMATS:
-[MCQ] 4 options A/B/C/D, correct marked âœ“, 1-line reason
-[SA] Short Answer: model answer 2â€“3 sentences
-[LA] Long Answer: model answer 5â€“8 sentences
+[MCQ] 4 options A/B/C/D, correct marked ✓, 1-line reason
+[SA] Short Answer: model answer 2–3 sentences
+[LA] Long Answer: model answer 5–8 sentences
 [FIB] Fill in the Blank with answer
-[CBSA] 3-4 line classroom scenario + question + 2â€“3 sentence answer
+[CBSA] 3-4 line classroom scenario + question + 2–3 sentence answer
 
-Title: ${type} Paper â€” ${selectedStudent.name} â€” ${selectedSubject||"Mixed"} â€” ${new Date().toLocaleDateString()}`;
+Title: ${type} Paper — ${selectedStudent.name} — ${selectedSubject||"Mixed"} — ${new Date().toLocaleDateString()}`;
       setPaperOutput(await callGroq(prompt, 3000));
     } catch { setMsg("âŒ Generation failed. Check API key."); }
     setGenerating(false);
@@ -4810,7 +4810,7 @@ Write a friendly, encouraging message (180-220 words) that:
 4. Suggests how to make it fun and low-pressure at home
 5. Ends with encouragement and confidence in the child's progress
 
-Keep tone warm, professional and supportive â€” never alarming or critical.`;
+Keep tone warm, professional and supportive — never alarming or critical.`;
       setParentOutput(await callGroq(prompt));
     } catch { setMsg("âŒ Generation failed."); }
     setGenerating(false);
@@ -4827,7 +4827,7 @@ Keep tone warm, professional and supportive â€” never alarming or critical.
         competency_name: selectedCompetency?.name||null,
         ...extraData,
       });
-      setMsg("âœ… Saved!");
+      setMsg("✅ Saved!");
     } catch { setMsg("âŒ Save failed."); }
     setSaving(false);
     setTimeout(()=>setMsg(""), 3000);
@@ -4857,11 +4857,11 @@ Keep tone warm, professional and supportive â€” never alarming or critical.
   };
 
   const SUB_TABS = [
-    {id:"ame", label:"ðŸ“š AME Homework", desc:"Select competency â†’ generate 3 differentiated sets (Above/Medium/Emerging) for the whole class"},
-    {id:"practice", label:"ðŸ“ Practice Paper", desc:"Select student â†’ loads their PA/SA or Baseline gaps â†’ generates targeted practice questions"},
-    {id:"assessment", label:"ðŸ“‹ Assessment Paper", desc:"Select student â†’ loads their gaps â†’ generates formal assessment with marks allocation"},
-    {id:"parent", label:"ðŸ‘¨â€ðŸ‘©â€ðŸ‘§ Parent Suggestions", desc:"Select student â†’ auto-loads their activity learning gaps â†’ generates targeted home support suggestions for parents"},
-    {id:"history", label:"ðŸ•’ History", desc:"All AI-generated records for this year â€” view, print, delete"},
+    {id:"ame", label:"📚 AME Homework", desc:"Select competency â†’ generate 3 differentiated sets (Above/Medium/Emerging) for the whole class"},
+    {id:"practice", label:"📝 Practice Paper", desc:"Select student â†’ loads their PA/SA or Baseline gaps â†’ generates targeted practice questions"},
+    {id:"assessment", label:"📋 Assessment Paper", desc:"Select student â†’ loads their gaps â†’ generates formal assessment with marks allocation"},
+    {id:"parent", label:"👨â€👩â€👧 Parent Suggestions", desc:"Select student â†’ auto-loads their activity learning gaps â†’ generates targeted home support suggestions for parents"},
+    {id:"history", label:"🕒 History", desc:"All AI-generated records for this year — view, print, delete"},
   ];
 
   const Q_TYPE_OPTIONS = ["Multiple Choice (MCQ)","Short Answer","Long Answer","True/False","Fill in the Blank","Case-Based Short Answer"];
@@ -4869,11 +4869,11 @@ Keep tone warm, professional and supportive â€” never alarming or critical.
   return (
     <div className="space-y-4">
       <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-        <h2 className="text-sm font-bold text-indigo-800 mb-1">ðŸ¤– AI Tools</h2>
+        <h2 className="text-sm font-bold text-indigo-800 mb-1">🤖 AI Tools</h2>
         <p className="text-xs text-indigo-600">All generated content is automatically saved to records and accessible in Student Portfolio.</p>
       </div>
 
-      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("âœ…")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
       {/* Sub-tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1 flex-nowrap">
@@ -4919,20 +4919,20 @@ Keep tone warm, professional and supportive â€” never alarming or critical.
           </button>
           {generatedAME && (
             <div className="space-y-3">
-              {[{key:"a",label:"ðŸŒŸ A â€” Above Average",color:"border-green-500 bg-green-50"},
-                {key:"m",label:"ðŸ“˜ M â€” Medium / Average",color:"border-blue-500 bg-blue-50"},
-                {key:"e",label:"ðŸŒ± E â€” Emerging",color:"border-orange-500 bg-orange-50"}].map(({key,label,color})=>(
+              {[{key:"a",label:"🌟 A — Above Average",color:"border-green-500 bg-green-50"},
+                {key:"m",label:"📘 M — Medium / Average",color:"border-blue-500 bg-blue-50"},
+                {key:"e",label:"🌱 E — Emerging",color:"border-orange-500 bg-orange-50"}].map(({key,label,color})=>(
                 <div key={key} className={`rounded-xl border-l-4 ${color} p-4`}>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-bold text-gray-700">{label}</h3>
-                    <button onClick={()=>printContent(generatedAME[key as "a"|"m"|"e"],label)} className="text-xs text-indigo-600 hover:underline">ðŸ–¨ Print</button>
+                    <button onClick={()=>printContent(generatedAME[key as "a"|"m"|"e"],label)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
                   </div>
                   <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{generatedAME[key as "a"|"m"|"e"]}</pre>
                 </div>
               ))}
               <button onClick={()=>saveRecord("AME",{content_a:generatedAME.a,content_m:generatedAME.m,content_e:generatedAME.e})} disabled={saving}
                 className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50">
-                {saving?"Saving...":"ðŸ’¾ Save to Records"}
+                {saving?"Saving...":"💾 Save to Records"}
               </button>
             </div>
           )}
@@ -5027,10 +5027,10 @@ Keep tone warm, professional and supportive â€” never alarming or critical.
           {paperOutput && (
             <div className="bg-white rounded-xl shadow p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-gray-700">{subTab==="practice"?"Practice":"Assessment"} Paper â€” {selectedStudent?.name}</h3>
+                <h3 className="text-sm font-bold text-gray-700">{subTab==="practice"?"Practice":"Assessment"} Paper — {selectedStudent?.name}</h3>
                 <div className="flex gap-2">
-                  <button onClick={()=>printContent(paperOutput,`${subTab==="practice"?"Practice":"Assessment"} Paper â€” ${selectedStudent?.name}`)} className="text-xs text-indigo-600 hover:underline">ðŸ–¨ Print</button>
-                  <button onClick={()=>saveRecord(subTab==="practice"?"Practice":"Assessment",{content:paperOutput,student_id:selectedStudent?.id,student_name:selectedStudent?.name})} disabled={saving} className="text-xs text-green-600 hover:underline">{saving?"Saving...":"ðŸ’¾ Save"}</button>
+                  <button onClick={()=>printContent(paperOutput,`${subTab==="practice"?"Practice":"Assessment"} Paper — ${selectedStudent?.name}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
+                  <button onClick={()=>saveRecord(subTab==="practice"?"Practice":"Assessment",{content:paperOutput,student_id:selectedStudent?.id,student_name:selectedStudent?.name})} disabled={saving} className="text-xs text-green-600 hover:underline">{saving?"Saving...":"💾 Save"}</button>
                 </div>
               </div>
               <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{paperOutput}</pre>
@@ -5065,13 +5065,13 @@ Keep tone warm, professional and supportive â€” never alarming or critical.
                 {loadingActivityGaps && <span className="ml-2 text-indigo-400 font-normal animate-pulse">Loading...</span>}
               </p>
               {!loadingActivityGaps && activityGaps.length === 0 && (
-                <p className="text-xs text-green-600">âœ… No significant gaps found in activities. Suggestion will focus on general enrichment.</p>
+                <p className="text-xs text-green-600">✅ No significant gaps found in activities. Suggestion will focus on general enrichment.</p>
               )}
               {!loadingActivityGaps && activityGaps.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {activityGaps.slice(0,8).map((g:any,i:number)=>(
                     <span key={i} className="px-2 py-1 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700">
-                      [{g.competency_code}] {g.subject} â€” {g.avg_score?.toFixed(0)}%
+                      [{g.competency_code}] {g.subject} — {g.avg_score?.toFixed(0)}%
                     </span>
                   ))}
                 </div>
@@ -5085,10 +5085,10 @@ Keep tone warm, professional and supportive â€” never alarming or critical.
           {parentOutput && (
             <div className="bg-white rounded-xl shadow p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-gray-700">Parent Suggestion â€” {selectedParentStudent?.name}</h3>
+                <h3 className="text-sm font-bold text-gray-700">Parent Suggestion — {selectedParentStudent?.name}</h3>
                 <div className="flex gap-2">
-                  <button onClick={()=>printContent(parentOutput,`Parent Suggestion â€” ${selectedParentStudent?.name}`)} className="text-xs text-indigo-600 hover:underline">ðŸ–¨ Print</button>
-                  <button onClick={()=>saveRecord("ParentSuggestion",{content:parentOutput,student_id:selectedParentStudent?.id,student_name:selectedParentStudent?.name})} disabled={saving} className="text-xs text-green-600 hover:underline">{saving?"Saving...":"ðŸ’¾ Save"}</button>
+                  <button onClick={()=>printContent(parentOutput,`Parent Suggestion — ${selectedParentStudent?.name}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
+                  <button onClick={()=>saveRecord("ParentSuggestion",{content:parentOutput,student_id:selectedParentStudent?.id,student_name:selectedParentStudent?.name})} disabled={saving} className="text-xs text-green-600 hover:underline">{saving?"Saving...":"💾 Save"}</button>
                 </div>
               </div>
               <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{parentOutput}</pre>
@@ -5109,13 +5109,13 @@ Keep tone warm, professional and supportive â€” never alarming or critical.
               <option value="Weekly">Weekly Homework</option>
               <option value="ParentSuggestion">Parent Suggestions</option>
             </select>
-            <button onClick={fetchHistory} className="px-3 py-1.5 bg-white border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">ðŸ”„ Refresh</button>
+            <button onClick={fetchHistory} className="px-3 py-1.5 bg-white border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">🔄 Refresh</button>
           </div>
           {loadingHistory ? (
             <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">Loading...</div>
           ) : history.length===0 ? (
             <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
-              <p className="text-2xl mb-2">ðŸ“­</p>
+              <p className="text-2xl mb-2">📭</p>
               <p className="text-sm">No records yet. Generate content to see it here.</p>
             </div>
           ) : (
@@ -5145,11 +5145,11 @@ Keep tone warm, professional and supportive â€” never alarming or critical.
                       <div className="mt-3 space-y-2">
                         {r.type==="AME" ? (
                           <>
-                            {[{key:"content_a",label:"ðŸŒŸ Above Average"},{key:"content_m",label:"ðŸ“˜ Medium"},{key:"content_e",label:"ðŸŒ± Emerging"}].map(({key,label})=>r[key]&&(
+                            {[{key:"content_a",label:"🌟 Above Average"},{key:"content_m",label:"📘 Medium"},{key:"content_e",label:"🌱 Emerging"}].map(({key,label})=>r[key]&&(
                               <div key={key} className="bg-gray-50 rounded-lg p-3">
                                 <div className="flex items-center justify-between mb-1">
                                   <p className="text-xs font-bold text-gray-600">{label}</p>
-                                  <button onClick={()=>printContent(r[key],label)} className="text-xs text-indigo-600 hover:underline">ðŸ–¨ Print</button>
+                                  <button onClick={()=>printContent(r[key],label)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
                                 </div>
                                 <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans">{r[key]}</pre>
                               </div>
@@ -5159,7 +5159,7 @@ Keep tone warm, professional and supportive â€” never alarming or critical.
                           <div className="bg-gray-50 rounded-lg p-3">
                             <div className="flex items-center justify-between mb-1">
                               <p className="text-xs font-bold text-gray-600">Content</p>
-                              <button onClick={()=>printContent(r.content,`${r.type} â€” ${r.subject}`)} className="text-xs text-indigo-600 hover:underline">ðŸ–¨ Print</button>
+                              <button onClick={()=>printContent(r.content,`${r.type} — ${r.subject}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
                             </div>
                             <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans">{r.content}</pre>
                           </div>
@@ -5209,14 +5209,14 @@ function AlertsTab({ user, mappings, academicYear }: any) {
   return (
     <div className="space-y-4">
       <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-yellow-800 mb-1">âš ï¸ Consecutive Decline Alert</h3>
+        <h3 className="text-sm font-bold text-yellow-800 mb-1">⚠️ Consecutive Decline Alert</h3>
         <p className="text-xs text-yellow-600">Students in your sections whose competency average dropped in 3 consecutive activities.</p>
       </div>
       <div className="bg-white rounded-xl shadow p-4">
         {loading ? (
           <p className="text-sm text-gray-400 text-center py-4">Loading...</p>
         ) : alerts.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">No students with consecutive declines in your sections. ðŸŽ‰</p>
+          <p className="text-sm text-gray-400 text-center py-4">No students with consecutive declines in your sections. 🎉</p>
         ) : (
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Students with Consecutive Decline ({alerts.length})</h3>
@@ -5225,7 +5225,7 @@ function AlertsTab({ user, mappings, academicYear }: any) {
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <span className="text-sm font-bold text-red-800">{s.student_name}</span>
-                    <span className="text-xs text-gray-500 ml-2">{s.grade} â€” {s.section}</span>
+                    <span className="text-xs text-gray-500 ml-2">{s.grade} — {s.section}</span>
                   </div>
                   <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
                     Drop: {s.decline_from} â†’ {s.decline_to} (-{s.drop})
@@ -5292,7 +5292,7 @@ function HomeworkPortfolioSection({ student, grade, section, subject, isClassTea
       {parentSuggestions.length > 0 && (
         <div className="bg-pink-50 border border-pink-200 rounded-xl overflow-hidden">
           <div className="px-4 py-3 bg-pink-700 text-white">
-            <h3 className="text-sm font-bold">ðŸ‘¨â€ðŸ‘©â€ðŸ‘§ Parent Suggestions for {student.name}</h3>
+            <h3 className="text-sm font-bold">👨â€👩â€👧 Parent Suggestions for {student.name}</h3>
           </div>
           <div className="divide-y divide-pink-100">
             {parentSuggestions.map((r: any) => (
@@ -5306,7 +5306,7 @@ function HomeworkPortfolioSection({ student, grade, section, subject, isClassTea
                     <button onClick={() => setExpandedId(expandedId === r.id ? null : r.id)} className="text-xs text-indigo-600 hover:underline">
                       {expandedId === r.id ? "Hide" : "View"}
                     </button>
-                    <button onClick={() => printContent(r.content, `Parent Suggestion â€” ${student.name}`)} className="text-xs text-gray-500 hover:underline">ðŸ–¨ Print</button>
+                    <button onClick={() => printContent(r.content, `Parent Suggestion — ${student.name}`)} className="text-xs text-gray-500 hover:underline">🖨 Print</button>
                   </div>
                 </div>
                 {expandedId === r.id && <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans mt-2 bg-white rounded p-3">{r.content}</pre>}
@@ -5319,7 +5319,7 @@ function HomeworkPortfolioSection({ student, grade, section, subject, isClassTea
       {/* Homework Records by Year */}
       {years.length === 0 && parentSuggestions.length === 0 ? (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
-          <p className="text-2xl mb-2">ðŸ“­</p>
+          <p className="text-2xl mb-2">📭</p>
           <p className="text-sm">No homework records found for this student's class.</p>
         </div>
       ) : years.map(year => (
@@ -5353,11 +5353,11 @@ function HomeworkPortfolioSection({ student, grade, section, subject, isClassTea
                 {expandedId === r.id && (
                   <div className="mt-3 space-y-2">
                     {r.type === "AME" ? (
-                      [{key:"content_a",label:"ðŸŒŸ Above Average"},{key:"content_m",label:"ðŸ“˜ Medium"},{key:"content_e",label:"ðŸŒ± Emerging"}].map(({key,label}) => r[key] && (
+                      [{key:"content_a",label:"🌟 Above Average"},{key:"content_m",label:"📘 Medium"},{key:"content_e",label:"🌱 Emerging"}].map(({key,label}) => r[key] && (
                         <div key={key} className="bg-gray-50 rounded p-3">
                           <div className="flex justify-between mb-1">
                             <p className="text-xs font-bold text-gray-600">{label}</p>
-                            <button onClick={() => printContent(r[key], label)} className="text-xs text-indigo-600 hover:underline">ðŸ–¨ Print</button>
+                            <button onClick={() => printContent(r[key], label)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
                           </div>
                           <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans">{r[key]}</pre>
                         </div>
@@ -5366,7 +5366,7 @@ function HomeworkPortfolioSection({ student, grade, section, subject, isClassTea
                       <div className="bg-gray-50 rounded p-3">
                         <div className="flex justify-between mb-1">
                           <p className="text-xs font-bold text-gray-600">Content</p>
-                          <button onClick={() => printContent(r.content, `${r.type} â€” ${r.subject}`)} className="text-xs text-indigo-600 hover:underline">ðŸ–¨ Print</button>
+                          <button onClick={() => printContent(r.content, `${r.type} — ${r.subject}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
                         </div>
                         <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans">{r.content}</pre>
                       </div>
@@ -5495,10 +5495,10 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
         <div className="flex items-center gap-3">
           <button onClick={() => { setSelectedStudent(null); setPortfolio(null); }}
             className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg flex items-center gap-1">
-            â† Back
+            ← Back
           </button>
           <div>
-            <h2 className="text-lg font-bold text-gray-800">ðŸ“ {selectedStudent.name}</h2>
+            <h2 className="text-lg font-bold text-gray-800">📁 {selectedStudent.name}</h2>
             <p className="text-xs text-gray-500">{selectedStudent.admission_no} Â· Full history across all years</p>
           </div>
         </div>
@@ -5514,21 +5514,21 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
             <div className="flex gap-2 flex-wrap">
               <button onClick={() => setPortfolioTab("pasa")}
                 className={`px-4 py-2 text-sm rounded-lg font-medium ${portfolioTab==="pasa" ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
-                ðŸ“Š PA/SA Marks
+                📊 PA/SA Marks
               </button>
               {(isClassTeacher || isEnglishTeacher || isMathTeacher) && (
                 <button onClick={() => setPortfolioTab("baseline")}
                   className={`px-4 py-2 text-sm rounded-lg font-medium ${portfolioTab==="baseline" ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
-                  ðŸ“ˆ Baseline
+                  📈 Baseline
                 </button>
               )}
               <button onClick={() => setPortfolioTab("activities")}
                 className={`px-4 py-2 text-sm rounded-lg font-medium ${portfolioTab==="activities" ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
-                ðŸŽ¯ Activities
+                🎯 Activities
               </button>
               <button onClick={() => setPortfolioTab("homework")}
                 className={`px-4 py-2 text-sm rounded-lg font-medium ${portfolioTab==="homework" ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
-                ðŸ“ Homework & AI Records
+                📝 Homework & AI Records
               </button>
             </div>
 
@@ -5566,7 +5566,7 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
                                       ? <span className={`font-medium ${sd.percentage>=80?"text-green-600":sd.percentage>=60?"text-blue-600":sd.percentage>=40?"text-yellow-600":"text-red-600"}`}>
                                           {sd.percentage}%
                                         </span>
-                                      : <span className="text-gray-300">â€”</span>}
+                                      : <span className="text-gray-300">—</span>}
                                   </td>
                                 );
                               })}
@@ -5575,7 +5575,7 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
                                   ? <span className={exam.grand_percentage>=80?"text-green-600":exam.grand_percentage>=60?"text-blue-600":exam.grand_percentage>=40?"text-yellow-600":"text-red-600"}>
                                       {exam.grand_percentage}%
                                     </span>
-                                  : "â€”"}
+                                  : "—"}
                               </td>
                             </tr>
                           ))}
@@ -5601,16 +5601,16 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
                     <div className="p-4 grid grid-cols-2 gap-4">
                       {(isClassTeacher || isEnglishTeacher) && yr.literacy && (
                         <div className="bg-blue-50 rounded-lg p-3">
-                          <p className="text-xs font-bold text-blue-700 mb-1">ðŸ“– Literacy</p>
-                          <p className="text-2xl font-bold text-blue-800">{yr.literacy.avg != null ? yr.literacy.avg.toFixed(1) : "â€”"}<span className="text-sm font-normal text-blue-500">%</span></p>
-                          <p className="text-xs text-blue-600 mt-1">Stage: {yr.literacy.stage || "â€”"}</p>
+                          <p className="text-xs font-bold text-blue-700 mb-1">📖 Literacy</p>
+                          <p className="text-2xl font-bold text-blue-800">{yr.literacy.avg != null ? yr.literacy.avg.toFixed(1) : "—"}<span className="text-sm font-normal text-blue-500">%</span></p>
+                          <p className="text-xs text-blue-600 mt-1">Stage: {yr.literacy.stage || "—"}</p>
                         </div>
                       )}
                       {(isClassTeacher || isMathTeacher) && yr.numeracy && (
                         <div className="bg-purple-50 rounded-lg p-3">
-                          <p className="text-xs font-bold text-purple-700 mb-1">ðŸ”¢ Numeracy</p>
-                          <p className="text-2xl font-bold text-purple-800">{yr.numeracy.avg != null ? yr.numeracy.avg.toFixed(1) : "â€”"}<span className="text-sm font-normal text-purple-500">%</span></p>
-                          <p className="text-xs text-purple-600 mt-1">Stage: {yr.numeracy.stage || "â€”"}</p>
+                          <p className="text-xs font-bold text-purple-700 mb-1">🔢 Numeracy</p>
+                          <p className="text-2xl font-bold text-purple-800">{yr.numeracy.avg != null ? yr.numeracy.avg.toFixed(1) : "—"}<span className="text-sm font-normal text-purple-500">%</span></p>
+                          <p className="text-xs text-purple-600 mt-1">Stage: {yr.numeracy.stage || "—"}</p>
                         </div>
                       )}
                     </div>
@@ -5649,14 +5649,14 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
                       <div className="flex items-center justify-between py-2 border-b border-gray-100">
                         <span className="text-sm font-bold text-gray-700">Overall</span>
                         <span className={`text-sm font-bold ${yr.overall>=80?"text-green-600":yr.overall>=60?"text-blue-600":yr.overall>=40?"text-yellow-600":"text-red-600"}`}>
-                          {yr.overall?.toFixed(1) ?? "â€”"}%
+                          {yr.overall?.toFixed(1) ?? "—"}%
                         </span>
                       </div>
                       {filteredSubjects.map((sub: string) => (
                         <div key={sub} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                           <span className="text-sm text-gray-700">{sub}</span>
                           <span className={`text-sm font-bold ${yr[sub]>=80?"text-green-600":yr[sub]>=60?"text-blue-600":yr[sub]>=40?"text-yellow-600":"text-red-600"}`}>
-                            {yr[sub]?.toFixed(1) ?? "â€”"}%
+                            {yr[sub]?.toFixed(1) ?? "—"}%
                           </span>
                         </div>
                       ))}
@@ -5675,7 +5675,7 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
   return (
     <div className="space-y-4">
       <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-        <h2 className="text-sm font-bold text-indigo-800 mb-1">ðŸ“ Student Portfolio</h2>
+        <h2 className="text-sm font-bold text-indigo-800 mb-1">📁 Student Portfolio</h2>
         <p className="text-xs text-indigo-600">
           Click any student to view their complete history across all academic years.
           {isClassTeacher ? " As class teacher you can see all subjects." : ` As subject teacher you can see: ${teacherSubjects.join(", ")}.`}
@@ -5693,7 +5693,7 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">Loading students...</div>
       ) : filteredStudents.length === 0 ? (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
-          <p className="text-2xl mb-2">ðŸ“­</p>
+          <p className="text-2xl mb-2">📭</p>
           <p className="text-sm">{showAlumni ? "No alumni found. Alumni must be graduates (graduated, not TC)." : "No students found in your current assignment."}</p>
         </div>
       ) : (
@@ -5820,7 +5820,7 @@ function PromotionTab({ user, mappings }: any) {
     <div className="space-y-4 w-full max-w-4xl">
       <div className={`border rounded-xl p-4 ${isGrade10 ? "bg-amber-50 border-amber-200" : "bg-indigo-50 border-indigo-200"}`}>
         <h3 className={`text-sm font-bold mb-1 ${isGrade10 ? "text-amber-800" : "text-indigo-800"}`}>
-          {isGrade10 ? "ðŸŽ“ Student Graduation" : "ðŸŽ“ Student Promotion"}
+          {isGrade10 ? "🎓 Student Graduation" : "🎓 Student Promotion"}
         </h3>
         <p className={`text-xs ${isGrade10 ? "text-amber-600" : "text-indigo-600"}`}>
           {isGrade10
@@ -5829,7 +5829,7 @@ function PromotionTab({ user, mappings }: any) {
         </p>
       </div>
 
-      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("âœ…") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
       {step === "preview" && (
         <div className="bg-white rounded-xl shadow p-6 text-center">
@@ -5848,14 +5848,14 @@ function PromotionTab({ user, mappings }: any) {
           )}
           <button onClick={loadStudents} disabled={loading}
             className={`px-6 py-2.5 text-white text-sm rounded-lg font-semibold disabled:opacity-50 ${isGrade10 ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"}`}>
-            {loading ? "Loading..." : "ðŸ“‹ Load Student List"}
+            {loading ? "Loading..." : "📋 Load Student List"}
           </button>
         </div>
       )}
 
       {step === "confirm" && students.length > 0 && (
         <div className="space-y-4">
-          {/* For promotion â€” section selector */}
+          {/* For promotion — section selector */}
           {!isGrade10 && (
             <div className="bg-white rounded-xl shadow p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Apply same section to all students</h3>
@@ -5870,7 +5870,7 @@ function PromotionTab({ user, mappings }: any) {
                 </div>
               ) : (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-xs text-yellow-700">âš ï¸ No sections found for {nextGrade}. Please add sections in Section Management first, or sections will be created when students are assigned.</p>
+                  <p className="text-xs text-yellow-700">⚠️ No sections found for {nextGrade}. Please add sections in Section Management first, or sections will be created when students are assigned.</p>
                   <input type="text" placeholder="Type section name manually (e.g. KARANTHA)"
                     value={defaultSection} onChange={e => applyDefaultSection(e.target.value.toUpperCase())}
                     className="mt-2 border border-gray-300 rounded px-3 py-1.5 text-sm w-full" />
@@ -5909,7 +5909,7 @@ function PromotionTab({ user, mappings }: any) {
                         <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => toggleStudent(s.id)} className="accent-indigo-600" />
                       </td>
                       <td className="px-3 py-2 font-medium text-gray-800">{s.name}</td>
-                      <td className="px-3 py-2 text-gray-400 text-xs">{s.admission_no || "â€”"}</td>
+                      <td className="px-3 py-2 text-gray-400 text-xs">{s.admission_no || "—"}</td>
                       {!isGrade10 && (
                         <td className="px-3 py-2">
                           {nextSections.length > 0 ? (
@@ -5940,7 +5940,7 @@ function PromotionTab({ user, mappings }: any) {
           </div>
 
           <div className={`border rounded-xl p-4 ${isGrade10 ? "bg-amber-50 border-amber-200" : "bg-yellow-50 border-yellow-200"}`}>
-            <p className={`text-sm font-bold mb-1 ${isGrade10 ? "text-amber-800" : "text-yellow-800"}`}>âš ï¸ Important</p>
+            <p className={`text-sm font-bold mb-1 ${isGrade10 ? "text-amber-800" : "text-yellow-800"}`}>⚠️ Important</p>
             <ul className={`text-xs space-y-1 list-disc ml-4 ${isGrade10 ? "text-amber-700" : "text-yellow-700"}`}>
               {isGrade10 ? (
                 <>
@@ -5963,15 +5963,15 @@ function PromotionTab({ user, mappings }: any) {
           <button onClick={isGrade10 ? executeGraduation : executePromotion} disabled={promoting || !selectedIds.length}
             className={`px-6 py-2.5 text-white text-sm rounded-lg font-semibold disabled:opacity-50 ${isGrade10 ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"}`}>
             {promoting ? "Processing..." : isGrade10
-              ? `ðŸŽ“ Graduate ${selectedIds.length} Students (${graduationYear})`
-              : `âœ… Promote ${selectedIds.length} Students to ${nextGrade}`}
+              ? `🎓 Graduate ${selectedIds.length} Students (${graduationYear})`
+              : `✅ Promote ${selectedIds.length} Students to ${nextGrade}`}
           </button>
         </div>
       )}
 
       {step === "done" && result && (
         <div className="bg-white rounded-xl shadow p-8 text-center">
-          <div className="text-5xl mb-4">{result.type === "graduation" ? "ðŸŽ“" : "ðŸŽ‰"}</div>
+          <div className="text-5xl mb-4">{result.type === "graduation" ? "🎓" : "🎉"}</div>
           <h3 className="text-xl font-bold text-green-700 mb-2">
             {result.type === "graduation" ? "Graduation Complete!" : "Promotion Complete!"}
           </h3>
@@ -5990,7 +5990,7 @@ function PromotionTab({ user, mappings }: any) {
 
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// LEARNING RESOURCES TAB â€” AI resources mapped to teacher's baseline gaps
+// LEARNING RESOURCES TAB — AI resources mapped to teacher's baseline gaps
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function LearningResourcesTab({ user, academicYear }: any) {
   const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
@@ -6062,7 +6062,7 @@ function LearningResourcesTab({ user, academicYear }: any) {
       const prompt = `You are an expert educational resource curator for teacher professional development in India.
 
 Teacher gap area:
-- Subject: ${gap.subject} â€” ${gap.domain}
+- Subject: ${gap.subject} — ${gap.domain}
 - Stage: ${gap.stage} | Target Grade: ${gap.grade}
 - Current Score: ${gap.score.toFixed(0)}%
 
@@ -6070,16 +6070,16 @@ Competencies in this area:
 ${compList || "General competencies for " + gap.domain}
 
 For EACH competency provide:
-1. ONE TEXT resource (article/guide) â€” Title, real URL, 1-sentence relevance
-2. ONE VIDEO resource (YouTube/Khan Academy) â€” Title, real URL, 1-sentence relevance
+1. ONE TEXT resource (article/guide) — Title, real URL, 1-sentence relevance
+2. ONE VIDEO resource (YouTube/Khan Academy) — Title, real URL, 1-sentence relevance
 
 Use sources: readingrockets.org, edutopia.org, ncert.nic.in, khanacademy.org, mathigon.org, nrich.maths.org
 
 Format exactly:
 ## [COMPETENCY_CODE or SHORT_NAME]
-ðŸ“„ TEXT: [Title] â€” [URL]
+📄 TEXT: [Title] — [URL]
    â†³ [How it helps the teacher]
-ðŸŽ¥ VIDEO: [Title] â€” [URL]
+🎥 VIDEO: [Title] — [URL]
    â†³ [How it helps]`;
 
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -6089,12 +6089,12 @@ Format exactly:
       });
       const data = await res.json();
       if (!res.ok) {
-        setResources(p => ({ ...p, [key]: `âš ï¸ GROQ Error ${res.status}: ${data.error?.message || JSON.stringify(data)}` }));
+        setResources(p => ({ ...p, [key]: `⚠️ GROQ Error ${res.status}: ${data.error?.message || JSON.stringify(data)}` }));
       } else {
         const result = data.choices?.[0]?.message?.content || "Could not generate resources.";
         setResources(p => ({ ...p, [key]: result }));
       }
-    } catch(e:any) { setResources(p => ({ ...p, [key]: `âš ï¸ Generation failed: ${e.message}` })); }
+    } catch(e:any) { setResources(p => ({ ...p, [key]: `⚠️ Generation failed: ${e.message}` })); }
     setGenerating(p => ({ ...p, [key]: false }));
   };
 
@@ -6111,7 +6111,7 @@ Format exactly:
   if (!baselineData?.assessments?.length) {
     return (
       <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
-        <p className="text-2xl mb-2">ðŸ“Š</p>
+        <p className="text-2xl mb-2">📊</p>
         <p className="text-sm">No baseline assessment found for {academicYear}. Your assessment needs to be completed first.</p>
       </div>
     );
@@ -6124,7 +6124,7 @@ Format exactly:
   return (
     <div className="space-y-4">
       <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
-        <h2 className="text-sm font-bold text-purple-800 mb-1">ðŸ“š Learning Resources</h2>
+        <h2 className="text-sm font-bold text-purple-800 mb-1">📚 Learning Resources</h2>
         <p className="text-xs text-purple-600">AI-generated resources mapped to your baseline gap competencies. Resources are cached once generated.</p>
       </div>
 
@@ -6141,7 +6141,7 @@ Format exactly:
 
       {gaps.length === 0 ? (
         <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
-          <p className="text-2xl mb-2">ðŸŽ‰</p>
+          <p className="text-2xl mb-2">🎉</p>
           <p className="text-sm font-medium text-green-700">No gap areas in this round! All domains above average.</p>
         </div>
       ) : (
@@ -6159,19 +6159,19 @@ Format exactly:
               <div key={key} className="bg-white rounded-xl shadow overflow-hidden">
                 <div className={`px-4 py-3 flex items-center justify-between flex-wrap gap-2 ${isLit ? "bg-blue-700" : "bg-purple-700"} text-white`}>
                   <div>
-                    <span className="text-sm font-bold">{isLit ? "ðŸ“–" : "ðŸ”¢"} {gap.subject === "literacy" ? "Literacy" : "Numeracy"} â€” {gap.domain}</span>
+                    <span className="text-sm font-bold">{isLit ? "📖" : "🔢"} {gap.subject === "literacy" ? "Literacy" : "Numeracy"} — {gap.domain}</span>
                     <span className="text-xs ml-2 opacity-75">Score: {gap.score.toFixed(0)}% Â· {gap.stage} Â· {gap.grade}</span>
                   </div>
                   {!result && (
                     <button onClick={() => generateResources(gap)} disabled={isGenerating}
                       className="px-3 py-1.5 bg-white text-indigo-700 text-xs rounded font-medium hover:bg-indigo-50 disabled:opacity-50">
-                      {isGenerating ? "Loading..." : "ðŸ” Generate Resources"}
+                      {isGenerating ? "Loading..." : "🔍 Generate Resources"}
                     </button>
                   )}
-                  {result && !result.startsWith("âš ï¸") && (
+                  {result && !result.startsWith("⚠️") && (
                     <button onClick={() => downloadResource(result, gap.domain)}
                       className="px-3 py-1.5 bg-white text-indigo-700 text-xs rounded font-medium hover:bg-indigo-50">
-                      ðŸ“¥ Download
+                      📥 Download
                     </button>
                   )}
                 </div>
@@ -6487,7 +6487,7 @@ FORMAT — repeat for every student (do not skip any):
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// BASELINE ENTRY TAB â€” matches Python app structure exactly
+// BASELINE ENTRY TAB — matches Python app structure exactly
 // Literacy: Listening, Speaking, Reading, Writing
 // Numeracy: Operations, Base 10, Measurement, Geometry
 // Unlimited rounds, stage progression, promotion at 80%
@@ -6576,12 +6576,12 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
   };
 
   const DASH_TABS = [
-    { id: "section", label: "ðŸ« My Section" },
-    { id: "grade",   label: "ðŸ“Š My Grade" },
-    { id: "alerts",  label: "âš ï¸ Alerts" },
+    { id: "section", label: "🏫 My Section" },
+    { id: "grade",   label: "📊 My Grade" },
+    { id: "alerts",  label: "⚠️ Alerts" },
   ];
 
-  // Compute section stats from rounds data â€” JSONB aware
+  // Compute section stats from rounds data — JSONB aware
   const computeSectionStats = () => {
     if (!sectionDash?.students?.length) return null;
     const students = sectionDash.students;
@@ -6660,13 +6660,13 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
 
               {/* Level Distribution */}
               <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Level Distribution â€” {classGrade} Â· {classSection}</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Level Distribution — {classGrade} Â· {classSection}</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
-                    { key: "L4", label: "Level 4 â€“ Exceeding", color: "#10b981", bg: "bg-green-50 border-green-200" },
-                    { key: "L3", label: "Level 3 â€“ Meeting",   color: "#6366f1", bg: "bg-blue-50 border-blue-200" },
-                    { key: "L2", label: "Level 2 â€“ Approaching", color: "#f59e0b", bg: "bg-yellow-50 border-yellow-200" },
-                    { key: "L1", label: "Level 1 â€“ Beginning", color: "#ef4444", bg: "bg-red-50 border-red-200" },
+                    { key: "L4", label: "Level 4 – Exceeding", color: "#10b981", bg: "bg-green-50 border-green-200" },
+                    { key: "L3", label: "Level 3 – Meeting",   color: "#6366f1", bg: "bg-blue-50 border-blue-200" },
+                    { key: "L2", label: "Level 2 – Approaching", color: "#f59e0b", bg: "bg-yellow-50 border-yellow-200" },
+                    { key: "L1", label: "Level 1 – Beginning", color: "#ef4444", bg: "bg-red-50 border-red-200" },
                   ].map(l => (
                     <div key={l.key} className={`rounded-xl p-4 text-center border ${l.bg}`}>
                       <p className="text-xs font-medium mb-1" style={{ color: l.color }}>{l.label}</p>
@@ -6682,7 +6682,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
               {/* Student breakdown table */}
               <div className="bg-white rounded-xl shadow overflow-hidden">
                 <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-700">Student Breakdown â€” {classGrade} Â· {classSection}</h3>
+                  <h3 className="text-sm font-semibold text-gray-700">Student Breakdown — {classGrade} Â· {classSection}</h3>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs border-collapse">
@@ -6743,7 +6743,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
 
               {/* Section comparison bar chart */}
               <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Section-wise Overall Average â€” {classGrade}</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Section-wise Overall Average — {classGrade}</h3>
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={(gradeDash.sections || []).map((s: any) => ({ name: s.section, overall: s.overallAvg, lit: s.literacyAvg, num: s.numeracyAvg, atRisk: s.atRisk, count: s.count }))}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -6785,7 +6785,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
                         <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.numeracyAvg)}`}>{s.numeracyAvg}%</span></td>
                         <td className="px-3 py-2 text-center"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(s.overallAvg)}`}>{s.overallAvg}%</span></td>
                         <td className="px-3 py-2 text-center">
-                          {s.atRisk > 0 ? <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">{s.atRisk} âš ï¸</span> : <span className="text-gray-400">0</span>}
+                          {s.atRisk > 0 ? <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">{s.atRisk} ⚠️</span> : <span className="text-gray-400">0</span>}
                         </td>
                       </tr>
                     ))}
@@ -6805,12 +6805,12 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
       {!loading && dashTab === "alerts" && (
         <div className="space-y-4">
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-            <h3 className="text-sm font-bold text-yellow-800 mb-1">âš ï¸ Consecutive Decline Alert</h3>
+            <h3 className="text-sm font-bold text-yellow-800 mb-1">⚠️ Consecutive Decline Alert</h3>
             <p className="text-xs text-yellow-600">Students in your sections whose baseline scores declined consecutively.</p>
           </div>
           <div className="bg-white rounded-xl shadow p-4">
             {alerts.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">No consecutive decline alerts in your sections. ðŸŽ‰</p>
+              <p className="text-sm text-gray-400 text-center py-6">No consecutive decline alerts in your sections. 🎉</p>
             ) : (
               <div className="space-y-2">
                 {alerts.map((a: any, i: number) => (
@@ -6913,7 +6913,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
     const raw = parseFloat(val);
     if (isNaN(raw) || val === "") return "border-gray-200";
     const max = parseFloat(maxMarks[domain]||"0");
-    if (max > 0 && raw > max) return "border-orange-500 bg-orange-50"; // exceeds max â€” data entry error
+    if (max > 0 && raw > max) return "border-orange-500 bg-orange-50"; // exceeds max — data entry error
     const pct = max > 0 ? (raw/max)*100 : raw;
     if (pct >= 80) return "border-green-400 bg-green-50";
     if (pct >= 60) return "border-blue-300 bg-blue-50";
@@ -6965,7 +6965,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
         grade: classGrade, section: classSection, academic_year: academicYear,
         round: roundKey, stage, assessment_date: assessmentDate, entries,
       });
-      setMsg(`âœ… Round saved â€” ${entries.length} students`); fetchRounds(); setNewRoundOpen(false); setEditingRound(null);
+      setMsg(`✅ Round saved — ${entries.length} students`); fetchRounds(); setNewRoundOpen(false); setEditingRound(null);
     } catch { setMsg("âŒ Error saving"); }
     setSaving(false); setTimeout(() => setMsg(""), 3000);
   };
@@ -7047,7 +7047,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
         matched++;
       }
       setScores(newScores);
-      setMsg(`âœ… Excel imported â€” ${matched} students matched`);
+      setMsg(`✅ Excel imported — ${matched} students matched`);
     } catch (err:any) { setMsg("âŒ Excel import failed: "+err.message); }
     setXlParsing(false);
     if (xlFileRef.current) xlFileRef.current.value = "";
@@ -7069,14 +7069,14 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
       {/* Header */}
       <div className="bg-white rounded-xl shadow p-4 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-sm font-bold text-indigo-800">{classGrade} â€” {classSection}</h2>
+          <h2 className="text-sm font-bold text-indigo-800">{classGrade} — {classSection}</h2>
           <p className="text-xs text-gray-500 mt-0.5">Stage: {stage.charAt(0).toUpperCase()+stage.slice(1)} Â· {students.length} students Â· {rounds.length} round(s) completed</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <input ref={xlFileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleXlUpload} />
           <button onClick={() => xlFileRef.current?.click()} disabled={xlParsing}
             className="px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center gap-1.5">
-            {xlParsing ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"/>Parsing...</> : "ðŸ“‚ Import Excel"}
+            {xlParsing ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"/>Parsing...</> : "📂 Import Excel"}
           </button>
           <button onClick={() => { setNewRoundOpen(true); setEditingRound(null); initScoresForRound(); }}
             className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
@@ -7085,19 +7085,19 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
         </div>
       </div>
 
-      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("âœ…")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
+      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
       {/* Domain configuration */}
       <div className="bg-white rounded-xl shadow border border-indigo-100 p-4">
-        <h3 className="text-xs font-bold text-indigo-800 mb-3">âš™ï¸ Domain Configuration â€” {classGrade} Â· {classSection}</h3>
+        <h3 className="text-xs font-bold text-indigo-800 mb-3">âš™ï¸ Domain Configuration — {classGrade} Â· {classSection}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className="text-xs font-semibold text-blue-700 mb-2">ðŸ“š Literacy Domains</p>
+            <p className="text-xs font-semibold text-blue-700 mb-2">📚 Literacy Domains</p>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {litDomains.map((d, i) => (
                 <span key={d} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2 py-0.5 rounded-full">
                   {d}
-                  <button onClick={() => setLitDomains(prev => prev.filter((_,j) => j !== i))} className="text-blue-400 hover:text-red-500 ml-0.5">âœ•</button>
+                  <button onClick={() => setLitDomains(prev => prev.filter((_,j) => j !== i))} className="text-blue-400 hover:text-red-500 ml-0.5">✕</button>
                 </span>
               ))}
             </div>
@@ -7110,12 +7110,12 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
             </div>
           </div>
           <div>
-            <p className="text-xs font-semibold text-purple-700 mb-2">ðŸ”¢ Numeracy Domains</p>
+            <p className="text-xs font-semibold text-purple-700 mb-2">🔢 Numeracy Domains</p>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {numDomains.map((d, i) => (
                 <span key={d} className="flex items-center gap-1 bg-purple-50 border border-purple-200 text-purple-700 text-xs px-2 py-0.5 rounded-full">
                   {d}
-                  <button onClick={() => setNumDomains(prev => prev.filter((_,j) => j !== i))} className="text-purple-400 hover:text-red-500 ml-0.5">âœ•</button>
+                  <button onClick={() => setNumDomains(prev => prev.filter((_,j) => j !== i))} className="text-purple-400 hover:text-red-500 ml-0.5">✕</button>
                 </span>
               ))}
             </div>
@@ -7147,7 +7147,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
         <div className="bg-white rounded-xl shadow border border-indigo-200 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 bg-indigo-50 border-b border-indigo-200 flex-wrap gap-2">
             <h3 className="text-sm font-bold text-indigo-800">
-              {editingRound ? `âœï¸ Editing Round ${rounds.indexOf(editingRound)+1}` : `+ Round ${rounds.length+1}`} â€” {classGrade} {classSection}
+              {editingRound ? `✏ï¸ Editing Round ${rounds.indexOf(editingRound)+1}` : `+ Round ${rounds.length+1}`} — {classGrade} {classSection}
             </h3>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5">
@@ -7157,7 +7157,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
               </div>
               <button onClick={() => saveRound(activeRoundKey)} disabled={saving}
                 className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-                {saving ? "Saving..." : "ðŸ’¾ Save"}
+                {saving ? "Saving..." : "💾 Save"}
               </button>
             </div>
           </div>
@@ -7175,7 +7175,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
                   <th className="px-2 py-2 text-left min-w-[120px]">Gaps</th>
                 </tr>
                 <tr className="bg-amber-50 border-b-2 border-amber-300">
-                  <td className="px-3 py-1 text-xs font-bold text-amber-800 sticky left-0 bg-amber-50">ðŸ“ Max Marks</td>
+                  <td className="px-3 py-1 text-xs font-bold text-amber-800 sticky left-0 bg-amber-50">📐 Max Marks</td>
                   {litDomains.map(d => (
                     <td key={`litmax-${d}`} className="px-1 py-1 text-center border-l border-amber-200">
                       <input type="number" min={1} step={1} value={maxMarks[d]||""} placeholder="max"
@@ -7183,7 +7183,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
                         className="w-14 text-center text-xs border border-amber-300 bg-amber-50 rounded px-1 py-0.5 font-bold text-amber-800" />
                     </td>
                   ))}
-                  <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">â€”</td>
+                  <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">—</td>
                   {numDomains.map(d => (
                     <td key={`nummax-${d}`} className="px-1 py-1 text-center border-l border-amber-200">
                       <input type="number" min={1} step={1} value={maxMarks[d]||""} placeholder="max"
@@ -7191,9 +7191,9 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
                         className="w-14 text-center text-xs border border-amber-300 bg-amber-50 rounded px-1 py-0.5 font-bold text-amber-800" />
                     </td>
                   ))}
-                  <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">â€”</td>
-                  <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">â€”</td>
-                  <td className="px-1 py-1 text-center text-xs text-amber-400">â€”</td>
+                  <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">—</td>
+                  <td className="px-1 py-1 text-center text-xs text-amber-400 border-l border-amber-200">—</td>
+                  <td className="px-1 py-1 text-center text-xs text-amber-400">—</td>
                   <td className="px-1 py-1 text-xs text-amber-400 italic">Enter max per domain</td>
                 </tr>
               </thead>
@@ -7215,34 +7215,34 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
                       <td className={`px-3 py-1.5 font-medium text-gray-800 sticky left-0 bg-inherit border-r border-gray-200`}>{s.student_name}</td>
                       {litDomains.map(d => (
                         <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
-                          <input type="number" min={0} step={0.5} value={sc[d]??""} placeholder="â€”"
+                          <input type="number" min={0} step={0.5} value={sc[d]??""} placeholder="—"
                             onChange={e => setScores(p => ({...p,[s.student_id]:{...(p[s.student_id]||{}),[d]:e.target.value}}))}
                             className={`w-14 text-center text-xs border rounded px-1 py-0.5 ${scoreCellBg(sc[d]||"",d)}`} />
                         </td>
                       ))}
                       <td className="px-2 py-1.5 text-center border-l border-gray-200">
-                        {litAvg!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(litAvg).bg}`}>{litAvg.toFixed(1)}%</span>:<span className="text-gray-300">â€”</span>}
+                        {litAvg!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(litAvg).bg}`}>{litAvg.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
                       </td>
                       {numDomains.map(d => (
                         <td key={d} className="px-1 py-1 text-center border-l border-gray-100">
-                          <input type="number" min={0} step={0.5} value={sc[d]??""} placeholder="â€”"
+                          <input type="number" min={0} step={0.5} value={sc[d]??""} placeholder="—"
                             onChange={e => setScores(p => ({...p,[s.student_id]:{...(p[s.student_id]||{}),[d]:e.target.value}}))}
                             className={`w-14 text-center text-xs border rounded px-1 py-0.5 ${scoreCellBg(sc[d]||"",d)}`} />
                         </td>
                       ))}
                       <td className="px-2 py-1.5 text-center border-l border-gray-200">
-                        {numAvg!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(numAvg).bg}`}>{numAvg.toFixed(1)}%</span>:<span className="text-gray-300">â€”</span>}
+                        {numAvg!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(numAvg).bg}`}>{numAvg.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-2 py-1.5 text-center border-l border-gray-200">
-                        {overall!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{overall.toFixed(1)}%</span>:<span className="text-gray-300">â€”</span>}
+                        {overall!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{overall.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-2 py-1.5 text-center">
-                        {overall!==null?<span className={`text-xs px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{getLvl(overall).label}</span>:<span className="text-gray-300">â€”</span>}
+                        {overall!==null?<span className={`text-xs px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{getLvl(overall).label}</span>:<span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-2 py-1.5">
                         {gaps.length>0
-                          ? <div className="flex flex-wrap gap-1">{gaps.map(g=><span key={g} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">âš ï¸ {g}</span>)}</div>
-                          : overall!==null?<span className="text-xs text-green-600">âœ… No gaps</span>:null}
+                          ? <div className="flex flex-wrap gap-1">{gaps.map(g=><span key={g} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">⚠️ {g}</span>)}</div>
+                          : overall!==null?<span className="text-xs text-green-600">✅ No gaps</span>:null}
                       </td>
                     </tr>
                   );
@@ -7271,10 +7271,10 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
         return (
           <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-700">Round {activeRoundIdx+1} Results â€” {classGrade} {classSection}</h3>
+              <h3 className="text-sm font-bold text-gray-700">Round {activeRoundIdx+1} Results — {classGrade} {classSection}</h3>
               <button onClick={() => { setEditingRound(roundKey); setNewRoundOpen(false); initScoresForRound(roundKey); }}
                 className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-xs rounded-lg hover:bg-indigo-200 font-medium border border-indigo-200">
-                âœï¸ Edit Round
+                ✏ï¸ Edit Round
               </button>
             </div>
             <div className="overflow-x-auto">
@@ -7309,27 +7309,27 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
                         <td className="px-3 py-2 font-medium text-gray-800">{s.student_name}</td>
                         {litD.map(d => (
                           <td key={d} className="px-2 py-2 text-center border-l border-gray-100">
-                            <span className="text-gray-700">{rnd.literacy_scores?.[d]??<span className="text-gray-300">â€”</span>}</span>
+                            <span className="text-gray-700">{rnd.literacy_scores?.[d]??<span className="text-gray-300">—</span>}</span>
                             {litPct[d]!==undefined && <span className="text-gray-400 ml-1">({litPct[d].toFixed(0)}%)</span>}
                           </td>
                         ))}
                         <td className="px-2 py-2 text-center border-l border-gray-200">
-                          {litAvg!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(litAvg).bg}`}>{litAvg.toFixed(1)}%</span>:<span className="text-gray-300">â€”</span>}
+                          {litAvg!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(litAvg).bg}`}>{litAvg.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
                         </td>
                         {numD.map(d => (
                           <td key={d} className="px-2 py-2 text-center border-l border-gray-100">
-                            <span className="text-gray-700">{rnd.numeracy_scores?.[d]??<span className="text-gray-300">â€”</span>}</span>
+                            <span className="text-gray-700">{rnd.numeracy_scores?.[d]??<span className="text-gray-300">—</span>}</span>
                             {numPct[d]!==undefined && <span className="text-gray-400 ml-1">({numPct[d].toFixed(0)}%)</span>}
                           </td>
                         ))}
                         <td className="px-2 py-2 text-center border-l border-gray-200">
-                          {numAvg!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(numAvg).bg}`}>{numAvg.toFixed(1)}%</span>:<span className="text-gray-300">â€”</span>}
+                          {numAvg!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(numAvg).bg}`}>{numAvg.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          {overall!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{overall.toFixed(1)}%</span>:<span className="text-gray-300">â€”</span>}
+                          {overall!==null?<span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{overall.toFixed(1)}%</span>:<span className="text-gray-300">—</span>}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          {overall!==null?<span className={`text-xs px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{getLvl(overall).label}</span>:<span className="text-gray-300">â€”</span>}
+                          {overall!==null?<span className={`text-xs px-1.5 py-0.5 rounded ${getLvl(overall).bg}`}>{getLvl(overall).label}</span>:<span className="text-gray-300">—</span>}
                         </td>
                       </tr>
                     );
@@ -7390,7 +7390,7 @@ function ObservationsTab({ user }: { user: any }) {
 
   if (obs.length === 0) return (
     <div className="bg-white rounded-xl shadow p-10 text-center">
-      <p className="text-4xl mb-3">ðŸ”</p>
+      <p className="text-4xl mb-3">🔍</p>
       <p className="text-sm font-semibold text-gray-600">No shared observations yet</p>
       <p className="text-xs text-gray-400 mt-1">When an admin shares a class observation for you, it will appear here.</p>
     </div>
@@ -7417,10 +7417,10 @@ function ObservationsTab({ user }: { user: any }) {
               className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors text-left">
               <div className="flex items-center gap-4 flex-wrap">
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">{o.observation_date || "â€”"}</p>
+                  <p className="text-sm font-semibold text-gray-800">{o.observation_date || "—"}</p>
                   <p className="text-xs text-gray-500">{o.grade_observed} Â· {o.subject_observed}</p>
                 </div>
-                <div className="text-xs text-gray-500">Observer: <span className="font-medium text-gray-700">{o.observed_by || "â€”"}</span></div>
+                <div className="text-xs text-gray-500">Observer: <span className="font-medium text-gray-700">{o.observed_by || "—"}</span></div>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg}`}>{pct}%</span>
                 <span className={`text-sm font-bold ${pctColor}`}>{total}/24</span>
               </div>
