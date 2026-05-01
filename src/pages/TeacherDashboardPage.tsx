@@ -70,6 +70,7 @@ export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
     { id: "baseline_dash",  label: "ðŸ“ˆ Baseline Dashboard", show: true },
     { id: "activities",     label: "ðŸŽ¯ Activities",        show: true },
     { id: "ai_tools",       label: "ðŸ¤– AI Tools",          show: true },
+    { id: "homework",       label: "📝 AI Homework",    show: true },
     { id: "alerts",         label: "âš ï¸ Alerts",            show: true },
     { id: "promotion",      label: "ðŸŽ“ Promotion",         show: isClassTeacher },
     { id: "portfolio",      label: "ðŸ“ Student Portfolio",  show: true },
@@ -6238,19 +6239,20 @@ Format exactly:
 }
 
 function HomeworkTab({ user, mappings, academicYear }: any) {
-  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]); // IDs
   const [gapSource, setGapSource] = useState<"baseline" | "pasa" | "activities">("baseline");
   const [questionType, setQuestionType] = useState<"MCQ" | "Short" | "Fill" | "Mixed">("Mixed");
   const [numQuestions, setNumQuestions] = useState(10);
   const [subject, setSubject] = useState("");
   const [grade, setGrade] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [gapStatus, setGapStatus] = useState("");
   const [output, setOutput] = useState("");
-  const [studentList, setStudentList] = useState<string[]>([]);
+  const [studentList, setStudentList] = useState<{ id: string; name: string }[]>([]);
   const [subjects, setSubjects] = useState<string[]>([]);
   const [error, setError] = useState("");
+  const MAX_STUDENTS = 10;
 
-  // Build subject list from mappings
   useEffect(() => {
     if (mappings?.mappings?.length) {
       const subs = [...new Set(mappings.mappings.map((m: any) => m.subject))] as string[];
@@ -6260,7 +6262,6 @@ function HomeworkTab({ user, mappings, academicYear }: any) {
     }
   }, [mappings]);
 
-  // Load students when grade changes — only for teacher's assigned sections
   useEffect(() => {
     if (!grade || !mappings) return;
     const fetchStudents = async () => {
@@ -6270,59 +6271,116 @@ function HomeworkTab({ user, mappings, academicYear }: any) {
             .filter((m: any) => m.grade === grade && m.section)
             .map((m: any) => m.section as string)
         )];
-        const allNames = new Set<string>();
+        const seen = new Map<string, string>();
         const targets = sections.length
           ? sections.map(s => `${API}/students?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(s)}`)
           : [`${API}/students?grade=${encodeURIComponent(grade)}`];
         for (const url of targets) {
           const r = await axios.get(url);
           const st = r.data?.data || r.data || [];
-          st.filter((s: any) => s.is_active !== false).forEach((s: any) => { if (s.name) allNames.add(s.name); });
+          st.filter((s: any) => s.is_active !== false && s.id && s.name).forEach((s: any) => seen.set(s.id, s.name));
         }
-        setStudentList([...allNames].sort());
+        setStudentList([...seen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)));
+        setSelectedStudents([]);
       } catch { }
     };
     fetchStudents();
   }, [grade, mappings]);
 
-  const toggleStudent = (name: string) => {
-    setSelectedStudents(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
+  const toggleStudent = (id: string) => {
+    setSelectedStudents(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const fetchGapsForStudent = async (studentId: string): Promise<string> => {
+    try {
+      if (gapSource === "baseline") {
+        const r = await axios.get(`${API}/baseline/student/${studentId}/portfolio`);
+        const allA: any[] = r.data?.assessments || [];
+        const latest = allA.sort((a: any, b: any) => (a.round > b.round ? 1 : -1)).slice(-1)[0];
+        if (!latest) return "  no baseline data available";
+        const gaps: string[] = [];
+        if (latest.literacy_pct) Object.entries(latest.literacy_pct).forEach(([d, s]: [string, any]) => {
+          if (+s < 60) gaps.push(`  - Literacy / ${d}: ${(+s).toFixed(0)}%`);
+        });
+        if (latest.numeracy_pct) Object.entries(latest.numeracy_pct).forEach(([d, s]: [string, any]) => {
+          if (+s < 60) gaps.push(`  - Numeracy / ${d}: ${(+s).toFixed(0)}%`);
+        });
+        return gaps.length ? gaps.join("\n") : "  above 60% in all baseline domains — generate enrichment questions";
+      } else if (gapSource === "pasa") {
+        const r = await axios.get(`${API}/pasa/student/${studentId}/analysis?academic_year=${academicYear}`);
+        const gaps: string[] = [];
+        (r.data?.examSummary || []).forEach((exam: any) => {
+          Object.entries(exam.subjects || {}).forEach(([sub, sd]: [string, any]) => {
+            if (subject && sub.toLowerCase() !== subject.toLowerCase()) return;
+            (sd.competency_scores || []).forEach((cs: any) => {
+              if (cs.marks_obtained !== null && cs.max_marks > 0 && (cs.marks_obtained / cs.max_marks) * 100 < 60) {
+                gaps.push(`  - [${cs.competency_code}] ${cs.competency_name}: ${((cs.marks_obtained / cs.max_marks) * 100).toFixed(0)}% (${exam.exam})`);
+              }
+            });
+          });
+        });
+        return gaps.length ? gaps.join("\n") : "  above 60% in all PA/SA assessments — generate enrichment questions";
+      } else {
+        const r = await axios.get(`${API}/activities/longitudinal/student/${studentId}`);
+        const gaps: string[] = [];
+        (r.data?.longitudinal || []).forEach((yr: any) => {
+          (yr.subjects || []).forEach((sub: any) => {
+            if (subject && sub.subject?.toLowerCase() !== subject.toLowerCase()) return;
+            (sub.competencies || []).forEach((c: any) => {
+              if (c.avg_score !== null && c.avg_score < 60)
+                gaps.push(`  - [${c.competency_code}] ${c.competency_name}: ${c.avg_score?.toFixed(0)}%`);
+            });
+          });
+        });
+        return gaps.length ? gaps.join("\n") : "  no activity gaps below 60% — generate enrichment questions";
+      }
+    } catch {
+      return "  gap data unavailable — generate general subject questions";
+    }
   };
 
   const generate = async () => {
     if (!selectedStudents.length) { setError("Select at least one student."); return; }
     if (!subject) { setError("Select a subject."); return; }
-    setError(""); setGenerating(true); setOutput("");
+    if (selectedStudents.length > MAX_STUDENTS) { setError(`Select at most ${MAX_STUDENTS} students per generation.`); return; }
+    setError(""); setGenerating(true); setOutput(""); setGapStatus("");
 
-    const studentNames = selectedStudents.join(", ");
-    const prompt = `You are an expert teacher creating personalized homework for students.
+    const studentGapBlocks: string[] = [];
+    for (let i = 0; i < selectedStudents.length; i++) {
+      const id = selectedStudents[i];
+      const student = studentList.find(s => s.id === id);
+      if (!student) continue;
+      setGapStatus(`Fetching ${gapSource} gaps for ${student.name} (${i + 1}/${selectedStudents.length})...`);
+      const gaps = await fetchGapsForStudent(id);
+      studentGapBlocks.push(`**${student.name}**:\n${gaps}`);
+    }
+    setGapStatus("Generating personalized homework with AI...");
 
-Students: ${studentNames}
-Grade: ${grade}
-Subject: ${subject}
-Academic Year: ${academicYear}
-Gap Source: ${gapSource} assessment data
-Question Type: ${questionType}
-Number of Questions: ${numQuestions}
+    const qtypeLabel = questionType === "Mixed" ? "Mix of MCQ, Short Answer, and Fill in the Blanks" : questionType;
+    const prompt = `You are an expert teacher creating PERSONALIZED homework for each student based on their individual assessment gaps.
 
-Create ${numQuestions} personalized homework questions for these students based on their ${gapSource} assessment learning gaps in ${subject}.
+Subject: ${subject} | Grade: ${grade}
+Question type: ${qtypeLabel}
+Questions per student: ${numQuestions}
+Gap source: ${gapSource} assessments (Year: ${academicYear})
 
-Requirements:
-- Questions should address common learning gaps identified in ${gapSource} assessments
-- Mix difficulty: 30% easy (recall), 50% medium (application), 20% hard (analysis)
-- Question type: ${questionType === "Mixed" ? "mix of MCQ, Short Answer, and Fill in the Blanks" : questionType}
-- Each question must have a clear answer key
-- Format clearly with numbered questions and answers at the end
+INDIVIDUAL STUDENT LEARNING GAPS (below 60% = weak area needing practice; enrichment = performing well):
+${studentGapBlocks.join("\n\n")}
 
-Format:
-## Homework â€” ${subject} (${grade})
-### Students: ${studentNames}
+TASK: For EACH student above, create exactly ${numQuestions} homework questions targeting their specific weak areas. If a student shows enrichment, create challenging extension questions instead.
+
+FORMAT — repeat for every student (do not skip any):
+
+## [Student Name] — Personalized ${subject} Homework
+**Targeting:** [list the specific competencies or domains being addressed]
 
 **Questions:**
-[numbered questions]
+[${numQuestions} numbered questions]
 
 **Answer Key:**
-[answers]`;
+[numbered answers]
+
+---`;
 
     try {
       const res = await fetch(GROQ_API, {
@@ -6331,7 +6389,7 @@ Format:
         body: JSON.stringify({
           model: "llama-3.3-70b-versatile",
           messages: [{ role: "user", content: prompt }],
-          max_tokens: 2000,
+          max_tokens: Math.min(600 + selectedStudents.length * numQuestions * 55, 6000),
           temperature: 0.7,
         }),
       });
@@ -6343,10 +6401,10 @@ Format:
       }
     } catch { setError("Failed to connect to AI. Check your network."); }
     setGenerating(false);
+    setGapStatus("");
   };
 
   const copyOutput = () => { navigator.clipboard.writeText(output); };
-
   const downloadOutput = () => {
     const blob = new Blob([output], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -6356,7 +6414,6 @@ Format:
     a.click();
     URL.revokeObjectURL(url);
   };
-
   const printOutput = () => {
     const w = window.open("", "_blank");
     if (!w) return;
@@ -6367,33 +6424,29 @@ Format:
   return (
     <div className="space-y-4 w-full max-w-4xl">
       <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-indigo-800 mb-1">ðŸ¤– AI-Powered Homework Generator</h3>
-        <p className="text-xs text-indigo-600">Uses Groq LLaMA 3.3 to generate personalized homework based on student assessment gaps.</p>
+        <h3 className="text-sm font-bold text-indigo-800 mb-1">AI-Powered Personalized Homework Generator</h3>
+        <p className="text-xs text-indigo-600">Fetches each student's real assessment gaps, then generates homework targeting their specific weak competencies.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Configuration */}
         <div className="bg-white rounded-xl shadow p-4 space-y-3">
           <h3 className="text-sm font-semibold text-gray-700">Configuration</h3>
-
           <div>
             <label className="text-xs text-gray-500 block mb-1">Grade</label>
-            <select value={grade} onChange={e => setGrade(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
+            <select value={grade} onChange={e => { setGrade(e.target.value); setSelectedStudents([]); }} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
               {[...new Set(mappings?.mappings?.map((m: any) => m.grade) || [])].map((g: any) => <option key={g} value={g}>{g}</option>)}
             </select>
           </div>
-
           <div>
             <label className="text-xs text-gray-500 block mb-1">Subject</label>
             <select value={subject} onChange={e => setSubject(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
               {subjects.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
-
           <div>
             <label className="text-xs text-gray-500 block mb-1">Gap Source</label>
             <div className="flex gap-2">
-              {[{ id: "baseline", label: "ðŸ“ˆ Baseline" }, { id: "pasa", label: "ðŸ“Š PA/SA" }, { id: "activities", label: "ðŸŽ¯ Activities" }].map(o => (
+              {[{ id: "baseline", label: "Baseline" }, { id: "pasa", label: "PA/SA" }, { id: "activities", label: "Activities" }].map(o => (
                 <button key={o.id} onClick={() => setGapSource(o.id as any)}
                   className={`flex-1 text-xs py-1.5 rounded-lg border font-medium ${gapSource === o.id ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300"}`}>
                   {o.label}
@@ -6401,7 +6454,6 @@ Format:
               ))}
             </div>
           </div>
-
           <div>
             <label className="text-xs text-gray-500 block mb-1">Question Type</label>
             <div className="flex gap-1 flex-wrap">
@@ -6413,51 +6465,59 @@ Format:
               ))}
             </div>
           </div>
-
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Number of Questions: <strong>{numQuestions}</strong></label>
-            <input type="range" min={5} max={30} step={5} value={numQuestions} onChange={e => setNumQuestions(+e.target.value)}
-              className="w-full accent-indigo-600" />
-            <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>5</span><span>30</span></div>
+            <label className="text-xs text-gray-500 block mb-1">Questions per student: <strong>{numQuestions}</strong></label>
+            <input type="range" min={5} max={20} step={5} value={numQuestions} onChange={e => setNumQuestions(+e.target.value)} className="w-full accent-indigo-600" />
+            <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>5</span><span>20</span></div>
           </div>
         </div>
 
-        {/* Student selector */}
         <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">
+          <h3 className="text-sm font-semibold text-gray-700 mb-1">
             Select Students
-            <button onClick={() => setSelectedStudents(studentList)} className="ml-2 text-xs text-indigo-600 hover:underline">All</button>
+            <button onClick={() => setSelectedStudents(studentList.slice(0, MAX_STUDENTS).map(s => s.id))} className="ml-2 text-xs text-indigo-600 hover:underline">All</button>
             <button onClick={() => setSelectedStudents([])} className="ml-2 text-xs text-gray-400 hover:underline">Clear</button>
-            <span className="ml-2 text-xs text-gray-400">({selectedStudents.length} selected)</span>
           </h3>
+          <p className="text-xs text-gray-400 mb-2">{selectedStudents.length}/{MAX_STUDENTS} selected — gaps fetched per student before generating</p>
+          {selectedStudents.length >= MAX_STUDENTS && (
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-2">Max {MAX_STUDENTS} students per generation</p>
+          )}
           <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
-            {studentList.map(name => (
-              <label key={name} className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 ${selectedStudents.includes(name) ? "bg-indigo-50" : ""}`}>
-                <input type="checkbox" checked={selectedStudents.includes(name)} onChange={() => toggleStudent(name)} className="accent-indigo-600" />
-                <span className="text-xs text-gray-700">{name}</span>
-              </label>
-            ))}
+            {studentList.map(s => {
+              const isSelected = selectedStudents.includes(s.id);
+              const isDisabled = !isSelected && selectedStudents.length >= MAX_STUDENTS;
+              return (
+                <label key={s.id} className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer ${isSelected ? "bg-indigo-50" : isDisabled ? "opacity-40" : "hover:bg-gray-50"}`}>
+                  <input type="checkbox" checked={isSelected} disabled={isDisabled} onChange={() => toggleStudent(s.id)} className="accent-indigo-600" />
+                  <span className="text-xs text-gray-700">{s.name}</span>
+                </label>
+              );
+            })}
             {!studentList.length && <p className="text-xs text-gray-400 text-center py-4">Select a grade to load students</p>}
           </div>
         </div>
       </div>
 
-      {/* Generate button */}
       {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{error}</p>}
-      <button onClick={generate} disabled={generating}
+      {generating && gapStatus && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-xs text-indigo-700">
+          <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+          {gapStatus}
+        </div>
+      )}
+      <button onClick={generate} disabled={generating || !selectedStudents.length}
         className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 transition-all">
-        {generating ? "ðŸ¤– Generating homework..." : "âœ¨ Generate Homework"}
+        {generating ? "Working..." : `Generate Personalized Homework (${selectedStudents.length} student${selectedStudents.length !== 1 ? "s" : ""})`}
       </button>
 
-      {/* Output */}
       {output && (
         <div className="bg-white rounded-xl shadow p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-700">Generated Homework</h3>
             <div className="flex gap-2">
-              <button onClick={copyOutput} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium">ðŸ“‹ Copy</button>
-              <button onClick={downloadOutput} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">â¬‡ï¸ Download</button>
-              <button onClick={printOutput} className="px-3 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium">ðŸ–¨ï¸ Print</button>
+              <button onClick={copyOutput} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium">Copy</button>
+              <button onClick={downloadOutput} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">Download</button>
+              <button onClick={printOutput} className="px-3 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium">Print</button>
             </div>
           </div>
           <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto border border-gray-200">
