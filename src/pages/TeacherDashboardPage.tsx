@@ -42,125 +42,82 @@ const fmtSubject = (s: string): string => {
 
 interface TeacherDashboardProps {
   user: any;
+  mappings: any;
+  activeTab: string;
+  activeGroup: "class" | "self";
+  academicYear: string;
+  setAcademicYear: (y: string) => void;
 }
 
-export default function TeacherDashboardPage({ user }: TeacherDashboardProps) {
-  const [activeGroup, setActiveGroup] = useState<"class" | "self">("class");
-  const [activeTab, setActiveTab] = useState<"students" | "classview" | "pasa" | "examconfig" | "activities" | "baseline_entry" | "baseline_dash" | "alerts" | "promotion" | "profile" | "self_baseline" | "appraisal" | "self_ai" | "homework" | "portfolio" | "ai_tools" | "observations">("students");
-  const [academicYear, setAcademicYear] = useState("2025-26");
-  const [mappings, setMappings] = useState<any>(null);
+export default function TeacherDashboardPage({ user, mappings, activeTab, activeGroup, academicYear, setAcademicYear }: TeacherDashboardProps) {
 
-  useEffect(() => { fetchMappings(); }, [academicYear]);
-
-  const fetchMappings = async () => {
-    if (!user?.id) return;
-    try {
-      const r = await axios.get(`${API}/mappings/teacher/${user.id}/dashboard?academic_year=${academicYear}`);
-      setMappings(r.data);
-    } catch { }
-  };
-
-  const isClassTeacher = !!(mappings?.is_class_teacher);
-
-  const CLASS_TABS = [
-    { id: "students",       label: "ðŸ‘¥ My Students",      show: true },
-    { id: "classview",      label: "ðŸ› My Class",         show: isClassTeacher },
-    { id: "pasa",           label: "âœï¸ PA/SA Marks",       show: true },
-    { id: "baseline_entry", label: "ðŸ“Š Baseline Entry",    show: isClassTeacher },
-    { id: "baseline_dash",  label: "ðŸ“ˆ Baseline Dashboard", show: true },
-    { id: "activities",     label: "ðŸŽ¯ Activities",        show: true },
-    { id: "ai_tools",       label: "ðŸ¤– AI Tools",          show: true },
-    { id: "homework",       label: "📝 AI Homework",    show: true },
-    { id: "alerts",         label: "âš ï¸ Alerts",            show: true },
-    { id: "promotion",      label: "ðŸŽ“ Promotion",         show: isClassTeacher },
-    { id: "portfolio",      label: "ðŸ“ Student Portfolio",  show: true },
-  ];
-
-  const SELF_TABS = [
-    { id: "profile",        label: "ðŸ‘¤ My Profile",       show: true },
-    { id: "self_baseline",  label: "ðŸ“ˆ My Baseline",      show: true },
-    { id: "appraisal",      label: "ðŸ“‹ My Appraisal",     show: true },
-    { id: "observations",   label: "ðŸ” My Observations",  show: true },
-    { id: "self_ai",        label: "ðŸ¤– AI Learning",      show: true },
-    { id: "learning_res",   label: "ðŸ“š Learning Resources", show: true },
-  ];
-
-  const activeTabs = activeGroup === "class" ? CLASS_TABS : SELF_TABS;
-
-  // When switching group, reset to first tab
-  const switchGroup = (g: "class" | "self") => {
-    setActiveGroup(g);
-    setActiveTab(g === "class" ? "students" : "profile");
+  const TAB_LABELS: Record<string, string> = {
+    students:       "My Students",
+    classview:      "My Class",
+    pasa:           "PA/SA Marks",
+    baseline_entry: "Baseline Entry",
+    baseline_dash:  "Baseline Dashboard",
+    activities:     "Activities",
+    ai_tools:       "AI Tools",
+    homework:       "AI Homework",
+    alerts:         "Alerts",
+    promotion:      "Promotion",
+    portfolio:      "Student Portfolio",
+    profile:        "My Profile",
+    self_baseline:  "My Baseline",
+    appraisal:      "My Appraisal",
+    observations:   "My Observations",
+    self_ai:        "AI Learning",
+    learning_res:   "Learning Resources",
   };
 
   return (
-    <div className="p-3 sm:p-6">
-      {/* Header */}
-      <div className="mb-4 flex items-start justify-between flex-wrap gap-3">
+    <div>
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 sticky top-0 z-10">
         <div>
-          <h1 className="text-lg sm:text-xl font-bold text-gray-800">Teacher Dashboard</h1>
-          <p className="text-xs sm:text-sm text-gray-500">Welcome, {user?.name} Â· {user?.role}</p>
+          <h1 className="text-sm font-bold text-gray-800">{TAB_LABELS[activeTab] || "Dashboard"}</h1>
+          <p className="text-xs text-gray-400">Welcome, {user?.name}</p>
         </div>
-        <div className="flex items-end gap-3">
+        <div className="flex items-center gap-3">
           {academicYear !== "2025-26" && (
-            <div className="px-3 py-1.5 bg-yellow-50 border border-yellow-300 rounded-lg text-xs text-yellow-700 font-medium">
-              ðŸ‘ Viewing {academicYear} â€” past year
-            </div>
+            <span className="px-3 py-1 bg-yellow-50 border border-yellow-300 rounded-lg text-xs text-yellow-700 font-medium">
+              Viewing {academicYear} — past year
+            </span>
           )}
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Academic Year</label>
-            <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}
-              className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+            <label className="text-xs text-gray-400 block mb-0.5">Academic Year</label>
+            <select
+              value={academicYear}
+              onChange={e => setAcademicYear(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1 text-xs"
+            >
               {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
         </div>
       </div>
 
-      {/* Group switcher */}
-      <div className="flex gap-2 mb-3 overflow-x-auto pb-1 flex-nowrap">
-        <button onClick={() => switchGroup("class")}
-          className={`px-4 py-2 text-xs sm:text-sm rounded-xl font-bold transition-all border-2 whitespace-nowrap flex-shrink-0 ${activeGroup === "class" ? "bg-indigo-600 text-white border-indigo-600 shadow-md" : "bg-white text-indigo-600 border-indigo-300 hover:bg-indigo-50"}`}>
-          ðŸ« Class Management
-        </button>
-        <button onClick={() => switchGroup("self")}
-          className={`px-4 py-2 text-xs sm:text-sm rounded-xl font-bold transition-all border-2 whitespace-nowrap flex-shrink-0 ${activeGroup === "self" ? "bg-purple-600 text-white border-purple-600 shadow-md" : "bg-white text-purple-600 border-purple-300 hover:bg-purple-50"}`}>
-          ðŸ‘¤ Self Management
-        </button>
+      {/* Tab content */}
+      <div className="p-4 sm:p-6">
+        {activeTab === "students"       && <StudentsTab user={user} mappings={mappings} academicYear={academicYear} />}
+        {activeTab === "classview"      && <ClassTab user={user} mappings={mappings} academicYear={academicYear} />}
+        {activeTab === "pasa"           && <PASATab user={user} mappings={mappings} academicYear={academicYear} />}
+        {activeTab === "baseline_entry" && <BaselineEntryTab user={user} mappings={mappings} academicYear={academicYear} />}
+        {activeTab === "baseline_dash"  && <BaselineDashTab user={user} mappings={mappings} academicYear={academicYear} />}
+        {activeTab === "activities"     && <ActivitiesTab user={user} mappings={mappings} academicYear={academicYear} />}
+        {activeTab === "ai_tools"       && <AIToolsTab user={user} mappings={mappings} academicYear={academicYear} />}
+        {activeTab === "alerts"         && <AlertsTab user={user} mappings={mappings} academicYear={academicYear} />}
+        {activeTab === "promotion"      && <PromotionTab user={user} mappings={mappings} />}
+        {activeTab === "portfolio"      && <PortfolioTab user={user} mappings={mappings} academicYear={academicYear} />}
+        {activeTab === "profile"        && <ProfileTab user={user} />}
+        {activeTab === "self_baseline"  && <BaselineTab user={user} academicYear={academicYear} />}
+        {activeTab === "appraisal"      && <AppraisalTab user={user} academicYear={academicYear} />}
+        {activeTab === "observations"   && <ObservationsTab user={user} />}
+        {activeTab === "self_ai"        && <SelfAITab user={user} academicYear={academicYear} />}
+        {activeTab === "learning_res"   && <LearningResourcesTab user={user} academicYear={academicYear} />}
+        {activeTab === "homework"       && <HomeworkTab user={user} mappings={mappings} academicYear={academicYear} />}
       </div>
-
-      {/* Sub-tabs */}
-      <div className="flex gap-1.5 mb-5 overflow-x-auto pb-2 flex-nowrap">
-        {activeTabs.filter(t => t.show).map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id as any)}
-            className={`px-3 py-1.5 text-xs sm:text-sm rounded-lg font-medium transition-all whitespace-nowrap flex-shrink-0 ${activeTab === t.id
-              ? activeGroup === "class" ? "bg-indigo-600 text-white shadow" : "bg-purple-600 text-white shadow"
-              : "bg-white text-gray-600 border border-gray-300 hover:bg-indigo-50"}`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Class Management tabs */}
-      {activeTab === "students"       && <StudentsTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "classview"      && <ClassTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "pasa"           && <PASATab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "baseline_entry" && <BaselineEntryTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "baseline_dash"  && <BaselineDashTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "activities"     && <ActivitiesTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "ai_tools"       && <AIToolsTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "alerts"         && <AlertsTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {activeTab === "promotion"      && <PromotionTab user={user} mappings={mappings} />}
-      {activeTab === "portfolio"      && <PortfolioTab user={user} mappings={mappings} academicYear={academicYear} />}
-
-      {/* Self Management tabs */}
-      {activeTab === "profile"        && <ProfileTab user={user} />}
-      {activeTab === "self_baseline"  && <BaselineTab user={user} academicYear={academicYear} />}
-      {activeTab === "appraisal"      && <AppraisalTab user={user} academicYear={academicYear} />}
-      {activeTab === "observations"   && <ObservationsTab user={user} />}
-      {activeTab === "self_ai"        && <SelfAITab user={user} academicYear={academicYear} />}
-      {activeTab === "learning_res"   && <LearningResourcesTab user={user} academicYear={academicYear} />}
-      {activeTab === "homework"       && <HomeworkTab user={user} mappings={mappings} academicYear={academicYear} />}
     </div>
   );
 }
