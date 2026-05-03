@@ -4370,7 +4370,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
   return (
     <div className="space-y-4 w-full max-w-3xl">
       <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-indigo-800 mb-1">âœ️ AI Practice & Assessment Paper</h3>
+        <h3 className="text-sm font-bold text-indigo-800 mb-1">✍️ AI Practice & Assessment Paper</h3>
         <p className="text-xs text-indigo-600">Questions mapped to your exact competency framework — tagged with competency codes.</p>
       </div>
 
@@ -4381,7 +4381,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
           {/* Paper type */}
           <div className="bg-white rounded-xl shadow p-4 space-y-3">
             <div className="flex gap-2">
-              {[{id:"practice",label:"âœ️ Practice Paper"},{id:"assessment",label:"📋 Assessment Paper"}].map(p=>(
+              {[{id:"practice",label:"✍️ Practice Paper"},{id:"assessment",label:"📋 Assessment Paper"}].map(p=>(
                 <button key={p.id} onClick={()=>setPpMode(p.id as any)}
                   className={`px-4 py-2 text-xs rounded-lg border font-medium ${ppMode===p.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
                   {p.label}
@@ -4860,7 +4860,7 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
     {id:"ame", label:"📚 AME Homework", desc:"Select competency → generate 3 differentiated sets (Above/Medium/Emerging) for the whole class"},
     {id:"practice", label:"📝 Practice Paper", desc:"Select student → loads their PA/SA or Baseline gaps → generates targeted practice questions"},
     {id:"assessment", label:"📋 Assessment Paper", desc:"Select student → loads their gaps → generates formal assessment with marks allocation"},
-    {id:"parent", label:"👨â€👩â€👧 Parent Suggestions", desc:"Select student → auto-loads their activity learning gaps → generates targeted home support suggestions for parents"},
+    {id:"parent", label:"👨‍👩‍👧 Parent Suggestions", desc:"Select student → auto-loads their activity learning gaps → generates targeted home support suggestions for parents"},
     {id:"history", label:"🕒 History", desc:"All AI-generated records for this year — view, print, delete"},
   ];
 
@@ -5292,7 +5292,7 @@ function HomeworkPortfolioSection({ student, grade, section, subject, isClassTea
       {parentSuggestions.length > 0 && (
         <div className="bg-pink-50 border border-pink-200 rounded-xl overflow-hidden">
           <div className="px-4 py-3 bg-pink-700 text-white">
-            <h3 className="text-sm font-bold">👨â€👩â€👧 Parent Suggestions for {student.name}</h3>
+            <h3 className="text-sm font-bold">👨‍👩‍👧 Parent Suggestions for {student.name}</h3>
           </div>
           <div className="divide-y divide-pink-100">
             {parentSuggestions.map((r: any) => (
