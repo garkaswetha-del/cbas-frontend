@@ -20,7 +20,7 @@ const scoreColor = (p: number) => p >= 80 ? "text-green-600" : p >= 60 ? "text-b
 const EXAM_TYPES = ["PA1", "PA2", "SA1", "PA3", "PA4", "SA2"];
 const ACADEMIC_YEARS = Array.from({ length: 5 }, (_, i) => { const y = 2025 + i; return `${y}-${String(y + 1).slice(2)}`; });
 
-// Map curriculum subject names â†’ competency framework subject keys
+// Map curriculum subject names → competency framework subject keys
 const SUBJECT_TO_COMPETENCY: Record<string, string> = {
   "mathematics": "numeracy", "maths": "numeracy", "math": "numeracy",
   "english": "language", "english language": "language",
@@ -122,9 +122,9 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 // TAB 1: MY PROFILE
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 function ProfileTab({ user }: { user: any }) {
   const [form, setForm] = useState({ name: user?.name || "", phone: user?.phone || "", qualification: user?.qualification || "", experience: user?.experience || "" });
   const [pwForm, setPwForm] = useState({ current: "", newPw: "", confirm: "" });
@@ -247,9 +247,9 @@ function ProfileTab({ user }: { user: any }) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 // Student detail modal — Fix #7
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 function StudentDetailModal({ student, academicYear, onClose }: any) {
   const [pasaData, setPasaData] = useState<any>(null);
   const [baselineData, setBaselineData] = useState<any>(null);
@@ -338,11 +338,11 @@ function StudentDetailModal({ student, academicYear, onClose }: any) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 // SHARED: Student Analysis View (used by Tab 2 + Tab 3)
 // Fix #1 baseline fields, #2 activities format, #3 empty rows,
 // #4 lazy PASA fetch, #5 section case, #6 search, #7 drill-down
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 function StudentAnalysisView({ students, subjects, baselineData, activitiesData, academicYear, grade, section }: any) {
   const [subTab, setSubTab] = useState<"pasa" | "baseline" | "activities">("pasa");
   const [selectedExam, setSelectedExam] = useState("PA1");
@@ -408,7 +408,7 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
         />
       </div>
 
-      {/* â”€â”€ PA/SA Sub-tab — Fix #4 lazy load â”€â”€ */}
+      {/* ── PA/SA Sub-tab — Fix #4 lazy load ── */}
       {subTab === "pasa" && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
@@ -558,7 +558,7 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
         </div>
       )}
 
-      {/* â”€â”€ Baseline Sub-tab — Fix #1 field mapping, #3 empty rows, #6 search, #7 click â”€â”€ */}
+      {/* ── Baseline Sub-tab — Fix #1 field mapping, #3 empty rows, #6 search, #7 click ── */}
       {subTab === "baseline" && (
         <div className="space-y-4">
           {assessedBaseline.length > 0 ? (
@@ -623,7 +623,7 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
         </div>
       )}
 
-      {/* â”€â”€ Activities Sub-tab — Fix #2 show activity definitions â”€â”€ */}
+      {/* ── Activities Sub-tab — Fix #2 show activity definitions ── */}
       {subTab === "activities" && (
         <div className="space-y-4">
           {activitiesData?.length > 0 ? (
@@ -684,9 +684,9 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 // TAB 2: MY STUDENTS
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 function StudentsTab({ user, mappings, academicYear }: any) {
   const [baselineData, setBaselineData] = useState<any[]>([]);
   const [activitiesData, setActivitiesData] = useState<any[]>([]);
@@ -780,9 +780,9 @@ function StudentsTab({ user, mappings, academicYear }: any) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 // TAB 3: MY CLASS (class teacher only)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 function ClassTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
   const [students, setStudents] = useState<any[]>([]);
@@ -843,9 +843,9 @@ function ClassTab({ user, mappings, academicYear }: any) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 // TAB 4: MY APPRAISAL
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 function AppraisalTab({ user, academicYear }: any) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -951,9 +951,9 @@ function AppraisalTab({ user, academicYear }: any) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 // TAB 5: MY BASELINE
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 function BaselineTab({ user, academicYear }: any) {
   const STAGE_ORDER = ["foundation","preparatory","middle","secondary"];
   const STAGE_LABELS: Record<string,string> = { foundation:"Foundation", preparatory:"Preparatory", middle:"Middle", secondary:"Secondary" };
@@ -1269,7 +1269,7 @@ function BaselineTab({ user, academicYear }: any) {
                       <td key={r.round} className="px-2 py-2 text-center">
                         <div className="text-xs capitalize font-medium text-blue-700">{STAGE_LABELS[stage]||stage}</div>
                         {pct !== null && <div className={`text-xs font-bold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${pct>=80?"bg-green-100 text-green-700":pct>=60?"bg-blue-100 text-blue-700":pct>=40?"bg-yellow-100 text-yellow-700":"bg-red-100 text-red-700"}`}>{pct.toFixed(1)}%</div>}
-                        {promoted && <div className="text-green-600 font-bold text-xs mt-0.5">🎉 â†’ {STAGE_LABELS[promotedTo]||promotedTo}</div>}
+                        {promoted && <div className="text-green-600 font-bold text-xs mt-0.5">🎉 → {STAGE_LABELS[promotedTo]||promotedTo}</div>}
                       </td>
                     );
                   })}
@@ -1286,7 +1286,7 @@ function BaselineTab({ user, academicYear }: any) {
                       <td key={r.round} className="px-2 py-2 text-center">
                         <div className="text-xs capitalize font-medium text-purple-700">{STAGE_LABELS[stage]||stage}</div>
                         {pct !== null && <div className={`text-xs font-bold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${pct>=80?"bg-green-100 text-green-700":pct>=60?"bg-blue-100 text-blue-700":pct>=40?"bg-yellow-100 text-yellow-700":"bg-red-100 text-red-700"}`}>{pct.toFixed(1)}%</div>}
-                        {promoted && <div className="text-green-600 font-bold text-xs mt-0.5">🎉 â†’ {STAGE_LABELS[promotedTo]||promotedTo}</div>}
+                        {promoted && <div className="text-green-600 font-bold text-xs mt-0.5">🎉 → {STAGE_LABELS[promotedTo]||promotedTo}</div>}
                       </td>
                     );
                   })}
@@ -1361,7 +1361,7 @@ function BaselineTab({ user, academicYear }: any) {
                         <span className={`px-2 py-0.5 rounded font-bold ${scoreBadge(avg)}`}>{avg>0?avg.toFixed(1)+"%":"—"}</span>
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {a.promoted ? <span className="text-green-700 font-bold">🎉 â†’ {a.promoted_to_stage}</span> : <span className="text-gray-400">—</span>}
+                        {a.promoted ? <span className="text-green-700 font-bold">🎉 → {a.promoted_to_stage}</span> : <span className="text-gray-400">—</span>}
                       </td>
                     </tr>
                   );
@@ -1376,7 +1376,7 @@ function BaselineTab({ user, academicYear }: any) {
 }
 
 // PA/SA TAB — Marks Entry + Full Analysis (teacher's subjects only)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 function PASATab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
   const EXAM_TYPES = ["FA1","FA2","SA1","FA3","FA4","SA2","Custom"];
@@ -1811,9 +1811,9 @@ function PASATab({ user, mappings, academicYear }: any) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 // ACTIVITIES TAB — Create + Marks Entry + Coverage + Analysis
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 function ActivitiesTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
   const ACTIVITY_TYPES = ["Individual","Group","Project","Assessment","Workshop","Other"];
@@ -2164,7 +2164,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
       </div>
       {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
-      {/* â”€â”€ CREATE â”€â”€ */}
+      {/* ── CREATE ── */}
       {subTab==="create"&&(
         <div className="space-y-4">
           <div className="flex justify-end">
@@ -2208,7 +2208,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
 
               {/* Competency & Rubric unified table */}
               {competencies.length===0
-                ? <p className="text-xs text-gray-400 italic">No competencies found. Add them in Admin â†’ Competency Registry.</p>
+                ? <p className="text-xs text-gray-400 italic">No competencies found. Add them in Admin → Competency Registry.</p>
                 : (() => {
                   const tcDomains=[...new Set(competencies.map((c:any)=>c.domain||"General"))] as string[];
                   const tcDomColor: Record<string,string>={};
@@ -2415,7 +2415,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
         </div>
       )}
 
-      {/* â”€â”€ MARKS ENTRY â”€â”€ */}
+      {/* ── MARKS ENTRY ── */}
       {subTab==="marks"&&(
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow p-4 flex gap-3 flex-wrap items-end">
@@ -2619,7 +2619,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
         </div>
       )}
 
-      {/* â”€â”€ SUBJECT-WISE REPORT â”€â”€ */}
+      {/* ── SUBJECT-WISE REPORT ── */}
       {subTab==="report"&&(
         <div className="space-y-4">
           {/* Grade + Section selectors */}
@@ -2752,7 +2752,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
         </div>
       )}
 
-      {/* â”€â”€ COVERAGE â”€â”€ */}
+      {/* ── COVERAGE ── */}
       {subTab==="coverage"&&(
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow p-4">
@@ -2821,7 +2821,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
         </div>
       )}
 
-      {/* â”€â”€ ANALYSIS â”€â”€ */}
+      {/* ── ANALYSIS ── */}
       {subTab==="analysis"&&(
         <ActivityAnalysisPanel
           allGrades={allGrades}
@@ -2838,7 +2838,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
 }
 
 
-// â”€â”€ ACTIVITY ANALYSIS PANEL â”€â”€
+// ── ACTIVITY ANALYSIS PANEL ──
 function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academicYear, API, LEVEL_COLOR, getLevel }: any) {
   const DOMAIN_COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#f97316","#84cc16"];
   const pctBg = (v: number) => v>=76?"bg-green-100 text-green-800":v>=51?"bg-blue-100 text-blue-800":v>=36?"bg-yellow-100 text-yellow-800":v>0?"bg-red-100 text-red-800":"bg-gray-100 text-gray-400";
@@ -2935,7 +2935,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
 
       {loading&&<div className="bg-white rounded-xl shadow p-6 text-center text-gray-400 text-sm animate-pulse">Loading...</div>}
 
-      {/* â”€â”€ GRADE â”€â”€ */}
+      {/* ── GRADE ── */}
       {!loading&&dashTab==="grade"&&(
         <div className="space-y-4">
           {gradeDash?(
@@ -3045,7 +3045,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
         </div>
       )}
 
-      {/* â”€â”€ SECTION â”€â”€ */}
+      {/* ── SECTION ── */}
       {!loading&&dashTab==="section"&&(
         <div className="space-y-4">
           {sectionDash?(
@@ -3161,7 +3161,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
         </div>
       )}
 
-      {/* â”€â”€ STUDENT â”€â”€ */}
+      {/* ── STUDENT ── */}
       {!loading&&dashTab==="student"&&(
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow p-4">
@@ -3249,7 +3249,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
         </div>
       )}
 
-      {/* â”€â”€ ALERTS â”€â”€ */}
+      {/* ── ALERTS ── */}
       {!loading&&dashTab==="alerts"&&(
         <div className="space-y-4">
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
@@ -3282,7 +3282,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
         </div>
       )}
 
-      {/* â”€â”€ COVERAGE â”€â”€ */}
+      {/* ── COVERAGE ── */}
       {!loading&&dashTab==="coverage"&&(
         <div className="space-y-4">
           {coverageData?(
@@ -3343,7 +3343,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
         </div>
       )}
 
-      {/* â”€â”€ COMPETENCY TAB â”€â”€ */}
+      {/* ── COMPETENCY TAB ── */}
       {!loading&&dashTab==="competency"&&(
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow p-4 flex gap-3 flex-wrap items-end">
@@ -3642,7 +3642,7 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
         getRndNumAvg(r).toFixed(1),
         getRndOverall(r).toFixed(1),
         getLevel(getRndOverall(r)).label,
-        r.promoted ? `Promoted â†’ ${r.promoted_to_stage}` : "In progress"
+        r.promoted ? `Promoted → ${r.promoted_to_stage}` : "In progress"
       ].join(",");
     });
     const header = ["Student",...litDomains,"Lit%",...numDomains,"Num%","Overall%","Level","Status"].join(",");
@@ -3687,7 +3687,7 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
       <div class="kpi-card"><div class="val">${classLitAvg}%</div><div class="lbl">Class Literacy Avg</div></div>
       <div class="kpi-card"><div class="val">${classNumAvg}%</div><div class="lbl">Class Numeracy Avg</div></div>
       <div class="kpi-card"><div class="val">${classOverall}%</div><div class="lbl">Class Overall Avg</div></div>
-      <div class="kpi-card"><div class="val">${assessed.filter((s: any) => s.rounds[activeRoundIdx].promoted).length}</div><div class="lbl">Promoted (â‰¥80%)</div></div>
+      <div class="kpi-card"><div class="val">${assessed.filter((s: any) => s.rounds[activeRoundIdx].promoted).length}</div><div class="lbl">Promoted (≥80%)</div></div>
     </div>
     <table><thead><tr>
       <th style="text-align:left">Student</th>
@@ -3710,8 +3710,8 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-gray-700">📊 Analytics — Round {activeRoundIdx+1}</h3>
         <div className="flex gap-2">
-          <button onClick={downloadReport} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">â¬‡️ CSV</button>
-          <button onClick={downloadHTMLReport} className="px-3 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium">â¬‡️ Report Card</button>
+          <button onClick={downloadReport} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">⬇️ CSV</button>
+          <button onClick={downloadHTMLReport} className="px-3 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium">⬇️ Report Card</button>
         </div>
       </div>
 
@@ -4012,7 +4012,7 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
         <button onClick={onBack} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium">← Back</button>
         <h3 className="text-base font-bold text-gray-800">{student.student_name}</h3>
         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv.bg} ${lv.color}`}>{lv.label}</span>
-        {lastRound?.promoted && <span className="text-xs text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full">🎉 Promoted â†’ {lastRound.promoted_to_stage}</span>}
+        {lastRound?.promoted && <span className="text-xs text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full">🎉 Promoted → {lastRound.promoted_to_stage}</span>}
       </div>
 
       {rounds.length === 0 ? (
@@ -4088,7 +4088,7 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
           {/* Strengths & Weaknesses */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-              <h4 className="text-sm font-semibold text-green-800 mb-2">✨ Strengths (â‰¥80%)</h4>
+              <h4 className="text-sm font-semibold text-green-800 mb-2">✨ Strengths (≥80%)</h4>
               {strengths.length > 0 ? strengths.map((s, i) => (
                 <div key={i} className="text-xs text-green-700 bg-white rounded-lg px-3 py-1.5 mb-1 border border-green-100">{s}</div>
               )) : <p className="text-xs text-green-600">Keep working — strengths will appear here!</p>}
@@ -4130,7 +4130,7 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${lv2.bg} ${lv2.color}`}>{r.overall?.toFixed(1)}%</span>
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {r.promoted ? <span className="text-green-600 font-bold text-xs">🎉 Promoted â†’ {r.promoted_to_stage}</span> : <span className="text-gray-400 text-xs">In progress</span>}
+                        {r.promoted ? <span className="text-green-600 font-bold text-xs">🎉 Promoted → {r.promoted_to_stage}</span> : <span className="text-gray-400 text-xs">In progress</span>}
                       </td>
                     </tr>
                   );
@@ -4541,9 +4541,9 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 // PROMOTION TAB — class teacher only
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 
 function AIToolsTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
@@ -4857,10 +4857,10 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
   };
 
   const SUB_TABS = [
-    {id:"ame", label:"📚 AME Homework", desc:"Select competency â†’ generate 3 differentiated sets (Above/Medium/Emerging) for the whole class"},
-    {id:"practice", label:"📝 Practice Paper", desc:"Select student â†’ loads their PA/SA or Baseline gaps â†’ generates targeted practice questions"},
-    {id:"assessment", label:"📋 Assessment Paper", desc:"Select student â†’ loads their gaps â†’ generates formal assessment with marks allocation"},
-    {id:"parent", label:"👨â€👩â€👧 Parent Suggestions", desc:"Select student â†’ auto-loads their activity learning gaps â†’ generates targeted home support suggestions for parents"},
+    {id:"ame", label:"📚 AME Homework", desc:"Select competency → generate 3 differentiated sets (Above/Medium/Emerging) for the whole class"},
+    {id:"practice", label:"📝 Practice Paper", desc:"Select student → loads their PA/SA or Baseline gaps → generates targeted practice questions"},
+    {id:"assessment", label:"📋 Assessment Paper", desc:"Select student → loads their gaps → generates formal assessment with marks allocation"},
+    {id:"parent", label:"👨â€👩â€👧 Parent Suggestions", desc:"Select student → auto-loads their activity learning gaps → generates targeted home support suggestions for parents"},
     {id:"history", label:"🕒 History", desc:"All AI-generated records for this year — view, print, delete"},
   ];
 
@@ -4888,7 +4888,7 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
         {SUB_TABS.find(t => t.id === subTab)?.desc}
       </div>
 
-      {/* â”€â”€ AME HOMEWORK â”€â”€ */}
+      {/* ── AME HOMEWORK ── */}
       {subTab === "ame" && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -4915,7 +4915,7 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
           )}
           <button onClick={generateAME} disabled={generating||!selectedCompetency}
             className="px-5 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-            {generating?"Generating 3 sets...":"âš¡ Generate AME Homework"}
+            {generating?"Generating 3 sets...":"⚡ Generate AME Homework"}
           </button>
           {generatedAME && (
             <div className="space-y-3">
@@ -4939,7 +4939,7 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
         </div>
       )}
 
-      {/* â”€â”€ PRACTICE / ASSESSMENT â”€â”€ */}
+      {/* ── PRACTICE / ASSESSMENT ── */}
       {(subTab==="practice"||subTab==="assessment") && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -5022,7 +5022,7 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
           <button onClick={()=>generatePaper(subTab==="practice"?"Practice":"Assessment")}
             disabled={generating||!selectedStudent||studentGaps.length===0}
             className="px-5 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-            {generating?"Generating...":"âš¡ Generate "+( subTab==="practice"?"Practice Paper":"Assessment Paper")}
+            {generating?"Generating...":"⚡ Generate "+( subTab==="practice"?"Practice Paper":"Assessment Paper")}
           </button>
           {paperOutput && (
             <div className="bg-white rounded-xl shadow p-4">
@@ -5039,7 +5039,7 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
         </div>
       )}
 
-      {/* â”€â”€ PARENT SUGGESTIONS â”€â”€ */}
+      {/* ── PARENT SUGGESTIONS ── */}
       {subTab==="parent" && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -5080,7 +5080,7 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
           )}
           <button onClick={generateParent} disabled={generating||!selectedParentStudent}
             className="px-5 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-            {generating?"Generating...":"âš¡ Generate Parent Suggestion"}
+            {generating?"Generating...":"⚡ Generate Parent Suggestion"}
           </button>
           {parentOutput && (
             <div className="bg-white rounded-xl shadow p-4">
@@ -5097,7 +5097,7 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
         </div>
       )}
 
-      {/* â”€â”€ HISTORY â”€â”€ */}
+      {/* ── HISTORY ── */}
       {subTab==="history" && (
         <div className="space-y-4">
           <div className="flex gap-3 items-center flex-wrap">
@@ -5228,7 +5228,7 @@ function AlertsTab({ user, mappings, academicYear }: any) {
                     <span className="text-xs text-gray-500 ml-2">{s.grade} — {s.section}</span>
                   </div>
                   <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
-                    Drop: {s.decline_from} â†’ {s.decline_to} (-{s.drop})
+                    Drop: {s.decline_from} → {s.decline_to} (-{s.drop})
                   </span>
                 </div>
                 <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
@@ -5445,7 +5445,7 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
         axios.get(`${API}/activities/longitudinal/student/${student.id}`),
       ]);
 
-      // Transform baseline assessments â†’ years structure for portfolio display
+      // Transform baseline assessments → years structure for portfolio display
       const baselineAssessments: any[] = baselineRes.data?.assessments || [];
       const byYear: Record<string, any[]> = {};
       baselineAssessments.forEach((a: any) => {
@@ -5709,7 +5709,7 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
                   <p className="text-sm font-medium text-gray-800">{s.name}</p>
                   <p className="text-xs text-gray-400">{s.admission_no} · {s.current_class} {s.section}</p>
                 </div>
-                <span className="text-xs text-indigo-600 font-medium">View Portfolio â†’</span>
+                <span className="text-xs text-indigo-600 font-medium">View Portfolio →</span>
               </button>
             ))}
           </div>
@@ -5980,7 +5980,7 @@ function PromotionTab({ user, mappings }: any) {
           </p>
           <button onClick={() => { setStep("preview"); setStudents([]); setResult(null); setMsg(""); }}
             className="mt-4 px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
-            â†© Back
+            ↩ Back
           </button>
         </div>
       )}
@@ -5989,9 +5989,9 @@ function PromotionTab({ user, mappings }: any) {
 }
 
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 // LEARNING RESOURCES TAB — AI resources mapped to teacher's baseline gaps
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 function LearningResourcesTab({ user, academicYear }: any) {
   const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
   const API = "https://cbas-backend-production.up.railway.app";
@@ -6078,9 +6078,9 @@ Use sources: readingrockets.org, edutopia.org, ncert.nic.in, khanacademy.org, ma
 Format exactly:
 ## [COMPETENCY_CODE or SHORT_NAME]
 📄 TEXT: [Title] — [URL]
-   â†³ [How it helps the teacher]
+   ↳ [How it helps the teacher]
 🎥 VIDEO: [Title] — [URL]
-   â†³ [How it helps]`;
+   ↳ [How it helps]`;
 
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -6486,12 +6486,12 @@ FORMAT — repeat for every student (do not skip any):
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 // BASELINE ENTRY TAB — matches Python app structure exactly
 // Literacy: Listening, Speaking, Reading, Writing
 // Numeracy: Operations, Base 10, Measurement, Geometry
 // Unlimited rounds, stage progression, promotion at 80%
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 const LITERACY_DOMAINS = ["Listening", "Speaking", "Reading", "Writing"];
 const NUMERACY_DOMAINS = ["Operations", "Base 10", "Measurement", "Geometry"];
 const STAGES = ["foundation", "preparatory", "middle", "secondary"];
@@ -6512,9 +6512,9 @@ function getLevel(score: number) {
 }
 
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 // EXAM CONFIG TAB
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 
 function BaselineDashTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
@@ -6638,7 +6638,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
 
       {loading && <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Loading...</div>}
 
-      {/* â”€â”€ MY SECTION â”€â”€ */}
+      {/* ── MY SECTION ── */}
       {!loading && dashTab === "section" && (
         <div className="space-y-4">
           {stats ? (
@@ -6722,7 +6722,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
         </div>
       )}
 
-      {/* â”€â”€ MY GRADE â”€â”€ */}
+      {/* ── MY GRADE ── */}
       {!loading && dashTab === "grade" && (
         <div className="space-y-4">
           {gradeDash ? (
@@ -6801,7 +6801,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
         </div>
       )}
 
-      {/* â”€â”€ ALERTS â”€â”€ */}
+      {/* ── ALERTS ── */}
       {!loading && dashTab === "alerts" && (
         <div className="space-y-4">
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
@@ -6819,7 +6819,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
                       <p className="text-sm font-bold text-gray-800">{a.entity_name || a.student_name}</p>
                       <p className="text-xs text-gray-500">{a.grade} · {a.section}</p>
                       <p className="text-xs text-red-600 mt-0.5">
-                        {(a.scores||[]).map((s: any) => `${s.round}: ${s.overall?.toFixed(1)}%`).join(" â†’ ")}
+                        {(a.scores||[]).map((s: any) => `${s.round}: ${s.overall?.toFixed(1)}%`).join(" → ")}
                       </p>
                     </div>
                     <span className="text-sm font-bold text-red-600">▼ {a.drop?.toFixed(1)}%</span>
@@ -7344,9 +7344,9 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 // TAB: MY OBSERVATIONS (shared class observations)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────
 const OBS_CRITERIA = [
   { key: "preparation", label: "Prep", color: "#6366f1" },
   { key: "purposeful_class", label: "Purpose", color: "#f59e0b" },
