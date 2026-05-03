@@ -123,6 +123,18 @@ const Score = ({ value, max }: any) => {
   );
 };
 
+const SectionCommentCell = ({ field, comment, onComment, bg = "bg-white" }: any) => (
+  <td className={`px-2 py-1 border border-gray-200 min-w-[160px] ${bg}`}>
+    <textarea
+      value={comment || ""}
+      onChange={e => onComment(field, e.target.value)}
+      placeholder="Principal's comment…"
+      rows={2}
+      className="w-full text-xs border border-gray-200 rounded px-1.5 py-1 resize-none focus:outline-none focus:border-indigo-400"
+    />
+  </td>
+);
+
 const CellWithComment = ({ children, field, comment, onComment }: any) => {
   const [open, setOpen] = useState(false);
   return (
@@ -513,34 +525,34 @@ export default function AppraisalPage() {
           <thead className="sticky top-0 z-20">
             <tr>
               <th className={`${th} bg-indigo-700 text-white sticky left-0 z-30`} rowSpan={2}>Teacher Name</th>
-              <th className={`${th} bg-pink-200 text-pink-900`} colSpan={2}>LITERACY (10%)</th>
-              <th className={`${th} bg-blue-200 text-blue-900`} colSpan={2}>NUMERACY (10%)</th>
-              <th className={`${th} bg-green-100 text-green-800`} colSpan={6}>SKILLS & KNOWLEDGE (10%)</th>
-              <th className={`${th} bg-yellow-100 text-yellow-800`} colSpan={6}>BEHAVIOUR & ATTITUDE (10%)</th>
-              <th className={`${th} bg-pink-100 text-pink-800`} colSpan={2}>PARENTS FEEDBACK (20%)</th>
-              <th className={`${th} bg-purple-100 text-purple-800`} colSpan={2}>CLASSROOM TEACHING (20%)</th>
-              <th className={`${th} bg-orange-100 text-orange-800`} colSpan={2}>ENGLISH COMM (20%)</th>
-              <th className={`${th} bg-teal-100 text-teal-800`} colSpan={12}>RESPONSIBILITIES (Extra)</th>
+              <th className={`${th} bg-pink-200 text-pink-900`} colSpan={3}>LITERACY (10%)</th>
+              <th className={`${th} bg-blue-200 text-blue-900`} colSpan={3}>NUMERACY (10%)</th>
+              <th className={`${th} bg-green-100 text-green-800`} colSpan={7}>SKILLS & KNOWLEDGE (10%)</th>
+              <th className={`${th} bg-yellow-100 text-yellow-800`} colSpan={7}>BEHAVIOUR & ATTITUDE (10%)</th>
+              <th className={`${th} bg-pink-100 text-pink-800`} colSpan={3}>PARENTS FEEDBACK (20%)</th>
+              <th className={`${th} bg-purple-100 text-purple-800`} colSpan={3}>CLASSROOM TEACHING (20%)</th>
+              <th className={`${th} bg-orange-100 text-orange-800`} colSpan={3}>ENGLISH COMM (20%)</th>
+              <th className={`${th} bg-teal-100 text-teal-800`} colSpan={13}>RESPONSIBILITIES (Extra)</th>
               <th className={`${th} bg-rose-100 text-rose-800`} colSpan={2}>COMMITTEE</th>
               <th className={`${th} bg-indigo-100 text-indigo-800`} colSpan={4}>SUMMARY</th>
             </tr>
             <tr>
-              {["Band","Score"].map(h=><th key={"lit"+h} className={`${th} bg-pink-50`}>{h}</th>)}
-              {["Band","Score"].map(h=><th key={"num"+h} className={`${th} bg-blue-50`}>{h}</th>)}
-              {["Workshops","Training","Books Read","Articles","Strategies","Score"].map(h=><th key={h} className={`${th} bg-green-50`}>{h}</th>)}
-              {["Team Work","Attitude","Commitment","Adaptability","Dressing","Score"].map(h=><th key={h} className={`${th} bg-yellow-50`}>{h}</th>)}
-              {["Feedback Band","Score"].map(h=><th key={"pf"+h} className={`${th} bg-pink-50`}>{h}</th>)}
-              {["Observation","Score"].map(h=><th key={"cl"+h} className={`${th} bg-purple-50`}>{h}</th>)}
-              {["Band","Score"].map(h=><th key={"en"+h} className={`${th} bg-orange-50`}>{h}</th>)}
+              {["Band","Score","Comment"].map(h=><th key={"lit"+h} className={`${th} bg-pink-50`}>{h}</th>)}
+              {["Band","Score","Comment"].map(h=><th key={"num"+h} className={`${th} bg-blue-50`}>{h}</th>)}
+              {["Workshops","Training","Books Read","Articles","Strategies","Score","Comment"].map(h=><th key={h} className={`${th} bg-green-50`}>{h}</th>)}
+              {["Team Work","Attitude","Commitment","Adaptability","Dressing","Score","Comment"].map(h=><th key={h} className={`${th} bg-yellow-50`}>{h}</th>)}
+              {["Feedback Band","Score","Comment"].map(h=><th key={"pf"+h} className={`${th} bg-pink-50`}>{h}</th>)}
+              {["Observation","Score","Comment"].map(h=><th key={"cl"+h} className={`${th} bg-purple-50`}>{h}</th>)}
+              {["Band","Score","Comment"].map(h=><th key={"en"+h} className={`${th} bg-orange-50`}>{h}</th>)}
               {RESP.map(r=><th key={r.key} className={`${th} bg-teal-50`}>{r.label}</th>)}
-              <th className={`${th} bg-teal-50`}>Score</th>
+              {["Score","Comment"].map(h=><th key={"resp"+h} className={`${th} bg-teal-50`}>{h}</th>)}
               {["Role","Committee Name"].map(h=><th key={h} className={`${th} bg-rose-50`}>{h}</th>)}
               {["Overall %","Salary Increment","Shared","Action"].map(h=><th key={h} className={`${th} bg-indigo-50`}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
             {nurseryRows.length===0&&(
-              <tr><td colSpan={40} className="text-center py-10 text-gray-400">No Pre-KG / LKG / UKG teachers found.</td></tr>
+              <tr><td colSpan={49} className="text-center py-10 text-gray-400">No Pre-KG / LKG / UKG teachers found.</td></tr>
             )}
             {nurseryRows.map((t,idx)=>{
               const a = appraisals[t.teacher_id]||{};
@@ -559,8 +571,10 @@ export default function AppraisalPage() {
                   {renderNameCell(t)}
                   <td className={td}><Select value={a.literacy_band} onChange={(v:any)=>update(t.teacher_id,"literacy_band",v)} options={LIT}/></td>
                   <Score value={a.literacy_score} max={0.1}/>
+                  <SectionCommentCell field="literacy_section_comment" comment={a.literacy_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-pink-50"/>
                   <td className={td}><Select value={a.numeracy_band} onChange={(v:any)=>update(t.teacher_id,"numeracy_band",v)} options={NUM}/></td>
                   <Score value={a.numeracy_score} max={0.1}/>
+                  <SectionCommentCell field="numeracy_section_comment" comment={a.numeracy_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-blue-50"/>
                   <CellWithComment field="workshops" comment={a["workshops_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <Select value={a.workshops} onChange={(v:any)=>update(t.teacher_id,"workshops",v)} options={WO}/>
                   </CellWithComment>
@@ -577,6 +591,7 @@ export default function AppraisalPage() {
                     <Select value={a.teaching_strategies} onChange={(v:any)=>update(t.teacher_id,"teaching_strategies",v)} options={ST}/>
                   </CellWithComment>
                   <Score value={a.skills_score} max={0.1}/>
+                  <SectionCommentCell field="skills_section_comment" comment={a.skills_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-green-50"/>
                   <CellWithComment field="team_work" comment={a["team_work_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <Select value={a.team_work} onChange={(v:any)=>update(t.teacher_id,"team_work",v)} options={TW}/>
                   </CellWithComment>
@@ -593,24 +608,29 @@ export default function AppraisalPage() {
                     <Select value={a.dressing} onChange={(v:any)=>update(t.teacher_id,"dressing",v)} options={DR}/>
                   </CellWithComment>
                   <Score value={a.behaviour_score} max={0.1}/>
+                  <SectionCommentCell field="behaviour_section_comment" comment={a.behaviour_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-yellow-50"/>
                   <CellWithComment field="parents_feedback_band" comment={a["parents_feedback_band_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <Select value={a.parents_feedback_band} onChange={(v:any)=>update(t.teacher_id,"parents_feedback_band",v)} options={FB}/>
                   </CellWithComment>
                   <Score value={a.parents_feedback_score} max={0.2}/>
+                  <SectionCommentCell field="parents_feedback_section_comment" comment={a.parents_feedback_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-pink-50"/>
                   <CellWithComment field="obs_0" comment={a["obs_0_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <Select value={a.classroom_observation_band} onChange={(v:string)=>update(t.teacher_id,"classroom_observation_band",v)} options={CL}/>
                   </CellWithComment>
                   <Score value={a.classroom_score} max={0.2}/>
+                  <SectionCommentCell field="classroom_section_comment" comment={a.classroom_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-purple-50"/>
                   <CellWithComment field="english_comm_band" comment={a["english_comm_band_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <Select value={a.english_comm_band} onChange={(v:any)=>update(t.teacher_id,"english_comm_band",v)} options={EN}/>
                   </CellWithComment>
                   <Score value={a.english_comm_score} max={0.2}/>
+                  <SectionCommentCell field="english_comm_section_comment" comment={a.english_comm_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-orange-50"/>
                   {RESP.map(r=>(
                     <td key={r.key} className={`${td} text-center`}>
                       <Check value={a[r.key]} onChange={(v:boolean)=>update(t.teacher_id,r.key,v)}/>
                     </td>
                   ))}
                   <Score value={a.responsibilities_score} max={0.05}/>
+                  <SectionCommentCell field="responsibilities_section_comment" comment={a.responsibilities_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-teal-50"/>
                   <CellWithComment field="committee_role" comment={a["committee_role_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <Select value={a.committee_role} onChange={(v:any)=>update(t.teacher_id,"committee_role",v)} options={COMM}/>
                   </CellWithComment>
@@ -623,7 +643,7 @@ export default function AppraisalPage() {
               );
             })}
           </tbody>
-          {renderFooter(nurseryRows, 40)}
+          {renderFooter(nurseryRows, 49)}
         </table>
       </div>
       )}
@@ -635,32 +655,32 @@ export default function AppraisalPage() {
           <thead ref={theadRef} className="sticky top-0 z-20">
             <tr>
               <th className={`${th} bg-indigo-700 text-white sticky left-0 z-30`} rowSpan={2}>Teacher Name</th>
-              <th className={`${th} bg-blue-100 text-blue-800`} colSpan={7}>EXAM MARKS (50%)</th>
-              <th className={`${th} bg-green-100 text-green-800`} colSpan={6}>SKILLS & KNOWLEDGE (10%)</th>
-              <th className={`${th} bg-yellow-100 text-yellow-800`} colSpan={6}>BEHAVIOUR & ATTITUDE (10%)</th>
-              <th className={`${th} bg-pink-100 text-pink-800`} colSpan={2}>PARENTS FEEDBACK (10%)</th>
-              <th className={`${th} bg-purple-100 text-purple-800`} colSpan={2}>CLASSROOM TEACHING (10%)</th>
-              <th className={`${th} bg-orange-100 text-orange-800`} colSpan={2}>ENGLISH COMM (5%)</th>
-              <th className={`${th} bg-teal-100 text-teal-800`} colSpan={12}>RESPONSIBILITIES (5%)</th>
+              <th className={`${th} bg-blue-100 text-blue-800`} colSpan={8}>EXAM MARKS (50%)</th>
+              <th className={`${th} bg-green-100 text-green-800`} colSpan={7}>SKILLS & KNOWLEDGE (10%)</th>
+              <th className={`${th} bg-yellow-100 text-yellow-800`} colSpan={7}>BEHAVIOUR & ATTITUDE (10%)</th>
+              <th className={`${th} bg-pink-100 text-pink-800`} colSpan={3}>PARENTS FEEDBACK (10%)</th>
+              <th className={`${th} bg-purple-100 text-purple-800`} colSpan={3}>CLASSROOM TEACHING (10%)</th>
+              <th className={`${th} bg-orange-100 text-orange-800`} colSpan={3}>ENGLISH COMM (5%)</th>
+              <th className={`${th} bg-teal-100 text-teal-800`} colSpan={13}>RESPONSIBILITIES (5%)</th>
               <th className={`${th} bg-rose-100 text-rose-800`} colSpan={2}>COMMITTEE</th>
               <th className={`${th} bg-indigo-100 text-indigo-800`} colSpan={4}>SUMMARY</th>
             </tr>
             <tr>
-              {["PA 1","PA 2","PA 3","PA 4","SA 1","SA 2","Score"].map(h=><th key={h} className={`${th} bg-blue-50`}>{h}</th>)}
-              {["Workshops","Training","Books Read","Articles","Strategies","Score"].map(h=><th key={h} className={`${th} bg-green-50`}>{h}</th>)}
-              {["Team Work","Attitude","Commitment","Adaptability","Dressing","Score"].map(h=><th key={h} className={`${th} bg-yellow-50`}>{h}</th>)}
-              {["Feedback Band","Score"].map(h=><th key={h} className={`${th} bg-pink-50`}>{h}</th>)}
-              {["Observation","Score"].map(h=><th key={h} className={`${th} bg-purple-50`}>{h}</th>)}
-              {["Band","Score"].map(h=><th key={h} className={`${th} bg-orange-50`}>{h}</th>)}
+              {["PA 1","PA 2","PA 3","PA 4","SA 1","SA 2","Score","Comment"].map(h=><th key={h} className={`${th} bg-blue-50`}>{h}</th>)}
+              {["Workshops","Training","Books Read","Articles","Strategies","Score","Comment"].map(h=><th key={h} className={`${th} bg-green-50`}>{h}</th>)}
+              {["Team Work","Attitude","Commitment","Adaptability","Dressing","Score","Comment"].map(h=><th key={h} className={`${th} bg-yellow-50`}>{h}</th>)}
+              {["Feedback Band","Score","Comment"].map(h=><th key={h} className={`${th} bg-pink-50`}>{h}</th>)}
+              {["Observation","Score","Comment"].map(h=><th key={h} className={`${th} bg-purple-50`}>{h}</th>)}
+              {["Band","Score","Comment"].map(h=><th key={h} className={`${th} bg-orange-50`}>{h}</th>)}
               {RESP.map(r=><th key={r.key} className={`${th} bg-teal-50`}>{r.label}</th>)}
-              <th className={`${th} bg-teal-50`}>Score</th>
+              {["Score","Comment"].map(h=><th key={"resp"+h} className={`${th} bg-teal-50`}>{h}</th>)}
               {["Role","Committee Name"].map(h=><th key={h} className={`${th} bg-rose-50`}>{h}</th>)}
               {["Overall %","Salary Increment","Shared","Action"].map(h=><th key={h} className={`${th} bg-indigo-50`}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
             {otherRows.length===0&&(
-              <tr><td colSpan={55} className="text-center py-10 text-gray-400">No teachers found.</td></tr>
+              <tr><td colSpan={51} className="text-center py-10 text-gray-400">No teachers found.</td></tr>
             )}
             {otherRows.map((t,idx)=>{
               const a = appraisals[t.teacher_id]||{};
@@ -673,6 +693,7 @@ export default function AppraisalPage() {
                     </CellWithComment>
                   ))}
                   <Score value={a.exam_score} max={0.5} />
+                  <SectionCommentCell field="exam_section_comment" comment={a.exam_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-blue-50"/>
                   <CellWithComment field="workshops" comment={a["workshops_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <Select value={a.workshops} onChange={(v:any)=>update(t.teacher_id,"workshops",v)} options={WO} />
                   </CellWithComment>
@@ -689,6 +710,7 @@ export default function AppraisalPage() {
                     <Select value={a.teaching_strategies} onChange={(v:any)=>update(t.teacher_id,"teaching_strategies",v)} options={ST} />
                   </CellWithComment>
                   <Score value={a.skills_score} max={0.1} />
+                  <SectionCommentCell field="skills_section_comment" comment={a.skills_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-green-50"/>
                   <CellWithComment field="team_work" comment={a["team_work_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <Select value={a.team_work} onChange={(v:any)=>update(t.teacher_id,"team_work",v)} options={TW} />
                   </CellWithComment>
@@ -705,24 +727,29 @@ export default function AppraisalPage() {
                     <Select value={a.dressing} onChange={(v:any)=>update(t.teacher_id,"dressing",v)} options={DR} />
                   </CellWithComment>
                   <Score value={a.behaviour_score} max={0.1} />
+                  <SectionCommentCell field="behaviour_section_comment" comment={a.behaviour_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-yellow-50"/>
                   <CellWithComment field="parents_feedback_band" comment={a["parents_feedback_band_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <Select value={a.parents_feedback_band} onChange={(v:any)=>update(t.teacher_id,"parents_feedback_band",v)} options={FB} />
                   </CellWithComment>
                   <Score value={a.parents_feedback_score} max={0.1} />
+                  <SectionCommentCell field="parents_feedback_section_comment" comment={a.parents_feedback_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-pink-50"/>
                   <CellWithComment field="obs_0" comment={a["obs_0_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <Select value={a.classroom_observation_band} onChange={(v:string)=>update(t.teacher_id,"classroom_observation_band",v)} options={CL} />
                   </CellWithComment>
                   <Score value={a.classroom_score} max={0.1} />
+                  <SectionCommentCell field="classroom_section_comment" comment={a.classroom_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-purple-50"/>
                   <CellWithComment field="english_comm_band" comment={a["english_comm_band_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <Select value={a.english_comm_band} onChange={(v:any)=>update(t.teacher_id,"english_comm_band",v)} options={EN} />
                   </CellWithComment>
                   <Score value={a.english_comm_score} max={0.05} />
+                  <SectionCommentCell field="english_comm_section_comment" comment={a.english_comm_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-orange-50"/>
                   {RESP.map(r=>(
                     <td key={r.key} className={`${td} text-center`}>
                       <Check value={a[r.key]} onChange={(v:any)=>update(t.teacher_id,r.key,v)} />
                     </td>
                   ))}
                   <Score value={a.responsibilities_score} max={0.05} />
+                  <SectionCommentCell field="responsibilities_section_comment" comment={a.responsibilities_section_comment} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)} bg="bg-teal-50"/>
                   <CellWithComment field="committee_role" comment={a["committee_role_comment"]} onComment={(k:string,v:string)=>update(t.teacher_id,k,v)}>
                     <Select value={a.committee_role} onChange={(v:any)=>update(t.teacher_id,"committee_role",v)} options={COMM} />
                   </CellWithComment>
@@ -736,7 +763,7 @@ export default function AppraisalPage() {
               );
             })}
           </tbody>
-          {renderFooter(otherRows, 55)}
+          {renderFooter(otherRows, 51)}
         </table>
       </div>
       )}

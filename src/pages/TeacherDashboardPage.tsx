@@ -108,7 +108,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
         {activeTab === "activities"     && <ActivitiesTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "ai_tools"       && <AIToolsTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "alerts"         && <AlertsTab user={user} mappings={mappings} academicYear={academicYear} />}
-        {activeTab === "promotion"      && <PromotionTab user={user} mappings={mappings} />}
+        {activeTab === "promotion"      && <PromotionTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "portfolio"      && <PortfolioTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "profile"        && <ProfileTab user={user} />}
         {activeTab === "self_baseline"  && <BaselineTab user={user} academicYear={academicYear} />}
@@ -870,81 +870,88 @@ function AppraisalTab({ user, academicYear }: any) {
     </div>
   );
 
-  // overall_score is stored as fraction (0-1), overall_percentage = overall_score * 100
   const pct = n(data.overall_percentage || (data.overall_score ? data.overall_score * 100 : 0));
-  const score = pct.toFixed(2);
-  const maxScore = 100;
+  const isNursery = !!(data.literacy_band || data.numeracy_band || n(data.literacy_score) > 0 || n(data.numeracy_score) > 0);
+
+  const pctColor = pct >= 80 ? "#10b981" : pct >= 60 ? "#6366f1" : pct >= 40 ? "#f59e0b" : "#ef4444";
+
+  type Section = { label: string; weight: string; score: number; max: number; comment: string | null; color: string };
+  const sections: Section[] = isNursery
+    ? [
+        { label: "Literacy",            weight: "10%",   score: n(data.literacy_score),          max: 0.1,  comment: data.literacy_section_comment,          color: "bg-pink-50 border-pink-200" },
+        { label: "Numeracy",            weight: "10%",   score: n(data.numeracy_score),          max: 0.1,  comment: data.numeracy_section_comment,          color: "bg-blue-50 border-blue-200" },
+        { label: "Skills & Knowledge",  weight: "10%",   score: n(data.skills_score),            max: 0.1,  comment: data.skills_section_comment,            color: "bg-green-50 border-green-200" },
+        { label: "Behaviour & Attitude",weight: "10%",   score: n(data.behaviour_score),         max: 0.1,  comment: data.behaviour_section_comment,         color: "bg-yellow-50 border-yellow-200" },
+        { label: "Parents Feedback",    weight: "20%",   score: n(data.parents_feedback_score),  max: 0.2,  comment: data.parents_feedback_section_comment,  color: "bg-pink-50 border-pink-200" },
+        { label: "Classroom Teaching",  weight: "20%",   score: n(data.classroom_score),         max: 0.2,  comment: data.classroom_section_comment,         color: "bg-purple-50 border-purple-200" },
+        { label: "English Comm",        weight: "20%",   score: n(data.english_comm_score),      max: 0.2,  comment: data.english_comm_section_comment,      color: "bg-orange-50 border-orange-200" },
+        { label: "Responsibilities",    weight: "Extra", score: n(data.responsibilities_score),  max: 0.05, comment: data.responsibilities_section_comment,  color: "bg-teal-50 border-teal-200" },
+      ]
+    : [
+        { label: "Exam Marks",          weight: "50%",   score: n(data.exam_score),              max: 0.5,  comment: data.exam_section_comment,              color: "bg-blue-50 border-blue-200" },
+        { label: "Skills & Knowledge",  weight: "10%",   score: n(data.skills_score),            max: 0.1,  comment: data.skills_section_comment,            color: "bg-green-50 border-green-200" },
+        { label: "Behaviour & Attitude",weight: "10%",   score: n(data.behaviour_score),         max: 0.1,  comment: data.behaviour_section_comment,         color: "bg-yellow-50 border-yellow-200" },
+        { label: "Parents Feedback",    weight: "10%",   score: n(data.parents_feedback_score),  max: 0.1,  comment: data.parents_feedback_section_comment,  color: "bg-pink-50 border-pink-200" },
+        { label: "Classroom Teaching",  weight: "10%",   score: n(data.classroom_score),         max: 0.1,  comment: data.classroom_section_comment,         color: "bg-purple-50 border-purple-200" },
+        { label: "English Comm",        weight: "5%",    score: n(data.english_comm_score),      max: 0.05, comment: data.english_comm_section_comment,      color: "bg-orange-50 border-orange-200" },
+        { label: "Responsibilities",    weight: "5%",    score: n(data.responsibilities_score),  max: 0.05, comment: data.responsibilities_section_comment,  color: "bg-teal-50 border-teal-200" },
+      ];
 
   return (
-    <div className="max-w-3xl space-y-4">
-      {/* Score card */}
-      <div className="bg-white rounded-xl shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-base font-bold text-gray-800">{user?.name}</h2>
-            <p className="text-sm text-gray-500">Appraisal Report — {academicYear}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-3xl font-bold" style={{ color: pct >= 80 ? "#10b981" : pct >= 60 ? "#6366f1" : pct >= 40 ? "#f59e0b" : "#ef4444" }}>{score}%</p>
-            <p className="text-xs text-gray-400">out of {maxScore}%</p>
-            <p className={`text-xs font-bold mt-0.5 ${scoreBg(pct)} px-2 py-0.5 rounded-full`}>{fmtPct(pct)}</p>
-          </div>
+    <div className="max-w-2xl space-y-4">
+      {/* Overall score header */}
+      <div className="bg-white rounded-xl shadow p-5 flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-bold text-gray-800">{user?.name}</h2>
+          <p className="text-sm text-gray-500">Appraisal Report — {academicYear}</p>
+          {data.is_shared
+            ? <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">✅ Shared by Principal</span>
+            : <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 font-medium">⏳ Not yet shared</span>
+          }
         </div>
-        {/* Progress bar */}
-        <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
-          <div className="h-3 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: pct >= 80 ? "#10b981" : pct >= 60 ? "#6366f1" : pct >= 40 ? "#f59e0b" : "#ef4444" }} />
+        <div className="text-center">
+          <p className="text-4xl font-bold" style={{ color: pctColor }}>{pct.toFixed(1)}%</p>
+          <p className="text-xs text-gray-400 mt-0.5">Overall Score</p>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full mt-1 inline-block ${scoreBg(pct)}`}>{fmtPct(pct)}</span>
         </div>
       </div>
 
-      {/* Parameters / criteria breakdown */}
-      {(data.parameters || data.criteria || data.categories)?.length > 0 && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Parameter-wise Breakdown</h3>
-          <div className="space-y-3">
-            {(data.parameters || data.criteria || data.categories).map((p: any, i: number) => {
-              const pScore = n(p.score || p.marks || p.obtained);
-              const pMax = n(p.max_score || p.max_marks || p.max || 10);
-              const pPct = pMax > 0 ? (pScore / pMax) * 100 : 0;
-              return (
-                <div key={i}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-gray-700">{p.name || p.parameter || p.criterion}</span>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(pPct)}`}>{pScore}/{pMax}</span>
+      {/* Section-by-section report */}
+      <div className="bg-white rounded-xl shadow overflow-hidden">
+        <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-100">
+          <h3 className="text-sm font-semibold text-indigo-800">Section-wise Breakdown</h3>
+        </div>
+        <div className="divide-y divide-gray-100">
+          {sections.map((s, i) => {
+            const sPct = s.max > 0 ? Math.min((s.score / s.max) * 100, 100) : 0;
+            const barColor = sPct >= 80 ? "#10b981" : sPct >= 60 ? "#6366f1" : sPct >= 40 ? "#f59e0b" : "#ef4444";
+            return (
+              <div key={i} className={`p-4 ${s.color} border-l-4`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div>
+                    <span className="text-sm font-semibold text-gray-800">{s.label}</span>
+                    <span className="ml-2 text-xs text-gray-400">({s.weight})</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="h-2 rounded-full" style={{ width: `${Math.min(pPct, 100)}%`, backgroundColor: SUBJECT_COLORS[i % SUBJECT_COLORS.length] }} />
-                  </div>
-                  {p.remarks && <p className="text-xs text-gray-400 mt-0.5 italic">{p.remarks}</p>}
+                  <span className="text-sm font-bold text-gray-800">{sPct.toFixed(1)}%</span>
                 </div>
-              );
-            })}
-          </div>
+                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                  <div className="h-2 rounded-full transition-all" style={{ width: `${sPct}%`, backgroundColor: barColor }} />
+                </div>
+                {s.comment
+                  ? <p className="text-xs text-gray-700 italic bg-white/70 rounded px-2 py-1 border border-white/80">💬 {s.comment}</p>
+                  : <p className="text-xs text-gray-400 italic">No comment from principal.</p>
+                }
+              </div>
+            );
+          })}
         </div>
-      )}
+      </div>
 
-      {/* Chart if multiple params */}
-      {(data.parameters || data.criteria || data.categories)?.length > 1 && (
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Score Distribution</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={(data.parameters || data.criteria || data.categories).map((p: any) => ({ name: (p.name || p.parameter || "").substring(0, 18), score: n(p.score || p.marks || p.obtained), max: n(p.max_score || p.max_marks || p.max || 10) }))} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" tick={{ fontSize: 10 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 9 }} width={130} />
-              <Tooltip formatter={(v: any, name: any) => [v, name === "score" ? "Score" : "Max"]} />
-              <Bar dataKey="score" radius={[0, 4, 4, 0]}>
-                {(data.parameters || data.criteria || data.categories).map((_: any, i: number) => <Cell key={i} fill={SUBJECT_COLORS[i % SUBJECT_COLORS.length]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Remarks */}
+      {/* Overall remarks */}
       {data.overall_remarks && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-blue-800 mb-1">Principal's Remarks</h3>
-          <p className="text-sm text-blue-700">{data.overall_remarks}</p>
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-indigo-800 mb-1">Principal's Overall Remarks</h3>
+          <p className="text-sm text-indigo-700">{data.overall_remarks}</p>
         </div>
       )}
     </div>
@@ -5719,7 +5726,7 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
   );
 }
 
-function PromotionTab({ user, mappings }: any) {
+function PromotionTab({ user, mappings, academicYear }: any) {
   const GRADE_ORDER = ["Pre-KG","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
 
   const classGrade = mappings?.class_grade || "";
@@ -5814,6 +5821,9 @@ function PromotionTab({ user, mappings }: any) {
 
   if (!isClassTeacher) {
     return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Only class teachers can access the Promotion tab.</div>;
+  }
+  if (!classGrade || !classSection) {
+    return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Class assignment not loaded yet. Please wait a moment and try again.</div>;
   }
 
   return (
