@@ -152,19 +152,19 @@ function ProfileTab({ user }: { user: any }) {
         localStorage.setItem("cbas_user", JSON.stringify({ ...u, ...form, photo }));
       }
       setMsg("✅ Profile saved successfully");
-    } catch { setMsg("âŒ Error saving profile"); }
+    } catch { setMsg("❌ Error saving profile"); }
     setSaving(false);
     setTimeout(() => setMsg(""), 3000);
   };
 
   const changePassword = async () => {
-    if (!pwForm.newPw || pwForm.newPw !== pwForm.confirm) { setPwMsg("âŒ Passwords do not match"); setTimeout(() => setPwMsg(""), 3000); return; }
-    if (pwForm.newPw.length < 6) { setPwMsg("âŒ Password must be at least 6 characters"); setTimeout(() => setPwMsg(""), 3000); return; }
+    if (!pwForm.newPw || pwForm.newPw !== pwForm.confirm) { setPwMsg("❌ Passwords do not match"); setTimeout(() => setPwMsg(""), 3000); return; }
+    if (pwForm.newPw.length < 6) { setPwMsg("❌ Password must be at least 6 characters"); setTimeout(() => setPwMsg(""), 3000); return; }
     try {
       await axios.patch(`${API}/users/${user.id}`, { password: pwForm.newPw });
       setPwMsg("✅ Password changed successfully");
       setPwForm({ current: "", newPw: "", confirm: "" });
-    } catch { setPwMsg("âŒ Error changing password"); }
+    } catch { setPwMsg("❌ Error changing password"); }
     setTimeout(() => setPwMsg(""), 3000);
   };
 
@@ -275,7 +275,7 @@ function StudentDetailModal({ student, academicYear, onClose }: any) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 flex-shrink-0">
           <div>
             <h2 className="text-sm font-bold text-gray-800">{student.name}</h2>
-            <p className="text-xs text-gray-400">{student.current_class} Â· {student.section}{student.admission_no ? ` Â· ${student.admission_no}` : ""}</p>
+            <p className="text-xs text-gray-400">{student.current_class} · {student.section}{student.admission_no ? ` · ${student.admission_no}` : ""}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl font-bold p-1 leading-none">✕</button>
         </div>
@@ -451,7 +451,7 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
                       {examData.advancing?.map((s: any, i: number) => (
                         <div key={i} className="flex items-center justify-between px-2 py-1.5 bg-green-50 rounded border border-green-100 text-xs">
                           <span className="font-medium text-gray-800">{s.student_name}</span>
-                          <span className="text-green-700 font-bold">â–²+{n(s.change).toFixed(1)}</span>
+                          <span className="text-green-700 font-bold">▲+{n(s.change).toFixed(1)}</span>
                         </div>
                       ))}
                     </div>
@@ -465,7 +465,7 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
                       {examData.retracting?.map((s: any, i: number) => (
                         <div key={i} className="flex items-center justify-between px-2 py-1.5 bg-red-50 rounded border border-red-100 text-xs">
                           <span className="font-medium text-gray-800">{s.student_name}</span>
-                          <span className="text-red-700 font-bold">â–¼{Math.abs(n(s.change)).toFixed(1)}</span>
+                          <span className="text-red-700 font-bold">▼{Math.abs(n(s.change)).toFixed(1)}</span>
                         </div>
                       ))}
                     </div>
@@ -504,8 +504,8 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
                               <td className="px-3 py-2 text-center font-bold text-gray-400 sticky left-0 bg-inherit">{s.rank || i + 1}</td>
                               <td className="px-3 py-2 sticky left-[45px] bg-inherit border-l border-gray-100 font-medium text-gray-800 hover:text-indigo-600">
                                 {s.student_name}
-                                {isAdv && <span className="ml-1 text-green-500 font-bold">â–²</span>}
-                                {isRet && <span className="ml-1 text-red-500 font-bold">â–¼</span>}
+                                {isAdv && <span className="ml-1 text-green-500 font-bold">▲</span>}
+                                {isRet && <span className="ml-1 text-red-500 font-bold">▼</span>}
                               </td>
                               {examData.subjects?.map((sub: string) => {
                                 const sd = s.subjects?.[sub];
@@ -827,7 +827,7 @@ function ClassTab({ user, mappings, academicYear }: any) {
   return (
     <div className="space-y-4">
       <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-indigo-800">🏛 My Class — {classGrade} Â· {classSection}</h3>
+        <h3 className="text-sm font-bold text-indigo-800">🏛 My Class — {classGrade} · {classSection}</h3>
         <p className="text-xs text-indigo-600 mt-0.5">{students.length} students</p>
       </div>
       <StudentAnalysisView
@@ -1105,7 +1105,7 @@ function BaselineTab({ user, academicYear }: any) {
             <span className="text-2xl">🎉</span>
             <div>
               <p className="text-sm font-bold text-green-800">Stage Promoted!</p>
-              <p className="text-xs text-green-600">Promoted to <strong>{STAGE_LABELS[promotedTo]||promotedTo}</strong> stage Â· Next assessment: {STAGE_GRADE[promotedTo?.toLowerCase()||"foundation"]} competencies</p>
+              <p className="text-xs text-green-600">Promoted to <strong>{STAGE_LABELS[promotedTo]||promotedTo}</strong> stage · Next assessment: {STAGE_GRADE[promotedTo?.toLowerCase()||"foundation"]} competencies</p>
             </div>
           </div>
         )}
@@ -1193,7 +1193,7 @@ function BaselineTab({ user, academicYear }: any) {
         </div>
         <button onClick={fetchData} disabled={loading}
           className="px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-1 disabled:opacity-50">
-          {loading ? "â³" : "🔄"} Refresh
+          {loading ? "⏳" : "🔄"} Refresh
         </button>
       </div>
       {/* KPI Cards */}
@@ -1477,7 +1477,7 @@ function PASATab({ user, mappings, academicYear }: any) {
   const totalMarks = selectedComps.reduce((s:number,c:any)=>s+(+c.max_marks||0),0);
 
   const saveConfig = async () => {
-    if (!configForm.subject||!configForm.exam_type||!selectedComps.length){setMsg("âŒ Fill all fields and select competencies");return;}
+    if (!configForm.subject||!configForm.exam_type||!selectedComps.length){setMsg("❌ Fill all fields and select competencies");return;}
     setSavingConfig(true);
     try {
       const r = await axios.post(`${API}/pasa/config`,{
@@ -1491,7 +1491,7 @@ function PASATab({ user, mappings, academicYear }: any) {
         setMsg(r.data.message==="Config updated"?"✅ Updated (overwrote existing config)":"✅ Config saved!");
         setShowConfigForm(false);setSelectedComps([]);fetchConfigs();
       }
-    } catch {setMsg("âŒ Save failed");}
+    } catch {setMsg("❌ Save failed");}
     setSavingConfig(false);setTimeout(()=>setMsg(""),3000);
   };
 
@@ -1515,7 +1515,7 @@ function PASATab({ user, mappings, academicYear }: any) {
       });
       setMarks(im);setAbsent(ia);
       setSubTab("entry");
-    } catch {setMsg("âŒ Failed to load students.");}
+    } catch {setMsg("❌ Failed to load students.");}
     setLoadingEntry(false);
   };
 
@@ -1548,7 +1548,7 @@ function PASATab({ user, mappings, academicYear }: any) {
         academic_year:academicYear, teacher_id:user.id, entries,
       });
       setMsg("✅ Marks saved!");
-    } catch {setMsg("âŒ Save failed.");}
+    } catch {setMsg("❌ Save failed.");}
     setSavingMarks(false);setTimeout(()=>setMsg(""),3000);
   };
 
@@ -1583,11 +1583,11 @@ function PASATab({ user, mappings, academicYear }: any) {
     <div className="space-y-4">
       <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
         <p className="text-sm font-bold text-indigo-800">📝 PA/SA Marks — {academicYear}</p>
-        <p className="text-xs text-indigo-600">Competency-mapped exam system Â· {academicYear}</p>
+        <p className="text-xs text-indigo-600">Competency-mapped exam system · {academicYear}</p>
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"config",label:"âš™ï¸ Exam Config"},{id:"entry",label:"✏ï¸ Marks Entry"},{id:"dashboard",label:"📊 Dashboard"}].map(t=>(
+        {[{id:"config",label:"⚙️ Exam Config"},{id:"entry",label:"✏️ Marks Entry"},{id:"dashboard",label:"📊 Dashboard"}].map(t=>(
           <button key={t.id} onClick={()=>setSubTab(t.id as any)}
             className={`px-4 py-2 text-sm rounded-lg font-medium ${subTab===t.id?"bg-indigo-600 text-white":"bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
             {t.label}
@@ -1654,7 +1654,7 @@ function PASATab({ user, mappings, academicYear }: any) {
                 )}
                 {selectedComps.length>0&&(
                   <div className="mt-2 bg-indigo-50 rounded p-2 text-xs">
-                    <span className="font-bold text-indigo-800">{selectedComps.length} selected Â· Total: {totalMarks} marks</span>
+                    <span className="font-bold text-indigo-800">{selectedComps.length} selected · Total: {totalMarks} marks</span>
                   </div>
                 )}
               </div>
@@ -1675,12 +1675,12 @@ function PASATab({ user, mappings, academicYear }: any) {
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">{c.exam_type}</span>
                         <span className="text-sm font-medium text-gray-800">{c.subject}</span>
-                        <span className="text-xs text-gray-500">Â· {(c.competencies as any[])?.length||0} comps Â· {c.total_marks} marks</span>
+                        <span className="text-xs text-gray-500">· {(c.competencies as any[])?.length||0} comps · {c.total_marks} marks</span>
                       </div>
                     </div>
                     <button onClick={()=>loadEntryStudents(c)} disabled={loadingEntry}
                       className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50">
-                      {loadingEntry?"Loading...":"✏ï¸ Enter Marks"}
+                      {loadingEntry?"Loading...":"✏️ Enter Marks"}
                     </button>
                   </div>
                 ))}
@@ -1696,7 +1696,7 @@ function PASATab({ user, mappings, academicYear }: any) {
           <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2">
             <div>
               <p className="text-sm font-bold text-indigo-800">{selectedConfig.exam_type} — {selectedConfig.subject}</p>
-              <p className="text-xs text-indigo-600">{(selectedConfig.competencies as any[]).length} competencies Â· {selectedConfig.total_marks} total marks</p>
+              <p className="text-xs text-indigo-600">{(selectedConfig.competencies as any[]).length} competencies · {selectedConfig.total_marks} total marks</p>
             </div>
             <button onClick={saveMarks} disabled={savingMarks} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
               {savingMarks?"Saving...":"💾 Save Marks"}
@@ -1992,7 +1992,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
       setMsg("✅ Marks saved");
       setTeacherViewModeSet(prev=>{const n=new Set(prev);n.add(activityId);return n;});
       fetchTeacherCombined();
-    } catch { setMsg("âŒ Error saving"); }
+    } catch { setMsg("❌ Error saving"); }
     setSavingActivityId(null);
     setTimeout(()=>setMsg(""),3000);
   };
@@ -2045,16 +2045,16 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
 
   const saveActivity = async () => {
     if (!form.name||!form.grade||!form.subject||!form.sections.length) {
-      setMsg("âŒ Name, Grade, Subject and at least one Section are required"); setTimeout(()=>setMsg(""),3000); return;
+      setMsg("❌ Name, Grade, Subject and at least one Section are required"); setTimeout(()=>setMsg(""),3000); return;
     }
     if (!selectedComps.length) {
-      setMsg("âŒ Select at least one competency"); setTimeout(()=>setMsg(""),3000); return;
+      setMsg("❌ Select at least one competency"); setTimeout(()=>setMsg(""),3000); return;
     }
     // Validate rubrics - each selected competency needs at least one filled rubric
     for (const cid of selectedComps) {
       const rub = rubrics[cid];
       const filled=(rub?.items||[]).filter(item=>item.name.trim()&&+item.max_marks>0);
-      if (!filled.length) { setMsg("âŒ Each selected competency needs at least one rubric with a name and marks > 0"); setTimeout(()=>setMsg(""),3000); return; }
+      if (!filled.length) { setMsg("❌ Each selected competency needs at least one rubric with a name and marks > 0"); setTimeout(()=>setMsg(""),3000); return; }
     }
     setSavingActivity(true);
     try {
@@ -2082,7 +2082,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
       setSelectedComps([]); setRubrics({});
       setForm(p=>({...p, name:"", description:"", sections:[], }));
       fetchActivities();
-    } catch { setMsg("âŒ Error creating activity"); }
+    } catch { setMsg("❌ Error creating activity"); }
     setSavingActivity(false);
     setTimeout(()=>setMsg(""),3000);
   };
@@ -2098,7 +2098,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
 
     const deleteActivity = async (id: string) => {
     if (!confirm("Delete this activity?")) return;
-    try { await axios.delete(`${API}/activities/${id}`); setMsg("✅ Deleted"); fetchActivities(); } catch { setMsg("âŒ Error"); }
+    try { await axios.delete(`${API}/activities/${id}`); setMsg("✅ Deleted"); fetchActivities(); } catch { setMsg("❌ Error"); }
     setTimeout(()=>setMsg(""),3000);
   };
 
@@ -2147,7 +2147,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
       await axios.post(`${API}/activities/${selectedActivity.id}/marks`, { academic_year: academicYear, entries });
       setMsg("✅ Marks saved!"); fetchMarksData();
       setMarksViewMode(true);
-    } catch { setMsg("âŒ Error saving marks"); }
+    } catch { setMsg("❌ Error saving marks"); }
     setSavingMarks(false);
     setTimeout(()=>setMsg(""),3000);
   };
@@ -2157,7 +2157,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
   return (
     <div className="space-y-4">
       <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
-        {[{id:"create",label:"📋 Activities"},{id:"marks",label:"✏ï¸ Marks Entry"},{id:"report",label:"📑 Subject Report"},{id:"coverage",label:"📊 Coverage"},{id:"analysis",label:"📈 Analysis"}].map(t=>(
+        {[{id:"create",label:"📋 Activities"},{id:"marks",label:"✏️ Marks Entry"},{id:"report",label:"📑 Subject Report"},{id:"coverage",label:"📊 Coverage"},{id:"analysis",label:"📈 Analysis"}].map(t=>(
           <button key={t.id} onClick={()=>setSubTab(t.id as any)}
             className={`px-4 py-2 text-sm rounded-lg font-medium border ${subTab===t.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>{t.label}</button>
         ))}
@@ -2224,7 +2224,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                         </label>
                         {selectedComps.length>0&&(
                           <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
-                            {selectedComps.length} selected Â· Total: {grandTotal} marks
+                            {selectedComps.length} selected · Total: {grandTotal} marks
                           </span>
                         )}
                       </div>
@@ -2236,7 +2236,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                               <th className="px-3 py-2 min-w-[75px]">CG No.</th>
                               <th className="px-2 py-2 min-w-[100px]">Domain</th>
                               <th className="px-2 py-2 min-w-[220px]">Competency</th>
-                              <th className="px-3 py-2 border-l border-indigo-600 min-w-[380px]">Rubrics (Name Â· /Max marks)</th>
+                              <th className="px-3 py-2 border-l border-indigo-600 min-w-[380px]">Rubrics (Name · /Max marks)</th>
                               <th className="px-2 py-2 text-center border-l border-indigo-600 min-w-[55px]">Total</th>
                               <th className="px-2 py-2 text-center min-w-[70px]">Coverage</th>
                             </tr>
@@ -2353,14 +2353,14 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                           {/* Subject header */}
                           <div className="px-4 py-2 bg-indigo-50 border-y border-indigo-100 flex items-center justify-between">
                             <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">{subject}</span>
-                            <span className="text-xs text-indigo-500">{acts.length} activities Â· {acts.reduce((s,a)=>(a.competency_mappings||[]).length+s,0)} competency mappings</span>
+                            <span className="text-xs text-indigo-500">{acts.length} activities · {acts.reduce((s,a)=>(a.competency_mappings||[]).length+s,0)} competency mappings</span>
                           </div>
                           {/* Activities table */}
                           <table className="w-full text-xs border-collapse">
                             <thead>
                               <tr className="bg-gray-50 text-gray-500 border-b border-gray-100">
                                 <th className="px-4 py-2 text-left font-medium">Activity Name</th>
-                                <th className="px-3 py-2 text-left font-medium">Grade Â· Section</th>
+                                <th className="px-3 py-2 text-left font-medium">Grade · Section</th>
                                 <th className="px-3 py-2 text-left font-medium">Type</th>
                                 <th className="px-3 py-2 text-left font-medium">Date</th>
                                 <th className="px-3 py-2 text-left font-medium">Competencies</th>
@@ -2372,7 +2372,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                               {acts.map((a:any, idx:number)=>(
                                 <tr key={a.id} className={`border-b border-gray-50 ${idx%2===0?"bg-white":"bg-gray-50"} hover:bg-indigo-50 transition-colors`}>
                                   <td className="px-4 py-2.5 font-medium text-gray-800">{a.name}</td>
-                                  <td className="px-3 py-2.5 text-gray-500">{a.grade} Â· {a.section}</td>
+                                  <td className="px-3 py-2.5 text-gray-500">{a.grade} · {a.section}</td>
                                   <td className="px-3 py-2.5">
                                     <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs">{a.activity_type}</span>
                                   </td>
@@ -2396,9 +2396,9 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                                   <td className="px-3 py-2.5 text-center">
                                     <div className="flex gap-1 justify-center">
                                       <button onClick={()=>{setSelectedActivity(a);setSubTab("marks");}}
-                                        className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 font-medium">✏ï¸ Marks</button>
+                                        className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 font-medium">✏️ Marks</button>
                                       <button onClick={()=>deleteActivity(a.id)}
-                                        className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">🗑ï¸</button>
+                                        className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">🗑️</button>
                                     </div>
                                   </td>
                                 </tr>
@@ -2451,8 +2451,8 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                 {/* Combined marks table */}
                 <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
                   <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-200">
-                    <p className="text-sm font-bold text-indigo-800">Marks Entry — {marksFilterSubject} Â· {marksFilterGrade} Â· {marksFilterSection}</p>
-                    <p className="text-xs text-indigo-600">{sortedActs.length} activities Â· {(teacherCombined.students||[]).length} students Â· Most recent first Â· Student name is frozen</p>
+                    <p className="text-sm font-bold text-indigo-800">Marks Entry — {marksFilterSubject} · {marksFilterGrade} · {marksFilterSection}</p>
+                    <p className="text-xs text-indigo-600">{sortedActs.length} activities · {(teacherCombined.students||[]).length} students · Most recent first · Student name is frozen</p>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="text-xs border-collapse">
@@ -2469,7 +2469,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                                   <span className="text-indigo-300 whitespace-nowrap shrink-0">{activity.activity_date}</span>
                                   {isView?(
                                     <button onClick={()=>setTeacherViewModeSet(prev=>{const n=new Set(prev);n.delete(activity.id);return n;})}
-                                      className="px-2 py-0.5 bg-indigo-500 hover:bg-indigo-400 rounded whitespace-nowrap shrink-0">✏ï¸ Edit</button>
+                                      className="px-2 py-0.5 bg-indigo-500 hover:bg-indigo-400 rounded whitespace-nowrap shrink-0">✏️ Edit</button>
                                   ):(
                                     <button onClick={()=>saveTeacherActivityMarks(activity.id)} disabled={!!savingActivityId}
                                       className="px-2 py-0.5 bg-green-500 hover:bg-green-400 disabled:opacity-50 rounded whitespace-nowrap shrink-0">{isSaving?"...":"💾 Save"}</button>
@@ -2583,7 +2583,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                   return (
                     <div className="bg-white rounded-xl shadow border border-purple-200 overflow-hidden">
                       <div className="px-4 py-3 bg-purple-50 border-b border-purple-200">
-                        <h3 className="text-sm font-bold text-purple-800">Competency Analysis — {marksFilterSubject} Â· {marksFilterGrade} Â· {marksFilterSection}</h3>
+                        <h3 className="text-sm font-bold text-purple-800">Competency Analysis — {marksFilterSubject} · {marksFilterGrade} · {marksFilterSection}</h3>
                         <p className="text-xs text-purple-600">Average % per competency across all activities</p>
                       </div>
                       <div className="overflow-x-auto">
@@ -2802,7 +2802,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
                 )}
                 {uncovComps.length>0&&(
                   <div>
-                    <div className="text-xs font-semibold text-red-600 mb-2">â³ Pending ({uncovComps.length})</div>
+                    <div className="text-xs font-semibold text-red-600 mb-2">⏳ Pending ({uncovComps.length})</div>
                     <div className="space-y-1 max-h-40 overflow-y-auto">
                       {uncovComps.map((c:any)=>(
                         <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs">
@@ -3080,7 +3080,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
                       <div key={c.competency_id} className="flex items-center justify-between p-2 bg-red-50 rounded border border-red-100">
                         <div>
                           <span className="text-xs font-bold text-red-700">{c.competency_code}</span>
-                          <span className="text-xs text-gray-500 ml-2">{c.domain} Â· {c.subject}</span>
+                          <span className="text-xs text-gray-500 ml-2">{c.domain} · {c.subject}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg(p)}`}>{p.toFixed(1)}%</span>
@@ -3127,7 +3127,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
               )}
               {sectionDash.studentDomainBreakdown?.length>0&&(
                 <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Student Ã— Domain Breakdown</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Student × Domain Breakdown</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs border-collapse">
                       <thead>
@@ -3330,7 +3330,7 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
               )}
               {coverageData.uncovered_competencies?.length>0&&(
                 <div className="bg-white rounded-xl shadow p-4">
-                  <h3 className="text-sm font-semibold text-red-600 mb-2">â³ Pending ({coverageData.uncovered_competencies.length})</h3>
+                  <h3 className="text-sm font-semibold text-red-600 mb-2">⏳ Pending ({coverageData.uncovered_competencies.length})</h3>
                   <div className="flex flex-wrap gap-1">
                     {coverageData.uncovered_competencies.map((c:any)=>(
                       <span key={c.id} className="px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-600">{c.competency_code}</span>
@@ -3383,13 +3383,13 @@ function ActivityAnalysisPanel({ allGrades, sectionsByGrade, allSubjects, academ
               avgPct:c.max>0?+((c.obtained/c.max)*100).toFixed(1):0,
               atRisk:c.atRisk.size,
             })).sort((a,b)=>a.code.localeCompare(b.code));
-            if(!rows.length) return <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No marks data found for {compTabSubject} Â· {dashGrade} Â· {dashSection}</div>;
+            if(!rows.length) return <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No marks data found for {compTabSubject} · {dashGrade} · {dashSection}</div>;
             return (
               <div className="bg-white rounded-xl shadow border border-purple-200 overflow-hidden">
                 <div className="px-4 py-3 bg-purple-50 border-b border-purple-200 flex items-center justify-between flex-wrap gap-2">
                   <div>
-                    <h3 className="text-sm font-bold text-purple-800">Competency-wise Analysis — {compTabSubject} Â· {dashGrade} Â· {dashSection}</h3>
-                    <p className="text-xs text-purple-600">{rows.length} competencies Â· {(compTabCombined.activities||[]).length} activities Â· {(compTabCombined.students||[]).length} students</p>
+                    <h3 className="text-sm font-bold text-purple-800">Competency-wise Analysis — {compTabSubject} · {dashGrade} · {dashSection}</h3>
+                    <p className="text-xs text-purple-600">{rows.length} competencies · {(compTabCombined.activities||[]).length} activities · {(compTabCombined.students||[]).length} students</p>
                   </div>
                   <div className="flex gap-2">
                     {[
@@ -3514,7 +3514,7 @@ function MarksEntryPanel({ activity, combinedMarks, localRatings, updateRating, 
       }));
       await axios.post(`${API}/activities/${activity.id}/marks`, { academic_year: academicYear, entries });
       setMsg("✅ Marks saved successfully");
-    } catch { setMsg("âŒ Error saving marks"); }
+    } catch { setMsg("❌ Error saving marks"); }
     setLocalSaving(false);
     setTimeout(() => setMsg(""), 3000);
   };
@@ -3525,8 +3525,8 @@ function MarksEntryPanel({ activity, combinedMarks, localRatings, updateRating, 
     <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
         <div>
-          <h3 className="text-sm font-bold text-gray-700">{activity.name} — {activity.grade} Â· {activity.section}</h3>
-          <p className="text-xs text-gray-500 mt-0.5">{students.length} students Â· {competencies.length} competencies</p>
+          <h3 className="text-sm font-bold text-gray-700">{activity.name} — {activity.grade} · {activity.section}</h3>
+          <p className="text-xs text-gray-500 mt-0.5">{students.length} students · {competencies.length} competencies</p>
         </div>
         <button onClick={saveMarks} disabled={localSaving}
           className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold">
@@ -3681,7 +3681,7 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
     .kpi-card .lbl{font-size:12px;color:#6b7280}
     </style></head><body>
     <h1>Baseline Assessment Report</h1>
-    <p style="color:#6b7280">${grade} — ${section} &nbsp;Â·&nbsp; Round ${activeRoundIdx+1} &nbsp;Â·&nbsp; ${new Date().toLocaleDateString()}</p>
+    <p style="color:#6b7280">${grade} — ${section} &nbsp;·&nbsp; Round ${activeRoundIdx+1} &nbsp;·&nbsp; ${new Date().toLocaleDateString()}</p>
     <div class="kpi">
       <div class="kpi-card"><div class="val">${assessed.length}</div><div class="lbl">Students Assessed</div></div>
       <div class="kpi-card"><div class="val">${classLitAvg}%</div><div class="lbl">Class Literacy Avg</div></div>
@@ -3710,8 +3710,8 @@ function BaselineAnalyticsPanel({ sectionData, activeRoundIdx, LITERACY_DOMAINS,
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-gray-700">📊 Analytics — Round {activeRoundIdx+1}</h3>
         <div className="flex gap-2">
-          <button onClick={downloadReport} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">â¬‡ï¸ CSV</button>
-          <button onClick={downloadHTMLReport} className="px-3 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium">â¬‡ï¸ Report Card</button>
+          <button onClick={downloadReport} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">â¬‡️ CSV</button>
+          <button onClick={downloadHTMLReport} className="px-3 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium">â¬‡️ Report Card</button>
         </div>
       </div>
 
@@ -4351,9 +4351,9 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
         body: JSON.stringify({ model:"llama-3.3-70b-versatile", messages:[{role:"user",content:prompt}], max_tokens:3000 }),
       });
       const d = await res.json();
-      if (!res.ok) { setMsg(`âŒ GROQ Error ${res.status}: ${d.error?.message||JSON.stringify(d)}`); }
+      if (!res.ok) { setMsg(`❌ GROQ Error ${res.status}: ${d.error?.message||JSON.stringify(d)}`); }
       else setOutput(d.choices?.[0]?.message?.content || "No response from AI");
-    } catch(e:any) { setMsg(`âŒ AI failed: ${e.message}`); }
+    } catch(e:any) { setMsg(`❌ AI failed: ${e.message}`); }
     setGenerating(false);
   };
 
@@ -4370,7 +4370,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
   return (
     <div className="space-y-4 w-full max-w-3xl">
       <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-indigo-800 mb-1">âœï¸ AI Practice & Assessment Paper</h3>
+        <h3 className="text-sm font-bold text-indigo-800 mb-1">âœ️ AI Practice & Assessment Paper</h3>
         <p className="text-xs text-indigo-600">Questions mapped to your exact competency framework — tagged with competency codes.</p>
       </div>
 
@@ -4381,7 +4381,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
           {/* Paper type */}
           <div className="bg-white rounded-xl shadow p-4 space-y-3">
             <div className="flex gap-2">
-              {[{id:"practice",label:"âœï¸ Practice Paper"},{id:"assessment",label:"📋 Assessment Paper"}].map(p=>(
+              {[{id:"practice",label:"âœ️ Practice Paper"},{id:"assessment",label:"📋 Assessment Paper"}].map(p=>(
                 <button key={p.id} onClick={()=>setPpMode(p.id as any)}
                   className={`px-4 py-2 text-xs rounded-lg border font-medium ${ppMode===p.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
                   {p.label}
@@ -4517,7 +4517,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
 
           <button onClick={generate} disabled={generating||!GROQ_KEY2}
             className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-bold rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50">
-            {generating ? "â³ Generating..." : `🎯 Generate ${ppMode==="practice"?"Practice":"Assessment"} Paper (${numQ} questions)`}
+            {generating ? "⏳ Generating..." : `🎯 Generate ${ppMode==="practice"?"Practice":"Assessment"} Paper (${numQ} questions)`}
           </button>
           {!GROQ_KEY2 && <p className="text-xs text-amber-600 text-center">⚠️ VITE_GROQ_API_KEY not set in .env</p>}
 
@@ -4717,7 +4717,7 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
 
   // Generate AME homework
   const generateAME = async () => {
-    if (!selectedCompetency) { setMsg("âŒ Select a competency first"); return; }
+    if (!selectedCompetency) { setMsg("❌ Select a competency first"); return; }
     setGenerating(true); setGeneratedAME(null); setMsg("");
     try {
       const prompt = `You are an experienced teacher creating differentiated homework for ${selectedSubject}, Grade ${classGrade}.
@@ -4738,13 +4738,13 @@ Make each question clear, age-appropriate, directly testing the competency.`;
       const mMatch = raw.match(/===M===([\s\S]*?)===E===/);
       const eMatch = raw.match(/===E===([\s\S]*)$/);
       setGeneratedAME({ a: aMatch?.[1]?.trim()||raw, m: mMatch?.[1]?.trim()||"", e: eMatch?.[1]?.trim()||"" });
-    } catch { setMsg("âŒ Generation failed. Check API key."); }
+    } catch { setMsg("❌ Generation failed. Check API key."); }
     setGenerating(false);
   };
 
   // Generate Practice or Assessment paper
   const generatePaper = async (type: "Practice"|"Assessment") => {
-    if (!selectedStudent || !studentGaps.length) { setMsg("âŒ Select a student with gap data first"); return; }
+    if (!selectedStudent || !studentGaps.length) { setMsg("❌ Select a student with gap data first"); return; }
     setGenerating(true); setPaperOutput(""); setMsg("");
     try {
       const gapBlock = studentGaps.slice(0,8).map((g:any) =>
@@ -4757,7 +4757,7 @@ Make each question clear, age-appropriate, directly testing the competency.`;
         Mixed:"Mix 40% easy, 40% moderate, 20% challenging.",
       };
       const qCount = type === "Practice" ? numQ : 15;
-      const marksNote = type === "Assessment" ? "\n- Assign marks: 10 MCQ Ã— 1 mark, 3 Short Answer Ã— 4 marks, 2 Long Answer Ã— 5 marks (Total 32 marks)" : "";
+      const marksNote = type === "Assessment" ? "\n- Assign marks: 10 MCQ × 1 mark, 3 Short Answer × 4 marks, 2 Long Answer × 5 marks (Total 32 marks)" : "";
       const prompt = `You are an expert educational assessor creating a ${type} Paper for a student in India.
 
 Student: ${selectedStudent.name} | Grade: ${classGrade} | Subject: ${selectedSubject||"Mixed"}
@@ -4784,14 +4784,14 @@ FORMATS:
 
 Title: ${type} Paper — ${selectedStudent.name} — ${selectedSubject||"Mixed"} — ${new Date().toLocaleDateString()}`;
       setPaperOutput(await callGroq(prompt, 3000));
-    } catch { setMsg("âŒ Generation failed. Check API key."); }
+    } catch { setMsg("❌ Generation failed. Check API key."); }
     setGenerating(false);
   };
 
   // Generate gap-aware weekly homework
   // Generate parent suggestion
   const generateParent = async () => {
-    if (!selectedParentStudent) { setMsg("âŒ Select a student first"); return; }
+    if (!selectedParentStudent) { setMsg("❌ Select a student first"); return; }
     setGenerating(true); setParentOutput(""); setMsg("");
     try {
       const gapBlock = activityGaps.length > 0
@@ -4812,7 +4812,7 @@ Write a friendly, encouraging message (180-220 words) that:
 
 Keep tone warm, professional and supportive — never alarming or critical.`;
       setParentOutput(await callGroq(prompt));
-    } catch { setMsg("âŒ Generation failed."); }
+    } catch { setMsg("❌ Generation failed."); }
     setGenerating(false);
   };
 
@@ -4828,7 +4828,7 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
         ...extraData,
       });
       setMsg("✅ Saved!");
-    } catch { setMsg("âŒ Save failed."); }
+    } catch { setMsg("❌ Save failed."); }
     setSaving(false);
     setTimeout(()=>setMsg(""), 3000);
   };
@@ -5131,10 +5131,10 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.type==="AME"?"bg-green-100 text-green-700":r.type==="Practice"?"bg-blue-100 text-blue-700":r.type==="Assessment"?"bg-purple-100 text-purple-700":r.type==="Weekly"?"bg-orange-100 text-orange-700":"bg-pink-100 text-pink-700"}`}>{r.type}</span>
                           <span className="text-sm font-medium text-gray-800">{r.subject}</span>
-                          {r.competency_name && <span className="text-xs text-gray-500">Â· {r.competency_name}</span>}
-                          {r.student_name && <span className="text-xs text-gray-500">Â· {r.student_name}</span>}
+                          {r.competency_name && <span className="text-xs text-gray-500">· {r.competency_name}</span>}
+                          {r.student_name && <span className="text-xs text-gray-500">· {r.student_name}</span>}
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">{new Date(r.created_at).toLocaleDateString()} Â· {r.grade} {r.section}</p>
+                        <p className="text-xs text-gray-400 mt-1">{new Date(r.created_at).toLocaleDateString()} · {r.grade} {r.section}</p>
                       </div>
                       <div className="flex gap-2 ml-3">
                         <button onClick={()=>setExpandedRecord(expandedRecord===r.id?null:r.id)} className="text-xs text-indigo-600 hover:underline">{expandedRecord===r.id?"Hide":"View"}</button>
@@ -5300,7 +5300,7 @@ function HomeworkPortfolioSection({ student, grade, section, subject, isClassTea
                 <div className="flex items-center justify-between mb-1">
                   <div>
                     <span className="text-xs font-medium text-pink-700">{r.subject}</span>
-                    <span className="text-xs text-gray-400 ml-2">{new Date(r.created_at).toLocaleDateString()} Â· {r.academic_year}</span>
+                    <span className="text-xs text-gray-400 ml-2">{new Date(r.created_at).toLocaleDateString()} · {r.academic_year}</span>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setExpandedId(expandedId === r.id ? null : r.id)} className="text-xs text-indigo-600 hover:underline">
@@ -5341,10 +5341,10 @@ function HomeworkPortfolioSection({ student, grade, section, subject, isClassTea
                         "bg-orange-100 text-orange-700"
                       }`}>{r.type}</span>
                       <span className="text-sm font-medium text-gray-800">{r.subject}</span>
-                      {r.competency_name && <span className="text-xs text-gray-500">Â· {r.competency_name}</span>}
-                      {r.topic && <span className="text-xs text-gray-500">Â· {r.topic}</span>}
+                      {r.competency_name && <span className="text-xs text-gray-500">· {r.competency_name}</span>}
+                      {r.topic && <span className="text-xs text-gray-500">· {r.topic}</span>}
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">{new Date(r.created_at).toLocaleDateString()} Â· by {r.teacher_name}</p>
+                    <p className="text-xs text-gray-400 mt-1">{new Date(r.created_at).toLocaleDateString()} · by {r.teacher_name}</p>
                   </div>
                   <button onClick={() => setExpandedId(expandedId === r.id ? null : r.id)} className="text-xs text-indigo-600 hover:underline ml-3">
                     {expandedId === r.id ? "Hide" : "View"}
@@ -5499,7 +5499,7 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
           </button>
           <div>
             <h2 className="text-lg font-bold text-gray-800">📁 {selectedStudent.name}</h2>
-            <p className="text-xs text-gray-500">{selectedStudent.admission_no} Â· Full history across all years</p>
+            <p className="text-xs text-gray-500">{selectedStudent.admission_no} · Full history across all years</p>
           </div>
         </div>
 
@@ -5596,7 +5596,7 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
                   <div key={yr.academic_year} className="bg-white rounded-xl shadow overflow-hidden">
                     <div className="px-4 py-3 bg-green-700 text-white flex items-center justify-between">
                       <span className="font-bold text-sm">{yr.academic_year}</span>
-                      <span className="text-xs text-green-200">{yr.grade} Â· {yr.rounds} round(s)</span>
+                      <span className="text-xs text-green-200">{yr.grade} · {yr.rounds} round(s)</span>
                     </div>
                     <div className="p-4 grid grid-cols-2 gap-4">
                       {(isClassTeacher || isEnglishTeacher) && yr.literacy && (
@@ -5707,7 +5707,7 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
                 className="w-full px-4 py-3 flex items-center justify-between hover:bg-indigo-50 transition-colors text-left">
                 <div>
                   <p className="text-sm font-medium text-gray-800">{s.name}</p>
-                  <p className="text-xs text-gray-400">{s.admission_no} Â· {s.current_class} {s.section}</p>
+                  <p className="text-xs text-gray-400">{s.admission_no} · {s.current_class} {s.section}</p>
                 </div>
                 <span className="text-xs text-indigo-600 font-medium">View Portfolio â†’</span>
               </button>
@@ -5758,7 +5758,7 @@ function PromotionTab({ user, mappings }: any) {
       setStudentSections(initSections);
       setNextSections((Array.isArray(secRes.data) ? secRes.data : []).map((s: any) => s.name || s).filter(Boolean));
       setStep("confirm");
-    } catch { setMsg("âŒ Could not load students."); }
+    } catch { setMsg("❌ Could not load students."); }
     setLoading(false);
   };
 
@@ -5771,7 +5771,7 @@ function PromotionTab({ user, mappings }: any) {
 
   const executePromotion = async () => {
     const missing = selectedIds.filter(id => !studentSections[id]);
-    if (missing.length) { setMsg(`âŒ Please select a section for all ${missing.length} student(s).`); return; }
+    if (missing.length) { setMsg(`❌ Please select a section for all ${missing.length} student(s).`); return; }
     setPromoting(true);
     try {
       const sectionGroups: Record<string, string[]> = {};
@@ -5790,12 +5790,12 @@ function PromotionTab({ user, mappings }: any) {
       }
       setResult({ promoted: totalPromoted, type: "promotion" });
       setStep("done");
-    } catch { setMsg("âŒ Promotion failed. Try again."); }
+    } catch { setMsg("❌ Promotion failed. Try again."); }
     setPromoting(false);
   };
 
   const executeGraduation = async () => {
-    if (!graduationYear) { setMsg("âŒ Enter graduation year"); return; }
+    if (!graduationYear) { setMsg("❌ Enter graduation year"); return; }
     setPromoting(true);
     try {
       const r = await axios.post(`${API}/students/graduation/execute`, {
@@ -5804,7 +5804,7 @@ function PromotionTab({ user, mappings }: any) {
       });
       setResult({ promoted: r.data?.graduated || selectedIds.length, type: "graduation" });
       setStep("done");
-    } catch { setMsg("âŒ Graduation failed. Try again."); }
+    } catch { setMsg("❌ Graduation failed. Try again."); }
     setPromoting(false);
   };
 
@@ -5824,8 +5824,8 @@ function PromotionTab({ user, mappings }: any) {
         </h3>
         <p className={`text-xs ${isGrade10 ? "text-amber-600" : "text-indigo-600"}`}>
           {isGrade10
-            ? `Graduate students from ${classGrade} Â· ${classSection}. They will be marked as alumni and their data preserved.`
-            : `Promote students from ${classGrade} Â· ${classSection} to ${nextGrade}. Assign each student to their new section.`}
+            ? `Graduate students from ${classGrade} · ${classSection}. They will be marked as alumni and their data preserved.`
+            : `Promote students from ${classGrade} · ${classSection} to ${nextGrade}. Assign each student to their new section.`}
         </p>
       </div>
 
@@ -5833,7 +5833,7 @@ function PromotionTab({ user, mappings }: any) {
 
       {step === "preview" && (
         <div className="bg-white rounded-xl shadow p-6 text-center">
-          <p className="text-sm text-gray-600 mb-1">Your class: <strong>{classGrade} Â· {classSection}</strong></p>
+          <p className="text-sm text-gray-600 mb-1">Your class: <strong>{classGrade} · {classSection}</strong></p>
           {isGrade10 ? (
             <div className="mb-4">
               <p className="text-sm text-gray-600 mb-3">These students will be graduated and marked as alumni.</p>
@@ -5864,7 +5864,7 @@ function PromotionTab({ user, mappings }: any) {
                   <select value={defaultSection} onChange={e => applyDefaultSection(e.target.value)}
                     className="border border-gray-300 rounded px-3 py-2 text-sm flex-1 max-w-xs">
                     <option value="">-- Select default section for all --</option>
-                    {nextSections.map(s => <option key={s} value={s}>{nextGrade} Â· {s}</option>)}
+                    {nextSections.map(s => <option key={s} value={s}>{nextGrade} · {s}</option>)}
                   </select>
                   <span className="text-xs text-gray-400">Or assign individually per student below</span>
                 </div>
@@ -5883,7 +5883,7 @@ function PromotionTab({ user, mappings }: any) {
           <div className="bg-white rounded-xl shadow overflow-hidden">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-gray-700">
-                {students.length} students in {classGrade} Â· {classSection}
+                {students.length} students in {classGrade} · {classSection}
                 <span className="ml-2 text-xs text-gray-400">({selectedIds.length} selected)</span>
               </h3>
               <div className="flex gap-2">
@@ -5953,7 +5953,7 @@ function PromotionTab({ user, mappings }: any) {
                 <>
                   <li>Students will be moved to {nextGrade} with their selected sections immediately.</li>
                   <li>All historical data (PA/SA marks, activities, baseline) is preserved.</li>
-                  <li>Unselected students remain in {classGrade} Â· {classSection}.</li>
+                  <li>Unselected students remain in {classGrade} · {classSection}.</li>
                   <li>This cannot be undone from the teacher dashboard.</li>
                 </>
               )}
@@ -6160,7 +6160,7 @@ Format exactly:
                 <div className={`px-4 py-3 flex items-center justify-between flex-wrap gap-2 ${isLit ? "bg-blue-700" : "bg-purple-700"} text-white`}>
                   <div>
                     <span className="text-sm font-bold">{isLit ? "📖" : "🔢"} {gap.subject === "literacy" ? "Literacy" : "Numeracy"} — {gap.domain}</span>
-                    <span className="text-xs ml-2 opacity-75">Score: {gap.score.toFixed(0)}% Â· {gap.stage} Â· {gap.grade}</span>
+                    <span className="text-xs ml-2 opacity-75">Score: {gap.score.toFixed(0)}% · {gap.stage} · {gap.grade}</span>
                   </div>
                   {!result && (
                     <button onClick={() => generateResources(gap)} disabled={isGenerating}
@@ -6622,7 +6622,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
           </select>
         </div>
         <div className="text-xs text-gray-500">
-          Class: <span className="font-bold text-indigo-700">{classGrade} Â· {classSection}</span>
+          Class: <span className="font-bold text-indigo-700">{classGrade} · {classSection}</span>
         </div>
       </div>
 
@@ -6660,7 +6660,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
 
               {/* Level Distribution */}
               <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Level Distribution — {classGrade} Â· {classSection}</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Level Distribution — {classGrade} · {classSection}</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
                     { key: "L4", label: "Level 4 – Exceeding", color: "#10b981", bg: "bg-green-50 border-green-200" },
@@ -6682,7 +6682,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
               {/* Student breakdown table */}
               <div className="bg-white rounded-xl shadow overflow-hidden">
                 <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-700">Student Breakdown — {classGrade} Â· {classSection}</h3>
+                  <h3 className="text-sm font-semibold text-gray-700">Student Breakdown — {classGrade} · {classSection}</h3>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs border-collapse">
@@ -6716,7 +6716,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
             </>
           ) : (
             <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">
-              No baseline data for {classGrade} Â· {classSection}. Enter baseline data first.
+              No baseline data for {classGrade} · {classSection}. Enter baseline data first.
             </div>
           )}
         </div>
@@ -6817,12 +6817,12 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
                   <div key={i} className="flex items-center justify-between px-4 py-3 bg-red-50 rounded-lg border border-red-100">
                     <div>
                       <p className="text-sm font-bold text-gray-800">{a.entity_name || a.student_name}</p>
-                      <p className="text-xs text-gray-500">{a.grade} Â· {a.section}</p>
+                      <p className="text-xs text-gray-500">{a.grade} · {a.section}</p>
                       <p className="text-xs text-red-600 mt-0.5">
                         {(a.scores||[]).map((s: any) => `${s.round}: ${s.overall?.toFixed(1)}%`).join(" â†’ ")}
                       </p>
                     </div>
-                    <span className="text-sm font-bold text-red-600">â–¼ {a.drop?.toFixed(1)}%</span>
+                    <span className="text-sm font-bold text-red-600">▼ {a.drop?.toFixed(1)}%</span>
                   </div>
                 ))}
               </div>
@@ -6960,13 +6960,13 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
         if (!hasAny) return null;
         return { student_id: s.student_id, student_name: s.student_name, literacy_scores: litScores, numeracy_scores: numScores, max_marks: mm };
       }).filter(Boolean);
-      if (!entries.length) { setMsg("âŒ No scores entered to save"); setSaving(false); setTimeout(()=>setMsg(""),3000); return; }
+      if (!entries.length) { setMsg("❌ No scores entered to save"); setSaving(false); setTimeout(()=>setMsg(""),3000); return; }
       await axios.post(`${API}/baseline/section/round`, {
         grade: classGrade, section: classSection, academic_year: academicYear,
         round: roundKey, stage, assessment_date: assessmentDate, entries,
       });
       setMsg(`✅ Round saved — ${entries.length} students`); fetchRounds(); setNewRoundOpen(false); setEditingRound(null);
-    } catch { setMsg("âŒ Error saving"); }
+    } catch { setMsg("❌ Error saving"); }
     setSaving(false); setTimeout(() => setMsg(""), 3000);
   };
 
@@ -6989,7 +6989,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
 
       const ws = wb.Sheets[targetSheet];
       const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header:1, defval:null });
-      if (rows.length < 2) { setMsg("âŒ No data in Excel"); setXlParsing(false); return; }
+      if (rows.length < 2) { setMsg("❌ No data in Excel"); setXlParsing(false); return; }
 
       let hdrIdx = 1;
       for (let i = 0; i < Math.min(5, rows.length); i++) {
@@ -7048,7 +7048,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
       }
       setScores(newScores);
       setMsg(`✅ Excel imported — ${matched} students matched`);
-    } catch (err:any) { setMsg("âŒ Excel import failed: "+err.message); }
+    } catch (err:any) { setMsg("❌ Excel import failed: "+err.message); }
     setXlParsing(false);
     if (xlFileRef.current) xlFileRef.current.value = "";
     setTimeout(()=>setMsg(""),4000);
@@ -7070,7 +7070,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
       <div className="bg-white rounded-xl shadow p-4 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-sm font-bold text-indigo-800">{classGrade} — {classSection}</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Stage: {stage.charAt(0).toUpperCase()+stage.slice(1)} Â· {students.length} students Â· {rounds.length} round(s) completed</p>
+          <p className="text-xs text-gray-500 mt-0.5">Stage: {stage.charAt(0).toUpperCase()+stage.slice(1)} · {students.length} students · {rounds.length} round(s) completed</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <input ref={xlFileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleXlUpload} />
@@ -7089,7 +7089,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
 
       {/* Domain configuration */}
       <div className="bg-white rounded-xl shadow border border-indigo-100 p-4">
-        <h3 className="text-xs font-bold text-indigo-800 mb-3">âš™ï¸ Domain Configuration — {classGrade} Â· {classSection}</h3>
+        <h3 className="text-xs font-bold text-indigo-800 mb-3">⚙️ Domain Configuration — {classGrade} · {classSection}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <p className="text-xs font-semibold text-blue-700 mb-2">📚 Literacy Domains</p>
@@ -7147,7 +7147,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
         <div className="bg-white rounded-xl shadow border border-indigo-200 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 bg-indigo-50 border-b border-indigo-200 flex-wrap gap-2">
             <h3 className="text-sm font-bold text-indigo-800">
-              {editingRound ? `✏ï¸ Editing Round ${rounds.indexOf(editingRound)+1}` : `+ Round ${rounds.length+1}`} — {classGrade} {classSection}
+              {editingRound ? `✏️ Editing Round ${rounds.indexOf(editingRound)+1}` : `+ Round ${rounds.length+1}`} — {classGrade} {classSection}
             </h3>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5">
@@ -7274,7 +7274,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
               <h3 className="text-sm font-bold text-gray-700">Round {activeRoundIdx+1} Results — {classGrade} {classSection}</h3>
               <button onClick={() => { setEditingRound(roundKey); setNewRoundOpen(false); initScoresForRound(roundKey); }}
                 className="px-3 py-1.5 bg-indigo-100 text-indigo-700 text-xs rounded-lg hover:bg-indigo-200 font-medium border border-indigo-200">
-                ✏ï¸ Edit Round
+                ✏️ Edit Round
               </button>
             </div>
             <div className="overflow-x-auto">
@@ -7418,13 +7418,13 @@ function ObservationsTab({ user }: { user: any }) {
               <div className="flex items-center gap-4 flex-wrap">
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{o.observation_date || "—"}</p>
-                  <p className="text-xs text-gray-500">{o.grade_observed} Â· {o.subject_observed}</p>
+                  <p className="text-xs text-gray-500">{o.grade_observed} · {o.subject_observed}</p>
                 </div>
                 <div className="text-xs text-gray-500">Observer: <span className="font-medium text-gray-700">{o.observed_by || "—"}</span></div>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pctBg}`}>{pct}%</span>
                 <span className={`text-sm font-bold ${pctColor}`}>{total}/24</span>
               </div>
-              <span className="text-gray-400 text-sm ml-2">{isExpanded ? "â–²" : "â–¼"}</span>
+              <span className="text-gray-400 text-sm ml-2">{isExpanded ? "▲" : "▼"}</span>
             </button>
 
             {isExpanded && (
