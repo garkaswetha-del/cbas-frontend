@@ -5763,7 +5763,25 @@ function PromotionTab({ user, mappings, academicYear }: any) {
       const initSections: Record<string,string> = {};
       list.forEach((s:any) => { initSections[s.id] = ""; });
       setStudentSections(initSections);
-      setNextSections((Array.isArray(secRes.data) ? secRes.data : []).map((s: any) => s.name || s).filter(Boolean));
+
+      // Primary: sections registry table
+      let sections: string[] = (Array.isArray(secRes.data) ? secRes.data : [])
+        .map((s: any) => s.name || s)
+        .filter(Boolean);
+
+      // Fallback: derive sections from actual students in the next grade
+      // (the sections table may not be seeded even when students exist)
+      if (sections.length === 0 && nextGrade) {
+        const nextStudRes = await axios.get(`${API}/students?grade=${encodeURIComponent(nextGrade)}&limit=2000`);
+        const nextStudents: any[] = nextStudRes.data?.data || nextStudRes.data || [];
+        const unique = [...new Set(
+          nextStudents.filter((s:any) => s.is_active !== false && s.section)
+                      .map((s:any) => (s.section as string).toUpperCase())
+        )].sort();
+        sections = unique;
+      }
+
+      setNextSections(sections);
       setStep("confirm");
     } catch { setMsg("❌ Could not load students."); }
     setLoading(false);
