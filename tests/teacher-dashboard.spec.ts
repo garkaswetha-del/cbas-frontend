@@ -1258,9 +1258,10 @@ test.describe('R — Regression & Edge Cases', () => {
   test('R1. No raw garbled characters in page text (encoding fix)', async ({ page }) => {
     await loginAsTeacher(page);
     await page.waitForTimeout(2000);
-    // Check for known garbling patterns that were fixed
-    const garbled = await page.locator('text=/â€|â€œ|â€™|â€"/).count();
-    expect(garbled).toBe(0);
+    // Check for known garbling patterns that were fixed (â€ is the cp1252 misread of UTF-8 em-dash/quote bytes)
+    const bodyText = await page.locator('body').innerText().catch(() => '');
+    const hasGarbling = bodyText.includes('â') || bodyText.includes('â€');
+    expect(hasGarbling).toBe(false);
     console.log('✅ R1: No garbled cp1252 characters found in page text');
   });
 
