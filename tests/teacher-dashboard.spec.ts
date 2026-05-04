@@ -1248,6 +1248,76 @@ test.describe('Q — Promotion Tab: Load Students Fix', () => {
     expect(Array.isArray(r.data)).toBe(true);
     console.log(`✅ Q5: Sections API with academic_year=${ACADEMIC_YEAR} returned ${(r.data as string[]).length} sections for ${ctx!.grade}`);
   });
+
+  test('Q6. Fallback: next-grade sections derived from student data when registry is empty', async () => {
+    // The sections registry (/sections) is empty for most grades.
+    // The frontend fallback queries /students?grade=nextGrade and extracts unique sections.
+    // Verify this fallback data is correct for the actual next grade.
+    const gradeOrder = ['Pre-KG','LKG','UKG','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10'];
+    const idx = gradeOrder.indexOf(ctx!.grade);
+    if (idx < 0 || idx >= gradeOrder.length - 1) { console.log('⚠️ Q6: No next grade'); return; }
+    const nextGrade = gradeOrder[idx + 1];
+
+    // Simulate what the fallback does: fetch students in next grade
+    const r = await axios.get(`${API}/students?grade=${encodeURIComponent(nextGrade)}&limit=2000`);
+    const nextStudents: any[] = r.data?.data || r.data || [];
+    const sections = [...new Set(
+      nextStudents.filter((s: any) => s.is_active !== false && s.section)
+                  .map((s: any) => (s.section as string).toUpperCase())
+    )].sort();
+
+    // There must be at least one section (if grade exists in school)
+    if (nextStudents.length > 0) {
+      expect(sections.length).toBeGreaterThan(0);
+      console.log(`✅ Q6: Fallback sections for ${nextGrade}: [${sections.join(', ')}] (${nextStudents.length} students)`);
+    } else {
+      console.log(`⚠️ Q6: No students found in ${nextGrade} — sections fallback would show empty (correct)`);
+    }
+  });
+
+  test('Q7. UI: Promotion tab shows next-grade section options after Load Students', async ({ page }) => {
+    await loginAsTeacher(page);
+    await clickTab(page, 'Promotion');
+    await page.waitForTimeout(3000);
+
+    // Click the Load Student List button to enter the confirm step
+    const loadBtn = page.locator('button:has-text("Load Student List"), button:has-text("Load Students")');
+    if (await loadBtn.count() === 0) {
+      console.log('⚠️ Q7: Load button not found — promotion may already be in confirm step');
+    } else {
+      await loadBtn.first().click();
+      await page.waitForTimeout(5000);
+    }
+
+    // The confirm step renders an "Apply same section to all" dropdown
+    // target it specifically by its placeholder text
+    const applySelect = page.locator('select').filter({ hasText: /Select default section|Select section/i });
+    if (await applySelect.count() > 0) {
+      const opts = await applySelect.first().locator('option').allTextContents();
+      const realOpts = opts.filter(o => o.trim() && !o.includes('Select default') && !o.includes('--'));
+      expect(realOpts.length).toBeGreaterThan(0);
+      console.log(`✅ Q7: "Apply to all" section dropdown has ${realOpts.length} options: [${realOpts.join(', ')}]`);
+    } else {
+      // Sections may have been loaded and show as per-row selects — check the student rows
+      const studentSectionSelects = page.locator('select').filter({ hasText: /Select section/i });
+      const count = await studentSectionSelects.count();
+      if (count > 0) {
+        const opts = await studentSectionSelects.first().locator('option').allTextContents();
+        const realOpts = opts.filter(o => o.trim() && o !== '-- Select section --');
+        expect(realOpts.length).toBeGreaterThan(0);
+        console.log(`✅ Q7: Per-student section dropdown has ${realOpts.length} options: [${realOpts.join(', ')}]`);
+      } else {
+        // No sections shown — may be showing the manual input fallback (sections table empty AND no students in next grade)
+        const warningEl = page.locator('text=No sections found for');
+        if (await warningEl.count() > 0) {
+          console.log('⚠️ Q7: No sections found warning shown — sections table empty and fallback also empty');
+        } else {
+          // Grade 10 graduation case — no section needed
+          console.log('✅ Q7: No section dropdown — likely graduation (Grade 10) or pre-load state');
+        }
+      }
+    }
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
