@@ -55,10 +55,9 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
     students:       "My Students",
     classview:      "My Class",
     pasa:           "PA/SA Marks",
-    baseline_entry: "Baseline Entry",
-    baseline_dash:  "Baseline Dashboard",
+    baseline_entry: "Baseline",
     activities:     "Activities",
-    ai_tools:       "For Students",
+    ai_tools:       "AI Tools",
     alerts:         "Alerts",
     promotion:      "Promotion",
     portfolio:      "Student Portfolio",
@@ -66,7 +65,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
     self_baseline:  "My Baseline",
     appraisal:      "My Appraisal",
     observations:   "My Observations",
-    self_ai:        "My Learning",
+    self_ai:        "My AI",
   };
 
   return (
@@ -101,8 +100,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
         {activeTab === "students"       && <StudentsTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "classview"      && <ClassTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "pasa"           && <PASATab user={user} mappings={mappings} academicYear={academicYear} />}
-        {activeTab === "baseline_entry" && <BaselineEntryTab user={user} mappings={mappings} academicYear={academicYear} />}
-        {activeTab === "baseline_dash"  && <BaselineDashTab user={user} mappings={mappings} academicYear={academicYear} />}
+        {activeTab === "baseline_entry" && <BaselineCombinedTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "activities"     && <ActivitiesTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "ai_tools"       && <AIToolsTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "alerts"         && <AlertsTab user={user} mappings={mappings} academicYear={academicYear} />}
@@ -6714,6 +6712,38 @@ function getLevel(score: number) {
 // ─────────────────────────────────────────────────────────────────
 // EXAM CONFIG TAB
 // ─────────────────────────────────────────────────────────────────
+
+function BaselineCombinedTab({ user, mappings, academicYear }: any) {
+  const isClassTeacher = !!(mappings?.is_class_teacher);
+  const [sub, setSub] = useState<'entry' | 'dashboard'>(isClassTeacher ? 'entry' : 'dashboard');
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-4 border-b border-gray-200 pb-2">
+        {isClassTeacher && (
+          <button
+            onClick={() => setSub('entry')}
+            className={`px-4 py-1.5 rounded-t text-xs font-semibold border-b-2 transition-all ${
+              sub === 'entry' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Entry
+          </button>
+        )}
+        <button
+          onClick={() => setSub('dashboard')}
+          className={`px-4 py-1.5 rounded-t text-xs font-semibold border-b-2 transition-all ${
+            sub === 'dashboard' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Dashboard
+        </button>
+      </div>
+      {sub === 'entry' && isClassTeacher && <BaselineEntryTab user={user} mappings={mappings} academicYear={academicYear} />}
+      {sub === 'dashboard' && <BaselineDashTab user={user} mappings={mappings} academicYear={academicYear} />}
+    </div>
+  );
+}
 
 function BaselineDashTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
