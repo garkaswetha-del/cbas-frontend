@@ -4174,9 +4174,13 @@ function SelfAITab({ user, academicYear }: any) {
   const [generating, setGenerating] = useState(false);
   const [output, setOutput] = useState("");
   const [msg, setMsg] = useState("");
+  // Resource competencies: keyed by "subject_domain"
+  const [resourceComps, setResourceComps] = useState<Record<string, any[]>>({});
+  const [resourceLoading, setResourceLoading] = useState(false);
 
   useEffect(() => { fetchBaseline(); }, [academicYear]);
   useEffect(() => { if (selfSubTab === "custom" || mode === "custom") fetchCustomComps(); }, [custSubj, custDomain, baselineData]);
+  useEffect(() => { if (selfSubTab === "resources") { setResourceComps({}); loadResourceComps(); } }, [selfSubTab, baselineData]);
 
   const fetchBaseline = async () => {
     setBaselineError("");
@@ -4198,18 +4202,11 @@ function SelfAITab({ user, academicYear }: any) {
     const grade = STAGE_GRADE[stage];
     setLoadingComps(true);
     try {
-      const r = await axios.get(`${API}/activities/competencies?subject=${custSubj}&stage=${stage}&grade=${encodeURIComponent(grade)}`);
-      const all = r.data?.data || r.data || [];
-      const domainMap: Record<string,string> = {
-        "Listening":"listening","Speaking":"speaking","Reading":"reading","Reading and Comprehension":"reading","Writing":"writing",
-        "Operations":"operations","Base 10":"base10","Measurement":"measurement","Geometry":"geometry",
-      };
-      const filtered = all.filter((c:any) => {
-        const cd = (c.domain||"").toLowerCase();
-        const sel = custDomain.toLowerCase().replace(" ","").replace("10","10");
-        return cd.includes(sel) || cd.includes(custDomain.toLowerCase());
-      });
-      setCustComps(filtered.length ? filtered : all.slice(0,10));
+      const apiSubj = custSubj === "literacy" ? "language" : custSubj;
+      const r = await axios.get(`${API}/activities/competencies?subject=${apiSubj}&stage=${stage}&grade=${encodeURIComponent(grade)}`);
+      const all = r.data?.competencies || [];
+      const filtered = all.filter((c:any) => (c.domain||"").toLowerCase().includes(custDomain.toLowerCase()));
+      setCustComps(filtered.length ? filtered : all.slice(0, 10));
     } catch { setCustComps([]); }
     setLoadingComps(false);
   };
@@ -4236,16 +4233,15 @@ function SelfAITab({ user, academicYear }: any) {
       });
     }
 
-    // Fetch competencies for each gap
+    // Fetch ALL competencies for each gap domain
     const gapWithComps = await Promise.all(gaps.map(async (g:any) => {
       const grade = STAGE_GRADE[g.stage];
       try {
-        const r = await axios.get(`${API}/activities/competencies?subject=${g.subject}&stage=${g.stage}&grade=${encodeURIComponent(grade)}`);
-        const all = r.data?.data || r.data || [];
-        const comps = all.filter((c:any) => {
-          const cd = (c.domain||"").toLowerCase();
-          return cd.includes(g.sub.toLowerCase()) || cd.includes(g.sub.toLowerCase().replace(" ",""));
-        }).slice(0,5);
+        const apiSubj = g.subject === "literacy" ? "language" : g.subject;
+        const r = await axios.get(`${API}/activities/competencies?subject=${apiSubj}&stage=${g.stage}&grade=${encodeURIComponent(grade)}`);
+        const comps = (r.data?.competencies || []).filter((c:any) =>
+          (c.domain||"").toLowerCase().includes(g.sub.toLowerCase())
+        );
         return { ...g, grade, competencies: comps };
       } catch { return { ...g, grade, competencies:[] }; }
     }));
@@ -4383,17 +4379,34 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
     return Object.values(latestByDomain).filter((g:any) => g.score < 60);
   };
 
-  // Build search URLs (no AI needed — real search links that always work)
-  const getSearchLinks = (gap: any) => {
-    const subjectLabel = gap.subject === "literacy" ? "literacy" : "numeracy";
-    const q = `${subjectLabel} ${gap.domain} teacher professional development India`;
-    const ytQ = `${subjectLabel} ${gap.domain} teaching strategies classroom`;
-    const khanQ = gap.domain.toLowerCase().replace(" ","");
+  // Fetch competencies for all gap domains and build resource map
+  const loadResourceComps = async () => {
+    const gaps = getCurrentGaps();
+    if (!gaps.length) return;
+    setResourceLoading(true);
+    const map: Record<string, any[]> = {};
+    for (const gap of gaps) {
+      const key = `${gap.subject}_${gap.domain}`;
+      const apiSubj = gap.subject === "literacy" ? "language" : gap.subject;
+      try {
+        const r = await axios.get(`${API}/activities/competencies?subject=${apiSubj}&stage=${gap.stage}&grade=${encodeURIComponent(gap.grade)}`);
+        map[key] = (r.data?.competencies || []).filter((c:any) =>
+          (c.domain||"").toLowerCase().includes(gap.domain.toLowerCase())
+        );
+      } catch { map[key] = []; }
+    }
+    setResourceComps(map);
+    setResourceLoading(false);
+  };
+
+  // Per-competency search links — Google, YouTube, DIKSHA
+  const getCompLinks = (comp: any, gap: any) => {
+    const desc = (comp.description || "").slice(0, 80);
+    const grade = gap.grade || "";
     return {
-      google: `https://www.google.com/search?q=${encodeURIComponent(q)}`,
-      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(ytQ)}`,
-      khanacademy: `https://www.khanacademy.org/search?page_search_query=${encodeURIComponent(gap.domain)}`,
-      ncert: `https://ncert.nic.in/textbook.php?${encodeURIComponent(gap.subject.charAt(0).toUpperCase() + gap.subject.slice(1))}`,
+      google: `https://www.google.com/search?q=${encodeURIComponent(`${desc} ${grade} teaching activity India`)}`,
+      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${desc} teaching strategy classroom`)}`,
+      diksha: `https://diksha.gov.in/search?key=${encodeURIComponent(`${gap.subject === "literacy" ? "literacy" : "numeracy"} ${gap.domain} ${grade}`)}`,
     };
   };
 
@@ -4621,49 +4634,64 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
         <div className="space-y-4">
           <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
             <h4 className="text-sm font-bold text-purple-800 mb-1">📚 Learning Resources for Your Gap Areas</h4>
-            <p className="text-xs text-purple-600">Search links for each domain where your baseline score is below 60%. Domains clear automatically when you improve.</p>
+            <p className="text-xs text-purple-600">Competency-level resources for each gap domain — every competency gets specific Google, YouTube and DIKSHA links.</p>
           </div>
 
           {!assessments.length ? (
             <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No baseline data found for {academicYear}. Complete assessment first.</div>
+          ) : resourceLoading ? (
+            <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Loading competency resources…</div>
           ) : resourceGaps.length === 0 ? (
             <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
               <p className="text-2xl mb-2">🎉</p>
               <p className="text-sm font-medium text-green-700">No current gap areas! All domains are above 60% in your latest assessment.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              <p className="text-xs text-gray-500 px-1">{resourceGaps.length} gap area{resourceGaps.length!==1?"s":""} found — click links to open search results in a new tab</p>
-              {resourceGaps.map((gap:any)=>{
-                const links = getSearchLinks(gap);
+            <div className="space-y-4">
+              <p className="text-xs text-gray-500 px-1">{resourceGaps.length} gap domain{resourceGaps.length!==1?"s":""} · click any link to open in a new tab</p>
+              {resourceGaps.map((gap:any) => {
+                const key = `${gap.subject}_${gap.domain}`;
+                const comps: any[] = resourceComps[key] || [];
                 const isLit = gap.subject === "literacy";
                 return (
-                  <div key={`${gap.subject}_${gap.domain}`} className={`bg-white rounded-xl shadow overflow-hidden border-l-4 ${isLit?"border-blue-500":"border-purple-500"}`}>
+                  <div key={key} className={`bg-white rounded-xl shadow overflow-hidden border-l-4 ${isLit?"border-blue-500":"border-purple-500"}`}>
+                    {/* Domain header */}
                     <div className={`px-4 py-3 ${isLit?"bg-blue-50":"bg-purple-50"}`}>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold text-gray-800">{isLit?"📖":"🔢"} {gap.subject==="literacy"?"Literacy":"Numeracy"} — {gap.domain}</span>
+                        <span className="text-sm font-bold text-gray-800">{isLit?"📖":"🔢"} {isLit?"Literacy":"Numeracy"} — {gap.domain}</span>
                         <span className="text-xs text-gray-500">{gap.score.toFixed(0)}% · {gap.stage} · {gap.grade}</span>
                       </div>
+                      <p className="text-xs text-gray-500 mt-0.5">{comps.length} competenc{comps.length===1?"y":"ies"}</p>
                     </div>
-                    <div className="px-4 py-3 space-y-2">
-                      <a href={links.google} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs text-blue-700 font-medium transition-all">
-                        <span>🔍</span>
-                        <span className="flex-1">Search Google — teacher resources</span>
-                        <span className="text-blue-400">↗</span>
-                      </a>
-                      <a href={links.youtube} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg text-xs text-red-700 font-medium transition-all">
-                        <span>▶️</span>
-                        <span className="flex-1">Search YouTube — teaching strategies</span>
-                        <span className="text-red-400">↗</span>
-                      </a>
-                      <a href={links.khanacademy} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-3 py-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg text-xs text-green-700 font-medium transition-all">
-                        <span>🎓</span>
-                        <span className="flex-1">Khan Academy — {gap.domain}</span>
-                        <span className="text-green-400">↗</span>
-                      </a>
+                    {/* Per-competency resource rows */}
+                    <div className="px-4 py-3 space-y-3">
+                      {comps.length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">No competencies found for this domain.</p>
+                      ) : comps.map((comp:any) => {
+                        const links = getCompLinks(comp, gap);
+                        return (
+                          <div key={comp.competency_code} className="border border-gray-100 rounded-lg p-3 bg-gray-50">
+                            <p className="text-xs font-medium text-gray-700 mb-2 leading-snug">
+                              <span className={`font-bold mr-1 ${isLit?"text-blue-600":"text-purple-600"}`}>[{comp.competency_code}]</span>
+                              {comp.description}
+                            </p>
+                            <div className="flex gap-2 flex-wrap">
+                              <a href={links.google} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded text-xs text-blue-700 font-medium transition-all">
+                                🔍 Google
+                              </a>
+                              <a href={links.youtube} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 border border-red-200 rounded text-xs text-red-700 font-medium transition-all">
+                                ▶️ YouTube
+                              </a>
+                              <a href={links.diksha} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center gap-1 px-2 py-1 bg-green-50 hover:bg-green-100 border border-green-200 rounded text-xs text-green-700 font-medium transition-all">
+                                🎓 DIKSHA
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -4850,15 +4878,37 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
         const allA: any[] = r.data?.assessments || [];
         const latestA = allA.sort((a: any, b: any) => a.round > b.round ? 1 : -1).slice(-1)[0];
         if (!latestA) return "  no baseline data available";
-        const gaps: string[] = [];
-        if (latestA.literacy_pct) Object.entries(latestA.literacy_pct).forEach(([domain, score]: [string, any]) => {
-          if (+score < 60) gaps.push(`  - Literacy / ${domain}: ${(+score).toFixed(0)}%`);
-        });
-        if (latestA.numeracy_pct) Object.entries(latestA.numeracy_pct).forEach(([domain, score]: [string, any]) => {
-          if (+score < 60) gaps.push(`  - Numeracy / ${domain}: ${(+score).toFixed(0)}%`);
-        });
-        if (!gaps.length) return "  above 60% in all baseline domains — generate enrichment questions";
-        return gaps.join("\n");
+        const SGRADE: Record<string,string> = { foundation:"Grade 2", preparatory:"Grade 5", middle:"Grade 8", secondary:"Grade 10" };
+        const domainGaps: Array<{label:string; apiSubj:string; domain:string; score:number; stage:string; grade:string}> = [];
+        if (latestA.literacy_pct) {
+          const stage = latestA.gaps?.lit_stage || latestA.stage || "foundation";
+          Object.entries(latestA.literacy_pct).forEach(([domain, score]: [string, any]) => {
+            if (+score < 60) domainGaps.push({ label:"Literacy", apiSubj:"language", domain, score:+score, stage, grade:SGRADE[stage]||"Grade 2" });
+          });
+        }
+        if (latestA.numeracy_pct) {
+          const stage = latestA.gaps?.num_stage || latestA.stage || "foundation";
+          Object.entries(latestA.numeracy_pct).forEach(([domain, score]: [string, any]) => {
+            if (+score < 60) domainGaps.push({ label:"Numeracy", apiSubj:"numeracy", domain, score:+score, stage, grade:SGRADE[stage]||"Grade 2" });
+          });
+        }
+        if (!domainGaps.length) return "  above 60% in all baseline domains — generate enrichment questions";
+        const lines: string[] = [];
+        for (const dg of domainGaps) {
+          try {
+            const cr = await axios.get(`${API}/activities/competencies?subject=${dg.apiSubj}&stage=${dg.stage}&grade=${encodeURIComponent(dg.grade)}`);
+            const comps = (cr.data?.competencies || []).filter((c:any) => (c.domain||"").toLowerCase().includes(dg.domain.toLowerCase()));
+            if (comps.length) {
+              lines.push(`  ${dg.label} / ${dg.domain} (${dg.score.toFixed(0)}%) — all ${comps.length} competencies:`);
+              comps.forEach((c:any) => lines.push(`    - [${c.competency_code}] ${c.description}`));
+            } else {
+              lines.push(`  - ${dg.label} / ${dg.domain}: ${dg.score.toFixed(0)}%`);
+            }
+          } catch {
+            lines.push(`  - ${dg.label} / ${dg.domain}: ${dg.score.toFixed(0)}%`);
+          }
+        }
+        return lines.join("\n");
       }
     } catch {
       return "  gap data unavailable — generate general subject questions";
