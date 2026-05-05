@@ -6753,11 +6753,10 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
     { value: "baseline_3", label: "Round 3" },
   ];
 
-  const classGrade = mappings?.class_grade || (mappings?.mappings || [])[0]?.grade || "";
-  const rawSection = mappings?.class_section;
-  const classSection = rawSection ||
-    (classGrade ? ((mappings?.mappings || []).find((m: any) => m.grade === classGrade)?.section || "") : "") ||
-    (mappings?.mappings || [])[0]?.section || "";
+  // Prefer the is_class_teacher entry in mappings[] — its section is correctly cased to match DB
+  const classMappingEntry = (mappings?.mappings || []).find((m: any) => m.is_class_teacher);
+  const classGrade = classMappingEntry?.grade || mappings?.class_grade || (mappings?.mappings || [])[0]?.grade || "";
+  const classSection = classMappingEntry?.section || mappings?.class_section || (mappings?.mappings || [])[0]?.section || "";
   const myGrades = [...new Set((mappings?.mappings || []).map((m: any) => m.grade).filter(Boolean))] as string[];
 
   const [dashTab, setDashTab] = useState<"section"|"grade"|"alerts">("section");
@@ -7076,11 +7075,10 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
     "Grade 9":"secondary","Grade 10":"secondary",
   };
 
-  const classGrade = mappings?.class_grade || (mappings?.mappings || [])[0]?.grade || "";
-  const rawSection = mappings?.class_section;
-  const classSection = rawSection ||
-    (classGrade ? ((mappings?.mappings || []).find((m: any) => m.grade === classGrade)?.section || "") : "") ||
-    (mappings?.mappings || [])[0]?.section || "";
+  // Prefer the is_class_teacher entry in mappings[] — its section is correctly cased to match DB
+  const classMappingEntry = (mappings?.mappings || []).find((m: any) => m.is_class_teacher);
+  const classGrade = classMappingEntry?.grade || mappings?.class_grade || (mappings?.mappings || [])[0]?.grade || "";
+  const classSection = classMappingEntry?.section || mappings?.class_section || (mappings?.mappings || [])[0]?.section || "";
   const stage = GRADE_TO_STAGE[classGrade] || "foundation";
 
   const [sectionData, setSectionData] = useState<any>(null);
