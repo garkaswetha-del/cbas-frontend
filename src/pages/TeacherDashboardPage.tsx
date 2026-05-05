@@ -58,8 +58,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
     baseline_entry: "Baseline Entry",
     baseline_dash:  "Baseline Dashboard",
     activities:     "Activities",
-    ai_tools:       "AI Tools",
-    homework:       "AI Homework",
+    ai_tools:       "For Students",
     alerts:         "Alerts",
     promotion:      "Promotion",
     portfolio:      "Student Portfolio",
@@ -67,8 +66,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
     self_baseline:  "My Baseline",
     appraisal:      "My Appraisal",
     observations:   "My Observations",
-    self_ai:        "AI Learning",
-    learning_res:   "Learning Resources",
+    self_ai:        "My Learning",
   };
 
   return (
@@ -115,8 +113,6 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
         {activeTab === "appraisal"      && <AppraisalTab user={user} academicYear={academicYear} />}
         {activeTab === "observations"   && <ObservationsTab user={user} />}
         {activeTab === "self_ai"        && <SelfAITab user={user} academicYear={academicYear} />}
-        {activeTab === "learning_res"   && <LearningResourcesTab user={user} academicYear={academicYear} />}
-        {activeTab === "homework"       && <HomeworkTab user={user} mappings={mappings} academicYear={academicYear} />}
       </div>
     </div>
   );
@@ -4153,23 +4149,24 @@ function StudentBaselineProfile({ studentId, sectionData, onBack, getLevel, LITE
 
 
 function SelfAITab({ user, academicYear }: any) {
-  const GROQ_API2 = "https://api.groq.com/openai/v1/chat/completions";
   const GROQ_KEY2 = import.meta.env.VITE_GROQ_API_KEY || "";
 
   const STAGE_GRADE: Record<string,string> = { foundation:"Grade 2", preparatory:"Grade 5", middle:"Grade 8", secondary:"Grade 10" };
   const LIT_DOMAINS = ["Listening","Speaking","Reading","Writing"];
   const NUM_DOMAINS = ["Operations","Base 10","Measurement","Geometry"];
-  const LIT_KEYS   = ["Listening","Speaking","Reading","Writing"];
-  const NUM_KEYS   = ["Operations","Base 10","Measurement","Geometry"];
 
+  const [selfSubTab, setSelfSubTab] = useState<"gap"|"custom"|"resources">("gap");
   const [baselineData, setBaselineData] = useState<any>(null);
+  const [baselineError, setBaselineError] = useState("");
   const [mode, setMode] = useState<"gap"|"custom">("gap");
   const [ppMode, setPpMode] = useState<"practice"|"assessment">("practice");
-  // Gap-based settings
+  // Paper settings
   const [numQ, setNumQ] = useState(10);
   const [difficulty, setDifficulty] = useState("Mixed");
   const [qTypes, setQTypes] = useState(["MCQ","Short Answer","Case-Based"]);
   const [focusGap, setFocusGap] = useState("All my gaps");
+  const [extraInstructions, setExtraInstructions] = useState("");
+  const [totalMarks, setTotalMarks] = useState(50);
   // Custom topic settings
   const [custSubj, setCustSubj] = useState("literacy");
   const [custDomain, setCustDomain] = useState("Listening");
@@ -4181,13 +4178,16 @@ function SelfAITab({ user, academicYear }: any) {
   const [msg, setMsg] = useState("");
 
   useEffect(() => { fetchBaseline(); }, [academicYear]);
-  useEffect(() => { if (mode === "custom") fetchCustomComps(); }, [custSubj, custDomain, baselineData]);
+  useEffect(() => { if (selfSubTab === "custom" || mode === "custom") fetchCustomComps(); }, [custSubj, custDomain, baselineData]);
 
   const fetchBaseline = async () => {
+    setBaselineError("");
     try {
       const r = await axios.get(`${API}/baseline/teacher/${user.id}?academic_year=${academicYear}`);
       setBaselineData(r.data);
-    } catch {}
+    } catch {
+      setBaselineError("Could not load baseline data. Please check your connection.");
+    }
   };
 
   // Fetch competencies for custom mode
@@ -4256,28 +4256,15 @@ function SelfAITab({ user, academicYear }: any) {
   };
 
   const generate = async () => {
-    if (!baselineData?.assessments?.length) { setMsg("No baseline data found. Complete your assessment first."); return; }
+    if (!baselineData?.assessments?.length) { setMsg("❌ No baseline data found. Complete your assessment first."); return; }
     setGenerating(true); setOutput(""); setMsg("");
-
-    const assessments = baselineData.assessments || [];
-    const sortedRounds = [...assessments].sort((a:any,b:any)=>a.round>b.round?1:-1);
-    const latestRound = sortedRounds[sortedRounds.length-1];
-    const litAvg = latestRound?.literacy_total ? +latestRound.literacy_total : null;
-    const numAvg = latestRound?.numeracy_total ? +latestRound.numeracy_total : null;
-    const overallAvg = litAvg!==null&&numAvg!==null?(litAvg+numAvg)/2:litAvg??numAvg??0;
-
-    let prompt = "";
-
-    if (mode === "gap") {
-      const gaps = await buildGapContext();
-      const selectedGaps = focusGap === "All my gaps" ? gaps : gaps.filter(g=>`${g.domain} – ${g.sub}`===focusGap);
-
-      const compBlock = selectedGaps.map((g:any) => {
-        const compLines = g.competencies.length
-          ? g.competencies.map((c:any)=>`  - [${c.competency_code}]: ${c.description||c.desc||""}`).join("\n")
-          : "  - General competencies";
-        return `DOMAIN: ${g.domain} – ${g.sub} | Stage: ${g.stage} | Grade: ${g.grade} | Score: ${g.score.toFixed(0)}%\nCompetencies:\n${compLines}`;
-      }).join("\n\n");
+    try {
+      const assessments = baselineData.assessments || [];
+      const sortedRounds = [...assessments].sort((a:any,b:any)=>a.round>b.round?1:-1);
+      const latestRound = sortedRounds[sortedRounds.length-1];
+      const litAvg = latestRound?.literacy_total ? +latestRound.literacy_total : null;
+      const numAvg = latestRound?.numeracy_total ? +latestRound.numeracy_total : null;
+      const overallAvg = litAvg!==null&&numAvg!==null?(litAvg+numAvg)/2:litAvg??numAvg??0;
 
       const diffNote: Record<string,string> = {
         "Easy":"Recall and basic application only.",
@@ -4285,10 +4272,23 @@ function SelfAITab({ user, academicYear }: any) {
         "Challenging":"Prioritise analysis, evaluation and synthesis.",
         "Mixed":"40% easy, 40% moderate, 20% challenging."
       };
+      const marksNote = ppMode === "assessment" ? `\n- Total marks: ${totalMarks}. Distribute marks proportionally across questions.` : "";
+      const extraNote = extraInstructions ? `\n\nEXTRA INSTRUCTIONS:\n${extraInstructions}` : "";
 
-      const qtStr = qTypes.join(", ");
+      let prompt = "";
 
-      prompt = `You are an expert educational assessor for teacher professional development in India.
+      if (selfSubTab === "gap") {
+        const gaps = await buildGapContext();
+        const selectedGaps = focusGap === "All my gaps" ? gaps : gaps.filter((g:any)=>`${g.domain} – ${g.sub}`===focusGap);
+
+        const compBlock = selectedGaps.map((g:any) => {
+          const compLines = g.competencies.length
+            ? g.competencies.map((c:any)=>`  - [${c.competency_code}]: ${c.description||c.desc||""}`).join("\n")
+            : "  - General competencies";
+          return `DOMAIN: ${g.domain} – ${g.sub} | Stage: ${g.stage} | Grade: ${g.grade} | Score: ${g.score.toFixed(0)}%\nCompetencies:\n${compLines}`;
+        }).join("\n\n");
+
+        prompt = `You are an expert educational assessor for teacher professional development in India.
 
 Create a ${ppMode === "practice" ? "PRACTICE PAPER" : "ASSESSMENT PAPER"} for teacher ${user?.name} targeting their competency gaps.
 
@@ -4298,15 +4298,15 @@ Literacy Stage: ${latestRound?.gaps?.lit_stage||latestRound?.stage||"—"} (Grad
 Numeracy Stage: ${latestRound?.gaps?.num_stage||latestRound?.stage||"—"} (Grade: ${STAGE_GRADE[latestRound?.gaps?.num_stage||latestRound?.stage||"foundation"]||"—"})
 
 FOCUS COMPETENCIES (from gap analysis):
-${compBlock || "General competencies — no specific gaps identified"}
+${compBlock || "General competencies — no specific gaps identified; generate enrichment questions"}
 
 PAPER REQUIREMENTS:
 - Exactly ${numQ} questions
-- Question types: ${qtStr}
+- Question types: ${qTypes.join(", ")}
 - Difficulty: ${difficulty} — ${diffNote[difficulty]||"Mixed difficulty"}
 - Tag every question with its competency code [CODE]
 - Test both THEORETICAL KNOWLEDGE and CLASSROOM APPLICATION
-- Include complete Answer Key with explanations
+- Include complete Answer Key with explanations${marksNote}${extraNote}
 
 QUESTION FORMAT:
 [MCQ] 4 options A/B/C/D, mark correct with ✓, 1-line reason
@@ -4317,18 +4317,18 @@ QUESTION FORMAT:
 
 Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.name} — ${new Date().toLocaleDateString()}`;
 
-    } else {
-      // Custom topic mode
-      const compLines = custComps.length
-        ? custComps.map((c:any)=>`  - [${c.competency_code}]: ${c.description||c.desc||""}`).join("\n")
-        : "  - General competencies";
+      } else {
+        // Custom topic mode
+        const compLines = custComps.length
+          ? custComps.map((c:any)=>`  - [${c.competency_code}]: ${c.description||c.desc||""}`).join("\n")
+          : "  - General competencies";
 
-      const subjectRounds = assessments.filter((a:any)=>a.subject===custSubj);
-      const latest = subjectRounds[subjectRounds.length-1];
-      const stage = latest?.stage || "foundation";
-      const grade = STAGE_GRADE[stage];
+        const subjectRounds = assessments.filter((a:any)=>a.subject===custSubj);
+        const latest = subjectRounds[subjectRounds.length-1];
+        const stage = latest?.stage || "foundation";
+        const grade = STAGE_GRADE[stage];
 
-      prompt = `You are an expert educational assessor for teacher professional development in India.
+        prompt = `You are an expert educational assessor for teacher professional development in India.
 
 Create a ${ppMode === "practice" ? "PRACTICE PAPER" : "ASSESSMENT PAPER"} for teacher ${user?.name}.
 
@@ -4343,16 +4343,15 @@ ${compLines}
 PAPER REQUIREMENTS:
 - Exactly ${numQ} questions
 - Question types: ${qTypes.join(", ")}
-- Difficulty: ${difficulty}
+- Difficulty: ${difficulty} — ${diffNote[difficulty]||"Mixed difficulty"}
 - Tag every question with its competency code [CODE]
 - Test THEORETICAL KNOWLEDGE and CLASSROOM APPLICATION
-- Include complete Answer Key
+- Include complete Answer Key${marksNote}${extraNote}
 
 Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.name} — ${custSubj} — ${custDomain} — ${new Date().toLocaleDateString()}`;
-    }
+      }
 
-    try {
-      const res = await fetch(GROQ_API2, {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method:"POST",
         headers:{"Content-Type":"application/json","Authorization":`Bearer ${GROQ_KEY2}`},
         body: JSON.stringify({ model:"llama-3.3-70b-versatile", messages:[{role:"user",content:prompt}], max_tokens:3000 }),
@@ -4360,189 +4359,336 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
       const d = await res.json();
       if (!res.ok) { setMsg(`❌ GROQ Error ${res.status}: ${d.error?.message||JSON.stringify(d)}`); }
       else setOutput(d.choices?.[0]?.message?.content || "No response from AI");
-    } catch(e:any) { setMsg(`❌ AI failed: ${e.message}`); }
+    } catch(e:any) { setMsg(`❌ AI failed: ${(e as Error).message}`); }
     setGenerating(false);
+  };
+
+  // Compute current gaps using latest-per-domain approach (same as Learning Resources logic)
+  const getCurrentGaps = () => {
+    if (!baselineData?.assessments?.length) return [];
+    const allRounds = [...baselineData.assessments].sort((a:any,b:any) => a.round > b.round ? 1 : -1);
+    const latestByDomain: Record<string,any> = {};
+    allRounds.forEach((a:any) => {
+      const litStage = (a.gaps as any)?.lit_stage || a.stage || "foundation";
+      const numStage = (a.gaps as any)?.num_stage || a.stage || "foundation";
+      if (a.literacy_pct) {
+        Object.entries(a.literacy_pct).forEach(([domain, pct]: [string,any]) => {
+          latestByDomain[`lit_${domain}`] = { subject:"literacy", domain, score:+pct, stage:litStage, grade:STAGE_GRADE[litStage]||"Grade 2" };
+        });
+      }
+      if (a.numeracy_pct) {
+        Object.entries(a.numeracy_pct).forEach(([domain, pct]: [string,any]) => {
+          latestByDomain[`num_${domain}`] = { subject:"numeracy", domain, score:+pct, stage:numStage, grade:STAGE_GRADE[numStage]||"Grade 2" };
+        });
+      }
+    });
+    return Object.values(latestByDomain).filter((g:any) => g.score < 60);
+  };
+
+  // Build search URLs (no AI needed — real search links that always work)
+  const getSearchLinks = (gap: any) => {
+    const subjectLabel = gap.subject === "literacy" ? "literacy" : "numeracy";
+    const q = `${subjectLabel} ${gap.domain} teacher professional development India`;
+    const ytQ = `${subjectLabel} ${gap.domain} teaching strategies classroom`;
+    const khanQ = gap.domain.toLowerCase().replace(" ","");
+    return {
+      google: `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(ytQ)}`,
+      khanacademy: `https://www.khanacademy.org/search?page_search_query=${encodeURIComponent(gap.domain)}`,
+      ncert: `https://ncert.nic.in/textbook.php?${encodeURIComponent(gap.subject.charAt(0).toUpperCase() + gap.subject.slice(1))}`,
+    };
   };
 
   const assessments = baselineData?.assessments || [];
   const latestA = [...assessments].sort((a:any,b:any)=>a.round>b.round?1:-1).slice(-1)[0];
-
-  // Compute gaps for display — domains below 60%
   const gapList: string[] = [];
   if (latestA?.literacy_pct) Object.entries(latestA.literacy_pct).forEach(([d,v]:any) => { if (+v < 60) gapList.push(`Literacy – ${d}`); });
   if (latestA?.numeracy_pct) Object.entries(latestA.numeracy_pct).forEach(([d,v]:any) => { if (+v < 60) gapList.push(`Numeracy – ${d}`); });
-
   const custDomains = custSubj === "literacy" ? LIT_DOMAINS : NUM_DOMAINS;
+  const resourceGaps = getCurrentGaps();
+
+  const SELF_SUB_TABS = [
+    { id:"gap",       label:"📌 Based on My Gaps",   desc:"Generate a practice or assessment paper targeting your specific competency gap areas" },
+    { id:"custom",    label:"🎯 Custom Topic",         desc:"Generate questions for any literacy or numeracy domain of your choice" },
+    { id:"resources", label:"📚 Learning Resources",  desc:"Search links for your current gap areas — Google, YouTube, Khan Academy" },
+  ];
 
   return (
     <div className="space-y-4 w-full max-w-3xl">
       <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-indigo-800 mb-1">✍️ AI Practice & Assessment Paper</h3>
-        <p className="text-xs text-indigo-600">Questions mapped to your exact competency framework — tagged with competency codes.</p>
+        <h3 className="text-sm font-bold text-indigo-800 mb-1">✨ My Learning</h3>
+        <p className="text-xs text-indigo-600">AI-powered practice papers and learning resources based on your competency baseline.</p>
       </div>
 
-      {!assessments.length ? (
-        <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No baseline data found for {academicYear}. Complete assessment first.</div>
-      ) : (
-        <>
-          {/* Paper type */}
-          <div className="bg-white rounded-xl shadow p-4 space-y-3">
-            <div className="flex gap-2">
-              {[{id:"practice",label:"✍️ Practice Paper"},{id:"assessment",label:"📋 Assessment Paper"}].map(p=>(
-                <button key={p.id} onClick={()=>setPpMode(p.id as any)}
-                  className={`px-4 py-2 text-xs rounded-lg border font-medium ${ppMode===p.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
+      {/* Sub-tab bar */}
+      <div className="flex gap-2 overflow-x-auto pb-1 flex-nowrap">
+        {SELF_SUB_TABS.map(t=>(
+          <button key={t.id} onClick={()=>setSelfSubTab(t.id as any)}
+            className={`px-3 py-2 text-xs rounded-lg font-medium whitespace-nowrap flex-shrink-0 ${selfSubTab===t.id?"bg-purple-600 text-white":"bg-white border border-gray-300 text-gray-600 hover:bg-purple-50"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="bg-gray-50 rounded-lg px-4 py-2 text-xs text-gray-500 italic">
+        {SELF_SUB_TABS.find(t=>t.id===selfSubTab)?.desc}
+      </div>
 
-            {/* Mode */}
-            <div className="flex gap-2">
-              {[{id:"gap",label:"📌 Based on My Gaps"},{id:"custom",label:"🎯 Custom Topic"}].map(m=>(
-                <button key={m.id} onClick={()=>setMode(m.id as any)}
-                  className={`px-4 py-2 text-xs rounded-lg border font-medium ${mode===m.id?"bg-purple-600 text-white border-purple-600":"bg-white text-gray-600 border-gray-300 hover:bg-purple-50"}`}>
-                  {m.label}
-                </button>
-              ))}
-            </div>
-          </div>
+      {baselineError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{baselineError}</p>}
 
-          {mode === "gap" && (
-            <div className="bg-white rounded-xl shadow p-4 space-y-3">
-              {gapList.length === 0 ? (
-                <div className="text-sm text-green-700 bg-green-50 rounded-lg p-3">🎉 No gaps found — you're above average in all domains! Switch to Custom Topic to practise any area.</div>
-              ) : (
-                <>
+      {/* ── BASED ON MY GAPS ── */}
+      {selfSubTab === "gap" && (
+        <div className="space-y-4">
+          {!assessments.length ? (
+            <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No baseline data found for {academicYear}. Complete assessment first.</div>
+          ) : (
+            <>
+              {/* Paper type */}
+              <div className="bg-white rounded-xl shadow p-4 flex gap-2 flex-wrap">
+                {[{id:"practice",label:"✍️ Practice Paper"},{id:"assessment",label:"📋 Assessment Paper"}].map(p=>(
+                  <button key={p.id} onClick={()=>setPpMode(p.id as any)}
+                    className={`px-4 py-2 text-xs rounded-lg border font-medium ${ppMode===p.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="bg-white rounded-xl shadow p-4 space-y-3">
+                {gapList.length === 0 ? (
+                  <div className="text-sm text-green-700 bg-green-50 rounded-lg p-3">🎉 No gaps found — above average in all domains! Paper will cover enrichment topics.</div>
+                ) : (
                   <div>
-                    <label className="text-xs text-gray-500 font-semibold block mb-1">Gap Areas (below subject average)</label>
-                    <div className="flex flex-wrap gap-2">
+                    <label className="text-xs text-gray-500 font-semibold block mb-1">Your Gap Areas (below 60%)</label>
+                    <div className="flex flex-wrap gap-2 mb-3">
                       {gapList.map(g=><span key={g} className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">⚠️ {g}</span>)}
                     </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-gray-500 block mb-1">Focus on</label>
-                      <select value={focusGap} onChange={e=>setFocusGap(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                      <select value={focusGap} onChange={e=>setFocusGap(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full max-w-xs">
                         <option>All my gaps</option>
                         {gapList.map(g=><option key={g}>{g}</option>)}
                       </select>
                     </div>
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">Number of Questions</label>
-                      <select value={numQ} onChange={e=>setNumQ(+e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
-                        {[5,10,15,20].map(n=><option key={n}>{n}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">Difficulty</label>
-                      <select value={difficulty} onChange={e=>setDifficulty(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
-                        {["Easy","Moderate","Challenging","Mixed"].map(d=><option key={d}>{d}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">Question Types</label>
-                      <div className="flex flex-wrap gap-1">
-                        {["MCQ","Short Answer","Long Answer","True/False","Fill-in-Blank","Case-Based"].map(qt=>(
-                          <button key={qt} onClick={()=>setQTypes(prev=>prev.includes(qt)?prev.filter(x=>x!==qt):[...prev,qt])}
-                            className={`px-2 py-0.5 rounded text-xs border ${qTypes.includes(qt)?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>
-                            {qt}
-                          </button>
-                        ))}
-                      </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">No. of Questions</label>
+                    <select value={numQ} onChange={e=>setNumQ(+e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                      {[5,10,15,20].map(n=><option key={n}>{n}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Difficulty</label>
+                    <select value={difficulty} onChange={e=>setDifficulty(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                      {["Easy","Moderate","Challenging","Mixed"].map(d=><option key={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="text-xs text-gray-500 block mb-1">Question Types</label>
+                    <div className="flex flex-wrap gap-1">
+                      {["MCQ","Short Answer","Long Answer","True/False","Fill-in-Blank","Case-Based"].map(qt=>(
+                        <button key={qt} onClick={()=>setQTypes(prev=>prev.includes(qt)?prev.filter(x=>x!==qt):[...prev,qt])}
+                          className={`px-2 py-0.5 rounded text-xs border ${qTypes.includes(qt)?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>
+                          {qt}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {mode === "custom" && (
-            <div className="bg-white rounded-xl shadow p-4 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Subject</label>
-                  <select value={custSubj} onChange={e=>{setCustSubj(e.target.value);setCustDomain(e.target.value==="literacy"?"Listening":"Operations");}} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
-                    <option value="literacy">📖 Literacy</option>
-                    <option value="numeracy">🔢 Numeracy</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Domain</label>
-                  <select value={custDomain} onChange={e=>setCustDomain(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
-                    {custDomains.map(d=><option key={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">No. of Questions</label>
-                  <select value={numQ} onChange={e=>setNumQ(+e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
-                    {[5,10,15,20].map(n=><option key={n}>{n}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {loadingComps ? (
-                <div className="text-xs text-gray-400">Loading competencies...</div>
-              ) : custComps.length > 0 ? (
-                <div className="bg-indigo-50 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-indigo-800 mb-2">{custComps.length} competencies found</p>
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
-                    {custComps.map((c:any,i:number)=>(
-                      <div key={i} className="flex gap-2 text-xs">
-                        <span className="font-mono text-indigo-600 font-bold shrink-0">[{c.competency_code}]</span>
-                        <span className="text-gray-600 truncate">{c.description||c.desc}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-xs text-gray-400 bg-gray-50 rounded p-3">No competencies found for this selection. Questions will be general.</div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Difficulty</label>
-                  <select value={difficulty} onChange={e=>setDifficulty(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
-                    {["Easy","Moderate","Challenging","Mixed"].map(d=><option key={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Question Types</label>
-                  <div className="flex flex-wrap gap-1">
-                    {["MCQ","Short Answer","Case-Based"].map(qt=>(
-                      <button key={qt} onClick={()=>setQTypes(prev=>prev.includes(qt)?prev.filter(x=>x!==qt):[...prev,qt])}
-                        className={`px-2 py-0.5 rounded text-xs border ${qTypes.includes(qt)?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>
-                        {qt}
-                      </button>
-                    ))}
+                  {ppMode === "assessment" && (
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Total Marks</label>
+                      <input type="number" min={10} max={200} value={totalMarks} onChange={e=>setTotalMarks(+e.target.value)}
+                        className="border border-gray-300 rounded px-2 py-1.5 text-xs w-24" />
+                    </div>
+                  )}
+                  <div className="sm:col-span-2">
+                    <label className="text-xs text-gray-500 block mb-1">Extra Instructions (optional)</label>
+                    <textarea value={extraInstructions} onChange={e=>setExtraInstructions(e.target.value)}
+                      rows={2} placeholder="e.g. include classroom application scenarios, focus on theory..."
+                      className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full resize-none" />
                   </div>
                 </div>
               </div>
-            </div>
+
+              {msg && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{msg}</p>}
+              <button onClick={generate} disabled={generating||!GROQ_KEY2}
+                className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-bold rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50">
+                {generating ? "⏳ Generating..." : `🎯 Generate ${ppMode==="practice"?"Practice":"Assessment"} Paper (${numQ} questions)`}
+              </button>
+              {!GROQ_KEY2 && <p className="text-xs text-amber-600 text-center">⚠️ VITE_GROQ_API_KEY not set in .env</p>}
+            </>
           )}
+        </div>
+      )}
+
+      {/* ── CUSTOM TOPIC ── */}
+      {selfSubTab === "custom" && (
+        <div className="space-y-4">
+          {/* Paper type */}
+          <div className="bg-white rounded-xl shadow p-4 flex gap-2 flex-wrap">
+            {[{id:"practice",label:"✍️ Practice Paper"},{id:"assessment",label:"📋 Assessment Paper"}].map(p=>(
+              <button key={p.id} onClick={()=>setPpMode(p.id as any)}
+                className={`px-4 py-2 text-xs rounded-lg border font-medium ${ppMode===p.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="bg-white rounded-xl shadow p-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Subject</label>
+                <select value={custSubj} onChange={e=>{setCustSubj(e.target.value);setCustDomain(e.target.value==="literacy"?"Listening":"Operations");}} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                  <option value="literacy">📖 Literacy</option>
+                  <option value="numeracy">🔢 Numeracy</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Domain</label>
+                <select value={custDomain} onChange={e=>setCustDomain(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                  {custDomains.map(d=><option key={d}>{d}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">No. of Questions</label>
+                <select value={numQ} onChange={e=>setNumQ(+e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                  {[5,10,15,20].map(n=><option key={n}>{n}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {loadingComps ? (
+              <div className="text-xs text-gray-400">Loading competencies...</div>
+            ) : custComps.length > 0 ? (
+              <div className="bg-indigo-50 rounded-lg p-3">
+                <p className="text-xs font-semibold text-indigo-800 mb-2">{custComps.length} competencies found</p>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {custComps.map((c:any,i:number)=>(
+                    <div key={i} className="flex gap-2 text-xs">
+                      <span className="font-mono text-indigo-600 font-bold shrink-0">[{c.competency_code}]</span>
+                      <span className="text-gray-600 truncate">{c.description||c.desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-gray-400 bg-gray-50 rounded p-3">No competencies found for this selection. Questions will be general.</div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Difficulty</label>
+                <select value={difficulty} onChange={e=>setDifficulty(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                  {["Easy","Moderate","Challenging","Mixed"].map(d=><option key={d}>{d}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Question Types</label>
+                <div className="flex flex-wrap gap-1">
+                  {["MCQ","Short Answer","Long Answer","Case-Based"].map(qt=>(
+                    <button key={qt} onClick={()=>setQTypes(prev=>prev.includes(qt)?prev.filter(x=>x!==qt):[...prev,qt])}
+                      className={`px-2 py-0.5 rounded text-xs border ${qTypes.includes(qt)?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>
+                      {qt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {ppMode === "assessment" && (
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Total Marks</label>
+                  <input type="number" min={10} max={200} value={totalMarks} onChange={e=>setTotalMarks(+e.target.value)}
+                    className="border border-gray-300 rounded px-2 py-1.5 text-xs w-24" />
+                </div>
+              )}
+              <div className="col-span-2">
+                <label className="text-xs text-gray-500 block mb-1">Extra Instructions (optional)</label>
+                <textarea value={extraInstructions} onChange={e=>setExtraInstructions(e.target.value)}
+                  rows={2} placeholder="e.g. include classroom application scenarios, focus on theory..."
+                  className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full resize-none" />
+              </div>
+            </div>
+          </div>
 
           {msg && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{msg}</p>}
-
           <button onClick={generate} disabled={generating||!GROQ_KEY2}
             className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-bold rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50">
             {generating ? "⏳ Generating..." : `🎯 Generate ${ppMode==="practice"?"Practice":"Assessment"} Paper (${numQ} questions)`}
           </button>
           {!GROQ_KEY2 && <p className="text-xs text-amber-600 text-center">⚠️ VITE_GROQ_API_KEY not set in .env</p>}
+        </div>
+      )}
 
-          {output && (
-            <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-bold text-gray-800">Generated Paper</h4>
-                <button onClick={()=>{const b=new Blob([output],{type:"text/plain"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=`Paper_${user?.name?.replace(/\s+/g,"_")}_${new Date().toISOString().split("T")[0]}.txt`;a.click();URL.revokeObjectURL(u);}}
-                  className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700">
-                  📥 Download .txt
-                </button>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-800 whitespace-pre-wrap font-mono leading-relaxed max-h-[600px] overflow-y-auto border border-gray-200">
-                {output}
-              </div>
+      {/* ── LEARNING RESOURCES ── */}
+      {selfSubTab === "resources" && (
+        <div className="space-y-4">
+          <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+            <h4 className="text-sm font-bold text-purple-800 mb-1">📚 Learning Resources for Your Gap Areas</h4>
+            <p className="text-xs text-purple-600">Search links for each domain where your baseline score is below 60%. Domains clear automatically when you improve.</p>
+          </div>
+
+          {!assessments.length ? (
+            <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">No baseline data found for {academicYear}. Complete assessment first.</div>
+          ) : resourceGaps.length === 0 ? (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+              <p className="text-2xl mb-2">🎉</p>
+              <p className="text-sm font-medium text-green-700">No current gap areas! All domains are above 60% in your latest assessment.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500 px-1">{resourceGaps.length} gap area{resourceGaps.length!==1?"s":""} found — click links to open search results in a new tab</p>
+              {resourceGaps.map((gap:any)=>{
+                const links = getSearchLinks(gap);
+                const isLit = gap.subject === "literacy";
+                return (
+                  <div key={`${gap.subject}_${gap.domain}`} className={`bg-white rounded-xl shadow overflow-hidden border-l-4 ${isLit?"border-blue-500":"border-purple-500"}`}>
+                    <div className={`px-4 py-3 ${isLit?"bg-blue-50":"bg-purple-50"}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-gray-800">{isLit?"📖":"🔢"} {gap.subject==="literacy"?"Literacy":"Numeracy"} — {gap.domain}</span>
+                        <span className="text-xs text-gray-500">{gap.score.toFixed(0)}% · {gap.stage} · {gap.grade}</span>
+                      </div>
+                    </div>
+                    <div className="px-4 py-3 space-y-2">
+                      <a href={links.google} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs text-blue-700 font-medium transition-all">
+                        <span>🔍</span>
+                        <span className="flex-1">Search Google — teacher resources</span>
+                        <span className="text-blue-400">↗</span>
+                      </a>
+                      <a href={links.youtube} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg text-xs text-red-700 font-medium transition-all">
+                        <span>▶️</span>
+                        <span className="flex-1">Search YouTube — teaching strategies</span>
+                        <span className="text-red-400">↗</span>
+                      </a>
+                      <a href={links.khanacademy} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg text-xs text-green-700 font-medium transition-all">
+                        <span>🎓</span>
+                        <span className="flex-1">Khan Academy — {gap.domain}</span>
+                        <span className="text-green-400">↗</span>
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
-        </>
+        </div>
+      )}
+
+      {/* Shared output — shown for gap & custom paper generation */}
+      {(selfSubTab==="gap"||selfSubTab==="custom") && output && (
+        <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-bold text-gray-800">Generated Paper</h4>
+            <button onClick={()=>{const b=new Blob([output],{type:"text/plain"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=`Paper_${user?.name?.replace(/\s+/g,"_")}_${new Date().toISOString().split("T")[0]}.txt`;a.click();URL.revokeObjectURL(u);}}
+              className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700">
+              📥 Download .txt
+            </button>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-800 whitespace-pre-wrap break-words font-mono leading-relaxed max-h-[600px] overflow-y-auto border border-gray-200">
+            {output}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -4552,11 +4698,16 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
 // PROMOTION TAB — class teacher only
 // ─────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// FOR STUDENTS TAB  (merged AI Tools + AI Homework)
+// Gap logic is preserved exactly:
+//   PASA  → latestByCode: iterate examSummary chronologically, last write wins per competency_code
+//   Baseline → sort rounds, take slice(-1)[0], check literacy_pct/numeracy_pct < 60%
+// ─────────────────────────────────────────────────────────────────────────────
 function AIToolsTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
   const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
 
-  // Correctly extract from mappings structure
   const allMappings: any[] = mappings?.mappings || [];
   const teacherSubjects: string[] = [...new Set(allMappings.map((m:any) => m.subject).filter(Boolean))] as string[];
   const classGrade = mappings?.class_grade || allMappings[0]?.grade || "";
@@ -4568,6 +4719,7 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  const [gapStatus, setGapStatus] = useState("");
 
   // AME
   const [competencies, setCompetencies] = useState<any[]>([]);
@@ -4575,18 +4727,18 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
   const [loadingComp, setLoadingComp] = useState(false);
   const [generatedAME, setGeneratedAME] = useState<{a:string;m:string;e:string}|null>(null);
 
-  // Practice / Assessment — individual student gap-based
+  // Practice / Assessment — multi-student
   const [students, setStudents] = useState<any[]>([]);
-  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [gapSource, setGapSource] = useState<"pasa"|"baseline">("pasa");
-  const [examTypes, setExamTypes] = useState<string[]>([]);
-  const [selectedExam, setSelectedExam] = useState("");
-  const [studentGaps, setStudentGaps] = useState<any[]>([]);
-  const [loadingGaps, setLoadingGaps] = useState(false);
   const [numQ, setNumQ] = useState(10);
   const [difficulty, setDifficulty] = useState("Mixed");
   const [qTypes, setQTypes] = useState<string[]>(["Multiple Choice (MCQ)","Short Answer","Case-Based Short Answer"]);
+  const [extraInstructions, setExtraInstructions] = useState("");
+  const [totalMarks, setTotalMarks] = useState(50);
   const [paperOutput, setPaperOutput] = useState("");
+  const MAX_STUDENTS = 10;
+
   // Parent suggestions
   const [selectedParentStudent, setSelectedParentStudent] = useState<any>(null);
   const [parentContext, setParentContext] = useState("");
@@ -4601,7 +4753,6 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
   // Auto-loads
   useEffect(() => { if (selectedSubject) fetchCompetencies(); }, [selectedSubject, classGrade]);
   useEffect(() => { if (allMappings.length > 0) fetchStudents(); }, [mappings]);
-  useEffect(() => { if ((subTab==="practice"||subTab==="assessment") && selectedStudent) fetchStudentGaps(); }, [selectedStudent, gapSource, selectedExam, selectedSubject]);
   useEffect(() => { if (subTab==="history") fetchHistory(); }, [subTab, historyFilter]);
   useEffect(() => { if (subTab==="parent" && selectedParentStudent) fetchActivityGaps(selectedParentStudent.id); }, [selectedParentStudent]);
 
@@ -4672,44 +4823,48 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
     } catch {}
   };
 
-  const fetchStudentGaps = async () => {
-    if (!selectedStudent) return;
-    setLoadingGaps(true); setStudentGaps([]);
+  // Fetch gaps for one student — returns formatted string for prompt building.
+  // Gap logic is preserved exactly:
+  //   PASA: latestByCode — iterates examSummary in order, last write per competency_code wins
+  //   Baseline: sort by round, take slice(-1)[0], check literacy_pct/numeracy_pct < 60%
+  const fetchGapsForOneStudent = async (studentId: string): Promise<string> => {
     try {
       if (gapSource === "pasa") {
-        const r = await axios.get(`${API}/pasa/student/${selectedStudent.id}/analysis?academic_year=${academicYear}`);
-        if (!r.data) { setLoadingGaps(false); return; }
-        setExamTypes([...new Set((r.data.examSummary||[]).map((e:any)=>e.exam).filter(Boolean))]);
-        const gaps: any[] = [];
+        const r = await axios.get(`${API}/pasa/student/${studentId}/analysis?academic_year=${academicYear}`);
+        if (!r.data) return "  no PASA data available";
+        const latestByCode: Record<string, any> = {};
         (r.data.examSummary || []).forEach((exam: any) => {
-          if (selectedExam && exam.exam !== selectedExam) return;
           Object.entries(exam.subjects || {}).forEach(([sub, sd]: [string, any]) => {
             if (selectedSubject && sub.toLowerCase() !== selectedSubject.toLowerCase()) return;
             (sd.competency_scores || []).forEach((cs: any) => {
-              if (cs.marks_obtained !== null && cs.max_marks > 0 && (cs.marks_obtained / cs.max_marks) * 100 < 60) {
-                gaps.push({ subject: sub, code: cs.competency_code, name: cs.competency_name, score: +((cs.marks_obtained/cs.max_marks)*100).toFixed(0), exam: exam.exam });
+              if (cs.marks_obtained !== null && cs.max_marks > 0) {
+                const pct = (cs.marks_obtained / cs.max_marks) * 100;
+                latestByCode[cs.competency_code] = { code: cs.competency_code, name: cs.competency_name, pct };
               }
             });
           });
         });
-        setStudentGaps(gaps);
+        const gaps = Object.values(latestByCode).filter((c: any) => c.pct < 60);
+        if (!gaps.length) return "  above 60% in all PA/SA competencies — generate enrichment questions";
+        return gaps.map((c: any) => `  - [${c.code}] ${c.name}: ${c.pct.toFixed(0)}%`).join("\n");
       } else {
-        const r = await axios.get(`${API}/baseline/student/${selectedStudent.id}/portfolio`);
-        const gaps: any[] = [];
+        const r = await axios.get(`${API}/baseline/student/${studentId}/portfolio`);
         const allA: any[] = r.data?.assessments || [];
         const latestA = allA.sort((a: any, b: any) => a.round > b.round ? 1 : -1).slice(-1)[0];
-        if (latestA) {
-          if (latestA.literacy_pct) Object.entries(latestA.literacy_pct).forEach(([domain, score]: [string, any]) => {
-            if (+score < 60) gaps.push({ subject: "literacy", domain, score: +score });
-          });
-          if (latestA.numeracy_pct) Object.entries(latestA.numeracy_pct).forEach(([domain, score]: [string, any]) => {
-            if (+score < 60) gaps.push({ subject: "numeracy", domain, score: +score });
-          });
-        }
-        setStudentGaps(gaps);
+        if (!latestA) return "  no baseline data available";
+        const gaps: string[] = [];
+        if (latestA.literacy_pct) Object.entries(latestA.literacy_pct).forEach(([domain, score]: [string, any]) => {
+          if (+score < 60) gaps.push(`  - Literacy / ${domain}: ${(+score).toFixed(0)}%`);
+        });
+        if (latestA.numeracy_pct) Object.entries(latestA.numeracy_pct).forEach(([domain, score]: [string, any]) => {
+          if (+score < 60) gaps.push(`  - Numeracy / ${domain}: ${(+score).toFixed(0)}%`);
+        });
+        if (!gaps.length) return "  above 60% in all baseline domains — generate enrichment questions";
+        return gaps.join("\n");
       }
-    } catch {}
-    setLoadingGaps(false);
+    } catch {
+      return "  gap data unavailable — generate general subject questions";
+    }
   };
 
   const callGroq = async (prompt: string, maxTokens = 2500): Promise<string> => {
@@ -4749,49 +4904,62 @@ Make each question clear, age-appropriate, directly testing the competency.`;
     setGenerating(false);
   };
 
-  // Generate Practice or Assessment paper
+  // Generate Practice or Assessment paper — multi-student, gap-aware
   const generatePaper = async (type: "Practice"|"Assessment") => {
-    if (!selectedStudent || !studentGaps.length) { setMsg("❌ Select a student with gap data first"); return; }
-    setGenerating(true); setPaperOutput(""); setMsg("");
+    if (!selectedStudents.length) { setMsg("❌ Select at least one student"); return; }
+    setGenerating(true); setPaperOutput(""); setMsg(""); setGapStatus("");
     try {
-      const gapBlock = studentGaps.slice(0,8).map((g:any) =>
-        `- ${g.subject||""} [${g.code||g.domain||""}] ${g.name||g.domain||""} — Score: ${g.score}%`
-      ).join("\n");
+      const studentDetails: { name: string; gaps: string }[] = [];
+      for (let i = 0; i < selectedStudents.length; i++) {
+        const id = selectedStudents[i];
+        const student = students.find((s:any) => s.id === id);
+        if (!student) continue;
+        setGapStatus(`Fetching gaps for ${student.name} (${i + 1}/${selectedStudents.length})...`);
+        const gaps = await fetchGapsForOneStudent(id);
+        studentDetails.push({ name: student.name, gaps });
+      }
+      setGapStatus("Generating paper...");
       const diffNote: Record<string,string> = {
         Easy:"All questions: recall and basic application only.",
         Moderate:"Mix of recall, application and simple analysis.",
         Challenging:"Focus on analysis, evaluation and synthesis.",
         Mixed:"Mix 40% easy, 40% moderate, 20% challenging.",
       };
-      const qCount = type === "Practice" ? numQ : 15;
-      const marksNote = type === "Assessment" ? "\n- Assign marks: 10 MCQ × 1 mark, 3 Short Answer × 4 marks, 2 Long Answer × 5 marks (Total 32 marks)" : "";
-      const prompt = `You are an expert educational assessor creating a ${type} Paper for a student in India.
+      const marksNote = type === "Assessment" ? `\n- Total marks: ${totalMarks}. Distribute marks proportionally across questions.` : "";
+      const extraNote = extraInstructions ? `\n\nEXTRA INSTRUCTIONS FROM TEACHER:\n${extraInstructions}` : "";
+      const studentSection = studentDetails.map(sd =>
+        `STUDENT: ${sd.name}\nGAP AREAS (below 60%):\n${sd.gaps}`
+      ).join("\n\n---\n\n");
+      const multiNote = studentDetails.length > 1
+        ? `GENERATE SEPARATE SECTIONS FOR EACH STUDENT:\n\n${studentSection}\n\nCreate a SEPARATE section for each student with exactly ${numQ} targeted questions based on their specific gap areas.`
+        : `${studentSection}\n\nCreate exactly ${numQ} questions targeting this student's specific gap areas.`;
+      const prompt = `You are an expert educational assessor creating ${type === "Practice" ? "a Practice Paper" : "an Assessment Paper"} for students in India.
 
-Student: ${selectedStudent.name} | Grade: ${classGrade} | Subject: ${selectedSubject||"Mixed"}
-Gap source: ${gapSource==="pasa"?"PA/SA Assessment":"Baseline Assessment"}
-${selectedExam?`Exam filter: ${selectedExam}`:""}
+Grade: ${classGrade} | Subject: ${selectedSubject||"Mixed"}
+Gap source: ${gapSource==="pasa"?"PA/SA Assessment (current gaps — latest exam per competency)":"Baseline Assessment (latest round)"}
 
-STUDENT GAP AREAS (below 60%):
-${gapBlock}
+${multiNote}
 
 REQUIREMENTS:
-- Exactly ${qCount} questions
-- Question types: ${type==="Practice"?qTypes.join(", "):"MCQ, Short Answer, Long Answer"}
-- Difficulty: ${difficulty} — ${diffNote[difficulty]}
+- Exactly ${numQ} questions${studentDetails.length > 1 ? " per student" : ""}
+- Question types: ${qTypes.join(", ")}
+- Difficulty: ${difficulty} — ${diffNote[difficulty]||"Mixed difficulty"}
 - Tag each question with competency code [CODE]
 - Include complete Answer Key with explanations${marksNote}
-- Age-appropriate language for Grade ${classGrade}
+- Age-appropriate language for Grade ${classGrade}${extraNote}
 
-FORMATS:
+QUESTION FORMAT:
 [MCQ] 4 options A/B/C/D, correct marked ✓, 1-line reason
 [SA] Short Answer: model answer 2–3 sentences
 [LA] Long Answer: model answer 5–8 sentences
 [FIB] Fill in the Blank with answer
-[CBSA] 3-4 line classroom scenario + question + 2–3 sentence answer
+[CBSA] Case-Based Short Answer: 3-4 line scenario + question + 2–3 sentence answer
+[CBLA] Case-Based Long Answer: 5-6 line detailed scenario + question + 5–8 sentence answer
 
-Title: ${type} Paper — ${selectedStudent.name} — ${selectedSubject||"Mixed"} — ${new Date().toLocaleDateString()}`;
-      setPaperOutput(await callGroq(prompt, 3000));
+Title: ${type} Paper — ${selectedSubject||"Mixed"} — Grade ${classGrade} — ${new Date().toLocaleDateString()}`;
+      setPaperOutput(await callGroq(prompt, Math.min(1000 + selectedStudents.length * numQ * 60, 6000)));
     } catch { setMsg("❌ Generation failed. Check API key."); }
+    setGapStatus("");
     setGenerating(false);
   };
 
@@ -4871,7 +5039,7 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
     {id:"history", label:"🕒 History", desc:"All AI-generated records for this year — view, print, delete"},
   ];
 
-  const Q_TYPE_OPTIONS = ["Multiple Choice (MCQ)","Short Answer","Long Answer","True/False","Fill in the Blank","Case-Based Short Answer"];
+  const Q_TYPE_OPTIONS = ["Multiple Choice (MCQ)","Short Answer","Long Answer","True/False","Fill in the Blank","Case-Based Short Answer","Case-Based Long Answer"];
 
   return (
     <div className="space-y-4">
@@ -4934,7 +5102,7 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
                     <h3 className="text-sm font-bold text-gray-700">{label}</h3>
                     <button onClick={()=>printContent(generatedAME[key as "a"|"m"|"e"],label)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
                   </div>
-                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{generatedAME[key as "a"|"m"|"e"]}</pre>
+                  <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words overflow-x-auto font-sans leading-relaxed">{generatedAME[key as "a"|"m"|"e"]}</pre>
                 </div>
               ))}
               <button onClick={()=>saveRecord("AME",{content_a:generatedAME.a,content_m:generatedAME.m,content_e:generatedAME.e})} disabled={saving}
@@ -4949,7 +5117,8 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
       {/* ── PRACTICE / ASSESSMENT ── */}
       {(subTab==="practice"||subTab==="assessment") && (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Settings row */}
+          <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-gray-500 block mb-1">Subject Filter</label>
               <select value={selectedSubject} onChange={e=>setSelectedSubject(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
@@ -4960,31 +5129,15 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
             <div>
               <label className="text-xs text-gray-500 block mb-1">Gap Source</label>
               <select value={gapSource} onChange={e=>setGapSource(e.target.value as any)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                <option value="pasa">PA/SA Competency Gaps</option>
-                <option value="baseline">Baseline Gaps</option>
-              </select>
-            </div>
-            {gapSource==="pasa" && (
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Exam Filter</label>
-                <select value={selectedExam} onChange={e=>setSelectedExam(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                  <option value="">All Exams</option>
-                  {examTypes.map(t=><option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-            )}
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Student *</label>
-              <select value={selectedStudent?.id||""} onChange={e=>setSelectedStudent(students.find(s=>s.id===e.target.value)||null)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                <option value="">-- Select student --</option>
-                {students.map((s:any)=><option key={s.id} value={s.id}>{s.name}</option>)}
+                <option value="pasa">PA/SA Competency Gaps (current)</option>
+                <option value="baseline">Baseline Gaps (current)</option>
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 block mb-1">No. of Questions</label>
-              <select value={numQ} onChange={e=>setNumQ(+e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                {[5,10,15,20].map(n=><option key={n} value={n}>{n} questions</option>)}
-              </select>
+              <label className="text-xs text-gray-500 block mb-1">No. of Questions: {numQ}</label>
+              <input type="range" min={5} max={30} step={1} value={numQ} onChange={e=>setNumQ(+e.target.value)}
+                className="w-full accent-indigo-600" />
+              <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>5</span><span>30</span></div>
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Difficulty</label>
@@ -4993,54 +5146,83 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
               </select>
             </div>
           </div>
-          {subTab==="practice" && (
+
+          {/* Question types — both practice and assessment */}
+          <div className="bg-white rounded-xl shadow p-4">
+            <label className="text-xs text-gray-500 block mb-2">Question Types</label>
+            <div className="flex flex-wrap gap-2">
+              {Q_TYPE_OPTIONS.map(qt=>(
+                <label key={qt} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                  <input type="checkbox" checked={qTypes.includes(qt)} onChange={e=>setQTypes(p=>e.target.checked?[...p,qt]:p.filter(q=>q!==qt))} className="accent-indigo-600" />
+                  {qt}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Total marks — Assessment only */}
+          {subTab==="assessment" && (
             <div className="bg-white rounded-xl shadow p-4">
-              <label className="text-xs text-gray-500 block mb-2">Question Types</label>
-              <div className="flex flex-wrap gap-2">
-                {Q_TYPE_OPTIONS.map(qt=>(
-                  <label key={qt} className="flex items-center gap-1.5 text-xs cursor-pointer">
-                    <input type="checkbox" checked={qTypes.includes(qt)} onChange={e=>setQTypes(p=>e.target.checked?[...p,qt]:p.filter(q=>q!==qt))} className="accent-indigo-600" />
-                    {qt}
-                  </label>
-                ))}
-              </div>
+              <label className="text-xs text-gray-500 block mb-1">Total Marks</label>
+              <input type="number" min={10} max={200} value={totalMarks} onChange={e=>setTotalMarks(+e.target.value)}
+                className="border border-gray-300 rounded px-3 py-1.5 text-sm w-32" />
+              <span className="text-xs text-gray-400 ml-2">Marks distributed proportionally across questions</span>
             </div>
           )}
-          {/* Gap display */}
-          {selectedStudent && (
-            <div className="bg-white rounded-xl shadow p-4">
-              <p className="text-xs font-bold text-gray-600 mb-2">
-                Gaps for {selectedStudent.name}
-                {loadingGaps && <span className="ml-2 text-indigo-400 font-normal animate-pulse">Loading...</span>}
-              </p>
-              {!loadingGaps && studentGaps.length===0 && <p className="text-xs text-gray-400">No gaps below 60% found. Try a different source or exam.</p>}
-              {!loadingGaps && studentGaps.length>0 && (
-                <div className="flex flex-wrap gap-2">
-                  {studentGaps.slice(0,10).map((g:any,i:number)=>(
-                    <span key={i} className="px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                      [{g.code||g.domain}] {g.score}%
-                    </span>
-                  ))}
-                  {studentGaps.length>10 && <span className="text-xs text-gray-400">+{studentGaps.length-10} more</span>}
-                </div>
+
+          {/* Extra instructions */}
+          <div className="bg-white rounded-xl shadow p-4">
+            <label className="text-xs text-gray-500 block mb-1">Extra Instructions (optional)</label>
+            <textarea value={extraInstructions} onChange={e=>setExtraInstructions(e.target.value)}
+              rows={2} placeholder="e.g. focus on diagrams, include real-world examples, avoid difficult vocabulary..."
+              className="border border-gray-300 rounded px-3 py-2 text-sm w-full resize-none" />
+          </div>
+
+          {/* Student multi-select */}
+          <div className="bg-white rounded-xl shadow p-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-gray-700">Select Students * <span className="font-normal text-gray-400">({selectedStudents.length}/{MAX_STUDENTS} selected — gaps fetched per student before generating)</span></label>
+              {selectedStudents.length > 0 && (
+                <button onClick={()=>setSelectedStudents([])} className="text-xs text-red-500 hover:underline">Clear all</button>
               )}
             </div>
-          )}
+            {selectedStudents.length >= MAX_STUDENTS && (
+              <p className="text-xs text-amber-600 mb-2">Maximum {MAX_STUDENTS} students reached. Deselect one to add another.</p>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-48 overflow-y-auto">
+              {students.map((s:any)=>{
+                const isSelected = selectedStudents.includes(s.id);
+                const isDisabled = !isSelected && selectedStudents.length >= MAX_STUDENTS;
+                return (
+                  <label key={s.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs cursor-pointer transition-all ${isSelected?"bg-indigo-50 border-indigo-400 text-indigo-800":isDisabled?"bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed":"border-gray-200 hover:border-indigo-300 hover:bg-indigo-50"}`}>
+                    <input type="checkbox" checked={isSelected} disabled={isDisabled}
+                      onChange={e=>setSelectedStudents(p=>e.target.checked?[...p,s.id]:p.filter(id=>id!==s.id))}
+                      className="accent-indigo-600 shrink-0" />
+                    {s.name}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {gapStatus && <p className="text-xs text-indigo-600 animate-pulse px-1">{gapStatus}</p>}
+
           <button onClick={()=>generatePaper(subTab==="practice"?"Practice":"Assessment")}
-            disabled={generating||!selectedStudent||studentGaps.length===0}
+            disabled={generating||!selectedStudents.length}
             className="px-5 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-            {generating?"Generating...":"⚡ Generate "+( subTab==="practice"?"Practice Paper":"Assessment Paper")}
+            {generating?"Generating...":"⚡ Generate "+(subTab==="practice"?"Practice Paper":"Assessment Paper")+(selectedStudents.length>0?` (${selectedStudents.length} student${selectedStudents.length!==1?"s":""})`:" — select students")}
           </button>
+
           {paperOutput && (
             <div className="bg-white rounded-xl shadow p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-gray-700">{subTab==="practice"?"Practice":"Assessment"} Paper — {selectedStudent?.name}</h3>
+                <h3 className="text-sm font-bold text-gray-700">{subTab==="practice"?"Practice":"Assessment"} Paper</h3>
                 <div className="flex gap-2">
-                  <button onClick={()=>printContent(paperOutput,`${subTab==="practice"?"Practice":"Assessment"} Paper — ${selectedStudent?.name}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
-                  <button onClick={()=>saveRecord(subTab==="practice"?"Practice":"Assessment",{content:paperOutput,student_id:selectedStudent?.id,student_name:selectedStudent?.name})} disabled={saving} className="text-xs text-green-600 hover:underline">{saving?"Saving...":"💾 Save"}</button>
+                  <button onClick={()=>printContent(paperOutput,`${subTab==="practice"?"Practice":"Assessment"} Paper — ${selectedSubject||"Mixed"}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
+                  <button onClick={()=>saveRecord(subTab==="practice"?"Practice":"Assessment",{content:paperOutput,student_name:students.filter((s:any)=>selectedStudents.includes(s.id)).map((s:any)=>s.name).join(", ")})} disabled={saving} className="text-xs text-green-600 hover:underline">{saving?"Saving...":"💾 Save"}</button>
                 </div>
               </div>
-              <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{paperOutput}</pre>
+              <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words overflow-x-auto font-sans leading-relaxed">{paperOutput}</pre>
             </div>
           )}
         </div>
@@ -6032,7 +6214,6 @@ function LearningResourcesTab({ user, academicYear }: any) {
 
   const [baselineData, setBaselineData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [selectedRound, setSelectedRound] = useState(0);
   const [resources, setResources] = useState<Record<string,string>>({});
   const [generating, setGenerating] = useState<Record<string,boolean>>({});
   const [msg, setMsg] = useState("");
@@ -6048,34 +6229,31 @@ function LearningResourcesTab({ user, academicYear }: any) {
     setLoading(false);
   };
 
-  const getRoundGaps = (roundIdx: number) => {
+  // Compute current gaps — for each domain, take the LATEST round's score.
+  // If the teacher improved to ≥60% in a later round, that domain is cleared.
+  const getCurrentGaps = () => {
     if (!baselineData?.assessments?.length) return [];
     const allRounds = [...baselineData.assessments].sort((a:any,b:any) => a.round > b.round ? 1 : -1);
-    const a = allRounds[roundIdx];
-    if (!a) return [];
-    const gaps: any[] = [];
-    const stage = a.stage || "foundation";
-    const grade = RESOURCE_GRADE[stage] || "Grade 2";
-
-    if (a.literacy_pct) {
+    const latestByDomain: Record<string, any> = {};
+    allRounds.forEach((a: any) => {
       const litStage = (a.gaps as any)?.lit_stage || a.stage || "foundation";
-      const litGrade = RESOURCE_GRADE[litStage] || "Grade 2";
-      Object.entries(a.literacy_pct).forEach(([domain, pct]: [string, any]) => {
-        if (+pct < 60) gaps.push({ subject:"literacy", domain, score:+pct, stage:litStage, grade:litGrade, round: roundIdx+1 });
-      });
-    }
-    if (a.numeracy_pct) {
       const numStage = (a.gaps as any)?.num_stage || a.stage || "foundation";
-      const numGrade = RESOURCE_GRADE[numStage] || "Grade 2";
-      Object.entries(a.numeracy_pct).forEach(([domain, pct]: [string, any]) => {
-        if (+pct < 60) gaps.push({ subject:"numeracy", domain, score:+pct, stage:numStage, grade:numGrade, round: roundIdx+1 });
-      });
-    }
-    return gaps;
+      if (a.literacy_pct) {
+        Object.entries(a.literacy_pct).forEach(([domain, pct]: [string, any]) => {
+          latestByDomain[`lit_${domain}`] = { subject:"literacy", domain, score:+pct, stage:litStage, grade:RESOURCE_GRADE[litStage]||"Grade 2" };
+        });
+      }
+      if (a.numeracy_pct) {
+        Object.entries(a.numeracy_pct).forEach(([domain, pct]: [string, any]) => {
+          latestByDomain[`num_${domain}`] = { subject:"numeracy", domain, score:+pct, stage:numStage, grade:RESOURCE_GRADE[numStage]||"Grade 2" };
+        });
+      }
+    });
+    return Object.values(latestByDomain).filter((g: any) => g.score < 60);
   };
 
   const generateResources = async (gap: any) => {
-    const key = `${gap.subject}_${gap.domain}_${selectedRound}`;
+    const key = `${gap.subject}_${gap.domain}`;
     if (resources[key]) return; // already cached
     setGenerating(p => ({ ...p, [key]: true }));
     try {
@@ -6145,41 +6323,29 @@ Format exactly:
     );
   }
 
-  // Get available rounds
-  const roundNums = [...new Set(baselineData.assessments.map((a: any) => a.round_number || 1))].sort() as number[];
-  const gaps = getRoundGaps(selectedRound);
+  // Current gaps: latest score per domain across all rounds. Cleared if teacher improved to ≥60%.
+  const gaps = getCurrentGaps();
 
   return (
     <div className="space-y-4">
       <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
         <h2 className="text-sm font-bold text-purple-800 mb-1">📚 Learning Resources</h2>
-        <p className="text-xs text-purple-600">AI-generated resources mapped to your baseline gap competencies. Resources are cached once generated.</p>
-      </div>
-
-      {/* Round selector */}
-      <div className="bg-white rounded-xl shadow p-3 flex gap-3 items-center flex-wrap">
-        <label className="text-xs text-gray-500">Assessment Round:</label>
-        {roundNums.map((rn, i) => (
-          <button key={rn} onClick={() => setSelectedRound(i)}
-            className={`px-3 py-1.5 text-xs rounded-lg font-medium ${selectedRound === i ? "bg-purple-600 text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-purple-50"}`}>
-            Round {rn}
-          </button>
-        ))}
+        <p className="text-xs text-purple-600">AI-generated resources for your current gap areas — updated automatically as you improve across rounds.</p>
       </div>
 
       {gaps.length === 0 ? (
         <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
           <p className="text-2xl mb-2">🎉</p>
-          <p className="text-sm font-medium text-green-700">No gap areas in this round! All domains above average.</p>
+          <p className="text-sm font-medium text-green-700">No current gap areas! All domains are above 60% in your latest assessment.</p>
         </div>
       ) : (
         <div className="space-y-3">
           <div className="bg-white rounded-xl shadow p-3">
-            <p className="text-xs font-bold text-gray-700">{gaps.length} Gap Areas in Round {roundNums[selectedRound]}</p>
-            <p className="text-xs text-gray-500 mt-0.5">Domains where you scored below your subject average. Click "Generate Resources" to load AI-curated materials.</p>
+            <p className="text-xs font-bold text-gray-700">{gaps.length} Current Gap Areas</p>
+            <p className="text-xs text-gray-500 mt-0.5">Domains where your latest score is below 60%. Once you improve, they clear automatically. Click "Generate Resources" to load AI-curated materials.</p>
           </div>
           {gaps.map((gap: any) => {
-            const key = `${gap.subject}_${gap.domain}_${selectedRound}`;
+            const key = `${gap.subject}_${gap.domain}`;
             const isGenerating = generating[key];
             const result = resources[key];
             const isLit = gap.subject === "literacy";
@@ -6293,17 +6459,22 @@ function HomeworkTab({ user, mappings, academicYear }: any) {
         return gaps.length ? gaps.join("\n") : "  above 60% in all baseline domains — generate enrichment questions";
       } else if (gapSource === "pasa") {
         const r = await axios.get(`${API}/pasa/student/${studentId}/analysis?academic_year=${academicYear}`);
-        const gaps: string[] = [];
+        // Latest score per competency — exams are chronological, last write wins
+        const latestByCode: Record<string, any> = {};
         (r.data?.examSummary || []).forEach((exam: any) => {
           Object.entries(exam.subjects || {}).forEach(([sub, sd]: [string, any]) => {
             if (subject && sub.toLowerCase() !== subject.toLowerCase()) return;
             (sd.competency_scores || []).forEach((cs: any) => {
-              if (cs.marks_obtained !== null && cs.max_marks > 0 && (cs.marks_obtained / cs.max_marks) * 100 < 60) {
-                gaps.push(`  - [${cs.competency_code}] ${cs.competency_name}: ${((cs.marks_obtained / cs.max_marks) * 100).toFixed(0)}% (${exam.exam})`);
+              if (cs.marks_obtained !== null && cs.max_marks > 0) {
+                const pct = (cs.marks_obtained / cs.max_marks) * 100;
+                latestByCode[cs.competency_code] = { code: cs.competency_code, name: cs.competency_name, pct };
               }
             });
           });
         });
+        const gaps = Object.values(latestByCode)
+          .filter((c: any) => c.pct < 60)
+          .map((c: any) => `  - [${c.code}] ${c.name}: ${c.pct.toFixed(0)}%`);
         return gaps.length ? gaps.join("\n") : "  above 60% in all PA/SA assessments — generate enrichment questions";
       } else {
         const r = await axios.get(`${API}/activities/longitudinal/student/${studentId}`);

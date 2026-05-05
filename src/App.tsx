@@ -28,8 +28,7 @@ const CLASS_TABS = (isClassTeacher: boolean) => [
   { id: 'baseline_entry', label: 'Baseline Entry',     show: isClassTeacher },
   { id: 'baseline_dash',  label: 'Baseline Dashboard', show: true },
   { id: 'activities',     label: 'Activities',         show: true },
-  { id: 'ai_tools',       label: 'AI Tools',           show: true },
-  { id: 'homework',       label: 'AI Homework',        show: true },
+  { id: 'ai_tools',       label: 'For Students',       show: true },
   { id: 'alerts',         label: 'Alerts',             show: true },
   { id: 'promotion',      label: 'Promotion',          show: isClassTeacher },
   { id: 'portfolio',      label: 'Student Portfolio',  show: true },
@@ -40,8 +39,7 @@ const SELF_TABS = [
   { id: 'self_baseline', label: 'My Baseline',        show: true },
   { id: 'appraisal',     label: 'My Appraisal',       show: true },
   { id: 'observations',  label: 'My Observations',    show: true },
-  { id: 'self_ai',       label: 'AI Learning',        show: true },
-  { id: 'learning_res',  label: 'Learning Resources', show: true },
+  { id: 'self_ai',       label: 'My Learning',        show: true },
 ];
 
 const SELF_TAB_IDS = new Set(SELF_TABS.map(t => t.id));
