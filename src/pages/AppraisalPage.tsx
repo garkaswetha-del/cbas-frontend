@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
 
-const API = "https://cbas-backend-production.up.railway.app";
+const API = import.meta.env.VITE_API_URL || "https://cbas-backend-bxiu.onrender.com";
 
 const GRADE_ORDER = ["Nursery","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
 
@@ -178,6 +178,62 @@ const RESP = [
   {key:"resp_others",label:"Others"},
 ];
 
+const WO_MAP: Record<string,string> = {
+  "4":"ATTENDED 41 TO 50:- 2 MARKS","3":"ATTENDED 21 TO 40:- 1.5 MARKS",
+  "2":"ATTENDED 10 TO 20:- 1 MARK","0":"NOT APPLICABLE :- 0 MARKS",
+};
+const TR_MAP: Record<string,string> = {
+  "2":"CONDUCTED 2 TRAINING:- 2 MARKS","1":"CONDUCTED 1 TRAINING:- 1 MARK","0":"NOT APPLICABLE :- 0 MARKS",
+};
+const BR_MAP: Record<string,string> = {
+  "3":"8 & ABOVE:- 2 MARKS","2":"6 TO 8:- 1.5 MARKS","1":"4 TO 6:- 1 MARK","0":"NOT APPLICABLE :- 0 MARKS",
+};
+const AR_MAP: Record<string,string> = {
+  "2":"2 & ABOVE:- 2 MARKS","1":"1 TO 2:- 1 MARK","0":"NOT APPLICABLE :- 0 MARKS",
+};
+const ST_MAP: Record<string,string> = {
+  "2":"2 & ABOVE:- 2 MARKS","1":"1 TO 2:- 1 MARK","0":"NOT APPLICABLE :- 0 MARKS",
+};
+const TW_MAP: Record<string,string> = {
+  "2":"HIGHLY CO-OPERATIVE: 2 MARKS","1":"GENERALLY CO-OPERATIVE: 1 MARK","0":"SOMETIMES CO-OPERATIVE: 0 MARKS",
+};
+const AT_MAP: Record<string,string> = {
+  "2":"RESPECTFUL & FAIR TOWARDS STUDENTS:- 2 MARKS","1":"SOMETIMES RESPECTFUL & FAIR:- 1 MARK","0":"UNFAIR:- 0 MARKS",
+};
+const CV_MAP: Record<string,string> = {
+  "2":"FULLY COMMITTED & ACTIVELY PROMOTES SCHOOL VALUES:- 2 MARKS",
+  "1":"GENERALLY COMMITTED & SUPPORTS SCHOOL VALUES:- 1 MARK","0":"RARELY FOLLOWS & COMMITTED:- 0 MARKS",
+};
+const AD_MAP: Record<string,string> = {
+  "2":"HIGHLY ADAPTABLE & FLEXIBLE:- 2 MARKS","1":"GENERALLY ADAPTABLE & FLEXIBLE:- 1 MARK","0":"STRUGGLES WITH ADAPTABILITY:- 0 MARKS",
+};
+const DR_MAP: Record<string,string> = {
+  "2":"ALWAYS CLEAN, NEAT & WELL PRESENTED PROFESSIONALLY:- 2 MARKS",
+  "1":"GENERALLY CLEAN & NEAT WITH OCCASIONAL LAPSES:- 1 MARK","0":"FREQUENTLY UNTIDY:- 0 MARKS",
+};
+const FB_MAP: Record<string,string> = {
+  "1":"BELOW 3:- 10%","2":"BELOW 5:- 8%","3":"BELOW 10:- 5%","4":"MORE THAN 10:- 2%",
+};
+const CL_MAP: Record<string,string> = {
+  "1":"BELOW 10:- 3 MARKS","2":"11 TO 15:- 5 MARKS","3":"16 TO 19:- 8 MARKS","4":"20 & ABOVE:- 10 MARKS",
+};
+const EN_MAP: Record<string,string> = {
+  "1":"BELOW 3:- 10%","2":"BELOW 5:- 8%","3":"BELOW 10:- 5%","4":"MORE THAN 10:- 2%",
+};
+const COMM_MAP: Record<string,string> = {
+  "LEAD":"LEAD","MEMBER":"MEMBER","NONE":"NOT INVOLVED",
+};
+const LIT_MAP: Record<string,string> = {
+  "E":"CREATIVE METHODS FOR PHONICS, VOCABULARY, READING & WRITING - EXCELLENT - 5",
+  "G":"REGULAR LITERACY PRACTICE USING STORIES, SONGS & WRITING - GOOD - 3",
+  "N":"IRREGULAR OR LESS ENGAGING LITERACY ACTIVITIES - NEEDS IMPROVEMENT - 2",
+};
+const NUM_MAP: Record<string,string> = {
+  "E":"HANDS ON NUMBER CONCEPTS (COUNTING, PATTERNS, ETC) - EXCELLENT - 5 MARKS",
+  "G":"REGULAR USE OF BASIC MATH THROUGH WORKSHEETS & OBJECTS - GOOD - 3 MARKS",
+  "N":"LIMITED STRATEGIES OR IRREGULAR TEACHING - NEEDS IMPROVEMENT - 2 MARKS",
+};
+
 export default function AppraisalPage() {
   const [year, setYear] = useState("2025-26");
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -193,6 +249,13 @@ export default function AppraisalPage() {
   const [filterStage, setFilterStage] = useState("");
   const [filterStatus, setFilterStatus] = useState<""|"pending"|"saved"|"shared">("");
   const [showShareConfirm, setShowShareConfirm] = useState<{id:string,name:string}|null>(null);
+
+  const [showImport, setShowImport] = useState(false);
+  const [importRows, setImportRows] = useState<any[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ok:number,fail:number}|null>(null);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   const theadRef = useRef<HTMLTableSectionElement>(null);
 
@@ -231,6 +294,178 @@ export default function AppraisalPage() {
   };
 
   const showMsg = (msg: string) => { setMessage(msg); setTimeout(()=>setMessage(""),4000); };
+
+  const mapCode = (map: Record<string,string>, val: any): string|undefined => {
+    if (val === undefined || val === null || val === "") return undefined;
+    const key = String(val).trim().toUpperCase();
+    return map[key] ?? map[String(val).trim()] ?? undefined;
+  };
+
+  const toYN = (val: any): boolean => {
+    if (!val) return false;
+    const s = String(val).trim().toUpperCase();
+    return s === "Y" || s === "YES" || s === "1" || s === "TRUE";
+  };
+
+  const rowToAppraisal = (row: any, isNursery: boolean): any => {
+    const g = (k: string) => row[k];
+    const payload: any = {
+      workshops:                   mapCode(WO_MAP, g("Workshops")),
+      training_sessions:           mapCode(TR_MAP, g("Training")),
+      books_read:                  mapCode(BR_MAP, g("Books Read")),
+      articles_published:          mapCode(AR_MAP, g("Articles")),
+      teaching_strategies:         mapCode(ST_MAP, g("Strategies")),
+      team_work:                   mapCode(TW_MAP, g("Team Work")),
+      attitude_towards_students:   mapCode(AT_MAP, g("Attitude")),
+      commitment_to_values:        mapCode(CV_MAP, g("Commitment")),
+      adaptability:                mapCode(AD_MAP, g("Adaptability")),
+      dressing:                    mapCode(DR_MAP, g("Dressing")),
+      parents_feedback_band:       mapCode(FB_MAP, g("Parents Feedback")),
+      classroom_observation_band:  mapCode(CL_MAP, g("Classroom")),
+      english_comm_band:           mapCode(EN_MAP, g("English Comm")),
+      committee_role:              g("Committee Role") ? (mapCode(COMM_MAP, g("Committee Role")) || String(g("Committee Role"))) : undefined,
+      committee_name:              g("Committee Name") || undefined,
+    };
+    RESP.forEach(r => { payload[r.key] = toYN(g(r.label)); });
+    if (isNursery) {
+      payload.literacy_band = mapCode(LIT_MAP, g("Literacy Band"));
+      payload.numeracy_band = mapCode(NUM_MAP, g("Numeracy Band"));
+    } else {
+      ["PA1","PA2","PA3","PA4","SA1","SA2"].forEach(f => {
+        const v = g(f);
+        payload[f.toLowerCase()] = (v !== undefined && v !== "") ? +v : undefined;
+      });
+    }
+    Object.keys(payload).forEach(k => { if (payload[k] === undefined) delete payload[k]; });
+    return payload;
+  };
+
+  const downloadTemplate = () => {
+    const wb = XLSX.utils.book_new();
+    const g1Headers = [
+      "Teacher Name","PA1","PA2","PA3","PA4","SA1","SA2",
+      "Workshops","Training","Books Read","Articles","Strategies",
+      "Team Work","Attitude","Commitment","Adaptability","Dressing",
+      "Parents Feedback","Classroom","English Comm",
+      ...RESP.map(r => r.label),
+      "Committee Role","Committee Name",
+    ];
+    const g1Rows = teachers.filter(t => !isNurseryTeacher(t.assigned_classes)).map(t => {
+      const row: any = Object.fromEntries(g1Headers.map(h => [h, ""]));
+      row["Teacher Name"] = t.teacher_name;
+      return row;
+    });
+    const ws1 = XLSX.utils.json_to_sheet(g1Rows.length > 0 ? g1Rows : [Object.fromEntries(g1Headers.map(h => [h, ""]))]);
+    XLSX.utils.book_append_sheet(wb, ws1, "Grade1+ Teachers");
+
+    const nursHeaders = [
+      "Teacher Name","Literacy Band","Numeracy Band",
+      "Workshops","Training","Books Read","Articles","Strategies",
+      "Team Work","Attitude","Commitment","Adaptability","Dressing",
+      "Parents Feedback","Classroom","English Comm",
+      ...RESP.map(r => r.label),
+      "Committee Role","Committee Name",
+    ];
+    const nursRows = teachers.filter(t => isNurseryTeacher(t.assigned_classes)).map(t => {
+      const row: any = Object.fromEntries(nursHeaders.map(h => [h, ""]));
+      row["Teacher Name"] = t.teacher_name;
+      return row;
+    });
+    const ws2 = XLSX.utils.json_to_sheet(nursRows.length > 0 ? nursRows : [Object.fromEntries(nursHeaders.map(h => [h, ""]))]);
+    XLSX.utils.book_append_sheet(wb, ws2, "Nursery Teachers");
+
+    const refRows = [
+      {Field:"Workshops",Code:"4",Meaning:"ATTENDED 41 TO 50:- 2 MARKS"},{Field:"",Code:"3",Meaning:"ATTENDED 21 TO 40:- 1.5 MARKS"},
+      {Field:"",Code:"2",Meaning:"ATTENDED 10 TO 20:- 1 MARK"},{Field:"",Code:"0",Meaning:"NOT APPLICABLE :- 0 MARKS"},
+      {Field:"Training",Code:"2",Meaning:"CONDUCTED 2 TRAINING:- 2 MARKS"},{Field:"",Code:"1",Meaning:"CONDUCTED 1 TRAINING:- 1 MARK"},
+      {Field:"",Code:"0",Meaning:"NOT APPLICABLE :- 0 MARKS"},
+      {Field:"Books Read",Code:"3",Meaning:"8 & ABOVE:- 2 MARKS"},{Field:"",Code:"2",Meaning:"6 TO 8:- 1.5 MARKS"},
+      {Field:"",Code:"1",Meaning:"4 TO 6:- 1 MARK"},{Field:"",Code:"0",Meaning:"NOT APPLICABLE :- 0 MARKS"},
+      {Field:"Articles",Code:"2",Meaning:"2 & ABOVE:- 2 MARKS"},{Field:"",Code:"1",Meaning:"1 TO 2:- 1 MARK"},
+      {Field:"",Code:"0",Meaning:"NOT APPLICABLE :- 0 MARKS"},
+      {Field:"Strategies",Code:"2",Meaning:"2 & ABOVE:- 2 MARKS"},{Field:"",Code:"1",Meaning:"1 TO 2:- 1 MARK"},
+      {Field:"",Code:"0",Meaning:"NOT APPLICABLE :- 0 MARKS"},
+      {Field:"Team Work",Code:"2",Meaning:"HIGHLY CO-OPERATIVE: 2 MARKS"},{Field:"",Code:"1",Meaning:"GENERALLY CO-OPERATIVE: 1 MARK"},
+      {Field:"",Code:"0",Meaning:"SOMETIMES CO-OPERATIVE: 0 MARKS"},
+      {Field:"Attitude",Code:"2",Meaning:"RESPECTFUL & FAIR TOWARDS STUDENTS:- 2 MARKS"},{Field:"",Code:"1",Meaning:"SOMETIMES RESPECTFUL & FAIR:- 1 MARK"},
+      {Field:"",Code:"0",Meaning:"UNFAIR:- 0 MARKS"},
+      {Field:"Commitment",Code:"2",Meaning:"FULLY COMMITTED & ACTIVELY PROMOTES SCHOOL VALUES:- 2 MARKS"},
+      {Field:"",Code:"1",Meaning:"GENERALLY COMMITTED & SUPPORTS SCHOOL VALUES:- 1 MARK"},{Field:"",Code:"0",Meaning:"RARELY FOLLOWS & COMMITTED:- 0 MARKS"},
+      {Field:"Adaptability",Code:"2",Meaning:"HIGHLY ADAPTABLE & FLEXIBLE:- 2 MARKS"},{Field:"",Code:"1",Meaning:"GENERALLY ADAPTABLE & FLEXIBLE:- 1 MARK"},
+      {Field:"",Code:"0",Meaning:"STRUGGLES WITH ADAPTABILITY:- 0 MARKS"},
+      {Field:"Dressing",Code:"2",Meaning:"ALWAYS CLEAN, NEAT & WELL PRESENTED PROFESSIONALLY:- 2 MARKS"},
+      {Field:"",Code:"1",Meaning:"GENERALLY CLEAN & NEAT WITH OCCASIONAL LAPSES:- 1 MARK"},{Field:"",Code:"0",Meaning:"FREQUENTLY UNTIDY:- 0 MARKS"},
+      {Field:"Parents Feedback",Code:"1",Meaning:"BELOW 3:- 10%"},{Field:"",Code:"2",Meaning:"BELOW 5:- 8%"},
+      {Field:"",Code:"3",Meaning:"BELOW 10:- 5%"},{Field:"",Code:"4",Meaning:"MORE THAN 10:- 2%"},
+      {Field:"Classroom",Code:"1",Meaning:"BELOW 10:- 3 MARKS"},{Field:"",Code:"2",Meaning:"11 TO 15:- 5 MARKS"},
+      {Field:"",Code:"3",Meaning:"16 TO 19:- 8 MARKS"},{Field:"",Code:"4",Meaning:"20 & ABOVE:- 10 MARKS"},
+      {Field:"English Comm",Code:"1",Meaning:"BELOW 3:- 10%"},{Field:"",Code:"2",Meaning:"BELOW 5:- 8%"},
+      {Field:"",Code:"3",Meaning:"BELOW 10:- 5%"},{Field:"",Code:"4",Meaning:"MORE THAN 10:- 2%"},
+      {Field:"Committee Role",Code:"LEAD",Meaning:"LEAD"},{Field:"",Code:"MEMBER",Meaning:"MEMBER"},
+      {Field:"",Code:"NONE",Meaning:"NOT INVOLVED"},
+      {Field:"Literacy Band (Nursery)",Code:"E",Meaning:"CREATIVE METHODS - EXCELLENT - 5"},
+      {Field:"",Code:"G",Meaning:"REGULAR PRACTICE - GOOD - 3"},{Field:"",Code:"N",Meaning:"IRREGULAR - NEEDS IMPROVEMENT - 2"},
+      {Field:"Numeracy Band (Nursery)",Code:"E",Meaning:"HANDS ON NUMBER CONCEPTS - EXCELLENT - 5 MARKS"},
+      {Field:"",Code:"G",Meaning:"REGULAR BASIC MATH - GOOD - 3 MARKS"},{Field:"",Code:"N",Meaning:"LIMITED STRATEGIES - NEEDS IMPROVEMENT - 2 MARKS"},
+      {Field:"Responsibilities",Code:"Y or N",Meaning:"Y = active, N = not active"},
+      {Field:"Exam Marks PA1-SA2",Code:"0-100",Meaning:"Enter numeric marks"},
+    ];
+    const ws3 = XLSX.utils.json_to_sheet(refRows);
+    XLSX.utils.book_append_sheet(wb, ws3, "Options Reference");
+    XLSX.writeFile(wb, `appraisal_template_${year}.xlsx`);
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const data = new Uint8Array(ev.target!.result as ArrayBuffer);
+      const wb = XLSX.read(data, { type: "array" });
+      const rows: any[] = [];
+      const ws1 = wb.Sheets["Grade1+ Teachers"];
+      if (ws1) XLSX.utils.sheet_to_json<any>(ws1).forEach(r => { if (r["Teacher Name"]) rows.push({...r, _isNursery: false}); });
+      const ws2 = wb.Sheets["Nursery Teachers"];
+      if (ws2) XLSX.utils.sheet_to_json<any>(ws2).forEach(r => { if (r["Teacher Name"]) rows.push({...r, _isNursery: true}); });
+      const resolved = rows.map(row => {
+        const name = String(row["Teacher Name"]).trim();
+        const teacher = teachers.find(t => t.teacher_name?.trim().toLowerCase() === name.toLowerCase());
+        return { ...row, _teacherId: teacher?.teacher_id || null, _teacherName: name };
+      });
+      setImportRows(resolved);
+      setImportResult(null);
+      setImportErrors([]);
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const runImport = async () => {
+    setImporting(true);
+    setImportErrors([]);
+    let ok = 0, fail = 0;
+    const errors: string[] = [];
+    for (const row of importRows) {
+      if (!row._teacherId) {
+        errors.push(`"${row._teacherName}" — teacher not found in system`);
+        fail++;
+        continue;
+      }
+      try {
+        const payload = rowToAppraisal(row, row._isNursery);
+        payload.academic_year = year;
+        payload.teacher_name = row._teacherName;
+        await axios.post(`${API}/appraisal/${row._teacherId}`, payload);
+        ok++;
+      } catch (err: any) {
+        errors.push(`"${row._teacherName}" — ${err?.response?.data?.message || "save failed"}`);
+        fail++;
+      }
+    }
+    setImportResult({ ok, fail });
+    setImportErrors(errors);
+    setImporting(false);
+    if (ok > 0) { fetchData(); showMsg(`✅ Imported ${ok} appraisal${ok > 1 ? "s" : ""}`); }
+  };
 
   const update = (tid:string, field:string, value:any) => {
     setAppraisals(prev=>({...prev,[tid]:{...prev[tid],[field]:value}}));
@@ -500,13 +735,96 @@ export default function AppraisalPage() {
             Clear
           </button>
         )}
-        <div className="ml-auto self-end">
+        <div className="ml-auto self-end flex gap-2">
+          <button onClick={()=>{ setShowImport(v=>!v); setImportRows([]); setImportResult(null); setImportErrors([]); }}
+            className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
+            📥 Import Excel
+          </button>
           <button onClick={exportToExcel}
             className="px-4 py-1.5 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 font-medium">
             📤 Export Excel
           </button>
         </div>
       </div>
+
+      {/* ── IMPORT PANEL ── */}
+      {showImport && (
+        <div className="mb-4 border border-indigo-200 rounded-xl bg-indigo-50 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-indigo-800">Import Appraisals from Excel</h3>
+            <button onClick={()=>setShowImport(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Step 1 */}
+            <div className="bg-white rounded-lg border border-indigo-100 p-3">
+              <p className="text-xs font-semibold text-indigo-700 mb-1">Step 1 — Download Template</p>
+              <p className="text-xs text-gray-500 mb-2">
+                Template pre-fills teacher names from the <strong>{year}</strong> year.
+                Sheet 1: Grade 1+ (PA1–SA2 marks). Sheet 2: Nursery (literacy/numeracy bands).
+                See the <em>Options Reference</em> sheet for valid codes.
+              </p>
+              <button onClick={downloadTemplate}
+                className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 font-medium">
+                ⬇ Download Template
+              </button>
+            </div>
+            {/* Step 2 */}
+            <div className="bg-white rounded-lg border border-indigo-100 p-3">
+              <p className="text-xs font-semibold text-indigo-700 mb-1">Step 2 — Upload Filled Template</p>
+              <p className="text-xs text-gray-500 mb-2">Upload the same Excel file after filling it in.</p>
+              <input ref={importFileRef} type="file" accept=".xlsx,.xls" onChange={handleImportFile}
+                className="text-xs text-gray-600 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-indigo-600 file:text-white file:cursor-pointer" />
+            </div>
+          </div>
+
+          {/* Preview */}
+          {importRows.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-indigo-700 mb-1">{importRows.length} row{importRows.length>1?"s":""} detected — preview:</p>
+              <div className="overflow-auto max-h-40 border border-gray-200 rounded-lg bg-white">
+                <table className="text-xs w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-1.5 text-left text-gray-600 font-medium">Teacher</th>
+                      <th className="px-3 py-1.5 text-left text-gray-600 font-medium">Type</th>
+                      <th className="px-3 py-1.5 text-left text-gray-600 font-medium">Match</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importRows.map((r,i) => (
+                      <tr key={i} className={i%2===0?"bg-white":"bg-gray-50"}>
+                        <td className="px-3 py-1">{r._teacherName}</td>
+                        <td className="px-3 py-1">{r._isNursery ? "Nursery" : "Grade 1+"}</td>
+                        <td className="px-3 py-1">
+                          {r._teacherId
+                            ? <span className="text-green-600 font-medium">✓ Found</span>
+                            : <span className="text-red-500 font-medium">✗ Not found</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center gap-3 mt-2">
+                <button onClick={runImport} disabled={importing || importRows.every(r=>!r._teacherId)}
+                  className="px-4 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+                  {importing ? "Importing…" : `Import ${importRows.filter(r=>r._teacherId).length} records`}
+                </button>
+                {importResult && (
+                  <span className="text-xs text-gray-600">
+                    ✅ {importResult.ok} imported · {importResult.fail > 0 ? `❌ ${importResult.fail} failed` : ""}
+                  </span>
+                )}
+              </div>
+              {importErrors.length > 0 && (
+                <ul className="mt-2 text-xs text-red-600 list-disc list-inside">
+                  {importErrors.map((e,i) => <li key={i}>{e}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── TABS ── */}
       <div className="flex gap-2 mb-3">
