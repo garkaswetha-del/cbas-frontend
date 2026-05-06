@@ -19,7 +19,7 @@ import axios from 'axios';
 // values, tests rename cascade, deactivate/reactivate lifecycle, then deletes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API = 'https://cbas-backend-production.up.railway.app';
+const API = 'https://cbas-backend-bxiu.onrender.com';
 const ACADEMIC_YEAR = '2025-26';
 
 test.describe.configure({ retries: 0 });

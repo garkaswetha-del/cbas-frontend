@@ -9,7 +9,7 @@ import axios from 'axios';
 //   - Works for baseline (per domain), PASA (per competency), activities
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API = 'https://cbas-backend-production.up.railway.app';
+const API = 'https://cbas-backend-bxiu.onrender.com';
 const ACADEMIC_YEAR = '2025-26';
 
 const GRADE_ORDER = [

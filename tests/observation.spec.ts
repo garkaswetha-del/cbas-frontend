@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import axios from 'axios';
 
 const BASE = 'http://localhost:5174';
-const API  = 'https://cbas-backend-production.up.railway.app';
+const API  = 'https://cbas-backend-bxiu.onrender.com';
 const ADMIN_EMAIL    = 'garkaswetha@gmail.com';
 const ADMIN_PASSWORD = 'swetha123';
 const ACADEMIC_YEAR  = '2025-26';

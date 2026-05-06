@@ -19,7 +19,7 @@ import axios from 'axios';
 //   check integrity → verify sync → test full sequence → check return values.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API = 'https://cbas-backend-production.up.railway.app';
+const API = 'https://cbas-backend-bxiu.onrender.com';
 const ACADEMIC_YEAR = '2025-26';
 
 // Real teacher with known baseline data

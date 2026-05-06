@@ -20,7 +20,7 @@ import axios from 'axios';
 // checks teacher↔admin sync, tests reversibility. Cleans up on completion.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API = 'https://cbas-backend-production.up.railway.app';
+const API = 'https://cbas-backend-bxiu.onrender.com';
 const ACADEMIC_YEAR = '2025-26';
 
 // Disable retries — tests are sequential and share state; retries cause afterAll to wipe the user

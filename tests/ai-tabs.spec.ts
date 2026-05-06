@@ -25,7 +25,7 @@ import axios from 'axios';
 //   R12 – Learning Resources URLs: search URLs for gap domains are well-formed
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API = 'https://cbas-backend-production.up.railway.app';
+const API = 'https://cbas-backend-bxiu.onrender.com';
 const ACADEMIC_YEAR = '2025-26';
 
 // ── Context shared across all tests ───────────────────────────────────────────

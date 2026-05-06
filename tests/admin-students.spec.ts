@@ -21,7 +21,7 @@ import axios from 'axios';
 // tests TC workflow, promotion chain. Cleans up on completion.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API = 'https://cbas-backend-production.up.railway.app';
+const API = 'https://cbas-backend-bxiu.onrender.com';
 
 test.describe.configure({ retries: 0 });
 

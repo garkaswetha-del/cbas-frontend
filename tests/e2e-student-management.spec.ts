@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const BASE = 'https://cbas-frontend-production.up.railway.app';
-const API  = 'https://cbas-backend-production.up.railway.app';
+const API  = 'https://cbas-backend-bxiu.onrender.com';
 const ADMIN_EMAIL    = 'garkaswetha@gmail.com';
 const ADMIN_PASSWORD = 'swetha123';
 
