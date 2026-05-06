@@ -11,7 +11,7 @@ const TEST_TEACHER = {
   email:    'e2e.teacher@cbas.test',
   password: 'E2eTest123',
   phone:    '9876543210',
-  qualification: 'BED',
+  qualification: 'GRADUATION WITH BED',
   subject:  'Science',
   grade:    'Grade 6',
 };
