@@ -6,7 +6,7 @@ export default defineConfig({
   retries: 1,
   workers: 1,
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:5173',
+    baseURL: process.env.BASE_URL || 'https://cbas-frontend.onrender.com',
     headless: false,
     slowMo: 500,
   },

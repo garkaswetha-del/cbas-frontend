@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const BASE = 'https://cbas-frontend-production.up.railway.app';
+const BASE = 'https://cbas-frontend.onrender.com';
 const ADMIN_EMAIL = 'garkaswetha@gmail.com';
 const ADMIN_PASSWORD = 'swetha123';
 

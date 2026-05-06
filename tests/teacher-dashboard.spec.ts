@@ -4,7 +4,7 @@ import axios from 'axios';
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
-const BASE = 'https://cbas-frontend-production.up.railway.app';
+const BASE = 'https://cbas-frontend.onrender.com';
 const API  = 'https://cbas-backend-bxiu.onrender.com';
 const ACADEMIC_YEAR = '2025-26';
 
