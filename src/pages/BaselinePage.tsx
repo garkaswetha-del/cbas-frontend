@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+﻿import { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import {
@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, LineChart, Line, Cell,
 } from "recharts";
 
-const API = "https://cbas-backend-production.up.railway.app";
+const API = import.meta.env.VITE_API_URL || "https://cbas-backend-bxiu.onrender.com";
 
 // ── Section name corrections (Excel typos → DB names) ────────────
 const SECTION_CORRECTIONS: Record<string, string> = {

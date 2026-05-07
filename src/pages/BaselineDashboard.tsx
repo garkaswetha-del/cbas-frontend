@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import axios from "axios";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
-const API = "https://cbas-backend-production.up.railway.app";
+const API = import.meta.env.VITE_API_URL || "https://cbas-backend-bxiu.onrender.com";
 const ROUNDS = [
   { value: "baseline_1", label: "Baseline 1" }, { value: "baseline_2", label: "Baseline 2" },
   { value: "baseline_3", label: "Baseline 3" }, { value: "baseline_4", label: "Baseline 4" },
@@ -48,6 +48,24 @@ export default function BaselineDashboard() {
   const [gradeData, setGradeData] = useState<any>(null);
   const [teacherData, setTeacherData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+
+  // Auto-detect latest available round on year change
+  useEffect(() => {
+    const detectLatestRound = async () => {
+      const allRounds = [...ROUNDS].reverse(); // try latest first
+      for (const r of allRounds) {
+        try {
+          const res = await axios.get(`${API}/baseline/dashboard/school?academic_year=${academicYear}&round=${r.value}`);
+          if (res.data?.totalStudents > 0 || res.data?.assessed > 0) {
+            setRound(r.value);
+            return;
+          }
+        } catch { }
+      }
+      setRound("baseline_1"); // fallback
+    };
+    detectLatestRound();
+  }, [academicYear]);
 
   useEffect(() => {
     if (activeTab === "school") fetchSchool();

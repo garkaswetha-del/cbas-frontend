@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
 
-const API = "https://cbas-backend-production.up.railway.app";
+const API = import.meta.env.VITE_API_URL || "https://cbas-backend-bxiu.onrender.com";
 
 const ACADEMIC_YEARS = Array.from({ length: 10 }, (_, i) => {
   const y = 2025 + i;

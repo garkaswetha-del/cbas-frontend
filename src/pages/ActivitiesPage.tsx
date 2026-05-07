@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -6,7 +6,7 @@ import {
   LineChart, Line, Legend,
 } from "recharts";
 
-const API = "https://cbas-backend-production.up.railway.app";
+const API = import.meta.env.VITE_API_URL || "https://cbas-backend-bxiu.onrender.com";
 
 const generateAcademicYears = () => {
   const years = [];

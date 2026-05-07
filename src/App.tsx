@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-const API = import.meta.env.VITE_API_URL || 'https://cbas-backend-production.up.railway.app';
+const API = import.meta.env.VITE_API_URL || 'https://cbas-backend-bxiu.onrender.com';
 import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/LoginPage';
 import UserManagementPage from './pages/UserManagementPage';
