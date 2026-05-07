@@ -647,6 +647,9 @@ export default function BaselinePage() {
   // Teacher / Dashboard state
   const [teachers, setTeachers] = useState<any[]>([]);
   const [dashTab, setDashTab] = useState<"school"|"grade"|"teachers"|"alerts">("school");
+  const [participatingGrades, setParticipatingGrades] = useState<string[]>([]);
+  const [showParticipation, setShowParticipation] = useState(false);
+  const [savingParticipation, setSavingParticipation] = useState(false);
   const [schoolData, setSchoolData] = useState<any>(null);
   const [gradeData, setGradeData] = useState<any>(null);
   const [teacherDashData, setTeacherDashData] = useState<any>(null);
@@ -935,6 +938,19 @@ export default function BaselinePage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Baseline");
     XLSX.writeFile(wb, `baseline_${grade.replace(/ /g,"_")}_${section}_${round}_${academicYear}.xlsx`);
+  };
+
+  const fetchParticipation = async () => {
+    try { const r = await axios.get(`${API}/baseline/participation?academic_year=${academicYear}`); setParticipatingGrades(r.data.participating_grades || []); } catch {}
+  };
+  useEffect(() => { fetchParticipation(); }, [academicYear]);
+
+  const saveParticipation = async () => {
+    setSavingParticipation(true);
+    try { await axios.post(`${API}/baseline/participation`, { academic_year: academicYear, participating_grades: participatingGrades }); } catch {}
+    setSavingParticipation(false);
+    setShowParticipation(false);
+    fetchSchoolDash();
   };
 
   const fetchSchoolDash = async () => {
@@ -1764,15 +1780,48 @@ export default function BaselinePage() {
                 {t.label}
               </button>
             ))}
-            <button onClick={() => {
-              if(dashTab==="school") fetchSchoolDash();
-              else if(dashTab==="grade") fetchGradeDash();
-              else if(dashTab==="teachers") fetchTeacherDash();
-              else fetchAlerts();
-            }} className="ml-auto px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
-              🔄 Refresh
-            </button>
+            <div className="ml-auto flex gap-2">
+              <button onClick={() => setShowParticipation(v => !v)}
+                className="px-3 py-2 text-xs bg-indigo-50 border border-indigo-300 rounded-lg text-indigo-700 font-medium hover:bg-indigo-100">
+                ⚙️ Grade Participation
+              </button>
+              <button onClick={() => {
+                if(dashTab==="school") fetchSchoolDash();
+                else if(dashTab==="grade") fetchGradeDash();
+                else if(dashTab==="teachers") fetchTeacherDash();
+                else fetchAlerts();
+              }} className="px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
+                🔄 Refresh
+              </button>
+            </div>
           </div>
+
+          {showParticipation && (
+            <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+              <h3 className="text-sm font-semibold text-indigo-800 mb-1">Grades participating in baseline exam — {academicYear}</h3>
+              <p className="text-xs text-gray-500 mb-3">Only selected grades count toward Total Students and Pending.</p>
+              <div className="flex flex-wrap gap-3 mb-3">
+                {GRADES.map((g:string) => (
+                  <label key={g} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                    <input type="checkbox" checked={participatingGrades.includes(g)}
+                      onChange={e => setParticipatingGrades(prev => e.target.checked ? [...prev, g] : prev.filter(x => x !== g))}
+                      className="w-4 h-4 accent-indigo-600" />
+                    {g}
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={saveParticipation} disabled={savingParticipation}
+                  className="px-4 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                  {savingParticipation ? "Saving..." : "Save"}
+                </button>
+                <button onClick={() => setShowParticipation(false)}
+                  className="px-4 py-1.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-600">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {dashLoading && (
             <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
