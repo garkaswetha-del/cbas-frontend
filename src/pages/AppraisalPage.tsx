@@ -142,9 +142,9 @@ const SectionCommentCell = ({ field, comment, onComment, bg = "bg-white" }: any)
 const CellWithComment = ({ children, field, comment, onComment }: any) => {
   const [open, setOpen] = useState(false);
   return (
-    <td className="px-2 py-1 border border-gray-200 max-w-[180px]">
-      <div className="flex items-center gap-1 min-w-0">
-        <div className="flex-1 min-w-0 overflow-hidden">{children}</div>
+    <td className="px-2 py-1 border border-gray-200">
+      <div className="flex items-center gap-1">
+        <div className="flex-1">{children}</div>
         <button onClick={()=>setOpen(!open)} title="Add comment"
           className={`text-xs px-1 rounded ${comment?"text-yellow-600 font-bold":"text-gray-300 hover:text-gray-500"}`}>
           💬
