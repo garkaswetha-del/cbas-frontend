@@ -94,12 +94,21 @@ const StatusBadge = ({ status }: { status: "pending"|"saved"|"shared" }) => {
   return <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-medium">⏳ Pending</span>;
 };
 
+function abbrevOption(s: string): string {
+  if (!s) return s;
+  const m = s.match(/:-?\s*(.+)$/);
+  if (m) return m[1].trim();
+  const m2 = s.match(/[–-]\s*([A-Z][A-Z\s\d%]+)$/);
+  if (m2) return m2[1].trim();
+  return s.length > 22 ? s.slice(0, 22) + '…' : s;
+}
+
 const Select = ({ value, onChange, options }: any) => (
   <select value={value||""} onChange={(e)=>onChange(e.target.value)}
     title={value||""}
     className="w-full text-xs border border-gray-300 rounded px-1 py-0.5 bg-white">
     <option value="">--</option>
-    {options.map((o:string)=><option key={o} value={o}>{o}</option>)}
+    {options.map((o:string)=><option key={o} value={o}>{abbrevOption(o)}</option>)}
   </select>
 );
 
