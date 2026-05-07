@@ -154,24 +154,26 @@ export default function BaselineDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-5 overflow-x-auto pb-1 flex-nowrap items-center">
+      <div className="flex gap-2 mb-3 overflow-x-auto pb-1 flex-nowrap items-center">
         {[{ id: "school", label: "🏫 School" }, { id: "grade", label: "📚 Grade" }, { id: "teachers", label: "👩‍🏫 Teachers" }].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id as any)}
             className={`px-4 py-2 text-sm rounded-lg font-medium transition-all ${activeTab === t.id ? "bg-indigo-600 text-white" : "bg-white text-gray-600 border border-gray-300 hover:bg-indigo-50"}`}>
             {t.label}
           </button>
         ))}
-        <button onClick={() => {
-          if (activeTab==="school") fetchSchool();
-          else if (activeTab==="grade") fetchGrade();
-          else fetchTeachers();
-        }} className="ml-auto px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
-          🔄 Refresh
-        </button>
-        <button onClick={() => setShowParticipation(v => !v)}
-          className="px-3 py-1.5 text-xs bg-white border border-indigo-300 rounded-lg text-indigo-600 hover:bg-indigo-50">
-          ⚙️ Grade Participation
-        </button>
+        <div className="ml-auto flex gap-2">
+          <button onClick={() => setShowParticipation(v => !v)}
+            className="px-3 py-1.5 text-xs bg-indigo-50 border border-indigo-300 rounded-lg text-indigo-700 font-medium hover:bg-indigo-100">
+            ⚙️ Grade Participation
+          </button>
+          <button onClick={() => {
+            if (activeTab==="school") fetchSchool();
+            else if (activeTab==="grade") fetchGrade();
+            else fetchTeachers();
+          }} className="px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
+            🔄 Refresh
+          </button>
+        </div>
       </div>
 
       {/* Grade Participation Settings */}
