@@ -39,6 +39,8 @@ const getDomainColor = (score: number) => {
   return "#ef4444";
 };
 
+const ALL_GRADES = ["Pre-KG", "LKG", "UKG", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10"];
+
 export default function BaselineDashboard() {
   const [activeTab, setActiveTab] = useState<"school" | "grade" | "teachers">("school");
   const [academicYear, setAcademicYear] = useState("2025-26");
@@ -48,6 +50,9 @@ export default function BaselineDashboard() {
   const [gradeData, setGradeData] = useState<any>(null);
   const [teacherData, setTeacherData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [participatingGrades, setParticipatingGrades] = useState<string[]>([]);
+  const [showParticipation, setShowParticipation] = useState(false);
+  const [savingParticipation, setSavingParticipation] = useState(false);
 
   // Auto-detect latest available round on year change
   useEffect(() => {
@@ -72,6 +77,20 @@ export default function BaselineDashboard() {
     if (activeTab === "grade") fetchGrade();
     if (activeTab === "teachers") fetchTeachers();
   }, [activeTab, round, selectedGrade, academicYear]);
+
+  useEffect(() => {
+    axios.get(`${API}/baseline/participation?academic_year=${academicYear}`)
+      .then(r => setParticipatingGrades(r.data.participating_grades || []))
+      .catch(() => setParticipatingGrades([]));
+  }, [academicYear]);
+
+  const saveParticipation = async () => {
+    setSavingParticipation(true);
+    await axios.post(`${API}/baseline/participation`, { academic_year: academicYear, participating_grades: participatingGrades });
+    setSavingParticipation(false);
+    setShowParticipation(false);
+    fetchSchool();
+  };
 
   const fetchSchool = async () => {
     setLoading(true);
@@ -149,7 +168,41 @@ export default function BaselineDashboard() {
         }} className="ml-auto px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
           🔄 Refresh
         </button>
+        <button onClick={() => setShowParticipation(v => !v)}
+          className="px-3 py-1.5 text-xs bg-white border border-indigo-300 rounded-lg text-indigo-600 hover:bg-indigo-50">
+          ⚙️ Grade Participation
+        </button>
       </div>
+
+      {/* Grade Participation Settings */}
+      {showParticipation && (
+        <div className="mb-5 p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+          <h3 className="text-sm font-semibold text-indigo-800 mb-1">Grades participating in baseline exam — {academicYear}</h3>
+          <p className="text-xs text-gray-500 mb-3">Only selected grades will be counted in Total Students and Pending. Leave all unchecked to count all grades.</p>
+          <div className="flex flex-wrap gap-3 mb-4">
+            {ALL_GRADES.map(g => (
+              <label key={g} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input type="checkbox" checked={participatingGrades.includes(g)}
+                  onChange={e => setParticipatingGrades(prev =>
+                    e.target.checked ? [...prev, g] : prev.filter(x => x !== g)
+                  )}
+                  className="w-4 h-4 accent-indigo-600" />
+                {g}
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={saveParticipation} disabled={savingParticipation}
+              className="px-4 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+              {savingParticipation ? "Saving..." : "Save"}
+            </button>
+            <button onClick={() => setShowParticipation(false)}
+              className="px-4 py-1.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading && <div className="text-center py-10 text-gray-400">Loading...</div>}
 
