@@ -97,7 +97,7 @@ const StatusBadge = ({ status }: { status: "pending"|"saved"|"shared" }) => {
 const Select = ({ value, onChange, options }: any) => (
   <select value={value||""} onChange={(e)=>onChange(e.target.value)}
     title={value||""}
-    className="w-full text-xs border border-gray-300 rounded px-1 py-0.5 bg-white">
+    className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white">
     <option value="">--</option>
     {options.map((o:string)=><option key={o} value={o}>{o}</option>)}
   </select>
@@ -142,7 +142,7 @@ const SectionCommentCell = ({ field, comment, onComment, bg = "bg-white" }: any)
 const CellWithComment = ({ children, field, comment, onComment }: any) => {
   const [open, setOpen] = useState(false);
   return (
-    <td className="px-2 py-1 border border-gray-200 min-w-[280px]">
+    <td className="px-2 py-1 border border-gray-200">
       <div className="flex items-center gap-1">
         <div className="flex-1">{children}</div>
         <button onClick={()=>setOpen(!open)} title="Add comment"
