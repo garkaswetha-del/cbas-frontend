@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import axios from "axios";
 
 const API = "https://cbas-backend-production.up.railway.app";
@@ -48,7 +48,7 @@ export default function LoginPage({ onLogin }: { onLogin: (user: any) => void })
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1.5">Email Address</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">âœ‰ï¸</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
                   <input
                     type="email"
                     value={email}
@@ -63,7 +63,7 @@ export default function LoginPage({ onLogin }: { onLogin: (user: any) => void })
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1.5">Password</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">ðŸ”’</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">#</span>
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
@@ -77,14 +77,14 @@ export default function LoginPage({ onLogin }: { onLogin: (user: any) => void })
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
                   >
-                    {showPassword ? "ðŸ™ˆ" : "ðŸ‘ï¸"}
+                    {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
               </div>
 
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-xs text-red-700 flex items-center gap-2">
-                  <span>âš ï¸</span> {error}
+                  <span>!</span> {error}
                 </div>
               )}
 
@@ -111,7 +111,7 @@ export default function LoginPage({ onLogin }: { onLogin: (user: any) => void })
         </div>
 
         <p className="text-center text-blue-200 text-xs mt-4 opacity-60">
-          Â© 2025 Wisdom Techno School. All rights reserved.
+          © 2025 Wisdom Techno School. All rights reserved.
         </p>
       </div>
     </div>
