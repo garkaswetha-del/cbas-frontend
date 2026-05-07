@@ -115,9 +115,12 @@ const Check = ({ value, onChange }: any) => (
 
 const Score = ({ value, max }: any) => {
   const v = value ? +value : 0;
-  const pct = max ? ((v/max)*100).toFixed(1) : (v*100).toFixed(1);
+  const pct = (v * 100).toFixed(1);
+  const maxPct = max ? max * 100 : 100;
+  const ratio = maxPct > 0 ? v * 100 / maxPct : 0;
+  const color = ratio >= 0.8 ? "text-green-700" : ratio >= 0.5 ? "text-indigo-700" : "text-orange-600";
   return (
-    <td className="px-2 py-1 text-center text-xs font-bold text-indigo-700 bg-indigo-50 border border-gray-200">
+    <td className={`px-2 py-1 text-center text-xs font-bold bg-indigo-50 border border-gray-200 ${color}`}>
       {value ? pct+"%" : "-"}
     </td>
   );
