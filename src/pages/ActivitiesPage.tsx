@@ -6,7 +6,7 @@ import {
   LineChart, Line, Legend,
 } from "recharts";
 
-const API = import.meta.env.VITE_API_URL || "https://cbas-backend-bxiu.onrender.com";
+const API = "https://cbas-backend-production.up.railway.app";
 
 const generateAcademicYears = () => {
   const years = [];

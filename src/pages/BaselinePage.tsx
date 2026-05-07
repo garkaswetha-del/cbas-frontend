@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, LineChart, Line, Cell,
 } from "recharts";
 
-const API = import.meta.env.VITE_API_URL || "https://cbas-backend-bxiu.onrender.com";
+const API = "https://cbas-backend-production.up.railway.app";
 
 // ── Section name corrections (Excel typos → DB names) ────────────
 const SECTION_CORRECTIONS: Record<string, string> = {

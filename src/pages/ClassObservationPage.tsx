@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, Cell,
 } from "recharts";
 
-const API = import.meta.env.VITE_API_URL || "https://cbas-backend-bxiu.onrender.com";
+const API = "https://cbas-backend-production.up.railway.app";
 const ACADEMIC_YEARS = ["2025-26", "2024-25", "2026-27"];
 
 const CRITERIA = [

@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
-const API = import.meta.env.VITE_API_URL || "https://cbas-backend-bxiu.onrender.com";
+const API = "https://cbas-backend-production.up.railway.app";
 const EXAM_TYPES = ["FA1", "FA2", "SA1", "FA3", "FA4", "SA2", "Custom"];
 const ACADEMIC_YEARS = ["2025-26", "2024-25", "2026-27"];
 
@@ -663,7 +663,7 @@ function PASADashboardTab({ academicYear }: any) {
 }
 
 function StudentDashTab({ grade, section, academicYear }: any) {
-  const API = import.meta.env.VITE_API_URL || "https://cbas-backend-bxiu.onrender.com";
+  const API = "https://cbas-backend-production.up.railway.app";
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [analysis, setAnalysis] = useState<any>(null);
