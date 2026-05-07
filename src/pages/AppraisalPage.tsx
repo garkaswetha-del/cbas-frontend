@@ -59,7 +59,7 @@ function calcIncrement(overallPct: number, respCount: number, salary: number|nul
   else if (overallPct >= 50) base = 5;
   else                       base = 3;
 
-  const extra = respCount > 0 ? respCount * 7 : 0;
+  const extra = respCount > 0 ? 7 : 0;
 
   const acceptedQuals = highestGrade ? (GRADE_CAPS[highestGrade]?.quals || []) : [];
   const hasQualPenalty = qualification !== null && acceptedQuals.length > 0 && respCount > 0
