@@ -168,6 +168,7 @@ export default function UserManagementPage() {
   const [historyUser, setHistoryUser] = useState<any>(null);
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [allSections, setAllSections] = useState<string[]>([]);
+  const [allSectionsFull, setAllSectionsFull] = useState<{grade: string; name: string}[]>([]);
   const photoRef = useRef<HTMLInputElement>(null);
   const xlsxRef = useRef<HTMLInputElement>(null);
 
@@ -214,9 +215,14 @@ export default function UserManagementPage() {
 
   const fetchAssignments = async () => {
     try {
-      const r = await axios.get(`${API}/teacher-assignments?academic_year=${academicYear}`);
+      const r = await axios.get(`${API}/mappings/all?academic_year=${academicYear}`);
       const map: Record<string, any> = {};
-      (r.data || []).forEach((a: any) => { map[a.teacher_id] = a; });
+      (r.data || []).forEach((m: any) => {
+        if (!map[m.teacher_id]) map[m.teacher_id] = { subjects: [], assigned_classes: [], class_teacher_of: '' };
+        if (m.subject && !map[m.teacher_id].subjects.includes(m.subject)) map[m.teacher_id].subjects.push(m.subject);
+        if (m.grade && !map[m.teacher_id].assigned_classes.includes(m.grade)) map[m.teacher_id].assigned_classes.push(m.grade);
+        if (m.is_class_teacher && m.grade && m.section) map[m.teacher_id].class_teacher_of = `${m.grade} ${m.section}`;
+      });
       setAssignments(map);
     } catch { }
   };
@@ -224,8 +230,9 @@ export default function UserManagementPage() {
   const fetchAllSections = async () => {
     try {
       const r = await axios.get(`${API}/sections/counts?academic_year=${academicYear}`);
-      const names = [...new Set((r.data || []).filter((s: any) => s.is_active !== false).map((s: any) => s.name as string))].sort();
-      setAllSections(names);
+      const active = (r.data || []).filter((s: any) => s.is_active !== false);
+      setAllSections([...new Set(active.map((s: any) => s.name as string))].sort());
+      setAllSectionsFull(active.map((s: any) => ({ grade: s.grade, name: s.name })));
     } catch { }
   };
 
@@ -246,8 +253,8 @@ export default function UserManagementPage() {
       role: user.role || "teacher",
       subjects: assignment?.subjects || [],
       assigned_classes: assignment?.assigned_classes || [],
-      assigned_sections: assignment ? (user.assigned_sections || []) : [],
-      class_teacher_of: assignment ? (user.class_teacher_of || "") : "",
+      assigned_sections: user.assigned_sections || [],
+      class_teacher_of: assignment?.class_teacher_of || "",
       phone: user.phone || "",
       appraisal_qualification: user.appraisal_qualification || user.qualification || "",
       experience: user.experience || "",
@@ -286,6 +293,28 @@ export default function UserManagementPage() {
           subjects: form.subjects,
           assigned_classes: form.assigned_classes,
         });
+        // If this teacher has no existing mappings for this year, create section-level
+        // mappings so the teacher can see their sections when they log in.
+        // Skip if mappings already exist (to avoid overwriting section-level setup).
+        const hasExistingMappings = !!(editUser && assignments[editUser.id]);
+        if (!hasExistingMappings && form.assigned_classes.length > 0) {
+          const mappingRows: any[] = [];
+          for (const grade of form.assigned_classes) {
+            const sections = allSectionsFull.filter(s => s.grade === grade).map(s => s.name);
+            for (const section of sections) {
+              for (const subject of (form.subjects.length > 0 ? form.subjects : [null])) {
+                mappingRows.push({ grade, section, subject, is_class_teacher: false });
+              }
+            }
+          }
+          if (mappingRows.length > 0) {
+            await axios.post(`${API}/mappings/save`, {
+              teacher_id: userId,
+              academic_year: academicYear,
+              mappings: mappingRows,
+            });
+          }
+        }
       }
       setShowForm(false);
       resetForm();
@@ -905,8 +934,8 @@ export default function UserManagementPage() {
                           {effectiveClasses.length>0 ? effectiveClasses.join(", ") : <span className="text-gray-300">Not assigned</span>}
                         </td>
                         <td className="px-3 py-2.5">
-                          {assignment && u.class_teacher_of ? (
-                            <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-medium">👑 {u.class_teacher_of}</span>
+                          {assignment?.class_teacher_of ? (
+                            <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-medium">👑 {assignment.class_teacher_of}</span>
                           ) : <span className="text-gray-300">—</span>}
                         </td>
                         <td className="px-3 py-2.5 text-gray-500">
