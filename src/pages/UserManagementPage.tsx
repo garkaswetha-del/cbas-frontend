@@ -246,8 +246,8 @@ export default function UserManagementPage() {
       role: user.role || "teacher",
       subjects: assignment?.subjects || [],
       assigned_classes: assignment?.assigned_classes || [],
-      assigned_sections: user.assigned_sections || [],
-      class_teacher_of: user.class_teacher_of || "",
+      assigned_sections: assignment ? (user.assigned_sections || []) : [],
+      class_teacher_of: assignment ? (user.class_teacher_of || "") : "",
       phone: user.phone || "",
       appraisal_qualification: user.appraisal_qualification || user.qualification || "",
       experience: user.experience || "",
@@ -905,9 +905,9 @@ export default function UserManagementPage() {
                           {effectiveClasses.length>0 ? effectiveClasses.join(", ") : <span className="text-gray-300">Not assigned</span>}
                         </td>
                         <td className="px-3 py-2.5">
-                          {u.class_teacher_of ? (
+                          {assignment && u.class_teacher_of ? (
                             <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-medium">👑 {u.class_teacher_of}</span>
-                          ) : "—"}
+                          ) : <span className="text-gray-300">—</span>}
                         </td>
                         <td className="px-3 py-2.5 text-gray-500">
                           <span className={u.last_login_at ? "text-green-600" : "text-gray-300 italic"}>
