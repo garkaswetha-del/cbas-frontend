@@ -57,9 +57,12 @@ export default function StudentManagementPage() {
   const [promoGrade, setPromoGrade] = useState("");
   const [promoSection, setPromoSection] = useState("");
   const [promoNewSection, setPromoNewSection] = useState("");
+  const [promoNewSectionCustom, setPromoNewSectionCustom] = useState("");
   const [promoPreview, setPromoPreview] = useState<any>(null);
   const [promoStep, setPromoStep] = useState<"select" | "preview" | "done">("select");
   const [promoSections, setPromoSections] = useState<string[]>([]);
+  const [promoNextSections, setPromoNextSections] = useState<string[]>([]);
+  const [promoGradYear, setPromoGradYear] = useState(new Date().getFullYear().toString());
 
   // Profile modal
   const [profileStudent, setProfileStudent] = useState<any>(null);
@@ -218,8 +221,9 @@ export default function StudentManagementPage() {
 
   // Promotion wizard
   const openPromotion = () => {
-    setPromoGrade(""); setPromoSection(""); setPromoNewSection("");
+    setPromoGrade(""); setPromoSection(""); setPromoNewSection(""); setPromoNewSectionCustom("");
     setPromoPreview(null); setPromoStep("select"); setPromoSections([]);
+    setPromoNextSections([]); setPromoGradYear(new Date().getFullYear().toString());
     setShowPromotion(true);
   };
 
@@ -239,19 +243,40 @@ export default function StudentManagementPage() {
       });
       setPromoPreview(res.data);
       setPromoStep("preview");
+      setPromoNewSection(""); setPromoNewSectionCustom("");
+      // Fetch sections for the next grade to populate the dropdown
+      if (res.data.next_grade) {
+        try {
+          const secRes = await axios.get(`${API}/students/sections/${encodeURIComponent(res.data.next_grade)}`);
+          setPromoNextSections(secRes.data?.sections || []);
+        } catch { setPromoNextSections([]); }
+      }
     } catch { showMsg("❌ Error loading preview"); }
   };
 
   const executePromotion = async () => {
-    if (!promoNewSection.trim()) { showMsg("❌ Enter the new section"); return; }
+    const effectiveSection = promoNewSection === "__other__" ? promoNewSectionCustom : promoNewSection;
+    if (!effectiveSection.trim()) { showMsg("❌ Select or enter the new section"); return; }
     try {
       const res = await axios.post(`${API}/students/promotion/execute`, {
-        grade: promoGrade, section: promoSection, new_section: promoNewSection,
+        grade: promoGrade, section: promoSection, new_section: effectiveSection,
       });
       showMsg(`✅ ${res.data.message}`);
       setPromoStep("done");
       fetchStudents(); fetchStats(); fetchAllSections();
     } catch { showMsg("❌ Promotion failed"); }
+  };
+
+  const executeGraduation = async () => {
+    if (!promoGradYear) { showMsg("❌ Select graduation year"); return; }
+    try {
+      const res = await axios.post(`${API}/students/graduation/execute`, {
+        grade: promoGrade, section: promoSection, graduation_year: promoGradYear,
+      });
+      showMsg(`✅ ${res.data.message}`);
+      setPromoStep("done");
+      fetchStudents(); fetchStats(); fetchAllSections();
+    } catch { showMsg("❌ Graduation failed"); }
   };
 
   // Export current filtered list as Excel
@@ -932,7 +957,7 @@ export default function StudentManagementPage() {
                     <select value={promoGrade} onChange={e => loadPromoSections(e.target.value)}
                       className="border border-gray-300 rounded px-3 py-2 text-sm w-full">
                       <option value="">-- Select Grade --</option>
-                      {CLASSES.filter(c => c !== "Grade 10").map(c => <option key={c} value={c}>{c}</option>)}
+                      {CLASSES.map(c => <option key={c} value={c}>{c}{c === "Grade 10" ? " (→ Alumni)" : ""}</option>)}
                     </select>
                   </div>
                   <div>
@@ -975,18 +1000,47 @@ export default function StudentManagementPage() {
                     </tbody>
                   </table>
                 </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">New Section in {promoPreview.next_grade} *</label>
-                  <input type="text" value={promoNewSection} onChange={e => setPromoNewSection(e.target.value)}
-                    placeholder="e.g. HIMALAYA"
-                    className="border border-gray-300 rounded px-3 py-2 text-sm w-full" />
-                  <p className="text-xs text-gray-400 mt-1">All {promoPreview.student_count} students will be placed in this section</p>
-                </div>
+                {promoPreview.next_grade ? (
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">New Section in {promoPreview.next_grade} *</label>
+                    <select value={promoNewSection} onChange={e => { setPromoNewSection(e.target.value); setPromoNewSectionCustom(""); }}
+                      className="border border-gray-300 rounded px-3 py-2 text-sm w-full">
+                      <option value="">-- Select Section --</option>
+                      {promoNextSections.map(s => <option key={s} value={s}>{s}</option>)}
+                      <option value="__other__">Other (type below)</option>
+                    </select>
+                    {promoNewSection === "__other__" && (
+                      <input type="text" value={promoNewSectionCustom} onChange={e => setPromoNewSectionCustom(e.target.value.toUpperCase())}
+                        placeholder="e.g. HIMALAYA"
+                        className="mt-2 border border-gray-300 rounded px-3 py-2 text-sm w-full" />
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">All {promoPreview.student_count} students will be placed in this section</p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Graduation Year *</label>
+                    <select value={promoGradYear} onChange={e => setPromoGradYear(e.target.value)}
+                      className="border border-gray-300 rounded px-3 py-2 text-sm w-full">
+                      {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i).map(y => (
+                        <option key={y} value={String(y)}>{y}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">These {promoPreview.student_count} students will be moved to Alumni records</p>
+                  </div>
+                )}
                 <div className="flex gap-2">
-                  <button onClick={executePromotion} disabled={!promoNewSection.trim()}
-                    className="flex-1 px-6 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold">
-                    ✅ Confirm Promotion
-                  </button>
+                  {promoPreview.next_grade ? (
+                    <button onClick={executePromotion}
+                      disabled={!promoNewSection || (promoNewSection === "__other__" && !promoNewSectionCustom.trim())}
+                      className="flex-1 px-6 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold">
+                      ✅ Confirm Promotion
+                    </button>
+                  ) : (
+                    <button onClick={executeGraduation}
+                      className="flex-1 px-6 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-semibold">
+                      🎓 Graduate to Alumni
+                    </button>
+                  )}
                   <button onClick={() => setPromoStep("select")}
                     className="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">← Back</button>
                 </div>
