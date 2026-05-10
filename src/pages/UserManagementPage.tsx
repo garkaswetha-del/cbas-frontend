@@ -15,18 +15,6 @@ const CLASSES = [
   "Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10",
 ];
 
-const ALL_SECTIONS = [
-  "Duke", "Popeye", "Daisy", "Lotus", "Orchid", "Tulip", "Eagle", "Robin", "Skylark",
-  "Asteroid", "Comet", "Galaxy", "Apus", "Pavo", "Volans",
-  "Edison", "Einstein", "Kalam", "Raman",
-  "Diamond", "Emerald", "Ruby",
-  "Ganga", "Godavari", "Kaveri",
-  "Sathya", "Shanthi", "Vedha",
-  "Jupiter", "Mars", "Mercury", "Venus",
-  "Centaurus", "Orion", "Pegasus",
-  "Himalaya", "Meru", "Vindhya",
-  "Bendre", "Karanth", "Kuvempu",
-];
 
 const SUBJECTS = [
   "English", "Mathematics", "Science", "Social Science", "Kannada", "Hindi",
@@ -179,6 +167,7 @@ export default function UserManagementPage() {
   const [newPassword, setNewPassword] = useState("");
   const [historyUser, setHistoryUser] = useState<any>(null);
   const [historyData, setHistoryData] = useState<any[]>([]);
+  const [allSections, setAllSections] = useState<string[]>([]);
   const photoRef = useRef<HTMLInputElement>(null);
   const xlsxRef = useRef<HTMLInputElement>(null);
 
@@ -195,6 +184,7 @@ export default function UserManagementPage() {
     fetchStats();
     fetchInactive();
     fetchAssignments();
+    fetchAllSections();
   }, [academicYear]);
 
   const showMsg = (msg: string) => { setMessage(msg); setTimeout(() => setMessage(""), 4000); };
@@ -228,6 +218,14 @@ export default function UserManagementPage() {
       const map: Record<string, any> = {};
       (r.data || []).forEach((a: any) => { map[a.teacher_id] = a; });
       setAssignments(map);
+    } catch { }
+  };
+
+  const fetchAllSections = async () => {
+    try {
+      const r = await axios.get(`${API}/sections/counts?academic_year=${academicYear}`);
+      const names = [...new Set((r.data || []).filter((s: any) => s.is_active !== false).map((s: any) => s.name as string))].sort();
+      setAllSections(names);
     } catch { }
   };
 
@@ -714,7 +712,7 @@ export default function UserManagementPage() {
           <div className="mb-4">
             <label className="text-xs text-gray-500 block mb-2 font-semibold">Assigned Sections ({form.assigned_sections.length} selected)</label>
             <div className="flex flex-wrap gap-2">
-              {ALL_SECTIONS.map(s => (
+              {allSections.map(s => (
                 <button key={s} onClick={() => toggleSection(s)}
                   className={`px-3 py-1 text-xs rounded-full border font-medium transition-all ${form.assigned_sections.includes(s)?"bg-purple-600 text-white border-purple-600":"bg-white text-gray-600 border-gray-300 hover:border-purple-400"}`}>
                   {s}
