@@ -244,8 +244,8 @@ export default function UserManagementPage() {
       email: user.email || "",
       password: "",
       role: user.role || "teacher",
-      subjects: assignment?.subjects || user.subjects || [],
-      assigned_classes: assignment?.assigned_classes || user.assigned_classes || [],
+      subjects: assignment?.subjects || [],
+      assigned_classes: assignment?.assigned_classes || [],
       assigned_sections: user.assigned_sections || [],
       class_teacher_of: user.class_teacher_of || "",
       phone: user.phone || "",
@@ -449,15 +449,15 @@ export default function UserManagementPage() {
       u.email?.toLowerCase().includes(q) ||
       (u.subjects || []).join(" ").toLowerCase().includes(q);
     const assignment = assignments[u.id];
-    const effectiveSubjects = assignment?.subjects || u.subjects || [];
-    const effectiveClasses = assignment?.assigned_classes || u.assigned_classes || [];
+    const effectiveSubjects = assignment?.subjects || [];
+    const effectiveClasses = assignment?.assigned_classes || [];
     const matchSubject = !filterSubject || effectiveSubjects.some((s: string) => s.toLowerCase().includes(filterSubject.toLowerCase()));
     const matchGrade = !filterGrade || effectiveClasses.includes(filterGrade);
     const matchQual = !filterQualification || (u.appraisal_qualification || '').toUpperCase() === filterQualification.toUpperCase();
     return matchSearch && matchSubject && matchGrade && matchQual;
   }).sort((a, b) => {
-    const aClasses = (assignments[a.id]?.assigned_classes || a.assigned_classes || []);
-    const bClasses = (assignments[b.id]?.assigned_classes || b.assigned_classes || []);
+    const aClasses = assignments[a.id]?.assigned_classes || [];
+    const bClasses = assignments[b.id]?.assigned_classes || [];
     return primaryStageOrder(aClasses) - primaryStageOrder(bClasses);
   });
 
@@ -861,8 +861,8 @@ export default function UserManagementPage() {
                 <tbody>
                   {filtered.map((u, i) => {
                     const assignment = assignments[u.id];
-                    const effectiveSubjects = assignment?.subjects || u.subjects || [];
-                    const effectiveClasses = assignment?.assigned_classes || u.assigned_classes || [];
+                    const effectiveSubjects = assignment?.subjects || [];
+                    const effectiveClasses = assignment?.assigned_classes || [];
                     return (
                       <tr key={u.id} className={`border-b border-gray-100 hover:bg-indigo-50/30 ${i%2===0?"bg-white":"bg-gray-50"}`}>
                         <td className="px-3 py-2.5 text-center text-gray-400">{i+1}</td>
