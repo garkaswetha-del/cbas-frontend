@@ -286,8 +286,9 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
             numScores[d] = roundData.numeracy_scores?.[d]?.toString() || "";
             numMax[d] = roundData.max_marks?.[d]?.toString() || "";
           });
+          const savedSubjectsExisting = rdGaps.subjects_assessed || "both";
           setEntries(prev => ({ ...prev, [t.id]: {
-            subjects: "both",
+            subjects: savedSubjectsExisting,
             lit_stage: litStage,
             num_stage: numStage,
             litScores, numScores, litMax, numMax,
@@ -305,7 +306,7 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
           const nextNumIdx = STAGE_ORDER.indexOf(prevNumStage) + (numPromoted ? 1 : 0);
           const nextLitStage = STAGE_ORDER[Math.min(nextLitIdx, STAGE_ORDER.length - 1)] || prevLitStage;
           const nextNumStage = STAGE_ORDER[Math.min(nextNumIdx, STAGE_ORDER.length - 1)] || prevNumStage;
-          const savedSubjects = (() => { try { return localStorage.getItem(`teacher_subjects_${t.id}`) || ""; } catch { return ""; } })();
+          const savedSubjects = prevGaps.subjects_assessed || (() => { try { return localStorage.getItem(`teacher_subjects_${t.id}`) || ""; } catch { return ""; } })();
           setEntries(prev => ({ ...prev, [t.id]: {
             subjects: savedSubjects || prev[t.id]?.subjects || "both",
             lit_stage: nextLitStage,
@@ -425,6 +426,7 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
           num_stage: num_stage || "foundation",
           lit_promoted,
           num_promoted,
+          subjects_assessed: subjects,
           assessment_date: assessmentDate,
           literacy_scores: literacyScores,
           numeracy_scores: numeracyScores,

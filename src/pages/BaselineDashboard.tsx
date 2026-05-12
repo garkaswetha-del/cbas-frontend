@@ -507,12 +507,16 @@ export default function BaselineDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {teacherData.top5.map((t: any, i: number) => (
+                  {(teacherData.top5 || []).map((t: any, i: number) => (
                     <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                       <td className="px-3 py-1 text-gray-400">{i + 1}</td>
                       <td className="px-3 py-1 font-medium">{t.name}</td>
-                      <td className="px-3 py-1 text-center text-blue-600">{t.literacy ?? "—"}</td>
-                      <td className="px-3 py-1 text-center text-green-600">{t.numeracy ?? "—"}</td>
+                      <td className="px-3 py-1 text-center text-blue-600">
+                        {t.subjects_assessed === 'numeracy' ? <span className="text-gray-400 text-xs">Not assessed</span> : (t.literacy != null ? `${t.literacy}%` : "—")}
+                      </td>
+                      <td className="px-3 py-1 text-center text-green-600">
+                        {t.subjects_assessed === 'literacy' ? <span className="text-gray-400 text-xs">Not assessed</span> : (t.numeracy != null ? `${t.numeracy}%` : "—")}
+                      </td>
                       <td className="px-3 py-1 text-center font-bold text-indigo-700">{t.overall}%</td>
                       <td className="px-3 py-1">{levelBadge(t.level)}</td>
                     </tr>
@@ -535,12 +539,16 @@ export default function BaselineDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {teacherData.bottom5.map((t: any, i: number) => (
+                  {(teacherData.bottom5 || []).map((t: any, i: number) => (
                     <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                       <td className="px-3 py-1 text-gray-400">{i + 1}</td>
                       <td className="px-3 py-1 font-medium">{t.name}</td>
-                      <td className="px-3 py-1 text-center text-blue-600">{t.literacy ?? "—"}</td>
-                      <td className="px-3 py-1 text-center text-green-600">{t.numeracy ?? "—"}</td>
+                      <td className="px-3 py-1 text-center text-blue-600">
+                        {t.subjects_assessed === 'numeracy' ? <span className="text-gray-400 text-xs">Not assessed</span> : (t.literacy != null ? `${t.literacy}%` : "—")}
+                      </td>
+                      <td className="px-3 py-1 text-center text-green-600">
+                        {t.subjects_assessed === 'literacy' ? <span className="text-gray-400 text-xs">Not assessed</span> : (t.numeracy != null ? `${t.numeracy}%` : "—")}
+                      </td>
                       <td className="px-3 py-1 text-center font-bold text-red-600">{t.overall}%</td>
                       <td className="px-3 py-1">{levelBadge(t.level)}</td>
                     </tr>
@@ -578,10 +586,18 @@ export default function BaselineDashboard() {
                       <td className="px-4 py-2 font-medium text-gray-800">{t.teacher_name}</td>
                       <td className="px-4 py-2 text-center text-gray-500 text-xs">{t.assessment?.stage || "—"}</td>
                       <td className="px-4 py-2 text-center font-semibold text-blue-600">
-                        {t.assessment?.literacy_total ? `${(+t.assessment.literacy_total).toFixed(1)}%` : "—"}
+                        {(() => {
+                          const sa = (t.assessment?.gaps as any)?.subjects_assessed;
+                          if (sa === 'numeracy') return <span className="text-gray-400 text-xs">Not assessed</span>;
+                          return t.assessment?.literacy_total ? `${(+t.assessment.literacy_total).toFixed(1)}%` : "—";
+                        })()}
                       </td>
                       <td className="px-4 py-2 text-center font-semibold text-green-600">
-                        {t.assessment?.numeracy_total ? `${(+t.assessment.numeracy_total).toFixed(1)}%` : "—"}
+                        {(() => {
+                          const sa = (t.assessment?.gaps as any)?.subjects_assessed;
+                          if (sa === 'literacy') return <span className="text-gray-400 text-xs">Not assessed</span>;
+                          return t.assessment?.numeracy_total ? `${(+t.assessment.numeracy_total).toFixed(1)}%` : "—";
+                        })()}
                       </td>
                       <td className="px-4 py-2 text-center font-bold text-indigo-700">
                         {t.assessment?.overall_score ? `${(+t.assessment.overall_score).toFixed(1)}%` : "—"}
