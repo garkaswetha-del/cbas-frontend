@@ -268,8 +268,10 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
 
         if (roundData) {
           // Pre-fill from saved data for THIS round only
-          const litStage = roundData.lit_stage || roundData.stage || "foundation";
-          const numStage = roundData.num_stage || roundData.stage || "foundation";
+          // lit_stage / num_stage are stored inside gaps.promotionInfo by the backend
+          const rdGaps = (roundData.gaps as any) || {};
+          const litStage = rdGaps.lit_stage || roundData.stage || "foundation";
+          const numStage = rdGaps.num_stage || roundData.stage || "foundation";
           const litDoms = getLitDomains(litStage);
           const numDoms = getNumDomains(numStage);
           const litScores: Record<string,string> = {};
@@ -292,11 +294,13 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
           }}));
         } else {
           // No saved data for this round — start FRESH (empty marks)
-          // Carry stage forward from previous round (with subject-wise promotion)
-          const prevLitStage = prevData?.lit_stage || prevData?.stage || "foundation";
-          const prevNumStage = prevData?.num_stage || prevData?.stage || "foundation";
-          const litPromoted = prevData?.lit_promoted === true;
-          const numPromoted = prevData?.num_promoted === true;
+          // Carry stage forward from previous round (subject-wise independent)
+          // lit_stage, num_stage, lit_promoted, num_promoted live inside gaps on the entity
+          const prevGaps = (prevData?.gaps as any) || {};
+          const prevLitStage = prevGaps.lit_stage || prevData?.stage || "foundation";
+          const prevNumStage = prevGaps.num_stage || prevData?.stage || "foundation";
+          const litPromoted = prevGaps.lit_promoted === true;
+          const numPromoted = prevGaps.num_promoted === true;
           const nextLitIdx = STAGE_ORDER.indexOf(prevLitStage) + (litPromoted ? 1 : 0);
           const nextNumIdx = STAGE_ORDER.indexOf(prevNumStage) + (numPromoted ? 1 : 0);
           const nextLitStage = STAGE_ORDER[Math.min(nextLitIdx, STAGE_ORDER.length - 1)] || prevLitStage;
@@ -478,24 +482,36 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
             const litAvgPct = doLit ? calcAvgPct(litScores, litMax, activeLitDomains) : 0;
             const numAvgPct = doNum ? calcAvgPct(numScores, numMax, activeNumDomains) : 0;
             const overall = doLit && doNum ? (litAvgPct+numAvgPct)/2 : doLit ? litAvgPct : numAvgPct;
-            const isPromoted = overall >= 80;
+            // Per-subject independent promotion at 80%
+            const litWillPromote = doLit && litAvgPct >= 80 && litAvgPct > 0;
+            const numWillPromote = doNum && numAvgPct >= 80 && numAvgPct > 0;
+            const isPromotedAny = litWillPromote || numWillPromote;
             const prevAssessments = existingData[teacher.id] || [];
             const prevRound = prevAssessments.find((a:any) => a.round === TROUNDS[Math.max(0,TROUNDS.findIndex(r=>r.value===round)-1)]?.value);
+            const prevGapsForBadge = (prevRound?.gaps as any) || {};
+            const prevLitPromotedBadge = prevGapsForBadge.lit_promoted === true;
+            const prevNumPromotedBadge = prevGapsForBadge.num_promoted === true;
 
             return (
               <div key={teacher.id} className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
                 {/* Teacher header */}
-                <div className={`px-4 py-3 flex items-center justify-between flex-wrap gap-2 ${isPromoted?"bg-green-50 border-b border-green-200":"bg-gray-50 border-b border-gray-200"}`}>
-                  <div className="flex items-center gap-3">
+                <div className={`px-4 py-3 flex items-center justify-between flex-wrap gap-2 ${isPromotedAny?"bg-green-50 border-b border-green-200":"bg-gray-50 border-b border-gray-200"}`}>
+                  <div className="flex items-center gap-3 flex-wrap">
                     <div>
                       <span className="font-bold text-sm text-gray-800">{teacher.name}</span>
                       <span className="text-xs text-gray-400 ml-2">{(teacher.subjects||[]).join(", ")}</span>
                     </div>
-                    {prevRound?.promoted && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">🎉 Promoted from prev round</span>
+                    {prevLitPromotedBadge && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">📖 Literacy promoted last round</span>
                     )}
-                    {isPromoted && overall > 0 && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">🎉 Will Promote This Round</span>
+                    {prevNumPromotedBadge && (
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">🔢 Numeracy promoted last round</span>
+                    )}
+                    {litWillPromote && (
+                      <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-bold">🎉 Literacy: will promote</span>
+                    )}
+                    {numWillPromote && (
+                      <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full font-bold">🎉 Numeracy: will promote</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
