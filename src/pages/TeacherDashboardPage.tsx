@@ -1001,13 +1001,13 @@ function BaselineTab({ user, academicYear }: any) {
   const latestLit = litRounds[litRounds.length - 1];
   const latestNum = numRounds[numRounds.length - 1];
 
-  const litAvg = latest?.literacy_total ? +latest.literacy_total : null;
-  const numAvg = latest?.numeracy_total ? +latest.numeracy_total : null;
-  const overall = latest?.overall_score ? +latest.overall_score : (litAvg !== null && numAvg !== null ? (litAvg+numAvg)/2 : (litAvg ?? numAvg ?? 0));
+  const litAvg = latestLit?.literacy_total != null ? +latestLit.literacy_total : null;
+  const numAvg = latestNum?.numeracy_total != null ? +latestNum.numeracy_total : null;
+  const overall = latest?.overall_score != null ? +latest.overall_score : (litAvg !== null && numAvg !== null ? (litAvg+numAvg)/2 : (litAvg ?? numAvg ?? 0));
 
-  // Get domain names dynamically
-  const LIT_LABELS = latest?.literacy_scores ? Object.keys(latest.literacy_scores) : ["Listening","Speaking","Reading","Writing"];
-  const NUM_LABELS = latest?.numeracy_scores ? Object.keys(latest.numeracy_scores) : ["Operations","Base 10","Measurement","Geometry"];
+  // Get domain names from the subject-specific latest round, not the overall latest round
+  const LIT_LABELS = latestLit?.literacy_scores ? Object.keys(latestLit.literacy_scores) : ["Listening","Speaking","Reading","Writing"];
+  const NUM_LABELS = latestNum?.numeracy_scores ? Object.keys(latestNum.numeracy_scores) : ["Operations","Base 10","Measurement","Geometry"];
   const LIT_DOMAINS = LIT_LABELS; // same — now using names directly
   const NUM_DOMAINS = NUM_LABELS;
 
@@ -1265,7 +1265,7 @@ function BaselineTab({ user, academicYear }: any) {
                     const stage = rGaps.lit_stage || r.stage || "foundation";
                     const promoted = rGaps.lit_promoted === true;
                     const promotedTo = rGaps.lit_promoted_to;
-                    const pct = r.literacy_total ? +r.literacy_total : null;
+                    const pct = r.literacy_total != null ? +r.literacy_total : null;
                     return (
                       <td key={r.round} className="px-2 py-2 text-center">
                         <div className="text-xs capitalize font-medium text-blue-700">{STAGE_LABELS[stage]||stage}</div>
@@ -1282,7 +1282,7 @@ function BaselineTab({ user, academicYear }: any) {
                     const stage = rGaps.num_stage || r.stage || "foundation";
                     const promoted = rGaps.num_promoted === true;
                     const promotedTo = rGaps.num_promoted_to;
-                    const pct = r.numeracy_total ? +r.numeracy_total : null;
+                    const pct = r.numeracy_total != null ? +r.numeracy_total : null;
                     return (
                       <td key={r.round} className="px-2 py-2 text-center">
                         <div className="text-xs capitalize font-medium text-purple-700">{STAGE_LABELS[stage]||stage}</div>
