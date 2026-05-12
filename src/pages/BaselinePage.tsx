@@ -2286,14 +2286,27 @@ export default function BaselinePage() {
                   {(teacherDashData.teacherList||[]).map((t:any) => (
                     <div key={t.teacher_id} className={`flex items-center justify-between p-2 rounded border ${t.assessment?"bg-green-50 border-green-100":"bg-gray-50 border-gray-100"}`}>
                       <span className="text-sm font-medium text-gray-800">{t.teacher_name}</span>
-                      {t.assessment ? (
-                        <div className="flex gap-2">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${scoreBg(+(+t.assessment.literacy_total||0))}`}>Lit: {(+t.assessment.literacy_total||0).toFixed(1)}%</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${scoreBg(+(+t.assessment.numeracy_total||0))}`}>Num: {(+t.assessment.numeracy_total||0).toFixed(1)}%</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${scoreBg(+(+t.assessment.overall_score||0))}`}>{(+t.assessment.overall_score||0).toFixed(1)}%</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${levelBg(t.assessment.level)}`}>{t.assessment.level?.split("–")[0].trim()}</span>
-                        </div>
-                      ) : (
+                      {t.assessment ? (() => {
+                        const aGaps = t.assessment.gaps || {};
+                        const sa = aGaps.subjects_assessed;
+                        const litAssessed = sa !== 'numeracy' && Object.keys(t.assessment.literacy_pct || {}).length > 0;
+                        const numAssessed = sa !== 'literacy' && Object.keys(t.assessment.numeracy_pct || {}).length > 0;
+                        const litVal = t.assessment.literacy_total != null ? (+t.assessment.literacy_total).toFixed(1) : "0.0";
+                        const numVal = t.assessment.numeracy_total != null ? (+t.assessment.numeracy_total).toFixed(1) : "0.0";
+                        const ovVal  = t.assessment.overall_score  != null ? (+t.assessment.overall_score).toFixed(1)  : "0.0";
+                        return (
+                          <div className="flex gap-2 flex-wrap">
+                            {litAssessed
+                              ? <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${scoreBg(+litVal)}`}>Lit: {litVal}%</span>
+                              : <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 italic">Lit: Not assessed</span>}
+                            {numAssessed
+                              ? <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${scoreBg(+numVal)}`}>Num: {numVal}%</span>
+                              : <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 italic">Num: Not assessed</span>}
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${scoreBg(+ovVal)}`}>{ovVal}%</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${levelBg(t.assessment.level)}`}>{t.assessment.level?.split("–")[0].trim()}</span>
+                          </div>
+                        );
+                      })() : (
                         <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Not assessed</span>
                       )}
                     </div>
@@ -2323,6 +2336,9 @@ export default function BaselinePage() {
                     <tbody>
                       {(teacherDashData.teacherList||[]).filter((t:any) => t.assessment).map((t:any, i:number) => {
                         const gaps = t.assessment.gaps || {};
+                        const sa = gaps.subjects_assessed;
+                        const litAssessed = sa !== 'numeracy' && Object.keys(t.assessment.literacy_pct || {}).length > 0;
+                        const numAssessed = sa !== 'literacy' && Object.keys(t.assessment.numeracy_pct || {}).length > 0;
                         const litGaps: string[] = gaps.literacy || [];
                         const numGaps: string[] = gaps.numeracy || [];
                         const litStage = gaps.lit_stage || t.assessment.stage || "foundation";
@@ -2336,32 +2352,44 @@ export default function BaselinePage() {
                           <tr key={t.teacher_id} className={i%2===0?"bg-white":"bg-gray-50"}>
                             <td className="px-3 py-2 font-medium text-gray-800">{t.teacher_name}</td>
                             <td className="px-3 py-2 text-center">
-                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full capitalize">{litStage}</span>
+                              {litAssessed
+                                ? <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full capitalize">{litStage}</span>
+                                : <span className="text-xs text-gray-400 italic">—</span>}
                             </td>
                             <td className="px-3 py-2 text-center">
-                              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full capitalize">{numStage}</span>
+                              {numAssessed
+                                ? <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full capitalize">{numStage}</span>
+                                : <span className="text-xs text-gray-400 italic">—</span>}
                             </td>
-                            <td className="px-3 py-2 text-center text-xs text-gray-600">{litGrade}</td>
-                            <td className="px-3 py-2 text-center text-xs text-gray-600">{numGrade}</td>
+                            <td className="px-3 py-2 text-center text-xs text-gray-600">{litAssessed ? litGrade : "—"}</td>
+                            <td className="px-3 py-2 text-center text-xs text-gray-600">{numAssessed ? numGrade : "—"}</td>
                             <td className="px-3 py-2">
-                              {litGaps.length > 0
-                                ? <div className="flex flex-wrap gap-1">{litGaps.map((g:string) => <span key={g} className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded text-xs">{g}</span>)}</div>
-                                : <span className="text-green-600 text-xs">✅ No gaps</span>}
+                              {!litAssessed
+                                ? <span className="text-gray-400 text-xs italic">Not assessed this round</span>
+                                : litGaps.length > 0
+                                  ? <div className="flex flex-wrap gap-1">{litGaps.map((g:string) => <span key={g} className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded text-xs">{g}</span>)}</div>
+                                  : <span className="text-green-600 text-xs">✅ No gaps</span>}
                             </td>
                             <td className="px-3 py-2">
-                              {numGaps.length > 0
-                                ? <div className="flex flex-wrap gap-1">{numGaps.map((g:string) => <span key={g} className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded text-xs">{g}</span>)}</div>
-                                : <span className="text-green-600 text-xs">✅ No gaps</span>}
+                              {!numAssessed
+                                ? <span className="text-gray-400 text-xs italic">Not assessed this round</span>
+                                : numGaps.length > 0
+                                  ? <div className="flex flex-wrap gap-1">{numGaps.map((g:string) => <span key={g} className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded text-xs">{g}</span>)}</div>
+                                  : <span className="text-green-600 text-xs">✅ No gaps</span>}
                             </td>
                             <td className="px-3 py-2 text-center">
-                              {litPromoted
-                                ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">🎉 Yes → {gaps.lit_promoted_to || "next"}</span>
-                                : <span className="text-xs text-gray-400">—</span>}
+                              {litAssessed
+                                ? litPromoted
+                                  ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">🎉 Yes → {gaps.lit_promoted_to || "next"}</span>
+                                  : <span className="text-xs text-gray-400">—</span>
+                                : <span className="text-xs text-gray-400 italic">—</span>}
                             </td>
                             <td className="px-3 py-2 text-center">
-                              {numPromoted
-                                ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">🎉 Yes → {gaps.num_promoted_to || "next"}</span>
-                                : <span className="text-xs text-gray-400">—</span>}
+                              {numAssessed
+                                ? numPromoted
+                                  ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">🎉 Yes → {gaps.num_promoted_to || "next"}</span>
+                                  : <span className="text-xs text-gray-400">—</span>
+                                : <span className="text-xs text-gray-400 italic">—</span>}
                             </td>
                           </tr>
                         );
