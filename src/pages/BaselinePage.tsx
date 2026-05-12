@@ -575,7 +575,7 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
                     </thead>
                     <tbody>
                       {/* Literacy rows */}
-                      {doLit && (<>
+                      {doLit ? (<>
                         <tr className="bg-blue-50">
                           <td className="px-2 py-1.5 font-bold text-blue-700" rowSpan={2}>📖 Literacy</td>
                           <td className="px-2 py-1 text-center text-xs text-amber-700 font-bold bg-amber-50 border border-amber-200 rounded">Max</td>
@@ -612,10 +612,17 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
                             {litAvgPct > 0 && <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(litAvgPct)}`}>{litAvgPct.toFixed(1)}%</span>}
                           </td>
                         </tr>
-                      </>)}
+                      </>) : (
+                        <tr className="bg-gray-50 border-t border-gray-100">
+                          <td className="px-3 py-2 text-blue-700 font-bold text-xs">📖 Literacy</td>
+                          <td colSpan={1 + activeNumDomains.length + 1} className="px-3 py-2 text-xs text-orange-600 font-medium italic">
+                            Not writing this exam this round
+                          </td>
+                        </tr>
+                      )}
 
                       {/* Numeracy rows */}
-                      {doNum && (<>
+                      {doNum ? (<>
                         <tr className="bg-purple-50">
                           <td className="px-2 py-1.5 font-bold text-purple-700" rowSpan={2}>🔢 Numeracy</td>
                           <td className="px-2 py-1 text-center text-xs text-amber-700 font-bold bg-amber-50 border border-amber-200 rounded">Max</td>
@@ -652,7 +659,14 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
                             {numAvgPct > 0 && <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(numAvgPct)}`}>{numAvgPct.toFixed(1)}%</span>}
                           </td>
                         </tr>
-                      </>)}
+                      </>) : (
+                        <tr className="bg-gray-50 border-t border-gray-100">
+                          <td className="px-3 py-2 text-purple-700 font-bold text-xs">🔢 Numeracy</td>
+                          <td colSpan={1 + activeLitDomains.length + 1} className="px-3 py-2 text-xs text-orange-600 font-medium italic">
+                            Not writing this exam this round
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

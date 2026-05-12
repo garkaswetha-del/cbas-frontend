@@ -588,19 +588,21 @@ export default function BaselineDashboard() {
                       <td className="px-4 py-2 text-center font-semibold text-blue-600">
                         {(() => {
                           const sa = (t.assessment?.gaps as any)?.subjects_assessed;
-                          if (sa === 'numeracy') return <span className="text-gray-400 text-xs">Not assessed</span>;
-                          return t.assessment?.literacy_total ? `${(+t.assessment.literacy_total).toFixed(1)}%` : "—";
+                          if (sa === 'numeracy') return <span className="text-gray-400 text-xs italic">Not assessed</span>;
+                          const v = t.assessment?.literacy_total;
+                          return v != null ? `${(+v).toFixed(1)}%` : "—";
                         })()}
                       </td>
                       <td className="px-4 py-2 text-center font-semibold text-green-600">
                         {(() => {
                           const sa = (t.assessment?.gaps as any)?.subjects_assessed;
-                          if (sa === 'literacy') return <span className="text-gray-400 text-xs">Not assessed</span>;
-                          return t.assessment?.numeracy_total ? `${(+t.assessment.numeracy_total).toFixed(1)}%` : "—";
+                          if (sa === 'literacy') return <span className="text-gray-400 text-xs italic">Not assessed</span>;
+                          const v = t.assessment?.numeracy_total;
+                          return v != null ? `${(+v).toFixed(1)}%` : "—";
                         })()}
                       </td>
                       <td className="px-4 py-2 text-center font-bold text-indigo-700">
-                        {t.assessment?.overall_score ? `${(+t.assessment.overall_score).toFixed(1)}%` : "—"}
+                        {t.assessment?.overall_score != null ? `${(+t.assessment.overall_score).toFixed(1)}%` : "—"}
                       </td>
                       <td className="px-4 py-2 text-center">{levelBadge(t.assessment?.level)}</td>
                       <td className="px-4 py-2 text-center">
