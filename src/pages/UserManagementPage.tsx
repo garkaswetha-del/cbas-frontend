@@ -430,21 +430,6 @@ export default function UserManagementPage() {
       };
       try {
         const res = await axios.post(`${API}/users`, payload);
-        // Write to teacher_mappings (the table UserManagement reads from)
-        if (res.data?.id && grades.length > 0) {
-          const mappingRows: any[] = [];
-          for (const grade of grades) {
-            const sects = allSectionsFull.filter((s: any) => s.grade === grade).map((s: any) => s.name);
-            for (const section of (sects.length > 0 ? sects : [''])) {
-              for (const subject of (subjects.length > 0 ? subjects : [null as any])) {
-                mappingRows.push({ grade, section: section || null, subject, is_class_teacher: false });
-              }
-            }
-          }
-          await axios.post(`${API}/mappings/save`, {
-            teacher_id: res.data.id, academic_year: academicYear, mappings: mappingRows,
-          });
-        }
         success++;
       } catch (e: any) {
         const msg = e?.response?.data?.message || "";
