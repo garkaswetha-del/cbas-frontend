@@ -194,9 +194,38 @@ function parseBaselineExcel(ws: XLSX.WorkSheet): {
 }
 
 // ── TeacherBaselineEntry component ────────────────────────────────
+const STAGE_LIT_DOMAINS: Record<string, string[]> = {
+  foundation:  ["Listening","Speaking","Reading and Comprehension","Writing","Digital literacy","Grammar"],
+  preparatory: ["Listening","Speaking","Reading and Comprehension","Writing","Vocabulary","Digital literacy","Grammar"],
+  middle:      ["Listening","Speaking","Reading and Comprehension","Writing","Vocabulary","Digital literacy","Grammar"],
+  secondary:   ["Listening","Speaking","Reading and Comprehension","Writing","Digital literacy","Language appreciation","Vocabulary","Grammar"],
+};
+const STAGE_NUM_DOMAINS: Record<string, string[]> = {
+  foundation:  ["Operations and algebraic thinking","Number and operations in Base 10","Measurement and data","Geometry","Mathematical vocabulary","Cognitive development"],
+  preparatory: ["Operations and algebraic thinking","Number and operations in Base 10","Measurement and data","Geometry","Mathematical vocabulary"],
+  middle:      ["Operations and algebraic thinking","Number and operations in Base 10","Measurement and data handling","Geometry","Mathematical reasoning and proof","Computational Thinking & Algorithmic Reasoning","Mathematical vocabulary"],
+  secondary:   ["Operations and algebraic thinking","Number and operations in Base 10","Measurement and data handling","Geometry","Mathematical reasoning and proof","Computational Thinking & Mathematical modelling","Interdisciplinary application","Mathematical vocabulary"],
+};
+const DOMAIN_LABEL: Record<string, string> = {
+  "Reading and Comprehension": "Reading",
+  "Digital literacy": "Digital Lit.",
+  "Language appreciation": "Lang. App.",
+  "Operations and algebraic thinking": "Operations",
+  "Number and operations in Base 10": "Base 10",
+  "Measurement and data": "Measurement",
+  "Measurement and data handling": "Measurement",
+  "Mathematical vocabulary": "Math Vocab.",
+  "Cognitive development": "Cognitive Dev.",
+  "Mathematical reasoning and proof": "Reasoning",
+  "Computational Thinking & Algorithmic Reasoning": "Comp. Thinking",
+  "Computational Thinking & Mathematical modelling": "Comp. Modelling",
+  "Interdisciplinary application": "Interdisciplinary",
+};
+const getDLabel = (d: string) => DOMAIN_LABEL[d] || d;
+const getLitDomains = (stage: string) => STAGE_LIT_DOMAINS[stage] || STAGE_LIT_DOMAINS.foundation;
+const getNumDomains = (stage: string) => STAGE_NUM_DOMAINS[stage] || STAGE_NUM_DOMAINS.foundation;
+
 function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAssessmentDate, API: apiUrl, globalRound }: any) {
-  const LIT_DOMAINS = ["Listening","Speaking","Reading","Writing"];
-  const NUM_DOMAINS = ["Operations","Base 10","Measurement","Geometry"];
   const TROUNDS = [
     {value:"baseline_1",label:"Round 1"},{value:"baseline_2",label:"Round 2"},
     {value:"baseline_3",label:"Round 3"},{value:"baseline_4",label:"Round 4"},
@@ -239,22 +268,26 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
 
         if (roundData) {
           // Pre-fill from saved data for THIS round only
+          const litStage = roundData.lit_stage || roundData.stage || "foundation";
+          const numStage = roundData.num_stage || roundData.stage || "foundation";
+          const litDoms = getLitDomains(litStage);
+          const numDoms = getNumDomains(numStage);
           const litScores: Record<string,string> = {};
           const numScores: Record<string,string> = {};
           const litMax: Record<string,string> = {};
           const numMax: Record<string,string> = {};
-          LIT_DOMAINS.forEach(d => {
+          litDoms.forEach(d => {
             litScores[d] = roundData.literacy_scores?.[d]?.toString() || "";
             litMax[d] = roundData.max_marks?.[d]?.toString() || "";
           });
-          NUM_DOMAINS.forEach(d => {
+          numDoms.forEach(d => {
             numScores[d] = roundData.numeracy_scores?.[d]?.toString() || "";
             numMax[d] = roundData.max_marks?.[d]?.toString() || "";
           });
           setEntries(prev => ({ ...prev, [t.id]: {
             subjects: "both",
-            lit_stage: roundData.lit_stage || roundData.stage || "foundation",
-            num_stage: roundData.num_stage || roundData.stage || "foundation",
+            lit_stage: litStage,
+            num_stage: numStage,
             litScores, numScores, litMax, numMax,
           }}));
         } else {
@@ -305,6 +338,14 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
     }
   };
 
+  // Stage change clears that subject's scores so new domains start fresh
+  const updateStage = (tid: string, subject: "lit" | "num", value: string) => {
+    const stageKey = subject === "lit" ? "lit_stage" : "num_stage";
+    const scoreKey = subject === "lit" ? "litScores" : "numScores";
+    const maxKey   = subject === "lit" ? "litMax"    : "numMax";
+    setEntries(prev => ({ ...prev, [tid]: { ...getEntry(tid), [stageKey]: value, [scoreKey]: {}, [maxKey]: {} } }));
+  };
+
   // Calculate % using per-teacher max marks
   const calcPct = (score: string, maxMark: string) => {
     const s = parseFloat(score);
@@ -338,22 +379,24 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
         const { litScores, numScores, litMax, numMax, lit_stage, num_stage, subjects } = entry;
         const doLit = subjects === "literacy" || subjects === "both";
         const doNum = subjects === "numeracy" || subjects === "both";
-        const hasLit = doLit && LIT_DOMAINS.some(d => litScores[d] && litScores[d] !== "");
-        const hasNum = doNum && NUM_DOMAINS.some(d => numScores[d] && numScores[d] !== "");
+        const activeLitDomains = getLitDomains(lit_stage);
+        const activeNumDomains = getNumDomains(num_stage);
+        const hasLit = doLit && activeLitDomains.some(d => litScores[d] && litScores[d] !== "");
+        const hasNum = doNum && activeNumDomains.some(d => numScores[d] && numScores[d] !== "");
         if (!hasLit && !hasNum) continue;
 
         const literacyScores: Record<string,number> = {};
         const numeracyScores: Record<string,number> = {};
         const maxMarks: Record<string,number> = {};
 
-        if (hasLit) LIT_DOMAINS.forEach(d => {
+        if (hasLit) activeLitDomains.forEach(d => {
           const v = parseFloat(litScores[d]||"");
           if (!isNaN(v)) {
             literacyScores[d] = v;
             maxMarks[d] = parseFloat(litMax[d]||"0") || 0;
           }
         });
-        if (hasNum) NUM_DOMAINS.forEach(d => {
+        if (hasNum) activeNumDomains.forEach(d => {
           const v = parseFloat(numScores[d]||"");
           if (!isNaN(v)) {
             numeracyScores[d] = v;
@@ -362,8 +405,8 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
         });
 
         // Calculate subject-wise % averages to determine promotion
-        const litPctAvg = hasLit ? calcAvgPct(litScores, litMax, LIT_DOMAINS) : 0;
-        const numPctAvg = hasNum ? calcAvgPct(numScores, numMax, NUM_DOMAINS) : 0;
+        const litPctAvg = hasLit ? calcAvgPct(litScores, litMax, activeLitDomains) : 0;
+        const numPctAvg = hasNum ? calcAvgPct(numScores, numMax, activeNumDomains) : 0;
         const lit_promoted = hasLit && litPctAvg >= 80;
         const num_promoted = hasNum && numPctAvg >= 80;
 
@@ -430,8 +473,10 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
             const { litScores={}, numScores={}, litMax={}, numMax={}, subjects="both", lit_stage="foundation", num_stage="foundation" } = entry;
             const doLit = subjects === "literacy" || subjects === "both";
             const doNum = subjects === "numeracy" || subjects === "both";
-            const litAvgPct = doLit ? calcAvgPct(litScores, litMax, LIT_DOMAINS) : 0;
-            const numAvgPct = doNum ? calcAvgPct(numScores, numMax, NUM_DOMAINS) : 0;
+            const activeLitDomains = getLitDomains(lit_stage);
+            const activeNumDomains = getNumDomains(num_stage);
+            const litAvgPct = doLit ? calcAvgPct(litScores, litMax, activeLitDomains) : 0;
+            const numAvgPct = doNum ? calcAvgPct(numScores, numMax, activeNumDomains) : 0;
             const overall = doLit && doNum ? (litAvgPct+numAvgPct)/2 : doLit ? litAvgPct : numAvgPct;
             const isPromoted = overall >= 80;
             const prevAssessments = existingData[teacher.id] || [];
@@ -468,19 +513,21 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
                     {doLit && (
                       <div className="flex items-center gap-1">
                         <label className="text-xs text-blue-600">Lit Stage:</label>
-                        <select value={lit_stage} onChange={e => updateEntry(teacher.id, "lit_stage", e.target.value)}
+                        <select value={lit_stage} onChange={e => updateStage(teacher.id, "lit", e.target.value)}
                           className="border border-blue-300 rounded px-2 py-1 text-xs text-blue-700 min-w-[110px]">
                           {STAGES.map(s => <option key={s.value} value={s.value}>{s.label.split(" ")[0]}</option>)}
                         </select>
+                        <span className="text-xs text-blue-400">({getLitDomains(lit_stage).length} domains)</span>
                       </div>
                     )}
                     {doNum && (
                       <div className="flex items-center gap-1">
                         <label className="text-xs text-purple-600">Num Stage:</label>
-                        <select value={num_stage} onChange={e => updateEntry(teacher.id, "num_stage", e.target.value)}
+                        <select value={num_stage} onChange={e => updateStage(teacher.id, "num", e.target.value)}
                           className="border border-purple-300 rounded px-2 py-1 text-xs text-purple-700 min-w-[110px]">
                           {STAGES.map(s => <option key={s.value} value={s.value}>{s.label.split(" ")[0]}</option>)}
                         </select>
+                        <span className="text-xs text-purple-400">({getNumDomains(num_stage).length} domains)</span>
                       </div>
                     )}
                     {/* Overall score badge */}
@@ -499,10 +546,12 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
                       <tr>
                         <th className="px-2 py-1 text-left text-gray-500 w-20">Subject</th>
                         <th className="px-2 py-1 text-center text-gray-400 font-normal w-16">Row</th>
-                        {[...LIT_DOMAINS.filter(()=>doLit), ...NUM_DOMAINS.filter(()=>doNum)].map((d,i) => {
-                          const isLit = LIT_DOMAINS.includes(d);
-                          return <th key={d+i} className={`px-2 py-1 text-center min-w-[70px] ${isLit?"text-blue-700":"text-purple-700"}`}>{d}</th>;
-                        })}
+                        {doLit && activeLitDomains.map((d,i) => (
+                          <th key={d+i} className="px-2 py-1 text-center min-w-[72px] text-blue-700" title={d}>{getDLabel(d)}</th>
+                        ))}
+                        {doNum && activeNumDomains.map((d,i) => (
+                          <th key={d+i} className="px-2 py-1 text-center min-w-[72px] text-purple-700" title={d}>{getDLabel(d)}</th>
+                        ))}
                         <th className="px-2 py-1 text-center text-gray-600 w-16">Avg %</th>
                       </tr>
                     </thead>
@@ -512,7 +561,7 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
                         <tr className="bg-blue-50">
                           <td className="px-2 py-1.5 font-bold text-blue-700" rowSpan={2}>📖 Literacy</td>
                           <td className="px-2 py-1 text-center text-xs text-amber-700 font-bold bg-amber-50 border border-amber-200 rounded">Max</td>
-                          {LIT_DOMAINS.map(d => (
+                          {activeLitDomains.map(d => (
                             <td key={d} className="px-1 py-1 text-center">
                               <input type="number" min={1} step={1}
                                 value={litMax[d]||""}
@@ -522,12 +571,12 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
                               />
                             </td>
                           ))}
-                          {doNum && NUM_DOMAINS.map(d => <td key={d} />)}
+                          {doNum && activeNumDomains.map(d => <td key={d} />)}
                           <td />
                         </tr>
                         <tr className="bg-blue-50">
                           <td className="px-2 py-1 text-center text-xs text-blue-600 font-bold">Marks</td>
-                          {LIT_DOMAINS.map(d => (
+                          {activeLitDomains.map(d => (
                             <td key={d} className="px-1 py-1 text-center">
                               <input type="number" min={0} step={0.5}
                                 value={litScores[d]||""}
@@ -540,7 +589,7 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
                               </div>}
                             </td>
                           ))}
-                          {doNum && NUM_DOMAINS.map(d => <td key={d} />)}
+                          {doNum && activeNumDomains.map(d => <td key={d} />)}
                           <td className="px-2 text-center">
                             {litAvgPct > 0 && <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${scoreBg(litAvgPct)}`}>{litAvgPct.toFixed(1)}%</span>}
                           </td>
@@ -552,8 +601,8 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
                         <tr className="bg-purple-50">
                           <td className="px-2 py-1.5 font-bold text-purple-700" rowSpan={2}>🔢 Numeracy</td>
                           <td className="px-2 py-1 text-center text-xs text-amber-700 font-bold bg-amber-50 border border-amber-200 rounded">Max</td>
-                          {doLit && LIT_DOMAINS.map(d => <td key={d} />)}
-                          {NUM_DOMAINS.map(d => (
+                          {doLit && activeLitDomains.map(d => <td key={d} />)}
+                          {activeNumDomains.map(d => (
                             <td key={d} className="px-1 py-1 text-center">
                               <input type="number" min={1} step={1}
                                 value={numMax[d]||""}
@@ -567,8 +616,8 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
                         </tr>
                         <tr className="bg-purple-50">
                           <td className="px-2 py-1 text-center text-xs text-purple-600 font-bold">Marks</td>
-                          {doLit && LIT_DOMAINS.map(d => <td key={d} />)}
-                          {NUM_DOMAINS.map(d => (
+                          {doLit && activeLitDomains.map(d => <td key={d} />)}
+                          {activeNumDomains.map(d => (
                             <td key={d} className="px-1 py-1 text-center">
                               <input type="number" min={0} step={0.5}
                                 value={numScores[d]||""}
