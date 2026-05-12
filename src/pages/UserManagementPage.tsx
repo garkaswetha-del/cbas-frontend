@@ -285,17 +285,9 @@ export default function UserManagementPage() {
         userId = res.data.id;
         showMsg("✅ User created");
       }
-      // Save assignment for the selected academic year
-      if (userId && (form.subjects.length > 0 || form.assigned_classes.length > 0)) {
-        await axios.post(`${API}/teacher-assignments`, {
-          teacher_id: userId,
-          academic_year: academicYear,
-          subjects: form.subjects,
-          assigned_classes: form.assigned_classes,
-        });
-        // If this teacher has no existing mappings for this year, create section-level
-        // mappings so the teacher can see their sections when they log in.
-        // Skip if mappings already exist (to avoid overwriting section-level setup).
+      // If this teacher has no existing mappings for this year, create section-level mappings.
+      // Skip if mappings already exist (avoid overwriting detailed Mappings-page setup).
+      if (userId && form.role === "teacher") {
         const hasExistingMappings = !!(editUser && assignments[editUser.id]);
         if (!hasExistingMappings && form.assigned_classes.length > 0) {
           const mappingRows: any[] = [];
@@ -438,11 +430,19 @@ export default function UserManagementPage() {
       };
       try {
         const res = await axios.post(`${API}/users`, payload);
-        // Also create assignment for current academic year
-        if (res.data?.id && (subjects.length > 0 || grades.length > 0)) {
-          await axios.post(`${API}/teacher-assignments`, {
-            teacher_id: res.data.id, academic_year: academicYear,
-            subjects, assigned_classes: grades,
+        // Write to teacher_mappings (the table UserManagement reads from)
+        if (res.data?.id && grades.length > 0) {
+          const mappingRows: any[] = [];
+          for (const grade of grades) {
+            const sects = allSectionsFull.filter((s: any) => s.grade === grade).map((s: any) => s.name);
+            for (const section of (sects.length > 0 ? sects : [''])) {
+              for (const subject of (subjects.length > 0 ? subjects : [null as any])) {
+                mappingRows.push({ grade, section: section || null, subject, is_class_teacher: false });
+              }
+            }
+          }
+          await axios.post(`${API}/mappings/save`, {
+            teacher_id: res.data.id, academic_year: academicYear, mappings: mappingRows,
           });
         }
         success++;
@@ -467,6 +467,14 @@ export default function UserManagementPage() {
     setImporting(false);
     fetchUsers(); fetchAssignments(); fetchStats();
   };
+
+  // Determine current academic year (Jun-Dec = current calendar year, Jan-May = previous)
+  const currentAcademicYear = (() => {
+    const now = new Date();
+    const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+    return `${yr}-${String(yr + 1).slice(2)}`;
+  })();
+  const isCurrentYear = academicYear === currentAcademicYear;
 
   const teachers = users.filter(u => u.role === "teacher");
   const admins = users.filter(u => u.role === "admin");
@@ -890,8 +898,16 @@ export default function UserManagementPage() {
                 <tbody>
                   {filtered.map((u, i) => {
                     const assignment = assignments[u.id];
-                    const effectiveSubjects = assignment?.subjects || [];
-                    const effectiveClasses = assignment?.assigned_classes || [];
+                    // For current year: fall back to user entity fields if teacher_mappings has no entry yet.
+                    // For future years: only show what's in teacher_mappings (empty = "Not assigned").
+                    const effectiveSubjects = assignment?.subjects?.length > 0
+                      ? assignment.subjects
+                      : (isCurrentYear ? (u.subjects || []) : []);
+                    const effectiveClasses = assignment?.assigned_classes?.length > 0
+                      ? assignment.assigned_classes
+                      : (isCurrentYear ? (u.assigned_classes || []) : []);
+                    const effectiveClassTeacher = assignment?.class_teacher_of
+                      || (isCurrentYear ? (u.class_teacher_of || '') : '');
                     return (
                       <tr key={u.id} className={`border-b border-gray-100 hover:bg-indigo-50/30 ${i%2===0?"bg-white":"bg-gray-50"}`}>
                         <td className="px-3 py-2.5 text-center text-gray-400">{i+1}</td>
@@ -934,8 +950,8 @@ export default function UserManagementPage() {
                           {effectiveClasses.length>0 ? effectiveClasses.join(", ") : <span className="text-gray-300">Not assigned</span>}
                         </td>
                         <td className="px-3 py-2.5">
-                          {assignment?.class_teacher_of ? (
-                            <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-medium">👑 {assignment.class_teacher_of}</span>
+                          {effectiveClassTeacher ? (
+                            <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-medium">👑 {effectiveClassTeacher}</span>
                           ) : <span className="text-gray-300">—</span>}
                         </td>
                         <td className="px-3 py-2.5 text-gray-500">
