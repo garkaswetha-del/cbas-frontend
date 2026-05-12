@@ -149,9 +149,12 @@ export default function StudentManagementPage() {
 
   const fetchSectionsForGrade = async (grade: string) => {
     if (!grade) { setFormSections([]); return; }
+    const now = new Date();
+    const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+    const academicYear = `${yr}-${String(yr + 1).slice(2)}`;
     try {
-      const res = await axios.get(`${API}/students/sections/${encodeURIComponent(grade)}`);
-      setFormSections(res.data?.sections || []);
+      const res = await axios.get(`${API}/sections`, { params: { grade, academic_year: academicYear } });
+      setFormSections((res.data || []).map((s: any) => s.name).filter(Boolean));
     } catch { setFormSections([]); }
   };
 
@@ -247,19 +250,21 @@ export default function StudentManagementPage() {
       // Fetch sections for the next grade to populate the dropdown
       if (res.data.next_grade) {
         try {
-          const secRes = await axios.get(`${API}/students/sections/${encodeURIComponent(res.data.next_grade)}`);
-          setPromoNextSections(secRes.data?.sections || []);
+          const now = new Date();
+          const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+          const academicYear = `${yr}-${String(yr + 1).slice(2)}`;
+          const secRes = await axios.get(`${API}/sections`, { params: { grade: res.data.next_grade, academic_year: academicYear } });
+          setPromoNextSections((secRes.data || []).map((s: any) => s.name).filter(Boolean));
         } catch { setPromoNextSections([]); }
       }
     } catch { showMsg("❌ Error loading preview"); }
   };
 
   const executePromotion = async () => {
-    const effectiveSection = promoNewSection === "__other__" ? promoNewSectionCustom : promoNewSection;
-    if (!effectiveSection.trim()) { showMsg("❌ Select or enter the new section"); return; }
+    if (!promoNewSection.trim()) { showMsg("❌ Select the new section"); return; }
     try {
       const res = await axios.post(`${API}/students/promotion/execute`, {
-        grade: promoGrade, section: promoSection, new_section: effectiveSection,
+        grade: promoGrade, section: promoSection, new_section: promoNewSection,
       });
       showMsg(`✅ ${res.data.message}`);
       setPromoStep("done");
@@ -540,23 +545,14 @@ export default function StudentManagementPage() {
             </div>
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Section</label>
-              {formSections.length > 0 ? (
-                <select value={form.section} onChange={e => setForm({ ...form, section: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm">
-                  <option value="">-- Select --</option>
-                  {formSections.map(s => <option key={s} value={s}>{s}</option>)}
-                  <option value="__custom__">Other (type below)</option>
-                </select>
-              ) : (
-                <input type="text" value={form.section}
-                  onChange={e => setForm({ ...form, section: e.target.value })}
-                  placeholder="e.g. HIMALAYA"
-                  className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" />
-              )}
-              {form.section === "__custom__" && (
-                <input type="text" placeholder="Type section name"
-                  onChange={e => setForm({ ...form, section: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm mt-1" />
+              <select value={form.section} onChange={e => setForm({ ...form, section: e.target.value })}
+                disabled={!form.current_class}
+                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm disabled:opacity-50">
+                <option value="">-- Select --</option>
+                {formSections.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              {form.current_class && formSections.length === 0 && (
+                <p className="text-xs text-orange-500 mt-1">No sections configured for this grade. Add them in Section Management.</p>
               )}
             </div>
             <div>
@@ -1003,16 +999,13 @@ export default function StudentManagementPage() {
                 {promoPreview.next_grade ? (
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">New Section in {promoPreview.next_grade} *</label>
-                    <select value={promoNewSection} onChange={e => { setPromoNewSection(e.target.value); setPromoNewSectionCustom(""); }}
+                    <select value={promoNewSection} onChange={e => setPromoNewSection(e.target.value)}
                       className="border border-gray-300 rounded px-3 py-2 text-sm w-full">
                       <option value="">-- Select Section --</option>
                       {promoNextSections.map(s => <option key={s} value={s}>{s}</option>)}
-                      <option value="__other__">Other (type below)</option>
                     </select>
-                    {promoNewSection === "__other__" && (
-                      <input type="text" value={promoNewSectionCustom} onChange={e => setPromoNewSectionCustom(e.target.value.toUpperCase())}
-                        placeholder="e.g. HIMALAYA"
-                        className="mt-2 border border-gray-300 rounded px-3 py-2 text-sm w-full" />
+                    {promoNextSections.length === 0 && (
+                      <p className="text-xs text-orange-500 mt-1">No sections configured for {promoPreview.next_grade}. Add them in Section Management first.</p>
                     )}
                     <p className="text-xs text-gray-400 mt-1">All {promoPreview.student_count} students will be placed in this section</p>
                   </div>
@@ -1031,7 +1024,7 @@ export default function StudentManagementPage() {
                 <div className="flex gap-2">
                   {promoPreview.next_grade ? (
                     <button onClick={executePromotion}
-                      disabled={!promoNewSection || (promoNewSection === "__other__" && !promoNewSectionCustom.trim())}
+                      disabled={!promoNewSection}
                       className="flex-1 px-6 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold">
                       ✅ Confirm Promotion
                     </button>
