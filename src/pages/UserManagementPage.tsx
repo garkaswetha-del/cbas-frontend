@@ -244,6 +244,20 @@ export default function UserManagementPage() {
 
   const openAdd = () => { resetForm(); setEditUser(null); setShowForm(true); };
 
+  const downloadCredentials = () => {
+    const teachers = users.filter((u: any) => u.role === "teacher");
+    const rows = teachers.map((u: any) => ({
+      "Name": u.name || "",
+      "User ID (Email)": u.email || "",
+      "Password": u.password || "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [{ wch: 30 }, { wch: 35 }, { wch: 20 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Teacher Login Credentials");
+    XLSX.writeFile(wb, `teacher_credentials_${academicYear}.xlsx`);
+  };
+
   const openEdit = (user: any) => {
     const assignment = assignments[user.id];
     setForm({
@@ -502,6 +516,10 @@ export default function UserManagementPage() {
           <button onClick={() => setShowImport(true)}
             className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium">
             📥 Import Excel
+          </button>
+          <button onClick={downloadCredentials}
+            className="px-4 py-2 bg-amber-500 text-white text-sm rounded-lg hover:bg-amber-600 font-medium">
+            📋 Download Credentials
           </button>
           <button onClick={openAdd}
             className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
