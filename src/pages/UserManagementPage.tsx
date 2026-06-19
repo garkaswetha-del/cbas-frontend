@@ -904,11 +904,10 @@ export default function UserManagementPage() {
                 <tbody>
                   {filtered.map((u, i) => {
                     const assignment = assignments[u.id];
-                    // For current year: fall back to user entity fields if teacher_mappings has no entry yet.
-                    // For future years: only show what's in teacher_mappings (empty = "Not assigned").
-                    const effectiveSubjects = assignment?.subjects || [];
-                    const effectiveClasses = assignment?.assigned_classes || [];
-                    const effectiveClassTeacher = assignment?.class_teacher_of || '';
+                    const isPastYear = academicYear < currentAcademicYear;
+                    const effectiveSubjects = assignment?.subjects?.length > 0 ? assignment.subjects : (isPastYear ? (u.subjects || []) : []);
+                    const effectiveClasses = assignment?.assigned_classes?.length > 0 ? assignment.assigned_classes : (isPastYear ? (u.assigned_classes || []) : []);
+                    const effectiveClassTeacher = assignment?.class_teacher_of || (isPastYear ? (u.class_teacher_of || '') : '');
                     return (
                       <tr key={u.id} className={`border-b border-gray-100 hover:bg-indigo-50/30 ${i%2===0?"bg-white":"bg-gray-50"}`}>
                         <td className="px-3 py-2.5 text-center text-gray-400">{i+1}</td>
