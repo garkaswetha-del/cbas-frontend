@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from "react";
 import axios from "axios";
+import { currentAcademicYear } from "../utils/academicYear";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 const API = "https://cbas-backend-production.up.railway.app";
@@ -43,7 +44,7 @@ const ALL_GRADES = ["Pre-KG", "LKG", "UKG", "Grade 1", "Grade 2", "Grade 3", "Gr
 
 export default function BaselineDashboard() {
   const [activeTab, setActiveTab] = useState<"school" | "grade" | "teachers">("school");
-  const [academicYear, setAcademicYear] = useState("2025-26");
+  const [academicYear, setAcademicYear] = useState(currentAcademicYear);
   const [round, setRound] = useState("baseline_1");
   const [selectedGrade, setSelectedGrade] = useState("Grade 1");
   const [schoolData, setSchoolData] = useState<any>(null);

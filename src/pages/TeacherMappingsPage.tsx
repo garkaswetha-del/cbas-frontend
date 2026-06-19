@@ -1,8 +1,9 @@
 ﻿import { useState, useEffect } from "react";
 import axios from "axios";
+import { currentAcademicYear } from "../utils/academicYear";
 
 const API = "https://cbas-backend-production.up.railway.app";
-const ACADEMIC_YEAR = "2025-26";
+const ACADEMIC_YEAR = currentAcademicYear();
 
 const GRADES = [
   "Grade 1","Grade 2","Grade 3","Grade 4","Grade 5",

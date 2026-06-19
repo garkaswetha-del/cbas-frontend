@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   BarChart, Bar, RadarChart, Radar, PolarGrid, PolarAngleAxis,
@@ -7,7 +8,7 @@ import {
 } from "recharts";
 
 const API = "https://cbas-backend-production.up.railway.app";
-const ACADEMIC_YEARS = ["2025-26", "2024-25", "2026-27"];
+const ACADEMIC_YEARS = generateAcademicYears();
 
 const CRITERIA = [
   { key: "preparation", label: "Prep", color: "#6366f1" },
@@ -52,7 +53,7 @@ const emptyRow = (name: string) => ({
 
 export default function ClassObservationPage() {
   const [activeTab, setActiveTab] = useState<"table" | "dashboard">("table");
-  const [academicYear, setAcademicYear] = useState("2025-26");
+  const [academicYear, setAcademicYear] = useState(currentAcademicYear);
   const [allTeachers, setAllTeachers] = useState<string[]>([]);
   const [teacherEmails, setTeacherEmails] = useState<Record<string, string>>({});
   const [dashboard, setDashboard] = useState<any>(null);

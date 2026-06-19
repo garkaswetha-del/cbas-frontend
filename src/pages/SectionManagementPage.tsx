@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
 
 const API = "https://cbas-backend-production.up.railway.app";
 
@@ -9,7 +10,7 @@ const GRADES = [
   "Grade 6","Grade 7","Grade 8","Grade 9","Grade 10",
 ];
 
-const ACADEMIC_YEARS = ["2025-26","2024-25","2026-27"];
+const ACADEMIC_YEARS = generateAcademicYears();
 
 interface SectionRow {
   id: string;
@@ -32,7 +33,7 @@ export default function SectionManagementPage() {
   const [sections, setSections] = useState<SectionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGrade, setSelectedGrade] = useState("Grade 1");
-  const [academicYear, setAcademicYear] = useState("2025-26");
+  const [academicYear, setAcademicYear] = useState(currentAcademicYear);
   const [newSection, setNewSection] = useState("");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [saving, setSaving] = useState(false);

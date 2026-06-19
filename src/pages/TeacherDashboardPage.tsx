@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef } from "react";
+import { currentAcademicYear } from "../utils/academicYear";
 import axios from "axios";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -18,7 +19,11 @@ const scoreBg = (p: number) => p >= 80 ? "bg-green-100 text-green-800" : p >= 60
 const scoreColor = (p: number) => p >= 80 ? "text-green-600" : p >= 60 ? "text-blue-600" : p >= 40 ? "text-yellow-600" : p > 0 ? "text-red-500" : "text-gray-400";
 
 const EXAM_TYPES = ["PA1", "PA2", "SA1", "PA3", "PA4", "SA2"];
-const ACADEMIC_YEARS = Array.from({ length: 5 }, (_, i) => { const y = 2025 + i; return `${y}-${String(y + 1).slice(2)}`; });
+const ACADEMIC_YEARS = ((): string[] => {
+  const now = new Date();
+  const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+  return Array.from({ length: 5 }, (_, i) => { const y = yr - 2 + i; return `${y}-${String(y + 1).slice(2)}`; });
+})();
 
 // Map curriculum subject names → competency framework subject keys
 const SUBJECT_TO_COMPETENCY: Record<string, string> = {
@@ -71,14 +76,14 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
   return (
     <div>
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div className="flex items-center justify-between px-3 sm:px-6 py-3 bg-white border-b border-gray-200 sticky top-0 z-10">
         <div>
           <h1 className="text-sm font-bold text-gray-800">{TAB_LABELS[activeTab] || "Dashboard"}</h1>
           <p className="text-xs text-gray-400">Welcome, {user?.name}</p>
         </div>
-        <div className="flex items-center gap-3">
-          {academicYear !== "2025-26" && (
-            <span className="px-3 py-1 bg-yellow-50 border border-yellow-300 rounded-lg text-xs text-yellow-700 font-medium">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+          {academicYear !== currentAcademicYear() && (
+            <span className="hidden sm:inline px-3 py-1 bg-yellow-50 border border-yellow-300 rounded-lg text-xs text-yellow-700 font-medium">
               Viewing {academicYear} — past year
             </span>
           )}
@@ -167,7 +172,7 @@ function ProfileTab({ user }: { user: any }) {
       {/* Photo + basic info */}
       <div className="bg-white rounded-xl shadow p-6">
         <h2 className="text-sm font-bold text-gray-700 mb-4">Profile Information</h2>
-        <div className="flex items-start gap-6 mb-5">
+        <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 mb-5">
           <div className="flex flex-col items-center gap-2">
             {photo ? (
               <img src={photo} alt="Profile" className="w-20 h-20 rounded-full object-cover border-2 border-indigo-300" />
@@ -179,7 +184,7 @@ function ProfileTab({ user }: { user: any }) {
             <input ref={fileRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
             <button onClick={() => fileRef.current?.click()} className="text-xs text-indigo-600 hover:underline">Change Photo</button>
           </div>
-          <div className="flex-1 grid grid-cols-2 gap-3">
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-gray-500 block mb-1">Full Name</label>
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -2176,8 +2181,8 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
           {showForm&&(
             <div className="bg-white rounded-xl shadow border border-gray-200 p-5 space-y-5">
               <h3 className="text-sm font-bold text-gray-700">New Activity</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Activity Name *</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2"><label className="text-xs text-gray-500 block mb-1">Activity Name *</label>
                   <input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} placeholder="e.g. Story Writing" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" /></div>
                 <div><label className="text-xs text-gray-500 block mb-1">Grade *</label>
                   <select value={form.grade} onChange={e=>setForm(p=>({...p,grade:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
@@ -4586,7 +4591,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
               <div className="text-xs text-gray-400 bg-gray-50 rounded p-3">No competencies found for this selection. Questions will be general.</div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Difficulty</label>
                 <select value={difficulty} onChange={e=>setDifficulty(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">

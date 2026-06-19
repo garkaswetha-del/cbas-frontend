@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import { currentAcademicYear } from "../utils/academicYear";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis,
@@ -55,7 +56,7 @@ export default function ActivitiesPage() {
   const [reportData, setReportData] = useState<any>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [expandedActivity, setExpandedActivity] = useState<string|null>(null);
-  const [academicYear, setAcademicYear] = useState("2025-26");
+  const [academicYear, setAcademicYear] = useState(currentAcademicYear);
 
   // Activities tab
   const [activities, setActivities] = useState<any[]>([]);

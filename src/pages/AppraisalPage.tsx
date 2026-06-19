@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
+import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
 
 const API = "https://cbas-backend-production.up.railway.app";
 
@@ -166,7 +167,7 @@ function isNurseryTeacher(assigned_classes: string[]): boolean {
   return assigned_classes.every(c => NURSERY_GRADES.includes(c));
 }
 
-const YEARS = ["2023-24","2024-25","2025-26","2026-27"];
+const YEARS = generateAcademicYears();
 
 const RESP = [
   {key:"resp_phonics",label:"Phonics"},
@@ -239,7 +240,7 @@ const NUM_MAP: Record<string,string> = {
 };
 
 export default function AppraisalPage() {
-  const [year, setYear] = useState("2025-26");
+  const [year, setYear] = useState(currentAcademicYear);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [appraisals, setAppraisals] = useState<Record<string,any>>({});
   const [teacherGrades, setTeacherGrades] = useState<Record<string,string>>({});
@@ -247,10 +248,9 @@ export default function AppraisalPage() {
   const [sharing, setSharing] = useState<string|null>(null);
   const [unsharing, setUnsharing] = useState<string|null>(null);
   const [message, setMessage] = useState("");
-  const [activeTab, setActiveTab] = useState<"nursery"|"others">("nursery");
+  const [activeTab, setActiveTab] = useState<"nursery"|"foundation"|"preparatory"|"middle"|"secondary">("nursery");
 
   const [search, setSearch] = useState("");
-  const [filterStage, setFilterStage] = useState("");
   const [filterStatus, setFilterStatus] = useState<""|"pending"|"saved"|"shared">("");
   const [showShareConfirm, setShowShareConfirm] = useState<{id:string,name:string}|null>(null);
 
@@ -534,7 +534,6 @@ export default function AppraisalPage() {
 
   const filteredTeachers = teachers.filter(t => {
     if (search && !t.teacher_name?.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filterStage && getStage(t.assigned_classes) !== filterStage) return false;
     if (filterStatus && getStatus(t) !== filterStatus) return false;
     return true;
   });
@@ -658,8 +657,12 @@ export default function AppraisalPage() {
     );
   };
 
-  const nurseryRows = filteredTeachers.filter(t=>isNurseryTeacher(t.assigned_classes));
-  const otherRows   = filteredTeachers.filter(t=>!isNurseryTeacher(t.assigned_classes));
+  const nurseryRows     = filteredTeachers.filter(t=>isNurseryTeacher(t.assigned_classes));
+  const foundationRows  = filteredTeachers.filter(t=>!isNurseryTeacher(t.assigned_classes) && getStage(t.assigned_classes)==="Foundation");
+  const preparatoryRows = filteredTeachers.filter(t=>getStage(t.assigned_classes)==="Preparatory");
+  const middleRows      = filteredTeachers.filter(t=>getStage(t.assigned_classes)==="Middle");
+  const secondaryRows   = filteredTeachers.filter(t=>getStage(t.assigned_classes)==="Secondary");
+  const standardRows    = activeTab==="foundation" ? foundationRows : activeTab==="preparatory" ? preparatoryRows : activeTab==="middle" ? middleRows : activeTab==="secondary" ? secondaryRows : [];
 
   return (
     <div className="p-4">
@@ -672,7 +675,7 @@ export default function AppraisalPage() {
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <label className="text-xs text-gray-500 font-medium">Academic Year:</label>
-            <select value={year} onChange={e=>{ setYear(e.target.value); setSearch(""); setFilterStage(""); setFilterStatus(""); }}
+            <select value={year} onChange={e=>{ setYear(e.target.value); setSearch(""); setFilterStatus(""); }}
               className="border border-gray-300 rounded px-2 py-1.5 text-sm font-semibold text-indigo-700 bg-white">
               {YEARS.map(y=><option key={y} value={y}>{y}</option>)}
             </select>
@@ -716,14 +719,6 @@ export default function AppraisalPage() {
             className="border border-gray-300 rounded px-3 py-1.5 text-sm w-44" />
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Stage</label>
-          <select value={filterStage} onChange={e=>setFilterStage(e.target.value)}
-            className="border border-gray-300 rounded px-3 py-1.5 text-sm">
-            <option value="">All Stages</option>
-            {STAGE_ORDER_LIST.map(s=><option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-        <div>
           <label className="text-xs text-gray-500 block mb-1">Status</label>
           <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value as any)}
             className="border border-gray-300 rounded px-3 py-1.5 text-sm">
@@ -733,8 +728,8 @@ export default function AppraisalPage() {
             <option value="shared">✅ Shared</option>
           </select>
         </div>
-        {(search||filterStage||filterStatus) && (
-          <button onClick={()=>{ setSearch(""); setFilterStage(""); setFilterStatus(""); }}
+        {(search||filterStatus) && (
+          <button onClick={()=>{ setSearch(""); setFilterStatus(""); }}
             className="px-3 py-1.5 text-xs text-gray-500 border border-gray-300 rounded hover:bg-gray-50 self-end">
             Clear
           </button>
@@ -831,11 +826,17 @@ export default function AppraisalPage() {
       )}
 
       {/* ── TABS ── */}
-      <div className="flex gap-2 mb-3">
-        {([["nursery","Pre-KG / LKG / UKG"],["others","Grade 1 onwards"]] as const).map(([tab,label])=>(
-          <button key={tab} onClick={()=>setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all ${activeTab===tab?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:border-indigo-400"}`}>
-            {label} ({tab==="nursery" ? nurseryRows.length : otherRows.length})
+      <div className="flex gap-2 mb-3 flex-wrap">
+        {([
+          {tab:"nursery",     label:"Nursery",              count:nurseryRows.length,     active:"bg-green-600 border-green-600",   inactive:"text-green-700 border-green-300 hover:border-green-500"},
+          {tab:"foundation",  label:"Foundation (Gr 1-2)",  count:foundationRows.length,  active:"bg-green-600 border-green-600",   inactive:"text-green-700 border-green-300 hover:border-green-500"},
+          {tab:"preparatory", label:"Preparatory (Gr 3-5)", count:preparatoryRows.length, active:"bg-blue-600 border-blue-600",     inactive:"text-blue-700 border-blue-300 hover:border-blue-500"},
+          {tab:"middle",      label:"Middle (Gr 6-8)",      count:middleRows.length,      active:"bg-purple-600 border-purple-600", inactive:"text-purple-700 border-purple-300 hover:border-purple-500"},
+          {tab:"secondary",   label:"Secondary (Gr 9-10)",  count:secondaryRows.length,   active:"bg-orange-500 border-orange-500", inactive:"text-orange-700 border-orange-300 hover:border-orange-500"},
+        ]).map(({tab,label,count,active,inactive})=>(
+          <button key={tab} onClick={()=>setActiveTab(tab as any)}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all bg-white ${activeTab===tab?`${active} text-white`:inactive}`}>
+            {label} ({count})
           </button>
         ))}
       </div>
@@ -971,7 +972,7 @@ export default function AppraisalPage() {
       )}
 
       {/* ── GRADE 1 ONWARDS TABLE ── */}
-      {activeTab==="others" && (
+      {activeTab!=="nursery" && (
       <div className="overflow-auto rounded-lg shadow border border-gray-200" style={{maxHeight:"80vh"}}>
         <table className="text-xs bg-white border-collapse" style={{minWidth:"2800px"}}>
           <thead ref={theadRef} className="sticky top-0 z-20">
@@ -1001,10 +1002,10 @@ export default function AppraisalPage() {
             </tr>
           </thead>
           <tbody>
-            {otherRows.length===0&&(
+            {standardRows.length===0&&(
               <tr><td colSpan={51} className="text-center py-10 text-gray-400">No teachers found.</td></tr>
             )}
-            {otherRows.map((t,idx)=>{
+            {standardRows.map((t,idx)=>{
               const a = appraisals[t.teacher_id]||{};
               return (
                 <tr key={t.teacher_id} className={idx%2===0?"bg-white":"bg-gray-50"}>
@@ -1085,7 +1086,7 @@ export default function AppraisalPage() {
               );
             })}
           </tbody>
-          {renderFooter(otherRows, 51)}
+          {renderFooter(standardRows, 51)}
         </table>
       </div>
       )}

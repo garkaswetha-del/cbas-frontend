@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
+import { currentAcademicYear } from "../utils/academicYear";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, LineChart, Line, Cell,
@@ -683,7 +684,7 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
 // ── Main BaselinePage export ──────────────────────────────────────
 export default function BaselinePage() {
   const [activeTab, setActiveTab] = useState<"entry"|"teacher"|"dashboard"|"ai_paper"|"report_card">("entry");
-  const [academicYear, setAcademicYear] = useState("2025-26");
+  const [academicYear, setAcademicYear] = useState(currentAcademicYear);
   const [round, setRound] = useState("baseline_1");
   const [grade, setGrade] = useState("Grade 1");
   const [sections, setSections] = useState<string[]>([]);

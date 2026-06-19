@@ -143,7 +143,11 @@ function primaryStageOrder(assigned_classes: string[]): number {
 }
 
 export default function UserManagementPage() {
-  const [academicYear, setAcademicYear] = useState("2025-26");
+  const [academicYear, setAcademicYear] = useState(() => {
+    const now = new Date();
+    const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+    return `${yr}-${String(yr + 1).slice(2)}`;
+  });
   const [users, setUsers] = useState<any[]>([]);
   const [inactiveUsers, setInactiveUsers] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<Record<string, any>>({});
@@ -473,7 +477,6 @@ export default function UserManagementPage() {
     const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
     return `${yr}-${String(yr + 1).slice(2)}`;
   })();
-  const isCurrentYear = academicYear === currentAcademicYear;
 
   const teachers = users.filter(u => u.role === "teacher");
   const admins = users.filter(u => u.role === "admin");
@@ -903,14 +906,9 @@ export default function UserManagementPage() {
                     const assignment = assignments[u.id];
                     // For current year: fall back to user entity fields if teacher_mappings has no entry yet.
                     // For future years: only show what's in teacher_mappings (empty = "Not assigned").
-                    const effectiveSubjects = assignment?.subjects?.length > 0
-                      ? assignment.subjects
-                      : (isCurrentYear ? (u.subjects || []) : []);
-                    const effectiveClasses = assignment?.assigned_classes?.length > 0
-                      ? assignment.assigned_classes
-                      : (isCurrentYear ? (u.assigned_classes || []) : []);
-                    const effectiveClassTeacher = assignment?.class_teacher_of
-                      || (isCurrentYear ? (u.class_teacher_of || '') : '');
+                    const effectiveSubjects = assignment?.subjects || [];
+                    const effectiveClasses = assignment?.assigned_classes || [];
+                    const effectiveClassTeacher = assignment?.class_teacher_of || '';
                     return (
                       <tr key={u.id} className={`border-b border-gray-100 hover:bg-indigo-50/30 ${i%2===0?"bg-white":"bg-gray-50"}`}>
                         <td className="px-3 py-2.5 text-center text-gray-400">{i+1}</td>

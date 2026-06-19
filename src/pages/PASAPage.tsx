@@ -1,9 +1,10 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
 
 const API = "https://cbas-backend-production.up.railway.app";
 const EXAM_TYPES = ["FA1", "FA2", "SA1", "FA3", "FA4", "SA2", "Custom"];
-const ACADEMIC_YEARS = ["2025-26", "2024-25", "2026-27"];
+const ACADEMIC_YEARS = generateAcademicYears();
 
 function getBand(pct: number) {
   if (pct >= 90) return { label: "A+", color: "text-green-700 bg-green-100" };
@@ -24,7 +25,7 @@ function KPICard({ label, value, color }: any) {
 
 export default function PASAPage() {
   const [activeTab, setActiveTab] = useState<"config" | "entry" | "dashboard" | "clear">("config");
-  const [academicYear, setAcademicYear] = useState("2025-26");
+  const [academicYear, setAcademicYear] = useState(currentAcademicYear);
   return (
     <div className="p-3 sm:p-6">
       <div className="mb-4 flex items-start justify-between flex-wrap gap-3">
