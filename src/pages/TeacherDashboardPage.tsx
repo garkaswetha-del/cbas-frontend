@@ -19,6 +19,30 @@ const scoreBg = (p: number) => p >= 80 ? "bg-green-100 text-green-800" : p >= 60
 const scoreColor = (p: number) => p >= 80 ? "text-green-600" : p >= 60 ? "text-blue-600" : p >= 40 ? "text-yellow-600" : p > 0 ? "text-red-500" : "text-gray-400";
 
 const EXAM_TYPES = ["PA1", "PA2", "SA1", "PA3", "PA4", "SA2"];
+
+const GRADE_ORDER_AP = ["Nursery","Pre-KG","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
+const GRADE_CAPS_AP: Record<string,{cap:number}> = {
+  "Nursery":{cap:17000},"Pre-KG":{cap:17000},"LKG":{cap:17000},"UKG":{cap:17000},
+  "Grade 1":{cap:19000},"Grade 2":{cap:19000},"Grade 3":{cap:19000},
+  "Grade 4":{cap:21000},"Grade 5":{cap:21000},
+  "Grade 6":{cap:23000},"Grade 7":{cap:23000},
+  "Grade 8":{cap:26000},"Grade 9":{cap:26000},"Grade 10":{cap:26000},
+};
+const RESP_KEYS = ["resp_phonics","resp_math","resp_reading","resp_handwriting","resp_kannada_reading","resp_notes_hw","resp_library","resp_parental_engagement","resp_below_a_students","resp_english_grammar","resp_others"];
+
+function calcHike(overallPct: number, respCount: number, salary: number|null, highestGrade: string|null) {
+  if (!overallPct) return { base: 0, extra: 0, total: 0, band: "", overCap: false, cap: null as number|null };
+  const cap = highestGrade ? (GRADE_CAPS_AP[highestGrade]?.cap ?? null) : null;
+  const overCap = !!(salary && cap && salary > cap);
+  let base = 0, band = "";
+  if (overallPct >= 80)      { base = overCap ? 10 : 15; band = "≥ 80%"; }
+  else if (overallPct >= 70) { base = overCap ? 8  : 12; band = "70–79%"; }
+  else if (overallPct >= 51) { base = overCap ? 6  : 8;  band = "51–69%"; }
+  else if (overallPct >= 50) { base = 5;                  band = "50%"; }
+  else                       { base = 3;                  band = "Below 50%"; }
+  const extra = respCount > 0 ? 7 : 0;
+  return { base, extra, total: base + extra, band, overCap, cap };
+}
 const ACADEMIC_YEARS = ((): string[] => {
   const now = new Date();
   const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
@@ -872,6 +896,15 @@ function AppraisalTab({ user, academicYear }: any) {
   const pct = n(data.overall_percentage || (data.overall_score ? data.overall_score * 100 : 0));
   const isNursery = !!(data.literacy_band || data.numeracy_band || n(data.literacy_score) > 0 || n(data.numeracy_score) > 0);
 
+  const respCount = RESP_KEYS.filter(k => data[k]).length;
+  const classes: string[] = user?.assigned_classes || [];
+  const highestGrade = classes.reduce((best: string|null, g: string) => {
+    if (!best) return g;
+    return GRADE_ORDER_AP.indexOf(g) > GRADE_ORDER_AP.indexOf(best) ? g : best;
+  }, null);
+  const salary = user?.salary ? +user.salary : null;
+  const hike = calcHike(pct, respCount, salary, highestGrade);
+
   const pctColor = pct >= 80 ? "#10b981" : pct >= 60 ? "#6366f1" : pct >= 40 ? "#f59e0b" : "#ef4444";
 
   type Section = { label: string; weight: string; score: number; max: number; comment: string | null; color: string };
@@ -914,6 +947,53 @@ function AppraisalTab({ user, academicYear }: any) {
           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full mt-1 inline-block ${scoreBg(pct)}`}>{fmtPct(pct)}</span>
         </div>
       </div>
+
+      {/* Salary Hike Card */}
+      {data.is_shared ? (
+        <div className="bg-white rounded-xl shadow p-5 border-l-4 border-green-500">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-bold text-gray-800">Your Salary Hike</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Based on your appraisal score</p>
+            </div>
+            <span className={`text-3xl font-bold ${hike.total >= 15 ? "text-green-600" : hike.total >= 10 ? "text-blue-600" : "text-orange-600"}`}>
+              {hike.total}%
+            </span>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 text-xs space-y-1.5">
+            <div className="flex justify-between text-gray-700">
+              <span>Score <span className="font-semibold text-indigo-700">{pct.toFixed(1)}%</span> → Band: <span className="font-semibold">{hike.band}</span></span>
+              <span className="font-semibold">Base: {hike.base}%</span>
+            </div>
+            {respCount > 0 && (
+              <div className="flex justify-between text-gray-700">
+                <span>Extra Responsibilities ({respCount} active)</span>
+                <span className="font-semibold text-green-600">+ {hike.extra}%</span>
+              </div>
+            )}
+            {hike.overCap && (
+              <div className="flex justify-between text-orange-700">
+                <span>Salary above grade cap (₹{(hike.cap!/1000).toFixed(0)}K) — reduced rate applied</span>
+                <span className="font-semibold">↓</span>
+              </div>
+            )}
+            <div className="border-t border-gray-200 pt-1.5 flex justify-between font-bold text-gray-800">
+              <span>Total Hike</span>
+              <span className={hike.total >= 15 ? "text-green-700" : hike.total >= 10 ? "text-blue-700" : "text-orange-700"}>{hike.total}%</span>
+            </div>
+          </div>
+          <div className="mt-3 bg-indigo-50 rounded-lg p-3 text-xs text-indigo-700">
+            <p className="font-semibold mb-1">How hike is calculated:</p>
+            <p>• Score ≥ 80% → <strong>15%</strong> hike &nbsp;|&nbsp; 70–79% → <strong>12%</strong> &nbsp;|&nbsp; 51–69% → <strong>8%</strong> &nbsp;|&nbsp; 50% → <strong>5%</strong></p>
+            <p className="mt-0.5">• Taking up extra responsibilities adds <strong>+7%</strong> to your hike</p>
+            {hike.overCap && <p className="mt-0.5">• If salary exceeds grade cap, reduced rates apply: 80%+ → 10%, 70–79% → 8%, 51–69% → 6%</p>}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-gray-50 rounded-xl shadow p-4 border border-dashed border-gray-300 text-center">
+          <p className="text-xs text-gray-400">🔒 Salary hike % will be visible once your appraisal is shared by the principal.</p>
+        </div>
+      )}
 
       {/* Section-by-section report */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
