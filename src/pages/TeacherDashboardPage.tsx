@@ -949,7 +949,7 @@ function AppraisalTab({ user, academicYear }: any) {
       </div>
 
       {/* Salary Hike Card */}
-      {data.is_shared ? (
+      {pct > 0 ? (
         <div className="bg-white rounded-xl shadow p-5 border-l-4 border-green-500">
           <div className="flex items-start justify-between mb-3">
             <div>
@@ -989,11 +989,7 @@ function AppraisalTab({ user, academicYear }: any) {
             {hike.overCap && <p className="mt-0.5">• If salary exceeds grade cap, reduced rates apply: 80%+ → 10%, 70–79% → 8%, 51–69% → 6%</p>}
           </div>
         </div>
-      ) : (
-        <div className="bg-gray-50 rounded-xl shadow p-4 border border-dashed border-gray-300 text-center">
-          <p className="text-xs text-gray-400">🔒 Salary hike % will be visible once your appraisal is shared by the principal.</p>
-        </div>
-      )}
+      ) : null}
 
       {/* Section-by-section report */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
