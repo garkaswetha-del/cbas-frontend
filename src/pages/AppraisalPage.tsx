@@ -252,6 +252,10 @@ export default function AppraisalPage() {
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<""|"pending"|"saved"|"shared">("");
+  const [filterMin, setFilterMin] = useState<string>("");
+  const [filterMax, setFilterMax] = useState<string>("");
+  const [activeBand, setActiveBand] = useState<string>("");
+  const [modalTeacher, setModalTeacher] = useState<any|null>(null);
   const [showShareConfirm, setShowShareConfirm] = useState<{id:string,name:string}|null>(null);
 
   const [showImport, setShowImport] = useState(false);
@@ -532,9 +536,28 @@ export default function AppraisalPage() {
     XLSX.writeFile(wb, `appraisals_${year}.xlsx`);
   };
 
+  const BANDS = [
+    { label:"≥ 80%",   hike:"15%", min:80,  max:100, color:"bg-green-50 border-green-400 text-green-800",   active:"bg-green-500 text-white border-green-500" },
+    { label:"70–79%",  hike:"12%", min:70,  max:79,  color:"bg-blue-50 border-blue-400 text-blue-800",     active:"bg-blue-500 text-white border-blue-500" },
+    { label:"51–69%",  hike:"8%",  min:51,  max:69,  color:"bg-yellow-50 border-yellow-400 text-yellow-800", active:"bg-yellow-500 text-white border-yellow-500" },
+    { label:"50%",     hike:"5%",  min:50,  max:50,  color:"bg-orange-50 border-orange-400 text-orange-800", active:"bg-orange-500 text-white border-orange-500" },
+    { label:"< 50%",   hike:"3%",  min:0,   max:49,  color:"bg-red-50 border-red-400 text-red-800",         active:"bg-red-500 text-white border-red-500" },
+  ];
+
   const filteredTeachers = teachers.filter(t => {
     if (search && !t.teacher_name?.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterStatus && getStatus(t) !== filterStatus) return false;
+    const pct = t.appraisal?.overall_percentage ? +t.appraisal.overall_percentage : null;
+    if (activeBand) {
+      const band = BANDS.find(b => b.label === activeBand);
+      if (band) {
+        if (pct === null || pct < band.min || pct > band.max) return false;
+      }
+    } else if (filterMin !== "" || filterMax !== "") {
+      if (pct === null) return false;
+      if (filterMin !== "" && pct < +filterMin) return false;
+      if (filterMax !== "" && pct > +filterMax) return false;
+    }
     return true;
   });
 
@@ -570,7 +593,7 @@ export default function AppraisalPage() {
       <td className={`${td} sticky left-0 bg-white z-10 min-w-[170px]`}>
         <div className="flex items-start justify-between gap-1">
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-xs text-gray-800 truncate">{t.teacher_name}</div>
+            <button onClick={()=>setModalTeacher(t)} className="font-semibold text-xs text-indigo-700 hover:underline truncate text-left">{t.teacher_name}</button>
             <StatusBadge status={status} />
             {a.updated_at && <div className="text-xs text-gray-400 mt-0.5">{timeAgo(a.updated_at)}</div>}
             {t.appraisal_qualification && <div className="text-xs text-indigo-400 italic truncate">{t.appraisal_qualification}</div>}
@@ -711,6 +734,25 @@ export default function AppraisalPage() {
 
       {message && <div className="mb-3 px-4 py-2 bg-green-50 border border-green-300 rounded text-sm text-green-800">{message}</div>}
 
+      {/* ── BAND ANALYSIS CARDS ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
+        {BANDS.map(b => {
+          const count = teachers.filter(t => {
+            const pct = t.appraisal?.overall_percentage ? +t.appraisal.overall_percentage : null;
+            return pct !== null && pct >= b.min && pct <= b.max;
+          }).length;
+          const isActive = activeBand === b.label;
+          return (
+            <button key={b.label} onClick={()=>{ setActiveBand(isActive ? "" : b.label); setFilterMin(""); setFilterMax(""); }}
+              className={`rounded-lg border-2 px-3 py-2 text-left transition-all ${isActive ? b.active : b.color}`}>
+              <p className="text-xs font-bold">{b.label}</p>
+              <p className="text-lg font-bold">{count} teachers</p>
+              <p className="text-xs opacity-80">Hike: {b.hike}</p>
+            </button>
+          );
+        })}
+      </div>
+
       {/* ── FILTER BAR ── */}
       <div className="flex gap-3 mb-3 flex-wrap items-end">
         <div>
@@ -728,10 +770,22 @@ export default function AppraisalPage() {
             <option value="shared">✅ Shared</option>
           </select>
         </div>
-        {(search||filterStatus) && (
-          <button onClick={()=>{ setSearch(""); setFilterStatus(""); }}
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Score Range (%)</label>
+          <div className="flex items-center gap-1">
+            <input type="number" min={0} max={100} placeholder="Min" value={filterMin}
+              onChange={e=>{ setFilterMin(e.target.value); setActiveBand(""); }}
+              className="border border-gray-300 rounded px-2 py-1.5 text-sm w-16 text-center" />
+            <span className="text-gray-400 text-xs">–</span>
+            <input type="number" min={0} max={100} placeholder="Max" value={filterMax}
+              onChange={e=>{ setFilterMax(e.target.value); setActiveBand(""); }}
+              className="border border-gray-300 rounded px-2 py-1.5 text-sm w-16 text-center" />
+          </div>
+        </div>
+        {(search||filterStatus||activeBand||filterMin||filterMax) && (
+          <button onClick={()=>{ setSearch(""); setFilterStatus(""); setActiveBand(""); setFilterMin(""); setFilterMax(""); }}
             className="px-3 py-1.5 text-xs text-gray-500 border border-gray-300 rounded hover:bg-gray-50 self-end">
-            Clear
+            Clear All
           </button>
         )}
         <div className="ml-auto self-end flex gap-2">
@@ -1090,6 +1144,108 @@ export default function AppraisalPage() {
         </table>
       </div>
       )}
+
+      {/* ── TEACHER PERFORMANCE MODAL ── */}
+      {modalTeacher && (() => {
+        const t = modalTeacher;
+        const a = appraisals[t.teacher_id] || {};
+        const pct = a.overall_percentage ? +a.overall_percentage : 0;
+        const hg = teacherGrades[t.teacher_id] || null;
+        const rc = RESP.filter(r => a[r.key]).length;
+        const salary = t.salary ? +t.salary : null;
+        const inc = calcIncrement(pct, rc, salary, hg, t.appraisal_qualification || null);
+        const isNursery = isNurseryTeacher(t.assigned_classes);
+        const pctColor = pct >= 80 ? "#10b981" : pct >= 70 ? "#6366f1" : pct >= 51 ? "#f59e0b" : pct > 0 ? "#ef4444" : "#9ca3af";
+
+        type MS = { label:string; weight:string; score:number; max:number; comment:string|null; color:string };
+        const sections: MS[] = isNursery ? [
+          { label:"Literacy",             weight:"10%",   score:+(a.literacy_score||0),         max:0.1,  comment:a.literacy_section_comment||null,         color:"bg-pink-50 border-pink-300" },
+          { label:"Numeracy",             weight:"10%",   score:+(a.numeracy_score||0),         max:0.1,  comment:a.numeracy_section_comment||null,         color:"bg-blue-50 border-blue-300" },
+          { label:"Skills & Knowledge",   weight:"10%",   score:+(a.skills_score||0),           max:0.1,  comment:a.skills_section_comment||null,           color:"bg-green-50 border-green-300" },
+          { label:"Behaviour & Attitude", weight:"10%",   score:+(a.behaviour_score||0),        max:0.1,  comment:a.behaviour_section_comment||null,        color:"bg-yellow-50 border-yellow-300" },
+          { label:"Parents Feedback",     weight:"20%",   score:+(a.parents_feedback_score||0), max:0.2,  comment:a.parents_feedback_section_comment||null, color:"bg-rose-50 border-rose-300" },
+          { label:"Classroom Teaching",   weight:"20%",   score:+(a.classroom_score||0),        max:0.2,  comment:a.classroom_section_comment||null,        color:"bg-purple-50 border-purple-300" },
+          { label:"English Comm",         weight:"20%",   score:+(a.english_comm_score||0),     max:0.2,  comment:a.english_comm_section_comment||null,     color:"bg-orange-50 border-orange-300" },
+          { label:"Responsibilities",     weight:"Extra", score:+(a.responsibilities_score||0), max:0.05, comment:a.responsibilities_section_comment||null, color:"bg-teal-50 border-teal-300" },
+        ] : [
+          { label:"Exam Marks",           weight:"50%",   score:+(a.exam_score||0),             max:0.5,  comment:a.exam_section_comment||null,             color:"bg-blue-50 border-blue-300" },
+          { label:"Skills & Knowledge",   weight:"10%",   score:+(a.skills_score||0),           max:0.1,  comment:a.skills_section_comment||null,           color:"bg-green-50 border-green-300" },
+          { label:"Behaviour & Attitude", weight:"10%",   score:+(a.behaviour_score||0),        max:0.1,  comment:a.behaviour_section_comment||null,        color:"bg-yellow-50 border-yellow-300" },
+          { label:"Parents Feedback",     weight:"10%",   score:+(a.parents_feedback_score||0), max:0.1,  comment:a.parents_feedback_section_comment||null, color:"bg-rose-50 border-rose-300" },
+          { label:"Classroom Teaching",   weight:"10%",   score:+(a.classroom_score||0),        max:0.1,  comment:a.classroom_section_comment||null,        color:"bg-purple-50 border-purple-300" },
+          { label:"English Comm",         weight:"5%",    score:+(a.english_comm_score||0),     max:0.05, comment:a.english_comm_section_comment||null,     color:"bg-orange-50 border-orange-300" },
+          { label:"Responsibilities",     weight:"5%",    score:+(a.responsibilities_score||0), max:0.05, comment:a.responsibilities_section_comment||null, color:"bg-teal-50 border-teal-300" },
+        ];
+
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={()=>setModalTeacher(null)}>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+              {/* Modal Header */}
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between z-10">
+                <div>
+                  <h2 className="text-base font-bold text-gray-800">{t.teacher_name}</h2>
+                  <p className="text-xs text-gray-400">{t.appraisal_qualification||"—"} · {(t.assigned_classes||[]).join(", ")||"No class"} · {year}</p>
+                </div>
+                <button onClick={()=>setModalTeacher(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none font-bold">×</button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {/* Score + Hike summary */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">Overall Score</p>
+                    <p className="text-3xl font-bold" style={{color:pctColor}}>{pct > 0 ? pct.toFixed(1)+"%" : "—"}</p>
+                    <p className="text-xs text-gray-400 mt-1">{getStatus(t) === "shared" ? "✅ Shared" : getStatus(t) === "saved" ? "💾 Saved" : "⏳ Pending"}</p>
+                  </div>
+                  <div className={`rounded-xl p-4 text-center border-2 ${inc.total >= 15 ? "bg-green-50 border-green-400" : inc.total >= 10 ? "bg-blue-50 border-blue-400" : inc.total > 0 ? "bg-yellow-50 border-yellow-400" : "bg-gray-50 border-gray-200"}`}>
+                    <p className="text-xs text-gray-500 mb-1">Salary Hike</p>
+                    <p className={`text-3xl font-bold ${inc.total >= 15 ? "text-green-700" : inc.total >= 10 ? "text-blue-700" : inc.total > 0 ? "text-yellow-700" : "text-gray-400"}`}>{pct > 0 ? inc.total+"%" : "—"}</p>
+                    {pct > 0 && <p className="text-xs text-gray-500 mt-1">{inc.note}</p>}
+                  </div>
+                </div>
+
+                {/* Hike breakdown */}
+                {pct > 0 && (
+                  <div className="bg-indigo-50 rounded-xl p-3 text-xs text-indigo-800 space-y-1">
+                    <p className="font-semibold mb-1">Hike Breakdown</p>
+                    <div className="flex justify-between"><span>Score {pct.toFixed(1)}% → Band</span><span className="font-bold">{inc.base + (inc.base === 10||inc.base===8||inc.base===6||inc.base===5?"(over cap)":"")} base %</span></div>
+                    {rc > 0 && <div className="flex justify-between"><span>Extra responsibilities ({rc})</span><span className="font-bold text-green-700">+ {inc.extra}%</span></div>}
+                    {inc.penalty > 0 && <div className="flex justify-between"><span>Unqualified for grade</span><span className="font-bold text-red-600">− {inc.penalty}%</span></div>}
+                    <div className="flex justify-between border-t border-indigo-200 pt-1 font-bold"><span>Total</span><span>{inc.total}%</span></div>
+                  </div>
+                )}
+
+                {/* Section breakdown */}
+                {pct > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-gray-600">Section-wise Performance</p>
+                    {sections.map((s, i) => {
+                      const sPct = s.max > 0 ? Math.min((s.score / s.max) * 100, 100) : 0;
+                      const barColor = sPct >= 80 ? "#10b981" : sPct >= 60 ? "#6366f1" : sPct >= 40 ? "#f59e0b" : "#ef4444";
+                      return (
+                        <div key={i} className={`rounded-lg border-l-4 p-3 ${s.color}`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-semibold text-gray-800">{s.label} <span className="text-gray-400 font-normal">({s.weight})</span></span>
+                            <span className="text-xs font-bold text-gray-800">{sPct.toFixed(1)}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1.5">
+                            <div className="h-1.5 rounded-full" style={{width:`${sPct}%`, backgroundColor:barColor}} />
+                          </div>
+                          {s.comment && <p className="text-xs text-gray-600 italic">💬 {s.comment}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {pct === 0 && (
+                  <div className="text-center py-6 text-gray-400 text-sm">No appraisal data filled yet.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── SHARE CONFIRM MODAL ── */}
       {showShareConfirm && (
