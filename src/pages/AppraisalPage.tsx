@@ -687,6 +687,8 @@ export default function AppraisalPage() {
   const secondaryRows   = filteredTeachers.filter(t=>getStage(t.assigned_classes)==="Secondary");
   const standardRows    = activeTab==="foundation" ? foundationRows : activeTab==="preparatory" ? preparatoryRows : activeTab==="middle" ? middleRows : activeTab==="secondary" ? secondaryRows : [];
 
+  const filterActive = !!(search || activeBand || filterMin || filterMax);
+
   return (
     <div className="p-4">
       {/* ── HEADER ── */}
@@ -880,7 +882,7 @@ export default function AppraisalPage() {
       )}
 
       {/* ── TABS ── */}
-      <div className="flex gap-2 mb-3 flex-wrap">
+      {!filterActive && <div className="flex gap-2 mb-3 flex-wrap">
         {([
           {tab:"nursery",     label:"Nursery",              count:nurseryRows.length,     active:"bg-green-600 border-green-600",   inactive:"text-green-700 border-green-300 hover:border-green-500"},
           {tab:"foundation",  label:"Foundation (Gr 1-2)",  count:foundationRows.length,  active:"bg-green-600 border-green-600",   inactive:"text-green-700 border-green-300 hover:border-green-500"},
@@ -893,10 +895,78 @@ export default function AppraisalPage() {
             {label} ({count})
           </button>
         ))}
-      </div>
+      </div>}
+
+      {/* ── COMBINED SEARCH RESULTS (all stages) ── */}
+      {filterActive && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold text-gray-700">
+              Results: <span className="text-indigo-700">{filteredTeachers.length}</span> teacher{filteredTeachers.length !== 1 ? "s" : ""} across all stages
+            </p>
+            <button onClick={()=>{ setSearch(""); setActiveBand(""); setFilterMin(""); setFilterMax(""); setFilterStatus(""); }}
+              className="text-xs text-gray-400 hover:text-gray-600 underline">Clear filters</button>
+          </div>
+          {filteredTeachers.length === 0 ? (
+            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">No teachers match this filter.</div>
+          ) : (
+            <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-gray-600 font-semibold w-8">#</th>
+                    <th className="px-3 py-2 text-left text-gray-600 font-semibold min-w-[160px]">Teacher Name</th>
+                    <th className="px-3 py-2 text-left text-gray-600 font-semibold">Stage</th>
+                    <th className="px-3 py-2 text-left text-gray-600 font-semibold">Classes</th>
+                    <th className="px-3 py-2 text-center text-gray-600 font-semibold">Status</th>
+                    <th className="px-3 py-2 text-center text-gray-600 font-semibold">Overall %</th>
+                    <th className="px-3 py-2 text-center text-gray-600 font-semibold">Hike %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTeachers.map((t, i) => {
+                    const a = appraisals[t.teacher_id] || {};
+                    const pct = a.overall_percentage ? +a.overall_percentage : 0;
+                    const rc = RESP.filter(r => a[r.key]).length;
+                    const hg = teacherGrades[t.teacher_id] || null;
+                    const inc = calcIncrement(pct, rc, t.salary ? +t.salary : null, hg, t.appraisal_qualification || null);
+                    const stage = isNurseryTeacher(t.assigned_classes) ? "Nursery" : getStage(t.assigned_classes);
+                    const stageColors: Record<string,string> = {
+                      Nursery:"bg-green-100 text-green-700", Foundation:"bg-green-100 text-green-700",
+                      Preparatory:"bg-blue-100 text-blue-700", Middle:"bg-purple-100 text-purple-700",
+                      Secondary:"bg-orange-100 text-orange-700",
+                    };
+                    const pctColor = pct >= 80 ? "text-green-700" : pct >= 70 ? "text-blue-700" : pct >= 51 ? "text-yellow-700" : pct > 0 ? "text-red-600" : "text-gray-400";
+                    return (
+                      <tr key={t.teacher_id} className={`border-b border-gray-100 hover:bg-indigo-50/30 ${i%2===0?"bg-white":"bg-gray-50"}`}>
+                        <td className="px-3 py-2 text-gray-400">{i+1}</td>
+                        <td className="px-3 py-2">
+                          <button onClick={()=>setModalTeacher(t)} className="font-semibold text-indigo-700 hover:underline text-left">{t.teacher_name}</button>
+                          {t.appraisal_qualification && <p className="text-gray-400 text-xs">{t.appraisal_qualification}</p>}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${stageColors[stage]||"bg-gray-100 text-gray-500"}`}>{stage}</span>
+                        </td>
+                        <td className="px-3 py-2 text-gray-500">{(t.assigned_classes||[]).join(", ")||"—"}</td>
+                        <td className="px-3 py-2 text-center"><StatusBadge status={getStatus(t)} /></td>
+                        <td className={`px-3 py-2 text-center font-bold ${pctColor}`}>{pct > 0 ? pct.toFixed(1)+"%" : "—"}</td>
+                        <td className="px-3 py-2 text-center">
+                          {pct > 0 ? (
+                            <span className={`font-bold ${inc.total >= 15 ? "text-green-700" : inc.total >= 10 ? "text-blue-700" : "text-orange-700"}`}>{inc.total}%</span>
+                          ) : <span className="text-gray-400">—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── NURSERY TABLE ── */}
-      {activeTab==="nursery" && (
+      {!filterActive && activeTab==="nursery" && (
       <div className="overflow-auto rounded-lg shadow border border-gray-200" style={{maxHeight:"80vh"}}>
         <table className="text-xs bg-white border-collapse" style={{minWidth:"2000px"}}>
           <thead className="sticky top-0 z-20">
@@ -1026,7 +1096,7 @@ export default function AppraisalPage() {
       )}
 
       {/* ── GRADE 1 ONWARDS TABLE ── */}
-      {activeTab!=="nursery" && (
+      {!filterActive && activeTab!=="nursery" && (
       <div className="overflow-auto rounded-lg shadow border border-gray-200" style={{maxHeight:"80vh"}}>
         <table className="text-xs bg-white border-collapse" style={{minWidth:"2800px"}}>
           <thead ref={theadRef} className="sticky top-0 z-20">
