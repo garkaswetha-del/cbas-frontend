@@ -21,21 +21,24 @@ const scoreColor = (p: number) => p >= 80 ? "text-green-600" : p >= 60 ? "text-b
 const EXAM_TYPES = ["PA1", "PA2", "SA1", "PA3", "PA4", "SA2"];
 
 const GRADE_ORDER_AP = ["Nursery","Pre-KG","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
-const GRADE_CAPS_AP: Record<string,{cap:number; quals:string[]}> = {
-  "Nursery": {cap:17000, quals:["NTT","NST"]},
-  "Pre-KG":  {cap:17000, quals:["NTT","NST"]},
-  "LKG":     {cap:17000, quals:["NTT","NST"]},
-  "UKG":     {cap:17000, quals:["NTT","NST"]},
-  "Grade 1": {cap:19000, quals:["NST","BED","DED"]},
-  "Grade 2": {cap:19000, quals:["NST","BED","DED"]},
-  "Grade 3": {cap:19000, quals:["NST","BED","DED"]},
-  "Grade 4": {cap:21000, quals:["BED","DED"]},
-  "Grade 5": {cap:21000, quals:["BED","DED"]},
-  "Grade 6": {cap:23000, quals:["BED","Graduation with BED"]},
-  "Grade 7": {cap:23000, quals:["BED","Graduation with BED"]},
-  "Grade 8": {cap:26000, quals:["Post Graduation with BED"]},
-  "Grade 9": {cap:26000, quals:["Post Graduation with BED"]},
-  "Grade 10":{cap:26000, quals:["Post Graduation with BED"]},
+const GRADE_CAPS_AP: Record<string,{cap:number}> = {
+  "Nursery": {cap:17000}, "Pre-KG": {cap:17000}, "LKG": {cap:17000}, "UKG": {cap:17000},
+  "Grade 1": {cap:19000}, "Grade 2": {cap:19000}, "Grade 3": {cap:19000},
+  "Grade 4": {cap:21000}, "Grade 5": {cap:21000},
+  "Grade 6": {cap:23000}, "Grade 7": {cap:23000},
+  "Grade 8": {cap:26000}, "Grade 9": {cap:26000}, "Grade 10": {cap:26000},
+};
+
+const QUAL_RANK_AP: Record<string, number> = {
+  "NTT": 1, "NST": 2, "DED": 3, "BED": 4,
+  "GRADUATION WITH BED": 5, "POST GRADUATION WITH BED": 6,
+};
+const GRADE_MIN_QUAL_RANK_AP: Record<string, number> = {
+  "Nursery": 1, "Pre-KG": 1, "LKG": 1, "UKG": 1,
+  "Grade 1": 2, "Grade 2": 2, "Grade 3": 2,
+  "Grade 4": 3, "Grade 5": 3,
+  "Grade 6": 5, "Grade 7": 5,
+  "Grade 8": 6, "Grade 9": 6, "Grade 10": 6,
 };
 const RESP_KEYS = ["resp_phonics","resp_math","resp_reading","resp_handwriting","resp_kannada_reading","resp_notes_hw","resp_library","resp_parental_engagement","resp_below_a_students","resp_english_grammar","resp_others"];
 
@@ -55,9 +58,9 @@ function calcHike(overallPct: number, respCount: number, overCap: boolean, highe
     else                       { base = 5;  band = "≤ 50%"; }
   }
   const extra = respCount > 0 ? 7 : 0;
-  const acceptedQuals = highestGrade ? (GRADE_CAPS_AP[highestGrade]?.quals || []) : [];
-  const hasQualPenalty = qualification !== null && acceptedQuals.length > 0
-    && !acceptedQuals.map(q => q.toUpperCase()).includes(qualification.toUpperCase());
+  const minRank = highestGrade ? (GRADE_MIN_QUAL_RANK_AP[highestGrade] ?? 0) : 0;
+  const qualRank = qualification !== null ? (QUAL_RANK_AP[qualification.toUpperCase()] ?? -1) : null;
+  const hasQualPenalty = qualRank !== null && minRank > 0 && qualRank < minRank;
   const penalty = hasQualPenalty ? 2 : 0;
   return { base, extra, penalty, total: base + extra - penalty, band, overCap };
 }

@@ -39,20 +39,41 @@ function primaryStageOrder(assigned_classes: string[]): number {
   return min;
 }
 
-const GRADE_CAPS: Record<string,{quals:string[],cap:number}> = {
-  "Nursery":  {quals:["NTT","NST"],                                                    cap:17000},
-  "LKG":      {quals:["NTT","NST"],                                                    cap:17000},
-  "UKG":      {quals:["NTT","NST"],                                                    cap:17000},
-  "Grade 1":  {quals:["NST","BED","DED"],                                              cap:19000},
-  "Grade 2":  {quals:["NST","BED","DED"],                                              cap:19000},
-  "Grade 3":  {quals:["NST","BED","DED"],                                              cap:19000},
-  "Grade 4":  {quals:["BED","DED"],                                                    cap:21000},
-  "Grade 5":  {quals:["BED","DED"],                                                    cap:21000},
-  "Grade 6":  {quals:["BED","Graduation with BED"],                                    cap:23000},
-  "Grade 7":  {quals:["BED","Graduation with BED"],                                    cap:23000},
-  "Grade 8":  {quals:["Post Graduation with BED"],                                      cap:26000},
-  "Grade 9":  {quals:["Post Graduation with BED"],                                      cap:26000},
-  "Grade 10": {quals:["Post Graduation with BED"],                                      cap:26000},
+const GRADE_CAPS: Record<string,{cap:number}> = {
+  "Nursery":  {cap:17000},
+  "LKG":      {cap:17000},
+  "UKG":      {cap:17000},
+  "Grade 1":  {cap:19000},
+  "Grade 2":  {cap:19000},
+  "Grade 3":  {cap:19000},
+  "Grade 4":  {cap:21000},
+  "Grade 5":  {cap:21000},
+  "Grade 6":  {cap:23000},
+  "Grade 7":  {cap:23000},
+  "Grade 8":  {cap:26000},
+  "Grade 9":  {cap:26000},
+  "Grade 10": {cap:26000},
+};
+
+// Qualification hierarchy — higher rank satisfies lower-grade requirements.
+// Quals not in this map (e.g. plain "Graduation", plain "Post Graduation") are
+// unrecognised teaching credentials and always trigger the penalty.
+const QUAL_RANK: Record<string, number> = {
+  "NTT": 1,
+  "NST": 2,
+  "DED": 3,
+  "BED": 4,
+  "GRADUATION WITH BED": 5,
+  "POST GRADUATION WITH BED": 6,
+};
+
+// Minimum qualification rank required per grade.
+const GRADE_MIN_QUAL_RANK: Record<string, number> = {
+  "Nursery": 1, "Pre-KG": 1, "LKG": 1, "UKG": 1,
+  "Grade 1": 2, "Grade 2": 2, "Grade 3": 2,
+  "Grade 4": 3, "Grade 5": 3,
+  "Grade 6": 5, "Grade 7": 5,
+  "Grade 8": 6, "Grade 9": 6, "Grade 10": 6,
 };
 
 function calcIncrement(overallPct: number, respCount: number, overCap: boolean, highestGrade: string|null, qualification: string|null) {
@@ -74,9 +95,9 @@ function calcIncrement(overallPct: number, respCount: number, overCap: boolean, 
 
   const extra = respCount > 0 ? 7 : 0;
 
-  const acceptedQuals = highestGrade ? (GRADE_CAPS[highestGrade]?.quals || []) : [];
-  const hasQualPenalty = qualification !== null && acceptedQuals.length > 0
-    && !acceptedQuals.map(q => q.toUpperCase()).includes(qualification.toUpperCase());
+  const minRank = highestGrade ? (GRADE_MIN_QUAL_RANK[highestGrade] ?? 0) : 0;
+  const qualRank = qualification !== null ? (QUAL_RANK[qualification.toUpperCase()] ?? -1) : null;
+  const hasQualPenalty = qualRank !== null && minRank > 0 && qualRank < minRank;
   const penalty = hasQualPenalty ? 2 : 0;
 
   const total = base + extra - penalty;
