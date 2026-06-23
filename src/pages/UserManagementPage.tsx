@@ -159,6 +159,7 @@ export default function UserManagementPage() {
   const [filterGrade, setFilterGrade] = useState("");
   const [filterQualification, setFilterQualification] = useState("");
   const [activeTab, setActiveTab] = useState<"active" | "inactive">("active");
+  const [stageFilter, setStageFilter] = useState("Foundation");
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState<any>(null);
   const [showImport, setShowImport] = useState(false);
@@ -500,6 +501,11 @@ export default function UserManagementPage() {
     return primaryStageOrder(aClasses) - primaryStageOrder(bClasses);
   });
 
+  const stageFiltered = filtered.filter(u => {
+    const cls = assignments[u.id]?.assigned_classes || u.assigned_classes || [];
+    return STAGE_ORDER_LIST[primaryStageOrder(cls)] === stageFilter;
+  });
+
   return (
     <div className="p-3 sm:p-6">
       {/* ── HEADER ── */}
@@ -828,6 +834,31 @@ export default function UserManagementPage() {
         </button>
       </div>
 
+      {/* ── STAGE TABS ── */}
+      {activeTab === "active" && (
+        <div className="flex gap-2 flex-wrap mb-4">
+          {[
+            { label:"Foundation",  sub:"Pre-KG – Grade 2", active:"bg-green-600 text-white",  inactive:"bg-white text-green-700 border border-green-300 hover:bg-green-50" },
+            { label:"Preparatory", sub:"Grade 3–5",         active:"bg-blue-600 text-white",   inactive:"bg-white text-blue-700 border border-blue-300 hover:bg-blue-50" },
+            { label:"Middle",      sub:"Grade 6–8",         active:"bg-purple-600 text-white", inactive:"bg-white text-purple-700 border border-purple-300 hover:bg-purple-50" },
+            { label:"Secondary",   sub:"Grade 9–10",        active:"bg-orange-500 text-white", inactive:"bg-white text-orange-700 border border-orange-300 hover:bg-orange-50" },
+          ].map(tab => {
+            const count = filtered.filter(u => {
+              const cls = assignments[u.id]?.assigned_classes || u.assigned_classes || [];
+              return STAGE_ORDER_LIST[primaryStageOrder(cls)] === tab.label;
+            }).length;
+            return (
+              <button key={tab.label} onClick={() => setStageFilter(tab.label)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${stageFilter === tab.label ? tab.active : tab.inactive}`}>
+                {tab.label}
+                <span className="ml-1.5 text-xs opacity-80">({count})</span>
+                <div className="text-xs font-normal opacity-70">{tab.sub}</div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* ── FILTER BAR ── */}
       {activeTab === "active" && (
         <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 mb-4 flex flex-wrap gap-3 items-end shadow-sm">
@@ -867,7 +898,7 @@ export default function UserManagementPage() {
               Clear Filters
             </button>
           )}
-          <span className="text-xs text-gray-400 ml-auto self-center">{filtered.length} of {teachers.length} shown</span>
+          <span className="text-xs text-gray-400 ml-auto self-center">{stageFiltered.length} of {teachers.length} shown</span>
         </div>
       )}
 
@@ -876,12 +907,12 @@ export default function UserManagementPage() {
         <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden mb-4">
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
             <h2 className="text-sm font-bold text-gray-700">
-              Teachers — {academicYear} ({filtered.length})
+              {stageFilter} Teachers — {academicYear} ({stageFiltered.length})
             </h2>
           </div>
           {loading ? (
             <div className="p-8 text-center text-gray-400 text-sm">Loading...</div>
-          ) : filtered.length === 0 ? (
+          ) : stageFiltered.length === 0 ? (
             <div className="p-8 text-center text-gray-400 text-sm">No teachers found.</div>
           ) : (
             <div className="overflow-x-auto">
@@ -902,7 +933,7 @@ export default function UserManagementPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((u, i) => {
+                  {stageFiltered.map((u, i) => {
                     const assignment = assignments[u.id];
                     const isPastYear = academicYear < currentAcademicYear;
                     const effectiveSubjects = assignment?.subjects?.length > 0 ? assignment.subjects : (isPastYear ? (u.subjects || []) : []);
