@@ -21,17 +21,26 @@ const scoreColor = (p: number) => p >= 80 ? "text-green-600" : p >= 60 ? "text-b
 const EXAM_TYPES = ["PA1", "PA2", "SA1", "PA3", "PA4", "SA2"];
 
 const GRADE_ORDER_AP = ["Nursery","Pre-KG","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
-const GRADE_CAPS_AP: Record<string,{cap:number}> = {
-  "Nursery":{cap:17000},"Pre-KG":{cap:17000},"LKG":{cap:17000},"UKG":{cap:17000},
-  "Grade 1":{cap:19000},"Grade 2":{cap:19000},"Grade 3":{cap:19000},
-  "Grade 4":{cap:21000},"Grade 5":{cap:21000},
-  "Grade 6":{cap:23000},"Grade 7":{cap:23000},
-  "Grade 8":{cap:26000},"Grade 9":{cap:26000},"Grade 10":{cap:26000},
+const GRADE_CAPS_AP: Record<string,{cap:number; quals:string[]}> = {
+  "Nursery": {cap:17000, quals:["NTT","NST"]},
+  "Pre-KG":  {cap:17000, quals:["NTT","NST"]},
+  "LKG":     {cap:17000, quals:["NTT","NST"]},
+  "UKG":     {cap:17000, quals:["NTT","NST"]},
+  "Grade 1": {cap:19000, quals:["NST","BED","DED"]},
+  "Grade 2": {cap:19000, quals:["NST","BED","DED"]},
+  "Grade 3": {cap:19000, quals:["NST","BED","DED"]},
+  "Grade 4": {cap:21000, quals:["BED","DED"]},
+  "Grade 5": {cap:21000, quals:["BED","DED"]},
+  "Grade 6": {cap:23000, quals:["BED","Graduation with BED"]},
+  "Grade 7": {cap:23000, quals:["BED","Graduation with BED"]},
+  "Grade 8": {cap:26000, quals:["Post Graduation with BED","Post Graduation"]},
+  "Grade 9": {cap:26000, quals:["Post Graduation with BED","Post Graduation"]},
+  "Grade 10":{cap:26000, quals:["Post Graduation with BED","Post Graduation"]},
 };
 const RESP_KEYS = ["resp_phonics","resp_math","resp_reading","resp_handwriting","resp_kannada_reading","resp_notes_hw","resp_library","resp_parental_engagement","resp_below_a_students","resp_english_grammar","resp_others"];
 
-function calcHike(overallPct: number, respCount: number, overCap: boolean) {
-  if (!overallPct) return { base: 0, extra: 0, total: 0, band: "", overCap: false };
+function calcHike(overallPct: number, respCount: number, overCap: boolean, highestGrade: string|null, qualification: string|null) {
+  if (!overallPct) return { base: 0, extra: 0, penalty: 0, total: 0, band: "", overCap: false };
   let base = 0, band = "";
   if (overCap) {
     if (overallPct >= 80)      { base = 10; band = "≥ 80% (capped)"; }
@@ -46,7 +55,11 @@ function calcHike(overallPct: number, respCount: number, overCap: boolean) {
     else                       { base = 5;  band = "≤ 50%"; }
   }
   const extra = respCount > 0 ? 7 : 0;
-  return { base, extra, total: base + extra, band, overCap };
+  const acceptedQuals = highestGrade ? (GRADE_CAPS_AP[highestGrade]?.quals || []) : [];
+  const hasQualPenalty = qualification !== null && acceptedQuals.length > 0 && respCount > 0
+    && !acceptedQuals.includes(qualification);
+  const penalty = hasQualPenalty ? 2 : 0;
+  return { base, extra, penalty, total: base + extra - penalty, band, overCap };
 }
 const ACADEMIC_YEARS = ((): string[] => {
   const now = new Date();
@@ -902,7 +915,13 @@ function AppraisalTab({ user, academicYear }: any) {
   const isNursery = !!(data.literacy_band || data.numeracy_band || n(data.literacy_score) > 0 || n(data.numeracy_score) > 0);
 
   const respCount = RESP_KEYS.filter(k => data[k]).length;
-  const hike = calcHike(pct, respCount, !!(user?.over_salary_cap));
+  const classes: string[] = user?.assigned_classes || [];
+  const highestGrade = classes.reduce((best: string|null, g: string) => {
+    if (!best) return g;
+    return GRADE_ORDER_AP.indexOf(g) > GRADE_ORDER_AP.indexOf(best) ? g : best;
+  }, null);
+  const qualification: string|null = user?.appraisal_qualification || user?.qualification || null;
+  const hike = calcHike(pct, respCount, !!(user?.over_salary_cap), highestGrade, qualification);
 
   const pctColor = pct >= 80 ? "#10b981" : pct >= 60 ? "#6366f1" : pct >= 40 ? "#f59e0b" : "#ef4444";
 
@@ -976,6 +995,12 @@ function AppraisalTab({ user, academicYear }: any) {
                 <span className="font-semibold">↓</span>
               </div>
             )}
+            {hike.penalty > 0 && (
+              <div className="flex justify-between text-red-700">
+                <span>Qualification not met for this grade</span>
+                <span className="font-semibold">− {hike.penalty}%</span>
+              </div>
+            )}
             <div className="border-t border-gray-200 pt-1.5 flex justify-between font-bold text-gray-800">
               <span>Total Hike</span>
               <span className={hike.total >= 15 ? "text-green-700" : hike.total >= 10 ? "text-blue-700" : "text-orange-700"}>{hike.total}%</span>
@@ -985,6 +1010,7 @@ function AppraisalTab({ user, academicYear }: any) {
             <p className="font-semibold mb-1">How hike is calculated:</p>
             <p>• Score ≥ 81% → <strong>15%</strong> &nbsp;|&nbsp; 75–80% → <strong>12%</strong> &nbsp;|&nbsp; 61–74% → <strong>10%</strong> &nbsp;|&nbsp; 51–60% → <strong>8%</strong> &nbsp;|&nbsp; 50% → <strong>5%</strong></p>
             <p className="mt-0.5">• Taking up extra responsibilities adds <strong>+7%</strong> to your hike</p>
+            <p className="mt-0.5">• Teaching a grade without the required qualification (while holding responsibilities) deducts <strong>−2%</strong></p>
             {hike.overCap && <p className="mt-0.5">• Salary above grade cap — reduced (capping) rates apply: 80%+ → 10%, 70–79% → 8%, 51–69% → 6%</p>}
           </div>
           {/* Improvement suggestion */}
