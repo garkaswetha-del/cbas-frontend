@@ -636,6 +636,9 @@ export default function AppraisalPage() {
             <div>
               <span className={`font-bold text-sm ${inc.total>=15?"text-green-700":inc.total>=8?"text-blue-700":"text-orange-700"}`}>{inc.total}%</span>
               <p className="text-xs text-gray-400 leading-tight mt-0.5">{inc.note}</p>
+              {inc.penalty > 0 && (
+                <span className="inline-block mt-0.5 text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-semibold">−2% qual. penalty</span>
+              )}
               {!q && <p className="text-xs text-gray-300 italic">Qual: pending</p>}
             </div>
           ) : "-"}

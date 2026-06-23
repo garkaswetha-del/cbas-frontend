@@ -1010,7 +1010,7 @@ function AppraisalTab({ user, academicYear }: any) {
             <p className="font-semibold mb-1">How hike is calculated:</p>
             <p>• Score ≥ 81% → <strong>15%</strong> &nbsp;|&nbsp; 75–80% → <strong>12%</strong> &nbsp;|&nbsp; 61–74% → <strong>10%</strong> &nbsp;|&nbsp; 51–60% → <strong>8%</strong> &nbsp;|&nbsp; 50% → <strong>5%</strong></p>
             <p className="mt-0.5">• Taking up extra responsibilities adds <strong>+7%</strong> to your hike</p>
-            <p className="mt-0.5">• Teaching a grade without the required qualification (while holding responsibilities) deducts <strong>−2%</strong></p>
+            <p className="mt-0.5">• Teaching a grade without the required qualification deducts <strong>−2%</strong></p>
             {hike.overCap && <p className="mt-0.5">• Salary above grade cap — reduced (capping) rates apply: 80%+ → 10%, 70–79% → 8%, 51–69% → 6%</p>}
           </div>
           {/* Improvement suggestion */}
