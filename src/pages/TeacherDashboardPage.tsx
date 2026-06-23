@@ -57,7 +57,7 @@ function calcHike(overallPct: number, respCount: number, overCap: boolean, highe
   const extra = respCount > 0 ? 7 : 0;
   const acceptedQuals = highestGrade ? (GRADE_CAPS_AP[highestGrade]?.quals || []) : [];
   const hasQualPenalty = qualification !== null && acceptedQuals.length > 0
-    && !acceptedQuals.includes(qualification);
+    && !acceptedQuals.map(q => q.toUpperCase()).includes(qualification.toUpperCase());
   const penalty = hasQualPenalty ? 2 : 0;
   return { base, extra, penalty, total: base + extra - penalty, band, overCap };
 }

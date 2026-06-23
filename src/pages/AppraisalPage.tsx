@@ -7,6 +7,13 @@ const API = "https://cbas-backend-production.up.railway.app";
 
 const GRADE_ORDER = ["Nursery","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
 
+function getHighestGrade(classes: string[]): string | null {
+  if (!classes || classes.length === 0) return null;
+  return classes.reduce((best, g) =>
+    GRADE_ORDER.indexOf(g) > GRADE_ORDER.indexOf(best) ? g : best
+  , classes[0]);
+}
+
 const STAGE_GRADES: Record<string,string[]> = {
   Foundation:   ["Pre-KG","LKG","UKG","Nursery","Grade 1","Grade 2"],
   Preparatory:  ["Grade 3","Grade 4","Grade 5"],
@@ -69,7 +76,7 @@ function calcIncrement(overallPct: number, respCount: number, overCap: boolean, 
 
   const acceptedQuals = highestGrade ? (GRADE_CAPS[highestGrade]?.quals || []) : [];
   const hasQualPenalty = qualification !== null && acceptedQuals.length > 0
-    && !acceptedQuals.includes(qualification);
+    && !acceptedQuals.map(q => q.toUpperCase()).includes(qualification.toUpperCase());
   const penalty = hasQualPenalty ? 2 : 0;
 
   const total = base + extra - penalty;
@@ -527,7 +534,7 @@ export default function AppraisalPage() {
     const rows = teachers.map(t => {
       const a = t.appraisal || {};
       const rc = RESP.filter(r=>a[r.key]).length;
-      const hg = teacherGrades[t.teacher_id]||null;
+      const hg = getHighestGrade(t.assigned_classes || []);
       const q = t.appraisal_qualification||null;
       const inc = calcIncrement(a.overall_percentage ? +a.overall_percentage : 0, rc, t.over_salary_cap || false, hg, q);
       return {
@@ -623,7 +630,7 @@ export default function AppraisalPage() {
   const renderSummaryCells = (t: any) => {
     const a = appraisals[t.teacher_id]||{};
     const rc = RESP.filter(r=>a[r.key]).length;
-    const hg = teacherGrades[t.teacher_id]||null;
+    const hg = getHighestGrade(t.assigned_classes || []);
     const q: string|null = t.appraisal_qualification||null;
     const inc = calcIncrement(a.overall_percentage ? +a.overall_percentage : 0, rc, t.over_salary_cap || false, hg, q);
     return (
@@ -679,7 +686,7 @@ export default function AppraisalPage() {
       ? evaluated.reduce((acc,t) => {
           const a = appraisals[t.teacher_id]||{};
           const rc = RESP.filter(r=>a[r.key]).length;
-          const inc = calcIncrement(+a.overall_percentage, rc, t.over_salary_cap||false, teacherGrades[t.teacher_id]||null, t.appraisal_qualification||null);
+          const inc = calcIncrement(+a.overall_percentage, rc, t.over_salary_cap||false, getHighestGrade(t.assigned_classes || []), t.appraisal_qualification||null);
           return acc + inc.total;
         }, 0) / evaluated.length
       : 0;
@@ -949,7 +956,7 @@ export default function AppraisalPage() {
                     const a = appraisals[t.teacher_id] || {};
                     const pct = a.overall_percentage ? +a.overall_percentage : 0;
                     const rc = RESP.filter(r => a[r.key]).length;
-                    const hg = teacherGrades[t.teacher_id] || null;
+                    const hg = getHighestGrade(t.assigned_classes || []);
                     const inc = calcIncrement(pct, rc, t.over_salary_cap || false, hg, t.appraisal_qualification || null);
                     const stage = isNurseryTeacher(t.assigned_classes) ? "Nursery" : getStage(t.assigned_classes);
                     const stageColors: Record<string,string> = {
@@ -1241,7 +1248,7 @@ export default function AppraisalPage() {
         const t = modalTeacher;
         const a = appraisals[t.teacher_id] || {};
         const pct = a.overall_percentage ? +a.overall_percentage : 0;
-        const hg = teacherGrades[t.teacher_id] || null;
+        const hg = getHighestGrade(t.assigned_classes || []);
         const rc = RESP.filter(r => a[r.key]).length;
         const inc = calcIncrement(pct, rc, t.over_salary_cap || false, hg, t.appraisal_qualification || null);
         const isNursery = isNurseryTeacher(t.assigned_classes);
