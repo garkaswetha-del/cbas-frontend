@@ -33,9 +33,9 @@ const GRADE_CAPS_AP: Record<string,{cap:number; quals:string[]}> = {
   "Grade 5": {cap:21000, quals:["BED","DED"]},
   "Grade 6": {cap:23000, quals:["BED","Graduation with BED"]},
   "Grade 7": {cap:23000, quals:["BED","Graduation with BED"]},
-  "Grade 8": {cap:26000, quals:["Post Graduation with BED","Post Graduation"]},
-  "Grade 9": {cap:26000, quals:["Post Graduation with BED","Post Graduation"]},
-  "Grade 10":{cap:26000, quals:["Post Graduation with BED","Post Graduation"]},
+  "Grade 8": {cap:26000, quals:["Post Graduation with BED"]},
+  "Grade 9": {cap:26000, quals:["Post Graduation with BED"]},
+  "Grade 10":{cap:26000, quals:["Post Graduation with BED"]},
 };
 const RESP_KEYS = ["resp_phonics","resp_math","resp_reading","resp_handwriting","resp_kannada_reading","resp_notes_hw","resp_library","resp_parental_engagement","resp_below_a_students","resp_english_grammar","resp_others"];
 

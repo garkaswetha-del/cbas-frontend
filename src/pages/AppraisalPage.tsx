@@ -50,9 +50,9 @@ const GRADE_CAPS: Record<string,{quals:string[],cap:number}> = {
   "Grade 5":  {quals:["BED","DED"],                                                    cap:21000},
   "Grade 6":  {quals:["BED","Graduation with BED"],                                    cap:23000},
   "Grade 7":  {quals:["BED","Graduation with BED"],                                    cap:23000},
-  "Grade 8":  {quals:["Post Graduation with BED","Post Graduation"],                   cap:26000},
-  "Grade 9":  {quals:["Post Graduation with BED","Post Graduation"],                   cap:26000},
-  "Grade 10": {quals:["Post Graduation with BED","Post Graduation"],                   cap:26000},
+  "Grade 8":  {quals:["Post Graduation with BED"],                                      cap:26000},
+  "Grade 9":  {quals:["Post Graduation with BED"],                                      cap:26000},
+  "Grade 10": {quals:["Post Graduation with BED"],                                      cap:26000},
 };
 
 function calcIncrement(overallPct: number, respCount: number, overCap: boolean, highestGrade: string|null, qualification: string|null) {
