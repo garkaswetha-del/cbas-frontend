@@ -11,14 +11,46 @@ const API = "https://cbas-backend-production.up.railway.app";
 const ACADEMIC_YEARS = generateAcademicYears();
 
 const CRITERIA = [
-  { key: "preparation", label: "Prep", color: "#6366f1" },
-  { key: "purposeful_class", label: "Purpose", color: "#f59e0b" },
-  { key: "action", label: "Action", color: "#10b981" },
-  { key: "analysis", label: "Analysis", color: "#ef4444" },
-  { key: "application", label: "Apply", color: "#8b5cf6" },
-  { key: "assessment", label: "Assess", color: "#06b6d4" },
-  { key: "super_teacher", label: "Super", color: "#f97316" },
-  { key: "high_energy", label: "Energy", color: "#ec4899" },
+  {
+    key: "preparation", label: "Prep", color: "#6366f1",
+    fullLabel: "Preparation",
+    details: "Communication (flow), notes, resources, energizers used",
+  },
+  {
+    key: "purposeful_class", label: "Purpose", color: "#f59e0b",
+    fullLabel: "Purposeful Class",
+    details: "Hook, crisp Aim, agenda, keywords, real life example",
+  },
+  {
+    key: "action", label: "Action", color: "#10b981",
+    fullLabel: "Action",
+    details: "Instructions, time frame, activity, resources distribution strategy, independent / Pairs / Groups, CFU, demonstrate, move around, time reminders, countdown, video activity summary",
+  },
+  {
+    key: "analysis", label: "Analysis", color: "#ef4444",
+    fullLabel: "Analysis",
+    details: "Not giving answers, varied means, turn and talk, wait time, kids talk, noticed students who are not attentive, real life connection, name calling, students raising hands, real life examples, appreciating, build answers",
+  },
+  {
+    key: "application", label: "Apply", color: "#8b5cf6",
+    fullLabel: "Application",
+    details: "Worksheet done by kids, reading CB, timeframe, moving around, direct to boardwork, raise hand for spellings",
+  },
+  {
+    key: "assessment", label: "Assess", color: "#06b6d4",
+    fullLabel: "Assessment",
+    details: "A, M, E — Quiz, photos, exit chat, ticket, question, workbook corrected and graded",
+  },
+  {
+    key: "super_teacher", label: "Super", color: "#f97316",
+    fullLabel: "Super Teacher",
+    details: "Lesson plan followed",
+  },
+  {
+    key: "high_energy", label: "Energy", color: "#ec4899",
+    fullLabel: "High Energy",
+    details: "Interaction, voice, expression",
+  },
 ];
 
 const SCORE_OPTIONS = [
@@ -54,6 +86,7 @@ const emptyRow = (name: string) => ({
 export default function ClassObservationPage() {
   const [activeTab, setActiveTab] = useState<"table" | "dashboard">("table");
   const [academicYear, setAcademicYear] = useState(currentAcademicYear);
+  const [showCriteriaRef, setShowCriteriaRef] = useState(false);
   const [allTeachers, setAllTeachers] = useState<string[]>([]);
   const [teacherEmails, setTeacherEmails] = useState<Record<string, string>>({});
   const [dashboard, setDashboard] = useState<any>(null);
@@ -290,6 +323,32 @@ export default function ClassObservationPage() {
       )}
 
       {activeTab === "table" && (
+        <>
+        <div className="mb-4 border border-indigo-200 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setShowCriteriaRef(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-sm font-semibold text-indigo-800 transition-colors"
+          >
+            <span>📋 Criteria Reference Guide</span>
+            <span className="text-indigo-500 text-xs">{showCriteriaRef ? "▲ Hide" : "▼ Show"}</span>
+          </button>
+          {showCriteriaRef && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-0 bg-white">
+              {CRITERIA.map((c, i) => (
+                <div
+                  key={c.key}
+                  className="p-3 border-t border-l border-indigo-100 first:border-l-0"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color }} />
+                    <span className="text-xs font-bold text-gray-800">{c.fullLabel}</span>
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed pl-4">{c.details}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
           <div className="flex gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs flex-wrap items-center">
             <span className="text-gray-500 font-medium">Rating:</span>
@@ -318,7 +377,8 @@ export default function ClassObservationPage() {
                   {CRITERIA.map(c => (
                     <th key={c.key} className="px-2 py-3 text-center min-w-[105px] border-l border-indigo-600"
                       style={{ borderTop: `3px solid ${c.color}` }}>
-                      {c.label}
+                      <div className="font-semibold">{c.fullLabel}</div>
+                      <div className="text-indigo-300 font-normal text-[10px] mt-0.5 leading-tight max-w-[95px] mx-auto truncate">{c.details.split(",")[0]}</div>
                     </th>
                   ))}
                   <th className="px-2 py-3 text-center min-w-[160px] border-l border-indigo-600">✅ Continue</th>
@@ -585,6 +645,7 @@ export default function ClassObservationPage() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {/* DASHBOARD */}
