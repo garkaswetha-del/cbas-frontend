@@ -237,12 +237,36 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
   const STAGE_ORDER = ["foundation","preparatory","middle","secondary"];
 
   const [round, setRound] = useState(globalRound || "baseline_1");
+  const [activeStage, setActiveStage] = useState("foundation");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   // Per-teacher entry: { [tid]: { subjects, lit_stage, num_stage, litScores, numScores, lit_max, num_max } }
   const [entries, setEntries] = useState<Record<string, any>>({});
   const [existingData, setExistingData] = useState<Record<string, any[]>>({});
+
+  const TEACHER_STAGE_MAP: Record<string, string> = {
+    "Nursery":"foundation","Pre-KG":"foundation","LKG":"foundation","UKG":"foundation",
+    "Grade 1":"foundation","Grade 2":"foundation",
+    "Grade 3":"preparatory","Grade 4":"preparatory","Grade 5":"preparatory",
+    "Grade 6":"middle","Grade 7":"middle","Grade 8":"middle",
+    "Grade 9":"secondary","Grade 10":"secondary",
+  };
+  const getTeacherStage = (assigned_classes: string[]): string => {
+    if (!assigned_classes?.length) return "foundation";
+    const counts: Record<string, number> = {};
+    assigned_classes.forEach(cls => {
+      const s = TEACHER_STAGE_MAP[cls] || "foundation";
+      counts[s] = (counts[s] || 0) + 1;
+    });
+    return STAGE_ORDER.reduce((best, s) => (counts[s] || 0) > (counts[best] || 0) ? s : best, STAGE_ORDER[0]);
+  };
+  const STAGE_TABS = [
+    { value:"foundation",  label:"Foundation",  sub:"Pre-KG – Grade 2", active:"bg-green-600 text-white",  inactive:"bg-white text-green-700 border border-green-300 hover:bg-green-50" },
+    { value:"preparatory", label:"Preparatory", sub:"Grade 3–5",         active:"bg-blue-600 text-white",   inactive:"bg-white text-blue-700 border border-blue-300 hover:bg-blue-50" },
+    { value:"middle",      label:"Middle",      sub:"Grade 6–8",         active:"bg-purple-600 text-white", inactive:"bg-white text-purple-700 border border-purple-300 hover:bg-purple-50" },
+    { value:"secondary",   label:"Secondary",   sub:"Grade 9–10",        active:"bg-orange-500 text-white", inactive:"bg-white text-orange-700 border border-orange-300 hover:bg-orange-50" },
+  ];
 
   // GAP #19: sync with global round when it changes
   useEffect(() => { if (globalRound) setRound(globalRound); }, [globalRound]);
@@ -471,11 +495,26 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
         </div>
       )}
 
+      {/* Stage tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {STAGE_TABS.map(tab => {
+          const count = teachers.filter((t: any) => getTeacherStage(t.assigned_classes || []) === tab.value).length;
+          return (
+            <button key={tab.value} onClick={() => setActiveStage(tab.value)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeStage === tab.value ? tab.active : tab.inactive}`}>
+              {tab.label}
+              <span className="ml-1.5 text-xs opacity-80">({count})</span>
+              <div className="text-xs font-normal opacity-70">{tab.sub}</div>
+            </button>
+          );
+        })}
+      </div>
+
       {loading ? (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Loading...</div>
       ) : (
         <div className="space-y-3">
-          {teachers.map((teacher: any, idx: number) => {
+          {teachers.filter((t: any) => getTeacherStage(t.assigned_classes || []) === activeStage).map((teacher: any, idx: number) => {
             const entry = getEntry(teacher.id);
             const { litScores={}, numScores={}, litMax={}, numMax={}, subjects="both", lit_stage="foundation", num_stage="foundation" } = entry;
             const doLit = subjects === "literacy" || subjects === "both";
