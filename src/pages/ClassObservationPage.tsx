@@ -83,12 +83,41 @@ const emptyRow = (name: string) => ({
   what_went_well: "", what_could_be_better: "", action_steps: "",
 });
 
+const STAGE_ORDER = ["foundation", "preparatory", "middle", "secondary"];
+
+const TEACHER_STAGE_MAP: Record<string, string> = {
+  "Pre-KG": "foundation", "Nursery": "foundation", "LKG": "foundation", "UKG": "foundation",
+  "Grade 1": "foundation", "Grade 2": "foundation",
+  "Grade 3": "preparatory", "Grade 4": "preparatory", "Grade 5": "preparatory",
+  "Grade 6": "middle", "Grade 7": "middle", "Grade 8": "middle",
+  "Grade 9": "secondary", "Grade 10": "secondary",
+};
+
+const getTeacherStage = (assigned_classes: string[]): string => {
+  if (!assigned_classes?.length) return "foundation";
+  const counts: Record<string, number> = {};
+  assigned_classes.forEach(cls => {
+    const s = TEACHER_STAGE_MAP[cls] || "foundation";
+    counts[s] = (counts[s] || 0) + 1;
+  });
+  return STAGE_ORDER.reduce((best, s) => (counts[s] || 0) > (counts[best] || 0) ? s : best, STAGE_ORDER[0]);
+};
+
+const STAGE_TABS = [
+  { value: "foundation", label: "Foundation", sub: "Pre-KG – Grade 2", active: "bg-green-600 text-white", inactive: "bg-white text-green-700 border border-green-300 hover:bg-green-50" },
+  { value: "preparatory", label: "Preparatory", sub: "Grade 3–5", active: "bg-blue-600 text-white", inactive: "bg-white text-blue-700 border border-blue-300 hover:bg-blue-50" },
+  { value: "middle", label: "Middle", sub: "Grade 6–8", active: "bg-purple-600 text-white", inactive: "bg-white text-purple-700 border border-purple-300 hover:bg-purple-50" },
+  { value: "secondary", label: "Secondary", sub: "Grade 9–10", active: "bg-orange-500 text-white", inactive: "bg-white text-orange-700 border border-orange-300 hover:bg-orange-50" },
+];
+
 export default function ClassObservationPage() {
   const [activeTab, setActiveTab] = useState<"table" | "dashboard">("table");
   const [academicYear, setAcademicYear] = useState(currentAcademicYear);
-  const [showCriteriaRef, setShowCriteriaRef] = useState(false);
+  const [showCriteriaRef, setShowCriteriaRef] = useState(true);
+  const [activeStage, setActiveStage] = useState("foundation");
   const [allTeachers, setAllTeachers] = useState<string[]>([]);
   const [teacherEmails, setTeacherEmails] = useState<Record<string, string>>({});
+  const [teacherClasses, setTeacherClasses] = useState<Record<string, string[]>>({});
   const [dashboard, setDashboard] = useState<any>(null);
   const [dashLoading, setDashLoading] = useState(false);
   const [newRows, setNewRows] = useState<Record<string, any>>({});
@@ -117,13 +146,16 @@ export default function ClassObservationPage() {
         axios.get(`${API}/observation/dashboard?academic_year=${academicYear}`),
       ]);
       const emailMap: Record<string, string> = {};
+      const classMap: Record<string, string[]> = {};
       const names: string[] = (tRes.data || []).map((t: any) => {
         emailMap[t.name] = t.email || "";
+        classMap[t.name] = t.assigned_classes || [];
         return t.name;
       });
       const observedNames: string[] = (dRes.data?.teachers || []).map((t: any) => t.teacher_name);
       const extra = observedNames.filter((n: string) => !names.includes(n));
       setTeacherEmails(emailMap);
+      setTeacherClasses(classMap);
       setAllTeachers([...names, ...extra]);
       setDashboard(dRes.data);
     } catch { }
@@ -349,6 +381,20 @@ export default function ClassObservationPage() {
             </div>
           )}
         </div>
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {STAGE_TABS.map(tab => {
+            const count = allTeachers.filter(n => getTeacherStage(teacherClasses[n] || []) === tab.value).length;
+            return (
+              <button key={tab.value} onClick={() => setActiveStage(tab.value)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeStage === tab.value ? tab.active : tab.inactive}`}>
+                {tab.label}
+                <span className="ml-1.5 text-xs opacity-75">({count})</span>
+                <div className="text-[10px] font-normal opacity-70">{tab.sub}</div>
+              </button>
+            );
+          })}
+        </div>
+
         <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
           <div className="flex gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs flex-wrap items-center">
             <span className="text-gray-500 font-medium">Rating:</span>
@@ -390,7 +436,7 @@ export default function ClassObservationPage() {
                 </tr>
               </thead>
               <tbody>
-                {allTeachers.map((name, idx) => {
+                {allTeachers.filter(n => getTeacherStage(teacherClasses[n] || []) === activeStage).map((name, idx) => {
                   const td = dashboard?.teachers?.find((t: any) => t.teacher_name === name);
                   const obsCount = td?.observation_count || 0;
                   const row = getRow(name);
