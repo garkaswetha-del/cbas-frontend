@@ -48,25 +48,21 @@ const GRADE_CAPS: Record<string,{quals:string[],cap:number}> = {
   "Grade 10": {quals:["Post Graduation with BED","Post Graduation"],                   cap:26000},
 };
 
-function calcIncrement(overallPct: number, respCount: number, salary: number|null, highestGrade: string|null, qualification: string|null) {
+function calcIncrement(overallPct: number, respCount: number, overCap: boolean, highestGrade: string|null, qualification: string|null) {
   if (!overallPct) return { base: 0, extra: 0, penalty: 0, total: 0, note: "-", overCap: false, band: "" };
-  const cap = highestGrade ? (GRADE_CAPS[highestGrade]?.cap || null) : null;
-  const overCap = !!(salary && cap && salary > cap);
 
   let base = 0, band = "";
   if (overCap) {
     if (overallPct >= 80)      { base = 10; band = "≥ 80% (capped)"; }
     else if (overallPct >= 70) { base = 8;  band = "70–79% (capped)"; }
     else if (overallPct >= 51) { base = 6;  band = "51–69% (capped)"; }
-    else if (overallPct >= 50) { base = 5;  band = "50%"; }
-    else                       { base = 3;  band = "< 50%"; }
+    else                       { base = 5;  band = "≤ 50% (capped)"; }
   } else {
     if (overallPct >= 81)      { base = 15; band = "≥ 81%"; }
     else if (overallPct >= 75) { base = 12; band = "75–80%"; }
     else if (overallPct >= 61) { base = 10; band = "61–74%"; }
     else if (overallPct >= 51) { base = 8;  band = "51–60%"; }
-    else if (overallPct >= 50) { base = 5;  band = "50%"; }
-    else                       { base = 3;  band = "< 50%"; }
+    else                       { base = 5;  band = "≤ 50%"; }
   }
 
   const extra = respCount > 0 ? 7 : 0;
@@ -484,6 +480,14 @@ export default function AppraisalPage() {
     if (ok > 0) { fetchData(); showMsg(`✅ Imported ${ok} appraisal${ok > 1 ? "s" : ""}`); }
   };
 
+  const toggleCapStatus = async (tid: string, newStatus: boolean) => {
+    try {
+      await axios.patch(`${API}/users/${tid}`, { over_salary_cap: newStatus });
+      await fetchData();
+      showMsg(`✅ Cap status updated`);
+    } catch { showMsg(`❌ Error updating cap status`); }
+  };
+
   const update = (tid:string, field:string, value:any) => {
     setAppraisals(prev=>({...prev,[tid]:{...prev[tid],[field]:value}}));
   };
@@ -525,7 +529,7 @@ export default function AppraisalPage() {
       const rc = RESP.filter(r=>a[r.key]).length;
       const hg = teacherGrades[t.teacher_id]||null;
       const q = t.appraisal_qualification||null;
-      const inc = calcIncrement(a.overall_percentage ? +a.overall_percentage : 0, rc, t.salary?+t.salary:null, hg, q);
+      const inc = calcIncrement(a.overall_percentage ? +a.overall_percentage : 0, rc, t.over_salary_cap || false, hg, q);
       return {
         "Name": t.teacher_name,
         "Qualification": q || "",
@@ -546,12 +550,11 @@ export default function AppraisalPage() {
   };
 
   const BANDS = [
-    { label:"≥ 81%",   hike:"15%", min:81,  max:100, color:"bg-green-50 border-green-400 text-green-800",    active:"bg-green-500 text-white border-green-500" },
-    { label:"75–80%",  hike:"12%", min:75,  max:80,  color:"bg-teal-50 border-teal-400 text-teal-800",       active:"bg-teal-500 text-white border-teal-500" },
-    { label:"61–74%",  hike:"10%", min:61,  max:74,  color:"bg-blue-50 border-blue-400 text-blue-800",       active:"bg-blue-500 text-white border-blue-500" },
-    { label:"51–60%",  hike:"8%",  min:51,  max:60,  color:"bg-yellow-50 border-yellow-400 text-yellow-800", active:"bg-yellow-500 text-white border-yellow-500" },
-    { label:"50%",     hike:"5%",  min:50,  max:50,  color:"bg-orange-50 border-orange-400 text-orange-800", active:"bg-orange-500 text-white border-orange-500" },
-    { label:"< 50%",   hike:"3%",  min:0,   max:49,  color:"bg-red-50 border-red-400 text-red-800",          active:"bg-red-500 text-white border-red-500" },
+    { label:"≥ 81%",   hike:"15%", min:81, max:100, color:"bg-green-50 border-green-400 text-green-800",    active:"bg-green-500 text-white border-green-500" },
+    { label:"75–80%",  hike:"12%", min:75, max:80,  color:"bg-teal-50 border-teal-400 text-teal-800",       active:"bg-teal-500 text-white border-teal-500" },
+    { label:"61–74%",  hike:"10%", min:61, max:74,  color:"bg-blue-50 border-blue-400 text-blue-800",       active:"bg-blue-500 text-white border-blue-500" },
+    { label:"51–60%",  hike:"8%",  min:51, max:60,  color:"bg-yellow-50 border-yellow-400 text-yellow-800", active:"bg-yellow-500 text-white border-yellow-500" },
+    { label:"≤ 50%",   hike:"5%",  min:0,  max:50,  color:"bg-red-50 border-red-400 text-red-800",          active:"bg-red-500 text-white border-red-500" },
   ];
 
   const filteredTeachers = teachers.filter(t => {
@@ -622,14 +625,13 @@ export default function AppraisalPage() {
     const rc = RESP.filter(r=>a[r.key]).length;
     const hg = teacherGrades[t.teacher_id]||null;
     const q: string|null = t.appraisal_qualification||null;
-    const salary: number|null = t.salary ? +t.salary : null;
-    const inc = calcIncrement(a.overall_percentage ? +a.overall_percentage : 0, rc, salary, hg, q);
+    const inc = calcIncrement(a.overall_percentage ? +a.overall_percentage : 0, rc, t.over_salary_cap || false, hg, q);
     return (
       <>
         <td className={`${td} text-center font-bold text-indigo-800`}>
           {a.overall_percentage ? (+a.overall_percentage).toFixed(1)+"%" : "-"}
         </td>
-        <td className={`${td} text-center min-w-[140px]`}>
+        <td className={`${td} text-center min-w-[160px]`}>
           {a.overall_percentage ? (
             <div>
               <span className={`font-bold text-sm ${inc.total>=15?"text-green-700":inc.total>=8?"text-blue-700":"text-orange-700"}`}>{inc.total}%</span>
@@ -637,6 +639,12 @@ export default function AppraisalPage() {
               {!q && <p className="text-xs text-gray-300 italic">Qual: pending</p>}
             </div>
           ) : "-"}
+          <button
+            onClick={() => toggleCapStatus(t.teacher_id, !t.over_salary_cap)}
+            title={t.over_salary_cap ? "Click to mark Below Cap" : "Click to mark Above Cap"}
+            className={`mt-1 text-xs px-2 py-0.5 rounded-full font-semibold border transition-colors ${t.over_salary_cap ? "bg-red-100 text-red-700 border-red-300 hover:bg-red-200" : "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"}`}>
+            {t.over_salary_cap ? "↑ ABOVE CAP" : "↓ BELOW CAP"}
+          </button>
         </td>
         <td className={`${td} text-center`}>
           {a.is_shared ? <span className="text-green-600 font-semibold text-xs">✅ Shared</span> : <span className="text-gray-400 text-xs">No</span>}
@@ -668,7 +676,7 @@ export default function AppraisalPage() {
       ? evaluated.reduce((acc,t) => {
           const a = appraisals[t.teacher_id]||{};
           const rc = RESP.filter(r=>a[r.key]).length;
-          const inc = calcIncrement(+a.overall_percentage, rc, t.salary?+t.salary:null, teacherGrades[t.teacher_id]||null, t.appraisal_qualification||null);
+          const inc = calcIncrement(+a.overall_percentage, rc, t.over_salary_cap||false, teacherGrades[t.teacher_id]||null, t.appraisal_qualification||null);
           return acc + inc.total;
         }, 0) / evaluated.length
       : 0;
@@ -747,7 +755,7 @@ export default function AppraisalPage() {
       {message && <div className="mb-3 px-4 py-2 bg-green-50 border border-green-300 rounded text-sm text-green-800">{message}</div>}
 
       {/* ── BAND ANALYSIS CARDS ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
         {BANDS.map(b => {
           const count = teachers.filter(t => {
             const pct = t.appraisal?.overall_percentage ? +t.appraisal.overall_percentage : null;
@@ -939,7 +947,7 @@ export default function AppraisalPage() {
                     const pct = a.overall_percentage ? +a.overall_percentage : 0;
                     const rc = RESP.filter(r => a[r.key]).length;
                     const hg = teacherGrades[t.teacher_id] || null;
-                    const inc = calcIncrement(pct, rc, t.salary ? +t.salary : null, hg, t.appraisal_qualification || null);
+                    const inc = calcIncrement(pct, rc, t.over_salary_cap || false, hg, t.appraisal_qualification || null);
                     const stage = isNurseryTeacher(t.assigned_classes) ? "Nursery" : getStage(t.assigned_classes);
                     const stageColors: Record<string,string> = {
                       Nursery:"bg-green-100 text-green-700", Foundation:"bg-green-100 text-green-700",
@@ -1232,8 +1240,7 @@ export default function AppraisalPage() {
         const pct = a.overall_percentage ? +a.overall_percentage : 0;
         const hg = teacherGrades[t.teacher_id] || null;
         const rc = RESP.filter(r => a[r.key]).length;
-        const salary = t.salary ? +t.salary : null;
-        const inc = calcIncrement(pct, rc, salary, hg, t.appraisal_qualification || null);
+        const inc = calcIncrement(pct, rc, t.over_salary_cap || false, hg, t.appraisal_qualification || null);
         const isNursery = isNurseryTeacher(t.assigned_classes);
         const pctColor = pct >= 81 ? "#10b981" : pct >= 75 ? "#0d9488" : pct >= 61 ? "#6366f1" : pct >= 51 ? "#f59e0b" : pct > 0 ? "#ef4444" : "#9ca3af";
 
@@ -1265,6 +1272,9 @@ export default function AppraisalPage() {
                 <div>
                   <h2 className="text-base font-bold text-gray-800">{t.teacher_name}</h2>
                   <p className="text-xs text-gray-400">{t.appraisal_qualification||"—"} · {(t.assigned_classes||[]).join(", ")||"No class"} · {year}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold mt-1 inline-block ${t.over_salary_cap ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                    {t.over_salary_cap ? "↑ ABOVE CAP — Reduced rates apply" : "↓ BELOW CAP — Standard rates apply"}
+                  </span>
                 </div>
                 <button onClick={()=>setModalTeacher(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none font-bold">×</button>
               </div>

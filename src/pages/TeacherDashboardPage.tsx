@@ -30,27 +30,23 @@ const GRADE_CAPS_AP: Record<string,{cap:number}> = {
 };
 const RESP_KEYS = ["resp_phonics","resp_math","resp_reading","resp_handwriting","resp_kannada_reading","resp_notes_hw","resp_library","resp_parental_engagement","resp_below_a_students","resp_english_grammar","resp_others"];
 
-function calcHike(overallPct: number, respCount: number, salary: number|null, highestGrade: string|null) {
-  if (!overallPct) return { base: 0, extra: 0, total: 0, band: "", overCap: false, cap: null as number|null };
-  const cap = highestGrade ? (GRADE_CAPS_AP[highestGrade]?.cap ?? null) : null;
-  const overCap = !!(salary && cap && salary > cap);
+function calcHike(overallPct: number, respCount: number, overCap: boolean) {
+  if (!overallPct) return { base: 0, extra: 0, total: 0, band: "", overCap: false };
   let base = 0, band = "";
   if (overCap) {
     if (overallPct >= 80)      { base = 10; band = "≥ 80% (capped)"; }
     else if (overallPct >= 70) { base = 8;  band = "70–79% (capped)"; }
     else if (overallPct >= 51) { base = 6;  band = "51–69% (capped)"; }
-    else if (overallPct >= 50) { base = 5;  band = "50%"; }
-    else                       { base = 3;  band = "Below 50%"; }
+    else                       { base = 5;  band = "≤ 50% (capped)"; }
   } else {
     if (overallPct >= 81)      { base = 15; band = "≥ 81%"; }
     else if (overallPct >= 75) { base = 12; band = "75–80%"; }
     else if (overallPct >= 61) { base = 10; band = "61–74%"; }
     else if (overallPct >= 51) { base = 8;  band = "51–60%"; }
-    else if (overallPct >= 50) { base = 5;  band = "50%"; }
-    else                       { base = 3;  band = "Below 50%"; }
+    else                       { base = 5;  band = "≤ 50%"; }
   }
   const extra = respCount > 0 ? 7 : 0;
-  return { base, extra, total: base + extra, band, overCap, cap };
+  return { base, extra, total: base + extra, band, overCap };
 }
 const ACADEMIC_YEARS = ((): string[] => {
   const now = new Date();
@@ -906,13 +902,7 @@ function AppraisalTab({ user, academicYear }: any) {
   const isNursery = !!(data.literacy_band || data.numeracy_band || n(data.literacy_score) > 0 || n(data.numeracy_score) > 0);
 
   const respCount = RESP_KEYS.filter(k => data[k]).length;
-  const classes: string[] = user?.assigned_classes || [];
-  const highestGrade = classes.reduce((best: string|null, g: string) => {
-    if (!best) return g;
-    return GRADE_ORDER_AP.indexOf(g) > GRADE_ORDER_AP.indexOf(best) ? g : best;
-  }, null);
-  const salary = user?.salary ? +user.salary : null;
-  const hike = calcHike(pct, respCount, salary, highestGrade);
+  const hike = calcHike(pct, respCount, !!(user?.over_salary_cap));
 
   const pctColor = pct >= 80 ? "#10b981" : pct >= 60 ? "#6366f1" : pct >= 40 ? "#f59e0b" : "#ef4444";
 
@@ -982,7 +972,7 @@ function AppraisalTab({ user, academicYear }: any) {
             )}
             {hike.overCap && (
               <div className="flex justify-between text-orange-700">
-                <span>Salary above grade cap (₹{(hike.cap!/1000).toFixed(0)}K) — reduced rate applied</span>
+                <span>Salary above grade cap — reduced (capping) rates applied</span>
                 <span className="font-semibold">↓</span>
               </div>
             )}
