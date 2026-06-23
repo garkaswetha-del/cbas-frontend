@@ -69,7 +69,7 @@ const QUAL_RANK: Record<string, number> = {
 
 // Minimum qualification rank required per grade.
 const GRADE_MIN_QUAL_RANK: Record<string, number> = {
-  "Nursery": 1, "Pre-KG": 1, "LKG": 1, "UKG": 1,
+  "Nursery": 0, "Pre-KG": 0, "LKG": 0, "UKG": 0,
   "Grade 1": 2, "Grade 2": 2, "Grade 3": 2,
   "Grade 4": 3, "Grade 5": 3,
   "Grade 6": 5, "Grade 7": 5,

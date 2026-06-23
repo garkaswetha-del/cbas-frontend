@@ -34,7 +34,7 @@ const QUAL_RANK_AP: Record<string, number> = {
   "GRADUATION WITH BED": 5, "POST GRADUATION WITH BED": 6,
 };
 const GRADE_MIN_QUAL_RANK_AP: Record<string, number> = {
-  "Nursery": 1, "Pre-KG": 1, "LKG": 1, "UKG": 1,
+  "Nursery": 0, "Pre-KG": 0, "LKG": 0, "UKG": 0,
   "Grade 1": 2, "Grade 2": 2, "Grade 3": 2,
   "Grade 4": 3, "Grade 5": 3,
   "Grade 6": 5, "Grade 7": 5,
