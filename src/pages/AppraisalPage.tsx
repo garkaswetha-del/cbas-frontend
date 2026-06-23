@@ -68,7 +68,7 @@ function calcIncrement(overallPct: number, respCount: number, overCap: boolean, 
   const extra = respCount > 0 ? 7 : 0;
 
   const acceptedQuals = highestGrade ? (GRADE_CAPS[highestGrade]?.quals || []) : [];
-  const hasQualPenalty = qualification !== null && acceptedQuals.length > 0 && respCount > 0
+  const hasQualPenalty = qualification !== null && acceptedQuals.length > 0
     && !acceptedQuals.includes(qualification);
   const penalty = hasQualPenalty ? 2 : 0;
 
