@@ -35,11 +35,20 @@ function calcHike(overallPct: number, respCount: number, salary: number|null, hi
   const cap = highestGrade ? (GRADE_CAPS_AP[highestGrade]?.cap ?? null) : null;
   const overCap = !!(salary && cap && salary > cap);
   let base = 0, band = "";
-  if (overallPct >= 80)      { base = overCap ? 10 : 15; band = "≥ 80%"; }
-  else if (overallPct >= 70) { base = overCap ? 8  : 12; band = "70–79%"; }
-  else if (overallPct >= 51) { base = overCap ? 6  : 8;  band = "51–69%"; }
-  else if (overallPct >= 50) { base = 5;                  band = "50%"; }
-  else                       { base = 3;                  band = "Below 50%"; }
+  if (overCap) {
+    if (overallPct >= 80)      { base = 10; band = "≥ 80% (capped)"; }
+    else if (overallPct >= 70) { base = 8;  band = "70–79% (capped)"; }
+    else if (overallPct >= 51) { base = 6;  band = "51–69% (capped)"; }
+    else if (overallPct >= 50) { base = 5;  band = "50%"; }
+    else                       { base = 3;  band = "Below 50%"; }
+  } else {
+    if (overallPct >= 81)      { base = 15; band = "≥ 81%"; }
+    else if (overallPct >= 75) { base = 12; band = "75–80%"; }
+    else if (overallPct >= 61) { base = 10; band = "61–74%"; }
+    else if (overallPct >= 51) { base = 8;  band = "51–60%"; }
+    else if (overallPct >= 50) { base = 5;  band = "50%"; }
+    else                       { base = 3;  band = "Below 50%"; }
+  }
   const extra = respCount > 0 ? 7 : 0;
   return { base, extra, total: base + extra, band, overCap, cap };
 }
@@ -984,10 +993,33 @@ function AppraisalTab({ user, academicYear }: any) {
           </div>
           <div className="mt-3 bg-indigo-50 rounded-lg p-3 text-xs text-indigo-700">
             <p className="font-semibold mb-1">How hike is calculated:</p>
-            <p>• Score ≥ 80% → <strong>15%</strong> hike &nbsp;|&nbsp; 70–79% → <strong>12%</strong> &nbsp;|&nbsp; 51–69% → <strong>8%</strong> &nbsp;|&nbsp; 50% → <strong>5%</strong></p>
+            <p>• Score ≥ 81% → <strong>15%</strong> &nbsp;|&nbsp; 75–80% → <strong>12%</strong> &nbsp;|&nbsp; 61–74% → <strong>10%</strong> &nbsp;|&nbsp; 51–60% → <strong>8%</strong> &nbsp;|&nbsp; 50% → <strong>5%</strong></p>
             <p className="mt-0.5">• Taking up extra responsibilities adds <strong>+7%</strong> to your hike</p>
-            {hike.overCap && <p className="mt-0.5">• If salary exceeds grade cap, reduced rates apply: 80%+ → 10%, 70–79% → 8%, 51–69% → 6%</p>}
+            {hike.overCap && <p className="mt-0.5">• Salary above grade cap — reduced (capping) rates apply: 80%+ → 10%, 70–79% → 8%, 51–69% → 6%</p>}
           </div>
+          {/* Improvement suggestion */}
+          {!hike.overCap && (() => {
+            if (pct >= 81) return (
+              <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-800">
+                <p className="font-semibold">🎉 You are in the highest hike band!</p>
+                <p className="mt-0.5">Maintain your performance to keep the 15% hike next year too.</p>
+              </div>
+            );
+            let needed = 0, nextHike = 0;
+            if (pct >= 75) { needed = 81; nextHike = 15; }
+            else if (pct >= 61) { needed = 75; nextHike = 12; }
+            else if (pct >= 51) { needed = 61; nextHike = 10; }
+            else if (pct >= 50) { needed = 51; nextHike = 8; }
+            else { needed = 50; nextHike = 5; }
+            const gap = (needed - pct).toFixed(1);
+            return (
+              <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+                <p className="font-semibold">💡 How to improve your hike:</p>
+                <p className="mt-0.5">Improve your overall score by <strong>{gap}%</strong> (reach <strong>{needed}%</strong>) to unlock a <strong>{nextHike}% hike</strong>.</p>
+                <p className="mt-1">Focus on sections where you scored below 80% — especially high-weight sections (Exam Marks 50%, Parents Feedback, Classroom Teaching).</p>
+              </div>
+            );
+          })()}
         </div>
       ) : null}
 

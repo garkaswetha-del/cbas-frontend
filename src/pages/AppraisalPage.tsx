@@ -49,16 +49,25 @@ const GRADE_CAPS: Record<string,{quals:string[],cap:number}> = {
 };
 
 function calcIncrement(overallPct: number, respCount: number, salary: number|null, highestGrade: string|null, qualification: string|null) {
-  if (!overallPct) return { base: 0, extra: 0, penalty: 0, total: 0, note: "-" };
+  if (!overallPct) return { base: 0, extra: 0, penalty: 0, total: 0, note: "-", overCap: false, band: "" };
   const cap = highestGrade ? (GRADE_CAPS[highestGrade]?.cap || null) : null;
-  const overCap = salary && cap ? salary > cap : false;
+  const overCap = !!(salary && cap && salary > cap);
 
-  let base = 0;
-  if (overallPct >= 80)      base = overCap ? 10 : 15;
-  else if (overallPct >= 70) base = overCap ? 8  : 12;
-  else if (overallPct >= 51) base = overCap ? 6  : 8;
-  else if (overallPct >= 50) base = 5;
-  else                       base = 3;
+  let base = 0, band = "";
+  if (overCap) {
+    if (overallPct >= 80)      { base = 10; band = "≥ 80% (capped)"; }
+    else if (overallPct >= 70) { base = 8;  band = "70–79% (capped)"; }
+    else if (overallPct >= 51) { base = 6;  band = "51–69% (capped)"; }
+    else if (overallPct >= 50) { base = 5;  band = "50%"; }
+    else                       { base = 3;  band = "< 50%"; }
+  } else {
+    if (overallPct >= 81)      { base = 15; band = "≥ 81%"; }
+    else if (overallPct >= 75) { base = 12; band = "75–80%"; }
+    else if (overallPct >= 61) { base = 10; band = "61–74%"; }
+    else if (overallPct >= 51) { base = 8;  band = "51–60%"; }
+    else if (overallPct >= 50) { base = 5;  band = "50%"; }
+    else                       { base = 3;  band = "< 50%"; }
+  }
 
   const extra = respCount > 0 ? 7 : 0;
 
@@ -69,7 +78,7 @@ function calcIncrement(overallPct: number, respCount: number, salary: number|nul
 
   const total = base + extra - penalty;
   const note = `Base:${base}%${extra>0?` + Resp:${extra}%`:""}${penalty>0?` - Penalty:${penalty}%`:""}`;
-  return { base, extra, penalty, total, note };
+  return { base, extra, penalty, total, note, overCap, band };
 }
 
 function timeAgo(dateStr: string|null|undefined): string {
@@ -537,11 +546,12 @@ export default function AppraisalPage() {
   };
 
   const BANDS = [
-    { label:"≥ 80%",   hike:"15%", min:80,  max:100, color:"bg-green-50 border-green-400 text-green-800",   active:"bg-green-500 text-white border-green-500" },
-    { label:"70–79%",  hike:"12%", min:70,  max:79,  color:"bg-blue-50 border-blue-400 text-blue-800",     active:"bg-blue-500 text-white border-blue-500" },
-    { label:"51–69%",  hike:"8%",  min:51,  max:69,  color:"bg-yellow-50 border-yellow-400 text-yellow-800", active:"bg-yellow-500 text-white border-yellow-500" },
+    { label:"≥ 81%",   hike:"15%", min:81,  max:100, color:"bg-green-50 border-green-400 text-green-800",    active:"bg-green-500 text-white border-green-500" },
+    { label:"75–80%",  hike:"12%", min:75,  max:80,  color:"bg-teal-50 border-teal-400 text-teal-800",       active:"bg-teal-500 text-white border-teal-500" },
+    { label:"61–74%",  hike:"10%", min:61,  max:74,  color:"bg-blue-50 border-blue-400 text-blue-800",       active:"bg-blue-500 text-white border-blue-500" },
+    { label:"51–60%",  hike:"8%",  min:51,  max:60,  color:"bg-yellow-50 border-yellow-400 text-yellow-800", active:"bg-yellow-500 text-white border-yellow-500" },
     { label:"50%",     hike:"5%",  min:50,  max:50,  color:"bg-orange-50 border-orange-400 text-orange-800", active:"bg-orange-500 text-white border-orange-500" },
-    { label:"< 50%",   hike:"3%",  min:0,   max:49,  color:"bg-red-50 border-red-400 text-red-800",         active:"bg-red-500 text-white border-red-500" },
+    { label:"< 50%",   hike:"3%",  min:0,   max:49,  color:"bg-red-50 border-red-400 text-red-800",          active:"bg-red-500 text-white border-red-500" },
   ];
 
   const filteredTeachers = teachers.filter(t => {
@@ -737,7 +747,7 @@ export default function AppraisalPage() {
       {message && <div className="mb-3 px-4 py-2 bg-green-50 border border-green-300 rounded text-sm text-green-800">{message}</div>}
 
       {/* ── BAND ANALYSIS CARDS ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 mb-4">
         {BANDS.map(b => {
           const count = teachers.filter(t => {
             const pct = t.appraisal?.overall_percentage ? +t.appraisal.overall_percentage : null;
@@ -936,7 +946,7 @@ export default function AppraisalPage() {
                       Preparatory:"bg-blue-100 text-blue-700", Middle:"bg-purple-100 text-purple-700",
                       Secondary:"bg-orange-100 text-orange-700",
                     };
-                    const pctColor = pct >= 80 ? "text-green-700" : pct >= 70 ? "text-blue-700" : pct >= 51 ? "text-yellow-700" : pct > 0 ? "text-red-600" : "text-gray-400";
+                    const pctColor = pct >= 81 ? "text-green-700" : pct >= 75 ? "text-teal-700" : pct >= 61 ? "text-blue-700" : pct >= 51 ? "text-yellow-700" : pct > 0 ? "text-red-600" : "text-gray-400";
                     return (
                       <tr key={t.teacher_id} className={`border-b border-gray-100 hover:bg-indigo-50/30 ${i%2===0?"bg-white":"bg-gray-50"}`}>
                         <td className="px-3 py-2 text-gray-400">{i+1}</td>
@@ -1225,7 +1235,7 @@ export default function AppraisalPage() {
         const salary = t.salary ? +t.salary : null;
         const inc = calcIncrement(pct, rc, salary, hg, t.appraisal_qualification || null);
         const isNursery = isNurseryTeacher(t.assigned_classes);
-        const pctColor = pct >= 80 ? "#10b981" : pct >= 70 ? "#6366f1" : pct >= 51 ? "#f59e0b" : pct > 0 ? "#ef4444" : "#9ca3af";
+        const pctColor = pct >= 81 ? "#10b981" : pct >= 75 ? "#0d9488" : pct >= 61 ? "#6366f1" : pct >= 51 ? "#f59e0b" : pct > 0 ? "#ef4444" : "#9ca3af";
 
         type MS = { label:string; weight:string; score:number; max:number; comment:string|null; color:string };
         const sections: MS[] = isNursery ? [
@@ -1275,15 +1285,35 @@ export default function AppraisalPage() {
                 </div>
 
                 {/* Hike breakdown */}
-                {pct > 0 && (
-                  <div className="bg-indigo-50 rounded-xl p-3 text-xs text-indigo-800 space-y-1">
-                    <p className="font-semibold mb-1">Hike Breakdown</p>
-                    <div className="flex justify-between"><span>Score {pct.toFixed(1)}% → Band</span><span className="font-bold">{inc.base + (inc.base === 10||inc.base===8||inc.base===6||inc.base===5?"(over cap)":"")} base %</span></div>
-                    {rc > 0 && <div className="flex justify-between"><span>Extra responsibilities ({rc})</span><span className="font-bold text-green-700">+ {inc.extra}%</span></div>}
-                    {inc.penalty > 0 && <div className="flex justify-between"><span>Unqualified for grade</span><span className="font-bold text-red-600">− {inc.penalty}%</span></div>}
-                    <div className="flex justify-between border-t border-indigo-200 pt-1 font-bold"><span>Total</span><span>{inc.total}%</span></div>
-                  </div>
-                )}
+                {pct > 0 && (() => {
+                  const nextBandSuggestion = (() => {
+                    if (inc.overCap) return null;
+                    if (pct >= 81) return null;
+                    if (pct >= 75) return { needed: 81, hike: 15, current: 12, gap: (81 - pct).toFixed(1) };
+                    if (pct >= 61) return { needed: 75, hike: 12, current: 10, gap: (75 - pct).toFixed(1) };
+                    if (pct >= 51) return { needed: 61, hike: 10, current: 8,  gap: (61 - pct).toFixed(1) };
+                    if (pct >= 50) return { needed: 51, hike: 8,  current: 5,  gap: (51 - pct).toFixed(1) };
+                    return { needed: 50, hike: 5, current: 3, gap: (50 - pct).toFixed(1) };
+                  })();
+                  return (
+                    <>
+                      <div className="bg-indigo-50 rounded-xl p-3 text-xs text-indigo-800 space-y-1">
+                        <p className="font-semibold mb-1">Hike Breakdown</p>
+                        <div className="flex justify-between"><span>Score {pct.toFixed(1)}% → Band: {inc.band}</span><span className="font-bold">{inc.base}% base</span></div>
+                        {inc.overCap && <div className="flex justify-between text-orange-600"><span>Salary above grade cap</span><span>Reduced (capping) rates applied</span></div>}
+                        {rc > 0 && <div className="flex justify-between"><span>Extra responsibilities ({rc})</span><span className="font-bold text-green-700">+ {inc.extra}%</span></div>}
+                        {inc.penalty > 0 && <div className="flex justify-between"><span>Unqualified for grade</span><span className="font-bold text-red-600">− {inc.penalty}%</span></div>}
+                        <div className="flex justify-between border-t border-indigo-200 pt-1 font-bold"><span>Total</span><span>{inc.total}%</span></div>
+                      </div>
+                      {nextBandSuggestion && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                          <p className="font-semibold mb-1">To reach the next hike band:</p>
+                          <p>Improve score by <strong>{nextBandSuggestion.gap}%</strong> → reach <strong>{nextBandSuggestion.needed}%</strong> to get <strong>{nextBandSuggestion.hike}% hike</strong> (currently {nextBandSuggestion.current}%)</p>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* Section breakdown */}
                 {pct > 0 && (
