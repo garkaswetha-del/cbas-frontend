@@ -482,7 +482,7 @@ export default function AppraisalPage() {
 
   const toggleCapStatus = async (tid: string, newStatus: boolean) => {
     try {
-      await axios.patch(`${API}/users/${tid}`, { over_salary_cap: newStatus });
+      await axios.patch(`${API}/users/${tid}/cap-status`, { over_salary_cap: newStatus });
       await fetchData();
       showMsg(`✅ Cap status updated`);
     } catch { showMsg(`❌ Error updating cap status`); }
