@@ -246,6 +246,25 @@ function App() {
     );
   }
 
+  // AHM gets academic tabs only — no admin routes registered
+  if (user.role === "ahm") {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<MainLayout user={user} onLogout={handleLogout} academicOnly />}>
+            <Route index element={<Navigate to="/baseline" replace />} />
+            <Route path="baseline" element={<BaselinePage />} />
+            <Route path="competencies" element={<CompetencyManagementPage />} />
+            <Route path="activities" element={<ActivitiesPage />} />
+            <Route path="pasa" element={<PASAPage />} />
+            <Route path="observation" element={<ClassObservationPage />} />
+            <Route path="*" element={<Navigate to="/baseline" replace />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    );
+  }
+
   // Principal / Admin get the full admin app
   return (
     <BrowserRouter>

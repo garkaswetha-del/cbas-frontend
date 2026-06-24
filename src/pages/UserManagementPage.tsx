@@ -703,6 +703,7 @@ export default function UserManagementPage() {
               <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
                 className="border border-gray-300 rounded px-3 py-1.5 text-sm w-full">
                 <option value="teacher">Teacher</option>
+                <option value="ahm">AHM</option>
                 <option value="admin">Admin</option>
                 <option value="principal">Principal</option>
               </select>

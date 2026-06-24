@@ -22,14 +22,15 @@ const ACADEMIC_PATHS = ACADEMIC_NAV.map(n => n.path);
 interface MainLayoutProps {
   user: any;
   onLogout: () => void;
+  academicOnly?: boolean;
 }
 
-export default function MainLayout({ user, onLogout }: MainLayoutProps) {
+export default function MainLayout({ user, onLogout, academicOnly = false }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
   const detectTab = (pathname: string) =>
-    ACADEMIC_PATHS.some(p => pathname.startsWith(p)) ? 'academic' : 'administrative';
+    academicOnly || ACADEMIC_PATHS.some(p => pathname.startsWith(p)) ? 'academic' : 'administrative';
 
   const [navTab, setNavTab] = useState<'administrative' | 'academic'>(() => detectTab(location.pathname));
 
@@ -39,7 +40,7 @@ export default function MainLayout({ user, onLogout }: MainLayoutProps) {
 
   const currentNav = navTab === 'administrative' ? ADMINISTRATIVE_NAV : ACADEMIC_NAV;
 
-  const TabSwitcher = () => (
+  const TabSwitcher = () => academicOnly ? null : (
     <div className="flex mx-3 mb-2 rounded-lg overflow-hidden border border-indigo-700">
       <button
         onClick={() => setNavTab('administrative')}
@@ -113,7 +114,7 @@ export default function MainLayout({ user, onLogout }: MainLayoutProps) {
       <div className="hidden md:flex w-64 bg-indigo-900 flex-col flex-shrink-0">
         <div className="px-4 py-4 border-b border-indigo-700">
           <h1 className="text-white text-sm font-bold leading-tight">Wisdom Techno School</h1>
-          <p className="text-indigo-300 text-xs mt-0.5">CBAS Portal</p>
+          <p className="text-indigo-300 text-xs mt-0.5">{academicOnly ? 'Academic Portal' : 'CBAS Portal'}</p>
         </div>
         <div className="pt-3 pb-1">
           <TabSwitcher />
@@ -137,7 +138,7 @@ export default function MainLayout({ user, onLogout }: MainLayoutProps) {
         <div className="px-4 py-4 border-b border-indigo-700 flex items-center justify-between">
           <div>
             <h1 className="text-white text-sm font-bold leading-tight">Wisdom Techno School</h1>
-            <p className="text-indigo-300 text-xs mt-0.5">CBAS Portal</p>
+            <p className="text-indigo-300 text-xs mt-0.5">{academicOnly ? 'Academic Portal' : 'CBAS Portal'}</p>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="text-indigo-300 hover:text-white text-xl p-1">✕</button>
         </div>
@@ -162,7 +163,7 @@ export default function MainLayout({ user, onLogout }: MainLayoutProps) {
           </button>
           <div className="text-center">
             <p className="text-white text-xs font-bold">Wisdom Techno School</p>
-            <p className="text-indigo-300 text-xs">CBAS Portal</p>
+            <p className="text-indigo-300 text-xs">{academicOnly ? 'Academic Portal' : 'CBAS Portal'}</p>
           </div>
           <button onClick={onLogout} className="text-indigo-300 hover:text-red-400 text-xs p-1">
             🚪
