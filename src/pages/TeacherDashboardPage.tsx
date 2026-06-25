@@ -159,7 +159,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
         {activeTab === "profile"        && <ProfileTab user={user} />}
         {activeTab === "self_baseline"  && <BaselineTab user={user} academicYear={academicYear} />}
         {activeTab === "appraisal"      && <AppraisalTab user={user} academicYear={academicYear} />}
-        {activeTab === "observations"   && <ObservationsTab user={user} />}
+        {activeTab === "observations"   && <ObservationsTab user={user} academicYear={academicYear} />}
         {activeTab === "self_ai"        && <SelfAITab user={user} academicYear={academicYear} />}
       </div>
     </div>
@@ -7779,20 +7779,20 @@ const OBS_SCORE_VAL: Record<string, number> = {
   not_done: 0, attempted: 1, done: 2, well_done: 3,
 };
 
-function ObservationsTab({ user }: { user: any }) {
+function ObservationsTab({ user, academicYear }: { user: any; academicYear: string }) {
   const [obs, setObs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  useEffect(() => { fetchObs(); }, []);
+  useEffect(() => { fetchObs(); }, [academicYear]);
 
   const fetchObs = async () => {
     setLoading(true);
     try {
-      const email = user?.email || "";
-      if (!email) { setObs([]); setLoading(false); return; }
-      const r = await axios.get(`${API}/observation/shared?teacher_email=${encodeURIComponent(email)}`);
-      setObs(Array.isArray(r.data) ? r.data : []);
+      const name = user?.name || "";
+      if (!name) { setObs([]); setLoading(false); return; }
+      const r = await axios.get(`${API}/observation/teacher/${encodeURIComponent(name)}?academic_year=${academicYear}`);
+      setObs(Array.isArray(r.data?.observations) ? r.data.observations : []);
     } catch { setObs([]); }
     setLoading(false);
   };
@@ -7806,8 +7806,8 @@ function ObservationsTab({ user }: { user: any }) {
   if (obs.length === 0) return (
     <div className="bg-white rounded-xl shadow p-10 text-center">
       <p className="text-4xl mb-3">🔍</p>
-      <p className="text-sm font-semibold text-gray-600">No shared observations yet</p>
-      <p className="text-xs text-gray-400 mt-1">When an admin shares a class observation for you, it will appear here.</p>
+      <p className="text-sm font-semibold text-gray-600">No observations recorded yet</p>
+      <p className="text-xs text-gray-400 mt-1">Observations entered by admin or AHM will appear here.</p>
     </div>
   );
 
@@ -7815,7 +7815,7 @@ function ObservationsTab({ user }: { user: any }) {
     <div className="space-y-4">
       <div className="bg-white rounded-xl shadow p-4 border-l-4 border-indigo-500">
         <h2 className="text-sm font-bold text-gray-700 mb-1">My Class Observations</h2>
-        <p className="text-xs text-gray-400">{obs.length} observation{obs.length !== 1 ? "s" : ""} shared with you</p>
+        <p className="text-xs text-gray-400">{obs.length} observation{obs.length !== 1 ? "s" : ""} · {academicYear}</p>
       </div>
 
       {obs.map((o: any) => {
