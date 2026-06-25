@@ -99,6 +99,8 @@ export default function ClassObservationPage() {
   const [teacherObs, setTeacherObs] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTeacher, setEditingTeacher] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -155,18 +157,67 @@ export default function ClassObservationPage() {
     if (!row.observed_by?.trim()) { showMsg("❌ Observer name is required"); return; }
     setSaving(name);
     try {
-      await axios.post(`${API}/observation`, {
-        ...row,
-        teacher_email: teacherEmails[name] || "",
-        academic_year: academicYear,
-      });
-      showMsg("✅ Observation saved for " + name);
+      if (editingId) {
+        await axios.put(`${API}/observation/${editingId}`, {
+          ...row,
+          teacher_email: teacherEmails[name] || "",
+          academic_year: academicYear,
+        });
+        showMsg("✅ Observation updated for " + name);
+        setEditingId(null);
+        setEditingTeacher(null);
+      } else {
+        await axios.post(`${API}/observation`, {
+          ...row,
+          teacher_email: teacherEmails[name] || "",
+          academic_year: academicYear,
+        });
+        showMsg("✅ Observation saved for " + name);
+      }
       setNewRows(prev => ({ ...prev, [name]: emptyRow(name) }));
       await fetchAll();
       setExpandedTeacher(name);
       await fetchTeacherObs(name);
     } catch { showMsg("❌ Error saving"); }
     setSaving(null);
+  };
+
+  const handleEdit = (o: any, teacherName: string) => {
+    setNewRows(prev => ({
+      ...prev,
+      [teacherName]: {
+        teacher_name: teacherName,
+        observation_date: o.observation_date || "",
+        grade_observed: o.grade_observed || "Grade 1",
+        section_observed: o.section_observed || "",
+        subject_observed: o.subject_observed || "",
+        block_number: o.block_number || "",
+        number_of_students: o.number_of_students || "",
+        classroom_norms_discussed: o.classroom_norms_discussed || false,
+        lesson_plan_available: o.lesson_plan_available || false,
+        observed_by: o.observed_by || "",
+        preparation: o.preparation || "not_done",
+        purposeful_class: o.purposeful_class || "not_done",
+        action: o.action || "not_done",
+        analysis: o.analysis || "not_done",
+        application: o.application || "not_done",
+        assessment: o.assessment || "not_done",
+        super_teacher: o.super_teacher || "not_done",
+        high_energy: o.high_energy || "not_done",
+        what_went_well: o.what_went_well || "",
+        what_could_be_better: o.what_could_be_better || "",
+        action_steps: o.action_steps || "",
+      },
+    }));
+    setEditingId(o.id);
+    setEditingTeacher(teacherName);
+    setExpandedTeacher(null);
+  };
+
+  const handleCancelEdit = (name: string) => {
+    setEditingId(null);
+    setEditingTeacher(null);
+    setNewRows(prev => ({ ...prev, [name]: emptyRow(name) }));
   };
 
   const handleDelete = async (id: string, teacherName: string) => {
@@ -398,7 +449,8 @@ export default function ClassObservationPage() {
                   const total = calcTotal(row);
                   const pct = calcPct(total);
                   const isExpanded = expandedTeacher === name;
-                  const bg = idx % 2 === 0 ? "bg-white" : "bg-gray-50";
+                  const isEditing = editingTeacher === name;
+                  const bg = isEditing ? "bg-amber-50" : idx % 2 === 0 ? "bg-white" : "bg-gray-50";
                   const obs = teacherObs[name]?.observations || [];
 
                   return (
@@ -406,6 +458,9 @@ export default function ClassObservationPage() {
                       <tr key={`row-${name}`} className={`border-b border-gray-100 ${bg}`}>
                         <td className={`px-3 py-2 font-medium ${stickyLeft(bg)}`}>
                           <div className="flex flex-col gap-1">
+                            {isEditing && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-200 text-amber-800 font-bold w-fit">✏️ Editing</span>
+                            )}
                             <div className="flex items-center gap-1.5">
                               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${obsCount > 0 ? "bg-green-500" : "bg-gray-300"}`} />
                               {obsCount > 0 ? (
@@ -515,10 +570,23 @@ export default function ClassObservationPage() {
                           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBg(pct)}`}>{pct}%</span>
                         </td>
                         <td className={`px-2 py-1.5 text-center ${stickyR3(bg)}`}>
-                          <button onClick={() => handleSave(name)} disabled={saving === name}
-                            className="px-2 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
-                            {saving === name ? "..." : "Save"}
-                          </button>
+                          {isEditing ? (
+                            <div className="flex flex-col gap-1">
+                              <button onClick={() => handleSave(name)} disabled={saving === name}
+                                className="px-2 py-1 bg-amber-500 text-white text-xs rounded-lg hover:bg-amber-600 disabled:opacity-50 font-medium">
+                                {saving === name ? "..." : "Update"}
+                              </button>
+                              <button onClick={() => handleCancelEdit(name)}
+                                className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded-lg hover:bg-gray-300 font-medium">
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button onClick={() => handleSave(name)} disabled={saving === name}
+                              className="px-2 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
+                              {saving === name ? "..." : "Save"}
+                            </button>
+                          )}
                         </td>
                       </tr>
 
@@ -554,7 +622,7 @@ export default function ClassObservationPage() {
                                       <th className="px-3 py-2 text-center">Start</th>
                                       <th className="px-3 py-2 text-center font-bold">Total</th>
                                       <th className="px-3 py-2 text-center font-bold">%</th>
-                                      <th className="px-3 py-2 text-center">Share</th>
+                                      <th className="px-3 py-2 text-center">Edit</th>
                                       <th className="px-3 py-2 text-center">Del</th>
                                     </tr>
                                   </thead>
@@ -592,9 +660,9 @@ export default function ClassObservationPage() {
                                           <span className={`font-bold px-2 py-0.5 rounded-full text-xs ${scoreBg(+o.percentage)}`}>{o.percentage}%</span>
                                         </td>
                                         <td className="px-3 py-2 text-center">
-                                          <button onClick={() => handleShare(o.id, !!o.is_shared, name)}
-                                            className={`px-2 py-1 text-xs rounded font-medium transition-all ${o.is_shared ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-600 hover:bg-indigo-100 hover:text-indigo-700"}`}>
-                                            {o.is_shared ? "Shared ✓" : "Share"}
+                                          <button onClick={() => handleEdit(o, name)}
+                                            className="px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200 text-xs font-medium">
+                                            Edit
                                           </button>
                                         </td>
                                         <td className="px-3 py-2 text-center">
