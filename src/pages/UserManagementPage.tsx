@@ -172,6 +172,9 @@ export default function UserManagementPage() {
   const [newPassword, setNewPassword] = useState("");
   const [historyUser, setHistoryUser] = useState<any>(null);
   const [historyData, setHistoryData] = useState<any[]>([]);
+  const [portfolioUser, setPortfolioUser] = useState<any>(null);
+  const [portfolioData, setPortfolioData] = useState<any>(null);
+  const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [allSections, setAllSections] = useState<string[]>([]);
   const [allSectionsFull, setAllSectionsFull] = useState<{grade: string; name: string}[]>([]);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -387,6 +390,17 @@ export default function UserManagementPage() {
       const r = await axios.get(`${API}/teacher-assignments/history/${u.id}`);
       setHistoryData(r.data || []);
     } catch { setHistoryData([]); }
+  };
+
+  const openPortfolio = async (u: any) => {
+    setPortfolioUser(u);
+    setPortfolioData(null);
+    setPortfolioLoading(true);
+    try {
+      const r = await axios.get(`${API}/portfolio/teacher/${u.id}`);
+      setPortfolioData(r.data);
+    } catch { setPortfolioData(null); }
+    setPortfolioLoading(false);
   };
 
   const toggleSubject = (sub: string) => setForm(p => ({
@@ -1065,7 +1079,11 @@ export default function UserManagementPage() {
                       <td className="px-3 py-2.5 text-gray-500">{u.appraisal_qualification||"—"}</td>
                       <td className="px-3 py-2.5 text-red-500">{formatDate(u.deactivated_at)}</td>
                       <td className="px-3 py-2.5 text-center">
-                        <div className="flex gap-1 justify-center">
+                        <div className="flex gap-1 justify-center flex-wrap">
+                          <button onClick={() => openPortfolio(u)}
+                            className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 text-xs font-medium">
+                            📋 Portfolio
+                          </button>
                           <button onClick={() => reactivateUser(u.id, u.name)}
                             className="px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 text-xs font-medium">
                             ✅ Reactivate
@@ -1082,6 +1100,199 @@ export default function UserManagementPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── PORTFOLIO MODAL ── */}
+      {portfolioUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-4">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg">
+                  {portfolioUser.name?.[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <h2 className="text-white font-bold text-base">{portfolioUser.name}</h2>
+                  <p className="text-indigo-200 text-xs">Teacher Portfolio</p>
+                </div>
+              </div>
+              <button onClick={() => { setPortfolioUser(null); setPortfolioData(null); }}
+                className="text-white/70 hover:text-white text-xl font-light">✕</button>
+            </div>
+
+            {portfolioLoading && (
+              <div className="p-12 text-center text-gray-400 text-sm">Loading portfolio...</div>
+            )}
+
+            {!portfolioLoading && !portfolioData && (
+              <div className="p-12 text-center text-gray-400 text-sm">Failed to load portfolio data.</div>
+            )}
+
+            {!portfolioLoading && portfolioData && (
+              <div className="p-5 space-y-5">
+
+                {/* Profile */}
+                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+                  <h3 className="text-xs font-bold text-indigo-800 uppercase tracking-wide mb-3">Profile</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div><span className="text-gray-400">Email</span><p className="font-medium text-gray-700">{portfolioData.profile.email || "—"}</p></div>
+                    <div><span className="text-gray-400">Qualification</span><p className="font-medium text-gray-700">{portfolioData.profile.appraisal_qualification || "—"}</p></div>
+                    <div><span className="text-gray-400">Experience</span><p className="font-medium text-gray-700">{portfolioData.profile.experience ? portfolioData.profile.experience + " yrs" : "—"}</p></div>
+                    <div><span className="text-gray-400">Subjects</span><p className="font-medium text-gray-700">{(portfolioData.profile.subjects || []).join(", ") || "—"}</p></div>
+                    <div><span className="text-gray-400">Phone</span><p className="font-medium text-gray-700">{portfolioData.profile.phone || "—"}</p></div>
+                    <div><span className="text-gray-400">Status</span><p className="font-medium text-red-600">Deactivated</p></div>
+                  </div>
+                </div>
+
+                {/* Appraisal History */}
+                <div>
+                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Appraisal History</h3>
+                  {portfolioData.appraisal_history.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">No appraisal records found.</p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50">
+                          <tr className="text-gray-500 border-b border-gray-200">
+                            <th className="px-3 py-2 text-left">Year</th>
+                            <th className="px-3 py-2 text-right">Overall %</th>
+                            <th className="px-3 py-2 text-right">Exam</th>
+                            <th className="px-3 py-2 text-right">Skills</th>
+                            <th className="px-3 py-2 text-right">Behaviour</th>
+                            <th className="px-3 py-2 text-right">Classroom</th>
+                            <th className="px-3 py-2 text-right">Parents</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {portfolioData.appraisal_history.map((a: any) => (
+                            <tr key={a.id} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="px-3 py-2 font-semibold text-indigo-700">{a.academic_year}</td>
+                              <td className="px-3 py-2 text-right">
+                                <span className={`font-bold ${+a.overall_percentage >= 75 ? "text-green-600" : +a.overall_percentage >= 50 ? "text-amber-600" : "text-red-500"}`}>
+                                  {(+a.overall_percentage).toFixed(1)}%
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right text-gray-600">{(+a.exam_score * 100).toFixed(0)}%</td>
+                              <td className="px-3 py-2 text-right text-gray-600">{(+a.skills_score * 100).toFixed(0)}%</td>
+                              <td className="px-3 py-2 text-right text-gray-600">{(+a.behaviour_score * 100).toFixed(0)}%</td>
+                              <td className="px-3 py-2 text-right text-gray-600">{(+a.classroom_score * 100).toFixed(0)}%</td>
+                              <td className="px-3 py-2 text-right text-gray-600">{(+a.parents_feedback_score * 100).toFixed(0)}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Observation History */}
+                <div>
+                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Observation History</h3>
+                  {portfolioData.observation_history.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">No observation records found.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {portfolioData.observation_history.map((y: any) => (
+                        <div key={y.academic_year} className="border border-gray-200 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-indigo-700">{y.academic_year}</span>
+                            <div className="flex gap-3 text-xs text-gray-500">
+                              <span>{y.count} observation{y.count !== 1 ? "s" : ""}</span>
+                              <span className={`font-bold ${y.avg_percentage >= 75 ? "text-green-600" : y.avg_percentage >= 50 ? "text-amber-600" : "text-red-500"}`}>
+                                Avg {y.avg_percentage}%
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {y.observations.map((o: any) => (
+                              <span key={o.id} className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs border border-indigo-100">
+                                {o.observation_date} · {o.grade_observed} · {(+o.percentage).toFixed(0)}%
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Teaching History + Student Impact */}
+                <div>
+                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Teaching History & Student Impact</h3>
+                  {portfolioData.teaching_history.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">No teaching history found.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {portfolioData.teaching_history.map((y: any) => (
+                        <div key={y.academic_year} className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+                            <span className="text-xs font-semibold text-gray-700">{y.academic_year}</span>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead className="bg-gray-50/50">
+                                <tr className="text-gray-400 border-b border-gray-100">
+                                  <th className="px-3 py-1.5 text-left">Grade</th>
+                                  <th className="px-3 py-1.5 text-left">Section</th>
+                                  <th className="px-3 py-1.5 text-left">Subject</th>
+                                  <th className="px-3 py-1.5 text-center">Class Teacher</th>
+                                  <th className="px-3 py-1.5 text-right">Students</th>
+                                  <th className="px-3 py-1.5 text-right">Avg PA/SA %</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {y.sections.map((s: any, i: number) => (
+                                  <tr key={i} className={`border-b border-gray-100 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`}>
+                                    <td className="px-3 py-1.5 text-gray-700">{s.grade}</td>
+                                    <td className="px-3 py-1.5 text-gray-600">{s.section}</td>
+                                    <td className="px-3 py-1.5 text-gray-500">{s.subject || "—"}</td>
+                                    <td className="px-3 py-1.5 text-center">
+                                      {s.is_class_teacher ? <span className="text-yellow-600 font-semibold">👑 Yes</span> : <span className="text-gray-300">—</span>}
+                                    </td>
+                                    <td className="px-3 py-1.5 text-right text-gray-500">{s.student_count || "—"}</td>
+                                    <td className="px-3 py-1.5 text-right">
+                                      {s.avg_student_percentage !== null ? (
+                                        <span className={`font-semibold ${s.avg_student_percentage >= 75 ? "text-green-600" : s.avg_student_percentage >= 50 ? "text-amber-600" : "text-red-500"}`}>
+                                          {s.avg_student_percentage}%
+                                        </span>
+                                      ) : <span className="text-gray-300">—</span>}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Baseline History */}
+                {portfolioData.baseline_history.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Baseline Assessment History</h3>
+                    <div className="space-y-2">
+                      {portfolioData.baseline_history.map((y: any) => (
+                        <div key={y.academic_year} className="border border-gray-200 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-indigo-700 mb-2">{y.academic_year}</p>
+                          <div className="flex flex-wrap gap-1">
+                            {y.rounds.map((r: any) => (
+                              <span key={r.id} className="bg-green-50 text-green-700 px-2 py-0.5 rounded text-xs border border-green-100">
+                                {r.round.replace("baseline_", "R")} · {r.subject || "—"} · {r.overall_score ? (+r.overall_score).toFixed(1) + "%" : "—"}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
