@@ -7789,10 +7789,10 @@ function ObservationsTab({ user, academicYear }: { user: any; academicYear: stri
   const fetchObs = async () => {
     setLoading(true);
     try {
-      const name = user?.name || "";
-      if (!name) { setObs([]); setLoading(false); return; }
-      const r = await axios.get(`${API}/observation/teacher/${encodeURIComponent(name)}?academic_year=${academicYear}`);
-      setObs(Array.isArray(r.data?.observations) ? r.data.observations : []);
+      const email = user?.email || "";
+      if (!email) { setObs([]); setLoading(false); return; }
+      const r = await axios.get(`${API}/observation/mine?teacher_email=${encodeURIComponent(email)}&academic_year=${academicYear}`);
+      setObs(Array.isArray(r.data) ? r.data : []);
     } catch { setObs([]); }
     setLoading(false);
   };
