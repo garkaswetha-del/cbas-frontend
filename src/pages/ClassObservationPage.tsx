@@ -90,6 +90,7 @@ export default function ClassObservationPage() {
   const [showCriteriaRef, setShowCriteriaRef] = useState(true);
   const [allTeachers, setAllTeachers] = useState<string[]>([]);
   const [teacherEmails, setTeacherEmails] = useState<Record<string, string>>({});
+  const [teacherIds, setTeacherIds] = useState<Record<string, string>>({});
   const [dashboard, setDashboard] = useState<any>(null);
   const [dashLoading, setDashLoading] = useState(false);
   const [newRows, setNewRows] = useState<Record<string, any>>({});
@@ -120,13 +121,16 @@ export default function ClassObservationPage() {
         axios.get(`${API}/observation/dashboard?academic_year=${academicYear}`),
       ]);
       const emailMap: Record<string, string> = {};
+      const idMap: Record<string, string> = {};
       const names: string[] = (tRes.data || []).map((t: any) => {
         emailMap[t.name] = t.email || "";
+        idMap[t.name] = t.id || "";
         return t.name;
       });
       const observedNames: string[] = (dRes.data?.teachers || []).map((t: any) => t.teacher_name);
       const extra = observedNames.filter((n: string) => !names.includes(n));
       setTeacherEmails(emailMap);
+      setTeacherIds(idMap);
       setAllTeachers([...names, ...extra]);
       setDashboard(dRes.data);
     } catch { }
@@ -161,6 +165,7 @@ export default function ClassObservationPage() {
         await axios.put(`${API}/observation/${editingId}`, {
           ...row,
           teacher_email: teacherEmails[name] || "",
+          teacher_id: teacherIds[name] || "",
           academic_year: academicYear,
         });
         showMsg("✅ Observation updated for " + name);
@@ -170,6 +175,7 @@ export default function ClassObservationPage() {
         await axios.post(`${API}/observation`, {
           ...row,
           teacher_email: teacherEmails[name] || "",
+          teacher_id: teacherIds[name] || "",
           academic_year: academicYear,
         });
         showMsg("✅ Observation saved for " + name);
