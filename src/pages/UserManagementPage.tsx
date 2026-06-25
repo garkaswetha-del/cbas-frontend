@@ -439,6 +439,36 @@ export default function UserManagementPage() {
     reader.readAsBinaryString(file);
   };
 
+  const buildMappingRows = (grades: string[], sections: string[], subjects: string[], classTeacherOf: string) => {
+    const rows: any[] = [];
+    const ctRaw = (classTeacherOf || "").trim();
+    let ctGrade = "", ctSection = "";
+    if (ctRaw) {
+      const parts = ctRaw.split(/\s+/);
+      if (parts[0].toLowerCase() === "grade" && parts.length >= 3) {
+        ctGrade = `Grade ${parts[1]}`;
+        ctSection = parts.slice(2).join(" ");
+      } else if (parts.length >= 2) {
+        ctGrade = parts[0];
+        ctSection = parts.slice(1).join(" ");
+      }
+    }
+    for (const grade of grades) {
+      // Match sections to this grade using the sections master list
+      const gradeSections = sections.filter(sec =>
+        allSectionsFull.some(s => s.grade === grade && s.name === sec)
+      );
+      const sectionsToUse = gradeSections.length > 0 ? gradeSections : sections;
+      for (const section of sectionsToUse) {
+        const isClassTeacher = ctGrade === grade && ctSection === section;
+        for (const subject of (subjects.length > 0 ? subjects : [null as any])) {
+          rows.push({ grade, section, subject, is_class_teacher: isClassTeacher });
+        }
+      }
+    }
+    return rows;
+  };
+
   const importAllTeachers = async () => {
     const list = parsedTeachers.length > 0 ? parsedTeachers : EXCEL_TEACHERS;
     setImporting(true); setImportProgress(0);
@@ -454,6 +484,7 @@ export default function UserManagementPage() {
       const grades = parseGrade(t.grade || "");
       const sections = (t.section || "").split(/[,;]/).map((s: string) => s.trim().replace(/^\d+[-–]\s*/i, "").trim()).filter(Boolean);
       const subjects = (t.subject || "").split(/[,;]/).map((s: string) => s.trim()).filter(Boolean);
+      const mappingRows = buildMappingRows(grades, sections, subjects, t.class_teacher || "");
       const payload = {
         name: t.name, email: t.email,
         password: t.password || autoPassword(t.name),
@@ -461,24 +492,46 @@ export default function UserManagementPage() {
         class_teacher_of: t.class_teacher || "",
         appraisal_qualification: t.appraisal_qualification || "",
       };
+
+      let userId: string | null = null;
+
       try {
         const res = await axios.post(`${API}/users`, payload);
+        userId = res.data.id;
         success++;
       } catch (e: any) {
         const msg = e?.response?.data?.message || "";
         if (msg.toLowerCase().includes("already") || e?.response?.status === 409) {
           const existing = emailToUser[t.email.toLowerCase()];
           if (existing) {
+            userId = existing.id;
             try {
-              await axios.patch(`${API}/users/${existing.id}`, { appraisal_qualification: t.appraisal_qualification });
+              await axios.patch(`${API}/users/${existing.id}`, {
+                appraisal_qualification: t.appraisal_qualification,
+                subjects,
+                assigned_classes: grades,
+                class_teacher_of: t.class_teacher || "",
+              });
               updated++;
-            } catch { skipped++; }
+            } catch { skipped++; userId = null; }
           } else { skipped++; }
         } else {
           failed++;
           errors.push({ row: i + 1, name: t.name, reason: msg || "Unknown error" });
         }
       }
+
+      // Write mappings for the selected academic year (replaces any existing mappings for this teacher+year)
+      if (userId && mappingRows.length > 0) {
+        try {
+          await axios.post(`${API}/mappings/save`, {
+            teacher_id: userId,
+            academic_year: academicYear,
+            mappings: mappingRows,
+          });
+        } catch { /* non-fatal */ }
+      }
+
       await new Promise(r => setTimeout(r, 80));
     }
     setImportResults({ success, updated, skipped, failed, errors });
