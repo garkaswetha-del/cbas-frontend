@@ -65,6 +65,14 @@ const CLASSES = [
   "Grade 6","Grade 7","Grade 8","Grade 9","Grade 10",
 ];
 
+const STAGE_GRADES: Record<string, string[]> = {
+  Foundation:  ["Pre-KG","LKG","UKG","Nursery","Grade 1","Grade 2"],
+  Preparatory: ["Grade 3","Grade 4","Grade 5"],
+  Middle:      ["Grade 6","Grade 7","Grade 8"],
+  Secondary:   ["Grade 9","Grade 10"],
+};
+const STAGE_ORDER = ["Foundation","Preparatory","Middle","Secondary"];
+
 const getScoreVal = (v: string) => SCORE_OPTIONS.find(s => s.value === v)?.score || 0;
 const calcTotal = (row: any) => CRITERIA.reduce((sum, c) => sum + getScoreVal(row[c.key] || "not_done"), 0);
 const calcPct = (total: number) => +((total / 24) * 100).toFixed(1);
@@ -98,6 +106,7 @@ export default function ClassObservationPage() {
   const [expandLoading, setExpandLoading] = useState<string | null>(null);
   const [dashTeacher, setDashTeacher] = useState<string | null>(null);
   const [teacherObs, setTeacherObs] = useState<Record<string, any>>({});
+  const [teacherStageMap, setTeacherStageMap] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -116,9 +125,10 @@ export default function ClassObservationPage() {
   const fetchAll = async () => {
     setDashLoading(true);
     try {
-      const [tRes, dRes] = await Promise.all([
+      const [tRes, dRes, mRes] = await Promise.all([
         axios.get(`${API}/observation/teachers`),
         axios.get(`${API}/observation/dashboard?academic_year=${academicYear}`),
+        axios.get(`${API}/mappings/all?academic_year=${academicYear}`),
       ]);
       const emailMap: Record<string, string> = {};
       const idMap: Record<string, string> = {};
@@ -133,6 +143,24 @@ export default function ClassObservationPage() {
       setTeacherIds(idMap);
       setAllTeachers([...names, ...extra]);
       setDashboard(dRes.data);
+
+      // Build teacher_id → grades map from mappings, then derive stage per teacher name
+      const idGradesMap: Record<string, string[]> = {};
+      (mRes.data || []).forEach((m: any) => {
+        if (!m.teacher_id || !m.grade) return;
+        if (!idGradesMap[m.teacher_id]) idGradesMap[m.teacher_id] = [];
+        if (!idGradesMap[m.teacher_id].includes(m.grade)) idGradesMap[m.teacher_id].push(m.grade);
+      });
+      const stageMap: Record<string, string> = {};
+      for (const [tname, tid] of Object.entries(idMap)) {
+        const grades = idGradesMap[tid] || [];
+        let stage = "";
+        for (const s of STAGE_ORDER) {
+          if (STAGE_GRADES[s].some(g => grades.includes(g))) { stage = s; break; }
+        }
+        stageMap[tname] = stage;
+      }
+      setTeacherStageMap(stageMap);
     } catch { }
     setDashLoading(false);
   };
@@ -344,6 +372,14 @@ export default function ClassObservationPage() {
   const stickyR2 = (bg: string) => `sticky right-[70px] z-20 ${bg}`;
   const stickyR3 = (bg: string) => `sticky right-0 z-20 ${bg} border-l border-gray-200`;
 
+  const groupedTeachers: { stage: string; label: string; teachers: string[] }[] = [];
+  for (const stage of STAGE_ORDER) {
+    const st = allTeachers.filter(n => (teacherStageMap[n] || "") === stage);
+    if (st.length > 0) groupedTeachers.push({ stage, label: stage, teachers: st });
+  }
+  const unassigned = allTeachers.filter(n => !STAGE_ORDER.some(s => s === (teacherStageMap[n] || "")));
+  if (unassigned.length > 0) groupedTeachers.push({ stage: "other", label: "Other", teachers: unassigned });
+
   return (
     <div className="p-3 sm:p-6">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -448,7 +484,16 @@ export default function ClassObservationPage() {
                 </tr>
               </thead>
               <tbody>
-                {allTeachers.map((name, idx) => {
+                {groupedTeachers.flatMap(({ stage, label, teachers }) => {
+                  const hdrColor = stage === "Foundation" ? "bg-emerald-700" : stage === "Preparatory" ? "bg-blue-700" : stage === "Middle" ? "bg-purple-700" : stage === "Secondary" ? "bg-orange-700" : "bg-gray-600";
+                  const rows: React.ReactNode[] = [
+                    <tr key={`hdr-${stage}`}>
+                      <td colSpan={22} className={`px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-white ${hdrColor}`}>
+                        {label} Stage — {teachers.length} teacher{teachers.length !== 1 ? "s" : ""}
+                      </td>
+                    </tr>
+                  ];
+                  teachers.forEach((name, idx) => {
                   const td = dashboard?.teachers?.find((t: any) => t.teacher_name === name);
                   const obsCount = td?.observation_count || 0;
                   const row = getRow(name);
@@ -459,9 +504,7 @@ export default function ClassObservationPage() {
                   const bg = isEditing ? "bg-amber-50" : idx % 2 === 0 ? "bg-white" : "bg-gray-50";
                   const obs = teacherObs[name]?.observations || [];
 
-                  return (
-                    <>
-                      <tr key={`row-${name}`} className={`border-b border-gray-100 ${bg}`}>
+                  rows.push(<tr key={`row-${name}`} className={`border-b border-gray-100 ${bg}`}>
                         <td className={`px-3 py-2 font-medium ${stickyLeft(bg)}`}>
                           <div className="flex flex-col gap-1">
                             {isEditing && (
@@ -594,9 +637,8 @@ export default function ClassObservationPage() {
                             </button>
                           )}
                         </td>
-                      </tr>
-
-                      {isExpanded && (
+                      </tr>);
+                  if (isExpanded) rows.push(
                         <tr key={`exp-${name}`}>
                           <td colSpan={22} className="p-0 border-b border-indigo-200">
                             <div className="bg-white border-l-4 border-indigo-500 p-4">
@@ -712,9 +754,9 @@ export default function ClassObservationPage() {
                             </div>
                           </td>
                         </tr>
-                      )}
-                    </>
                   );
+                  });
+                  return rows;
                 })}
               </tbody>
             </table>
