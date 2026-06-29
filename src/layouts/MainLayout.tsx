@@ -6,6 +6,7 @@ const ADMINISTRATIVE_NAV = [
   { path: '/students', label: 'Student Management', icon: '🎓' },
   { path: '/sections', label: 'Section Management', icon: '🏫' },
   { path: '/appraisal',label: 'Teachers Appraisal', icon: '📋' },
+  { path: '/memos',    label: 'Memos',              icon: '📩' },
 ];
 
 const ACADEMIC_NAV = [

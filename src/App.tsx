@@ -16,6 +16,7 @@ import ActivitiesPage from './pages/ActivitiesPage';
 import ClassObservationPage from "./pages/ClassObservationPage";
 import PASAPage from "./pages/PASAPage";
 import TeacherDashboardPage from "./pages/TeacherDashboardPage";
+import MemosPage from "./pages/MemosPage";
 
 const ACADEMIC_YEARS = Array.from({ length: 5 }, (_, i) => {
   const y = 2025 + i;
@@ -40,6 +41,7 @@ const SELF_TABS = [
   { id: 'appraisal',     label: 'My Appraisal',       show: true },
   { id: 'observations',  label: 'My Observations',    show: true },
   { id: 'self_ai',       label: 'My AI',              show: true },
+  { id: 'memos',         label: 'Memos',              show: true },
 ];
 
 const SELF_TAB_IDS = new Set(SELF_TABS.map(t => t.id));
@@ -280,6 +282,7 @@ function App() {
           <Route path="activities" element={<ActivitiesPage />} />
           <Route path="observation" element={<ClassObservationPage />} />
           <Route path="pasa" element={<PASAPage />} />
+          <Route path="memos" element={<MemosPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

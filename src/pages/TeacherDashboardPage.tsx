@@ -116,6 +116,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
     appraisal:      "My Appraisal",
     observations:   "My Observations",
     self_ai:        "My AI",
+    memos:          "Memos",
   };
 
   return (
@@ -161,6 +162,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
         {activeTab === "appraisal"      && <AppraisalTab user={user} academicYear={academicYear} />}
         {activeTab === "observations"   && <ObservationsTab user={user} academicYear={academicYear} />}
         {activeTab === "self_ai"        && <SelfAITab user={user} academicYear={academicYear} />}
+        {activeTab === "memos"          && <MemosTab user={user} academicYear={academicYear} />}
       </div>
     </div>
   );
@@ -7887,6 +7889,122 @@ function ObservationsTab({ user, academicYear }: { user: any; academicYear: stri
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MEMOS TAB
+// ─────────────────────────────────────────────────────────────────
+function MemosTab({ user, academicYear }: { user: any; academicYear: string }) {
+  const [memos, setMemos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [marking, setMarking] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setLoading(true);
+    axios.get(`${API}/memos/teacher?teacher_id=${user.id}&academic_year=${encodeURIComponent(academicYear)}`)
+      .then(r => setMemos(r.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [user?.id, academicYear]);
+
+  const markRead = async (memo_id: string) => {
+    setMarking(memo_id);
+    try {
+      await axios.post(`${API}/memos/${memo_id}/read`, { teacher_id: user.id, teacher_name: user.name });
+      setMemos(prev => prev.map(m => m.id === memo_id ? { ...m, is_read: true } : m));
+    } catch {}
+    setMarking(null);
+  };
+
+  const unread = memos.filter(m => !m.is_read);
+  const read = memos.filter(m => m.is_read);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="w-6 h-6 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (memos.length === 0) {
+    return (
+      <div className="text-center py-16 text-gray-400">
+        <div className="text-4xl mb-3">📩</div>
+        <p className="text-sm">No memos for {academicYear}</p>
+      </div>
+    );
+  }
+
+  const MemoCard = ({ m }: { m: any }) => (
+    <div
+      className={`rounded-xl border p-4 mb-3 transition-all ${
+        !m.is_read ? "bg-amber-50 border-amber-300" : "bg-white border-gray-200"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            {!m.is_read && (
+              <span className="text-xs bg-amber-400 text-white px-2 py-0.5 rounded-full font-semibold">New</span>
+            )}
+            <span className="text-sm font-bold text-gray-800">{m.title}</span>
+          </div>
+          <p className="text-xs text-gray-400 mb-2">{new Date(m.created_at).toLocaleString("en-IN")}</p>
+          {expandedId === m.id ? (
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{m.content}</p>
+          ) : (
+            <p className="text-sm text-gray-600 line-clamp-2">{m.content}</p>
+          )}
+          {m.content.length > 120 && (
+            <button
+              onClick={() => setExpandedId(expandedId === m.id ? null : m.id)}
+              className="text-xs text-indigo-600 hover:text-indigo-800 mt-1 font-medium"
+            >
+              {expandedId === m.id ? "Show less" : "Read more"}
+            </button>
+          )}
+        </div>
+        {!m.is_read && (
+          <button
+            onClick={() => markRead(m.id)}
+            disabled={marking === m.id}
+            className="flex-shrink-0 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-medium transition-all disabled:opacity-60"
+          >
+            {marking === m.id ? "..." : "Mark Read"}
+          </button>
+        )}
+        {m.is_read && (
+          <span className="flex-shrink-0 text-xs text-green-600 font-medium flex items-center gap-1">
+            <span>✓</span> Read
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      {unread.length > 0 && (
+        <div className="mb-5">
+          <p className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2">
+            Unread ({unread.length})
+          </p>
+          {unread.map(m => <MemoCard key={m.id} m={m} />)}
+        </div>
+      )}
+      {read.length > 0 && (
+        <div>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+            Read ({read.length})
+          </p>
+          {read.map(m => <MemoCard key={m.id} m={m} />)}
+        </div>
+      )}
     </div>
   );
 }
