@@ -7896,11 +7896,87 @@ function ObservationsTab({ user, academicYear }: { user: any; academicYear: stri
 // ─────────────────────────────────────────────────────────────────
 // MEMOS TAB
 // ─────────────────────────────────────────────────────────────────
+function MemoCard({ m, user, onMarkRead }: { m: any; user: any; onMarkRead: (id: string, reply: string) => Promise<void> }) {
+  const [expanded, setExpanded] = useState(false);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [marking, setMarking] = useState(false);
+
+  const handleConfirm = async () => {
+    setMarking(true);
+    await onMarkRead(m.id, replyText);
+    setMarking(false);
+    setReplyOpen(false);
+    setReplyText("");
+  };
+
+  return (
+    <div className={`rounded-xl border p-4 mb-3 transition-all ${!m.is_read ? "bg-amber-50 border-amber-300" : "bg-white border-gray-200"}`}>
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            {!m.is_read && <span className="text-xs bg-amber-400 text-white px-2 py-0.5 rounded-full font-semibold">New</span>}
+            <span className="text-sm font-bold text-gray-800">{m.title}</span>
+          </div>
+          <p className="text-xs text-gray-400 mb-2">{new Date(m.created_at).toLocaleString("en-IN")}</p>
+          {expanded
+            ? <p className="text-sm text-gray-700 whitespace-pre-wrap">{m.content}</p>
+            : <p className="text-sm text-gray-600 line-clamp-2">{m.content}</p>
+          }
+          {m.content.length > 120 && (
+            <button onClick={() => setExpanded(e => !e)} className="text-xs text-indigo-600 hover:text-indigo-800 mt-1 font-medium">
+              {expanded ? "Show less" : "Read more"}
+            </button>
+          )}
+          {m.is_read && m.reply && (
+            <p className="text-xs text-gray-500 mt-2 italic border-l-2 border-gray-300 pl-2">Your reply: {m.reply}</p>
+          )}
+        </div>
+
+        {/* Right side: action area */}
+        <div className="flex-shrink-0">
+          {m.is_read && (
+            <span className="text-xs text-green-600 font-medium flex items-center gap-1"><span>✓</span> Read</span>
+          )}
+          {!m.is_read && !replyOpen && (
+            <button onClick={() => setReplyOpen(true)}
+              className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-medium transition-all">
+              Mark Read
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Inline reply form */}
+      {!m.is_read && replyOpen && (
+        <div className="mt-3 pt-3 border-t border-amber-200">
+          <label className="text-xs text-gray-500 font-medium mb-1 block">Reply (optional)</label>
+          <textarea
+            value={replyText}
+            onChange={e => setReplyText(e.target.value)}
+            placeholder="Add a reply or acknowledgement..."
+            rows={2}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none mb-2"
+          />
+          <div className="flex gap-2">
+            <button onClick={handleConfirm} disabled={marking}
+              className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg font-medium disabled:opacity-60">
+              {marking ? "..." : "Confirm"}
+            </button>
+            <button onClick={() => { setReplyOpen(false); setReplyText(""); }}
+              className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MemosTab({ user, academicYear }: { user: any; academicYear: string }) {
   const [memos, setMemos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [marking, setMarking] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -7911,13 +7987,11 @@ function MemosTab({ user, academicYear }: { user: any; academicYear: string }) {
       .finally(() => setLoading(false));
   }, [user?.id, academicYear]);
 
-  const markRead = async (memo_id: string) => {
-    setMarking(memo_id);
+  const handleMarkRead = async (memo_id: string, reply: string) => {
     try {
-      await axios.post(`${API}/memos/${memo_id}/read`, { teacher_id: user.id, teacher_name: user.name });
-      setMemos(prev => prev.map(m => m.id === memo_id ? { ...m, is_read: true } : m));
+      await axios.post(`${API}/memos/${memo_id}/read`, { teacher_id: user.id, teacher_name: user.name, reply: reply || null });
+      setMemos(prev => prev.map(m => m.id === memo_id ? { ...m, is_read: true, reply: reply || null } : m));
     } catch {}
-    setMarking(null);
   };
 
   const unread = memos.filter(m => !m.is_read);
@@ -7926,7 +8000,7 @@ function MemosTab({ user, academicYear }: { user: any; academicYear: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="w-6 h-6 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -7940,69 +8014,18 @@ function MemosTab({ user, academicYear }: { user: any; academicYear: string }) {
     );
   }
 
-  const MemoCard = ({ m }: { m: any }) => (
-    <div
-      className={`rounded-xl border p-4 mb-3 transition-all ${
-        !m.is_read ? "bg-amber-50 border-amber-300" : "bg-white border-gray-200"
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            {!m.is_read && (
-              <span className="text-xs bg-amber-400 text-white px-2 py-0.5 rounded-full font-semibold">New</span>
-            )}
-            <span className="text-sm font-bold text-gray-800">{m.title}</span>
-          </div>
-          <p className="text-xs text-gray-400 mb-2">{new Date(m.created_at).toLocaleString("en-IN")}</p>
-          {expandedId === m.id ? (
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{m.content}</p>
-          ) : (
-            <p className="text-sm text-gray-600 line-clamp-2">{m.content}</p>
-          )}
-          {m.content.length > 120 && (
-            <button
-              onClick={() => setExpandedId(expandedId === m.id ? null : m.id)}
-              className="text-xs text-indigo-600 hover:text-indigo-800 mt-1 font-medium"
-            >
-              {expandedId === m.id ? "Show less" : "Read more"}
-            </button>
-          )}
-        </div>
-        {!m.is_read && (
-          <button
-            onClick={() => markRead(m.id)}
-            disabled={marking === m.id}
-            className="flex-shrink-0 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-medium transition-all disabled:opacity-60"
-          >
-            {marking === m.id ? "..." : "Mark Read"}
-          </button>
-        )}
-        {m.is_read && (
-          <span className="flex-shrink-0 text-xs text-green-600 font-medium flex items-center gap-1">
-            <span>✓</span> Read
-          </span>
-        )}
-      </div>
-    </div>
-  );
-
   return (
     <div className="max-w-2xl mx-auto">
       {unread.length > 0 && (
         <div className="mb-5">
-          <p className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2">
-            Unread ({unread.length})
-          </p>
-          {unread.map(m => <MemoCard key={m.id} m={m} />)}
+          <p className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2">Unread ({unread.length})</p>
+          {unread.map(m => <MemoCard key={m.id} m={m} user={user} onMarkRead={handleMarkRead} />)}
         </div>
       )}
       {read.length > 0 && (
         <div>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-            Read ({read.length})
-          </p>
-          {read.map(m => <MemoCard key={m.id} m={m} />)}
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Read ({read.length})</p>
+          {read.map(m => <MemoCard key={m.id} m={m} user={user} onMarkRead={handleMarkRead} />)}
         </div>
       )}
     </div>
