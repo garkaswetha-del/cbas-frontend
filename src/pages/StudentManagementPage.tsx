@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
+import SectionManagementPage from "./SectionManagementPage";
 
 const API = "https://cbas-backend-production.up.railway.app";
 const CLASSES = [
@@ -18,13 +19,13 @@ const emptyForm = {
   gender: "", phone: "", dob: "", admission_year: "",
   father_name: "", mother_name: "", parent_phone: "",
   father_qualification: "", mother_qualification: "",
-  father_working_status: "", mother_working_status: "", address: "",
+  father_working_status: "", mother_working_status: "", address: "", caste: "",
 };
 
 function today() { return new Date().toISOString().split("T")[0]; }
 
 export default function StudentManagementPage() {
-  const [activeTab, setActiveTab] = useState<"active" | "tc" | "alumni" | "parent">("active");
+  const [activeTab, setActiveTab] = useState<"active" | "tc" | "alumni" | "parent" | "sections">("active");
   const [students, setStudents] = useState<any[]>([]);
   const [tcStudents, setTcStudents] = useState<any[]>([]);
   const [alumni, setAlumni] = useState<any[]>([]);
@@ -131,10 +132,10 @@ export default function StudentManagementPage() {
       "Father Name": "Suresh Kumar", "Mother Name": "Priya Kumar", "Parent Phone": "9876543211",
       "Father Qualification": "Graduate", "Mother Qualification": "Non-Graduate",
       "Father Working Status": "Working", "Mother Working Status": "Not Working",
-      "Address": "123 Main St, City",
+      "Address": "123 Main St, City", "Caste": "OBC",
     }];
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = new Array(16).fill({ wch: 20 });
+    ws['!cols'] = new Array(17).fill({ wch: 20 });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Student Import Template");
     XLSX.writeFile(wb, "student_import_template.xlsx");
@@ -176,7 +177,7 @@ export default function StudentManagementPage() {
       mother_qualification: s.mother_qualification || "",
       father_working_status: s.father_working_status || "",
       mother_working_status: s.mother_working_status || "",
-      address: s.address || "",
+      address: s.address || "", caste: s.caste || "",
     });
     if (s.current_class) fetchSectionsForGrade(s.current_class);
     setShowForm(true);
@@ -362,6 +363,7 @@ export default function StudentManagementPage() {
           mother_qualification: col(row, "mother qualification", "mother qual"),
           father_working_status: col(row, "father working status", "father working", "father status"),
           mother_working_status: col(row, "mother working status", "mother working", "mother status"),
+          caste: col(row, "caste", "community", "religion"),
         });
       }
 
@@ -569,6 +571,12 @@ export default function StudentManagementPage() {
                 onChange={e => setForm({ ...form, address: e.target.value })}
                 className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" />
             </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Caste / Community</label>
+              <input type="text" value={form.caste}
+                onChange={e => setForm({ ...form, caste: e.target.value })}
+                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" />
+            </div>
           </div>
           <div className="mt-4 flex gap-2">
             <button onClick={handleSubmit} className="px-6 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-semibold">
@@ -599,6 +607,10 @@ export default function StudentManagementPage() {
         <button onClick={() => setActiveTab("parent")}
           className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === "parent" ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-blue-400"}`}>
           Parent Analytics
+        </button>
+        <button onClick={() => setActiveTab("sections")}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === "sections" ? "bg-gray-700 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-gray-400"}`}>
+          Section Management
         </button>
       </div>
 
@@ -904,6 +916,9 @@ export default function StudentManagementPage() {
         );
       })()}
 
+      {/* ── SECTIONS TAB ── */}
+      {activeTab === "sections" && <SectionManagementPage />}
+
       {/* ── TC MODAL ── */}
       {tcTarget && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -1080,6 +1095,7 @@ export default function StudentManagementPage() {
                 ["Father Working Status", profileStudent.father_working_status],
                 ["Mother Working Status", profileStudent.mother_working_status],
                 ["Address", profileStudent.address],
+                ["Caste / Community", profileStudent.caste],
               ].map(([label, value]) => (
                 <div key={label} className="bg-gray-50 rounded-lg p-2">
                   <p className="text-gray-400">{label}</p>
