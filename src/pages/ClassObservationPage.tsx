@@ -144,9 +144,19 @@ export default function ClassObservationPage() {
       setAllTeachers([...names, ...extra]);
       setDashboard(dRes.data);
 
-      // Build teacher_id → grades map from mappings, then derive stage per teacher name
+      // Build teacher_id → grades map from mappings, then derive stage per teacher name.
+      // Fall back to previous academic year if current year has no mappings yet.
+      let mappingsData: any[] = mRes.data || [];
+      if (mappingsData.length === 0) {
+        const yr = parseInt(academicYear.split('-')[0]);
+        const prevYear = `${yr - 1}-${String(yr).slice(2)}`;
+        try {
+          const prevRes = await axios.get(`${API}/mappings/all?academic_year=${prevYear}`);
+          mappingsData = prevRes.data || [];
+        } catch {}
+      }
       const idGradesMap: Record<string, string[]> = {};
-      (mRes.data || []).forEach((m: any) => {
+      mappingsData.forEach((m: any) => {
         if (!m.teacher_id || !m.grade) return;
         if (!idGradesMap[m.teacher_id]) idGradesMap[m.teacher_id] = [];
         if (!idGradesMap[m.teacher_id].includes(m.grade)) idGradesMap[m.teacher_id].push(m.grade);
