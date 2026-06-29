@@ -125,16 +125,22 @@ export default function ClassObservationPage() {
   const fetchAll = async () => {
     setDashLoading(true);
     try {
-      const [tRes, dRes, mRes] = await Promise.all([
+      const [tRes, dRes] = await Promise.all([
         axios.get(`${API}/observation/teachers`),
         axios.get(`${API}/observation/dashboard?academic_year=${academicYear}`),
-        axios.get(`${API}/mappings/all?academic_year=${academicYear}`),
       ]);
       const emailMap: Record<string, string> = {};
       const idMap: Record<string, string> = {};
+      const stageMap: Record<string, string> = {};
       const names: string[] = (tRes.data || []).map((t: any) => {
         emailMap[t.name] = t.email || "";
         idMap[t.name] = t.id || "";
+        const grades: string[] = t.assigned_classes || [];
+        let stage = "";
+        for (const s of STAGE_ORDER) {
+          if (STAGE_GRADES[s].some(g => grades.includes(g))) { stage = s; break; }
+        }
+        stageMap[t.name] = stage;
         return t.name;
       });
       const observedNames: string[] = (dRes.data?.teachers || []).map((t: any) => t.teacher_name);
@@ -143,33 +149,6 @@ export default function ClassObservationPage() {
       setTeacherIds(idMap);
       setAllTeachers([...names, ...extra]);
       setDashboard(dRes.data);
-
-      // Build teacher_id → grades map from mappings, then derive stage per teacher name.
-      // Fall back to previous academic year if current year has no mappings yet.
-      let mappingsData: any[] = mRes.data || [];
-      if (mappingsData.length === 0) {
-        const yr = parseInt(academicYear.split('-')[0]);
-        const prevYear = `${yr - 1}-${String(yr).slice(2)}`;
-        try {
-          const prevRes = await axios.get(`${API}/mappings/all?academic_year=${prevYear}`);
-          mappingsData = prevRes.data || [];
-        } catch {}
-      }
-      const idGradesMap: Record<string, string[]> = {};
-      mappingsData.forEach((m: any) => {
-        if (!m.teacher_id || !m.grade) return;
-        if (!idGradesMap[m.teacher_id]) idGradesMap[m.teacher_id] = [];
-        if (!idGradesMap[m.teacher_id].includes(m.grade)) idGradesMap[m.teacher_id].push(m.grade);
-      });
-      const stageMap: Record<string, string> = {};
-      for (const [tname, tid] of Object.entries(idMap)) {
-        const grades = idGradesMap[tid] || [];
-        let stage = "";
-        for (const s of STAGE_ORDER) {
-          if (STAGE_GRADES[s].some(g => grades.includes(g))) { stage = s; break; }
-        }
-        stageMap[tname] = stage;
-      }
       setTeacherStageMap(stageMap);
     } catch { }
     setDashLoading(false);
