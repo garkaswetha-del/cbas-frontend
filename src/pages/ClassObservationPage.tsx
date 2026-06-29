@@ -107,6 +107,9 @@ export default function ClassObservationPage() {
   const [dashTeacher, setDashTeacher] = useState<string | null>(null);
   const [teacherObs, setTeacherObs] = useState<Record<string, any>>({});
   const [teacherStageMap, setTeacherStageMap] = useState<Record<string, string>>({});
+  const [sortOrder, setSortOrder] = useState<"az" | "pct_desc" | "pct_asc">("az");
+  const [filterMin, setFilterMin] = useState("");
+  const [filterMax, setFilterMax] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -361,12 +364,36 @@ export default function ClassObservationPage() {
   const stickyR2 = (bg: string) => `sticky right-[70px] z-20 ${bg}`;
   const stickyR3 = (bg: string) => `sticky right-0 z-20 ${bg} border-l border-gray-200`;
 
+  const avgPctMap: Record<string, number> = {};
+  (dashboard?.teachers || []).forEach((t: any) => { avgPctMap[t.teacher_name] = t.avg_percentage ?? 0; });
+
+  const filterMinNum = filterMin !== "" ? +filterMin : null;
+  const filterMaxNum = filterMax !== "" ? +filterMax : null;
+  const rangeActive = filterMinNum !== null || filterMaxNum !== null;
+
+  const applyFilter = (names: string[]) => {
+    if (!rangeActive) return names;
+    return names.filter(n => {
+      const pct = avgPctMap[n];
+      if (pct === undefined) return false;
+      if (filterMinNum !== null && pct < filterMinNum) return false;
+      if (filterMaxNum !== null && pct > filterMaxNum) return false;
+      return true;
+    });
+  };
+
+  const applySort = (names: string[]) => {
+    if (sortOrder === "pct_desc") return [...names].sort((a, b) => (avgPctMap[b] ?? 0) - (avgPctMap[a] ?? 0));
+    if (sortOrder === "pct_asc") return [...names].sort((a, b) => (avgPctMap[a] ?? 0) - (avgPctMap[b] ?? 0));
+    return names;
+  };
+
   const groupedTeachers: { stage: string; label: string; teachers: string[] }[] = [];
   for (const stage of STAGE_ORDER) {
-    const st = allTeachers.filter(n => (teacherStageMap[n] || "") === stage);
+    const st = applySort(applyFilter(allTeachers.filter(n => (teacherStageMap[n] || "") === stage)));
     if (st.length > 0) groupedTeachers.push({ stage, label: stage, teachers: st });
   }
-  const unassigned = allTeachers.filter(n => !STAGE_ORDER.some(s => s === (teacherStageMap[n] || "")));
+  const unassigned = applySort(applyFilter(allTeachers.filter(n => !STAGE_ORDER.some(s => s === (teacherStageMap[n] || "")))));
   if (unassigned.length > 0) groupedTeachers.push({ stage: "other", label: "Other", teachers: unassigned });
 
   return (
@@ -407,6 +434,41 @@ export default function ClassObservationPage() {
 
       {activeTab === "table" && (
         <>
+        {/* ── SORT + RANGE FILTER ── */}
+        <div className="flex gap-4 items-center mb-4 flex-wrap bg-white border border-gray-200 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 font-medium">Sort:</span>
+            {([["az","A–Z"],["pct_desc","% High→Low"],["pct_asc","% Low→High"]] as const).map(([val, lbl]) => (
+              <button key={val} onClick={() => setSortOrder(val)}
+                className={`px-3 py-1 text-xs rounded-lg font-medium border transition-all ${sortOrder === val ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:border-indigo-400"}`}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+          <div className="w-px h-6 bg-gray-200 hidden sm:block" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 font-medium">% Range:</span>
+            <input type="number" min={0} max={100} value={filterMin}
+              onChange={e => setFilterMin(e.target.value)}
+              placeholder="Min"
+              className="w-16 border border-gray-300 rounded px-2 py-1 text-xs text-center" />
+            <span className="text-xs text-gray-400">–</span>
+            <input type="number" min={0} max={100} value={filterMax}
+              onChange={e => setFilterMax(e.target.value)}
+              placeholder="Max"
+              className="w-16 border border-gray-300 rounded px-2 py-1 text-xs text-center" />
+            {rangeActive && (
+              <button onClick={() => { setFilterMin(""); setFilterMax(""); }}
+                className="text-xs text-gray-400 hover:text-red-500 font-medium">✕ Clear</button>
+            )}
+          </div>
+          {rangeActive && (
+            <span className="text-xs text-indigo-600 font-semibold">
+              Showing {filterMin || "0"}%–{filterMax || "100"}% · {groupedTeachers.reduce((s, g) => s + g.teachers.length, 0)} teachers
+            </span>
+          )}
+        </div>
+
         <div className="mb-4 border border-indigo-200 rounded-xl overflow-hidden">
           <button
             onClick={() => setShowCriteriaRef(v => !v)}
@@ -831,6 +893,68 @@ export default function ClassObservationPage() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+
+          {/* ── ADVANCING & DECLINING ── */}
+          {(() => {
+            const trends = (dashboard.teachers || [])
+              .filter((t: any) => (t.observations || []).length >= 2)
+              .map((t: any) => {
+                const sorted = [...(t.observations || [])].sort((a: any, b: any) =>
+                  new Date(a.date).getTime() - new Date(b.date).getTime()
+                );
+                const latest = +(sorted[sorted.length - 1].percentage);
+                const prev = +(sorted[sorted.length - 2].percentage);
+                const diff = +(latest - prev).toFixed(1);
+                return { name: t.teacher_name, latest, prev, diff, trend: diff > 0 ? "up" : diff < 0 ? "down" : "stable" };
+              });
+            const advancing = trends.filter((t: any) => t.trend === "up").sort((a: any, b: any) => b.diff - a.diff);
+            const declining = trends.filter((t: any) => t.trend === "down").sort((a: any, b: any) => a.diff - b.diff);
+            if (advancing.length === 0 && declining.length === 0) return null;
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">📈 Advancing Teachers ({advancing.length})</h3>
+                  {advancing.length === 0 ? (
+                    <p className="text-xs text-gray-400">No advancing teachers yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {advancing.map((t: any) => (
+                        <div key={t.name} className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2">
+                          <span className="text-xs font-medium text-gray-700">{t.name}</span>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-gray-400">{t.prev}%</span>
+                            <span className="text-gray-400">→</span>
+                            <span className="font-bold text-green-700">{t.latest}%</span>
+                            <span className="px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">+{t.diff}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="bg-white rounded-xl shadow p-4 border-l-4 border-red-400">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">📉 Declining Teachers ({declining.length})</h3>
+                  {declining.length === 0 ? (
+                    <p className="text-xs text-gray-400">No declining teachers</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {declining.map((t: any) => (
+                        <div key={t.name} className="flex items-center justify-between bg-red-50 rounded-lg px-3 py-2">
+                          <span className="text-xs font-medium text-gray-700">{t.name}</span>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-gray-400">{t.prev}%</span>
+                            <span className="text-gray-400">→</span>
+                            <span className="font-bold text-red-600">{t.latest}%</span>
+                            <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-bold">{t.diff}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="bg-white rounded-xl shadow p-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Per Teacher Detail</h3>
