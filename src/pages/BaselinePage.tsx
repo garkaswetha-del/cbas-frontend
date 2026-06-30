@@ -822,7 +822,7 @@ export default function BaselinePage() {
 
   useEffect(() => { if (grade) fetchSections(); }, [grade]);
   useEffect(() => { if (grade && section) fetchStudents(); }, [grade, section, academicYear, round]);
-  useEffect(() => { fetchTeachers(); }, []);
+  useEffect(() => { fetchTeachers(); }, [academicYear]);
 
   // GAP #3: warn before page unload if unsaved
   useEffect(() => {
@@ -1001,7 +1001,27 @@ export default function BaselinePage() {
   };
 
   const fetchTeachers = async () => {
-    try { const r = await axios.get(`${API}/users?role=teacher`); setTeachers(r.data||[]); } catch {}
+    try {
+      const [usersRes, mappingsRes] = await Promise.all([
+        axios.get(`${API}/users?role=teacher`),
+        axios.get(`${API}/mappings/all?academic_year=${academicYear}`),
+      ]);
+      const allUsers: any[] = usersRes.data || [];
+      const mappings: any[] = mappingsRes.data || [];
+      if (mappings.length === 0) { setTeachers([]); return; }
+      // Build year-specific grades per teacher
+      const gradesByTeacher: Record<string, string[]> = {};
+      mappings.forEach((m: any) => {
+        if (!gradesByTeacher[m.teacher_id]) gradesByTeacher[m.teacher_id] = [];
+        if (m.grade && !gradesByTeacher[m.teacher_id].includes(m.grade))
+          gradesByTeacher[m.teacher_id].push(m.grade);
+      });
+      const yearTeacherIds = new Set(Object.keys(gradesByTeacher));
+      const yearTeachers = allUsers
+        .filter((u: any) => yearTeacherIds.has(u.id))
+        .map((u: any) => ({ ...u, assigned_classes: gradesByTeacher[u.id] || [] }));
+      setTeachers(yearTeachers);
+    } catch {}
   };
 
   const isCurrentLocked = () => lockedRounds.has(`${grade}_${section}_${round}_${academicYear}`);
