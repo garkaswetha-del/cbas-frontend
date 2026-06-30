@@ -177,8 +177,14 @@ export default function UserManagementPage() {
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [allSections, setAllSections] = useState<string[]>([]);
   const [allSectionsFull, setAllSectionsFull] = useState<{grade: string; name: string}[]>([]);
+  const [showEmailUpdate, setShowEmailUpdate] = useState(false);
+  const [parsedEmailRows, setParsedEmailRows] = useState<{name: string; currentEmail: string; newEmail: string; teacherId: string | null}[]>([]);
+  const [emailUpdateProgress, setEmailUpdateProgress] = useState(0);
+  const [emailUpdating, setEmailUpdating] = useState(false);
+  const [emailUpdateResults, setEmailUpdateResults] = useState<any>(null);
   const photoRef = useRef<HTMLInputElement>(null);
   const xlsxRef = useRef<HTMLInputElement>(null);
+  const emailXlsxRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     name: "", email: "", password: "", role: "teacher",
@@ -546,7 +552,7 @@ export default function UserManagementPage() {
     return `${yr}-${String(yr + 1).slice(2)}`;
   })();
 
-  const teachers = users.filter(u => u.role === "teacher");
+  const teachers = users.filter(u => u.role === "teacher" && (!academicYear || assignments[u.id] != null));
   const admins = users.filter(u => u.role === "admin");
 
   const filtered = teachers.filter(u => {
