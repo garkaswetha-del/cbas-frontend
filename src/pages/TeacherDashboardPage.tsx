@@ -5239,13 +5239,17 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
   };
 
   const callGroq = async (prompt: string, maxTokens = 2500): Promise<string> => {
+    if (!GROQ_KEY) throw new Error("VITE_GROQ_API_KEY is not set — contact admin to configure the AI key.");
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
       body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }], max_tokens: maxTokens, temperature: 0.7 }),
     });
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || "";
+    if (!res.ok) throw new Error(data.error?.message || `Groq API error ${res.status}`);
+    const content = data.choices?.[0]?.message?.content || "";
+    if (!content) throw new Error("Groq returned an empty response — please try again.");
+    return content;
   };
 
   // Generate AME homework
@@ -5270,8 +5274,8 @@ Make each question clear, age-appropriate, directly testing the competency.`;
       const aMatch = raw.match(/===A===([\s\S]*?)===M===/);
       const mMatch = raw.match(/===M===([\s\S]*?)===E===/);
       const eMatch = raw.match(/===E===([\s\S]*)$/);
-      setGeneratedAME({ a: aMatch?.[1]?.trim()||raw, m: mMatch?.[1]?.trim()||"", e: eMatch?.[1]?.trim()||"" });
-    } catch { setMsg("❌ Generation failed. Check API key."); }
+      setGeneratedAME({ a: aMatch?.[1]?.trim()||raw, m: mMatch?.[1]?.trim()||raw, e: eMatch?.[1]?.trim()||raw });
+    } catch(err: any) { setMsg(`❌ ${err?.message || "Generation failed — check AI key."}`); }
     setGenerating(false);
   };
 
@@ -5329,7 +5333,7 @@ QUESTION FORMAT:
 
 Title: ${type} Paper — ${selectedSubject||"Mixed"} — Grade ${classGrade} — ${new Date().toLocaleDateString()}`;
       setPaperOutput(await callGroq(prompt, Math.min(1000 + selectedStudents.length * numQ * 60, 6000)));
-    } catch { setMsg("❌ Generation failed. Check API key."); }
+    } catch(err: any) { setMsg(`❌ ${err?.message || "Generation failed — check AI key."}`); }
     setGapStatus("");
     setGenerating(false);
   };
@@ -5358,7 +5362,7 @@ Write a friendly, encouraging message (180-220 words) that:
 
 Keep tone warm, professional and supportive — never alarming or critical.`;
       setParentOutput(await callGroq(prompt));
-    } catch { setMsg("❌ Generation failed."); }
+    } catch(err: any) { setMsg(`❌ ${err?.message || "Generation failed — check AI key."}`); }
     setGenerating(false);
   };
 
@@ -5418,6 +5422,12 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
         <h2 className="text-sm font-bold text-indigo-800 mb-1">🤖 AI Tools</h2>
         <p className="text-xs text-indigo-600">All generated content is automatically saved to records and accessible in Student Portfolio.</p>
       </div>
+
+      {!GROQ_KEY && (
+        <div className="bg-red-50 border border-red-300 rounded-xl p-4 text-sm text-red-800">
+          ⚠️ <strong>AI key not configured.</strong> VITE_GROQ_API_KEY is missing from the build. Contact admin to redeploy with the key set.
+        </div>
+      )}
 
       {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
