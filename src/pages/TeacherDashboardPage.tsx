@@ -5279,60 +5279,40 @@ Make each question clear, age-appropriate, directly testing the competency.`;
     setGenerating(false);
   };
 
-  // Generate Practice or Assessment paper — multi-student, gap-aware
+  // Generate Practice or Assessment paper — one student at a time to stay under TPM limit
   const generatePaper = async (type: "Practice"|"Assessment") => {
     if (!selectedStudents.length) { setMsg("❌ Select at least one student"); return; }
     setGenerating(true); setPaperOutput(""); setMsg(""); setGapStatus("");
+    const diffNote: Record<string,string> = {
+      Easy:"All questions: recall and basic application only.",
+      Moderate:"Mix of recall, application and simple analysis.",
+      Challenging:"Focus on analysis, evaluation and synthesis.",
+      Mixed:"Mix 40% easy, 40% moderate, 20% challenging.",
+    };
+    const marksNote = type === "Assessment" ? `\nTotal marks: ${totalMarks}. Distribute marks proportionally.` : "";
+    const extraNote = extraInstructions ? `\nExtra instructions: ${extraInstructions}` : "";
+    const outputs: string[] = [];
     try {
-      const studentDetails: { name: string; gaps: string }[] = [];
       for (let i = 0; i < selectedStudents.length; i++) {
         const id = selectedStudents[i];
         const student = students.find((s:any) => s.id === id);
         if (!student) continue;
-        setGapStatus(`Fetching gaps for ${student.name} (${i + 1}/${selectedStudents.length})...`);
-        const gaps = await fetchGapsForOneStudent(id);
-        studentDetails.push({ name: student.name, gaps });
+        setGapStatus(`[${i+1}/${selectedStudents.length}] Fetching gaps for ${student.name}...`);
+        const rawGaps = await fetchGapsForOneStudent(id);
+        // Trim to top 5 gap lines to keep prompt small
+        const trimmedGaps = rawGaps.split("\n").slice(0, 10).join("\n");
+        setGapStatus(`[${i+1}/${selectedStudents.length}] Generating for ${student.name}...`);
+        const prompt = `Create a ${type === "Practice" ? "Practice" : "Assessment"} Paper for ${student.name}, Grade ${classGrade}, Subject: ${selectedSubject||"Mixed"}.
+Gap areas (below 60%):\n${trimmedGaps}
+Requirements: ${numQ} questions | Types: ${qTypes.join(", ")} | Difficulty: ${difficulty} — ${diffNote[difficulty]||"Mixed"}${marksNote}${extraNote}
+Tag each question [CODE]. Include Answer Key. Age-appropriate for Grade ${classGrade}.
+Format: [MCQ] A/B/C/D with ✓ answer | [SA] 2-3 sentence answer | [FIB] with answer | [CBSA] scenario+answer`;
+        const out = await callGroq(prompt, Math.min(600 + numQ * 80, 3000));
+        outputs.push(`${"═".repeat(60)}\n${type.toUpperCase()} PAPER — ${student.name}\n${"═".repeat(60)}\n${out}`);
+        // Small delay between students to avoid burst rate limiting
+        if (i < selectedStudents.length - 1) await new Promise(r => setTimeout(r, 2000));
       }
-      setGapStatus("Generating paper...");
-      const diffNote: Record<string,string> = {
-        Easy:"All questions: recall and basic application only.",
-        Moderate:"Mix of recall, application and simple analysis.",
-        Challenging:"Focus on analysis, evaluation and synthesis.",
-        Mixed:"Mix 40% easy, 40% moderate, 20% challenging.",
-      };
-      const marksNote = type === "Assessment" ? `\n- Total marks: ${totalMarks}. Distribute marks proportionally across questions.` : "";
-      const extraNote = extraInstructions ? `\n\nEXTRA INSTRUCTIONS FROM TEACHER:\n${extraInstructions}` : "";
-      const studentSection = studentDetails.map(sd =>
-        `STUDENT: ${sd.name}\nGAP AREAS (below 60%):\n${sd.gaps}`
-      ).join("\n\n---\n\n");
-      const multiNote = studentDetails.length > 1
-        ? `GENERATE SEPARATE SECTIONS FOR EACH STUDENT:\n\n${studentSection}\n\nCreate a SEPARATE section for each student with exactly ${numQ} targeted questions based on their specific gap areas.`
-        : `${studentSection}\n\nCreate exactly ${numQ} questions targeting this student's specific gap areas.`;
-      const prompt = `You are an expert educational assessor creating ${type === "Practice" ? "a Practice Paper" : "an Assessment Paper"} for students in India.
-
-Grade: ${classGrade} | Subject: ${selectedSubject||"Mixed"}
-Gap source: ${gapSource==="pasa"?"PA/SA Assessment (current gaps — latest exam per competency)":"Baseline Assessment (latest round)"}
-
-${multiNote}
-
-REQUIREMENTS:
-- Exactly ${numQ} questions${studentDetails.length > 1 ? " per student" : ""}
-- Question types: ${qTypes.join(", ")}
-- Difficulty: ${difficulty} — ${diffNote[difficulty]||"Mixed difficulty"}
-- Tag each question with competency code [CODE]
-- Include complete Answer Key with explanations${marksNote}
-- Age-appropriate language for Grade ${classGrade}${extraNote}
-
-QUESTION FORMAT:
-[MCQ] 4 options A/B/C/D, correct marked ✓, 1-line reason
-[SA] Short Answer: model answer 2–3 sentences
-[LA] Long Answer: model answer 5–8 sentences
-[FIB] Fill in the Blank with answer
-[CBSA] Case-Based Short Answer: 3-4 line scenario + question + 2–3 sentence answer
-[CBLA] Case-Based Long Answer: 5-6 line detailed scenario + question + 5–8 sentence answer
-
-Title: ${type} Paper — ${selectedSubject||"Mixed"} — Grade ${classGrade} — ${new Date().toLocaleDateString()}`;
-      setPaperOutput(await callGroq(prompt, Math.min(1000 + selectedStudents.length * numQ * 60, 6000)));
+      setPaperOutput(outputs.join("\n\n"));
     } catch(err: any) { setMsg(`❌ ${err?.message || "Generation failed — check AI key."}`); }
     setGapStatus("");
     setGenerating(false);
