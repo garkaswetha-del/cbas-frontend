@@ -25,7 +25,6 @@ const ACADEMIC_YEARS = Array.from({ length: 5 }, (_, i) => {
 
 const CLASS_TABS = (isClassTeacher: boolean) => [
   { id: 'students',       label: 'My Students',        show: true },
-  { id: 'classview',      label: 'My Class',           show: isClassTeacher },
   { id: 'pasa',           label: 'PA/SA Marks',        show: true },
   { id: 'baseline_entry', label: 'Baseline',           show: true },
   { id: 'activities',     label: 'Activities',         show: true },

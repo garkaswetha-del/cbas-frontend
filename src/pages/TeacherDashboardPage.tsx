@@ -103,7 +103,6 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
 
   const TAB_LABELS: Record<string, string> = {
     students:       "My Students",
-    classview:      "My Class",
     pasa:           "PA/SA Marks",
     baseline_entry: "Baseline",
     activities:     "Activities",
@@ -149,7 +148,6 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
       {/* Tab content */}
       <div className="p-4 sm:p-6">
         {activeTab === "students"       && <StudentsTab user={user} mappings={mappings} academicYear={academicYear} />}
-        {activeTab === "classview"      && <ClassTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "pasa"           && <PASATab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "baseline_entry" && <BaselineCombinedTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "activities"     && <ActivitiesTab user={user} mappings={mappings} academicYear={academicYear} />}
@@ -739,6 +737,8 @@ function StudentsTab({ user, mappings, academicYear }: any) {
   const [loading, setLoading] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
+  const classGrade = mappings?.class_grade || "";
+  const classSection = mappings?.class_section || "";
 
   // Build unique grade/section combos from mappings
   const combos: { grade: string; section: string; subjects: string[] }[] = [];
@@ -798,14 +798,19 @@ function StudentsTab({ user, mappings, academicYear }: any) {
       <div className="bg-white rounded-xl shadow p-4">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Your Assigned Sections</h3>
         <div className="flex gap-2 flex-wrap overflow-x-auto pb-1">
-          {combos.map(c => (
-            <button key={`${c.grade}-${c.section}`}
-              onClick={() => { setSelectedGrade(c.grade); setSelectedSection(c.section); }}
-              className={`px-3 py-2 text-xs rounded-lg font-medium border transition-all ${selectedGrade === c.grade && selectedSection === c.section ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
-              {c.grade} — {c.section}
-              <span className="block text-xs opacity-75">{c.subjects.join(", ")}</span>
-            </button>
-          ))}
+          {combos.map(c => {
+            const isMyClass = classGrade && classSection && c.grade === classGrade && c.section === classSection;
+            const isSelected = selectedGrade === c.grade && selectedSection === c.section;
+            return (
+              <button key={`${c.grade}-${c.section}`}
+                onClick={() => { setSelectedGrade(c.grade); setSelectedSection(c.section); }}
+                className={`px-3 py-2 text-xs rounded-lg font-medium border transition-all ${isSelected ? "bg-indigo-600 text-white border-indigo-600" : isMyClass ? "bg-indigo-50 text-indigo-700 border-indigo-400 hover:bg-indigo-100" : "bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>
+                {c.grade} — {c.section}
+                {isMyClass && <span className="ml-1 text-xs font-bold">★ My Class</span>}
+                <span className="block text-xs opacity-75">{c.subjects.join(", ")}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -827,70 +832,7 @@ function StudentsTab({ user, mappings, academicYear }: any) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// TAB 3: MY CLASS (class teacher only)
-// ─────────────────────────────────────────────────────────────────
-function ClassTab({ user, mappings, academicYear }: any) {
-  const API = "https://cbas-backend-production.up.railway.app";
-  const [students, setStudents] = useState<any[]>([]);
-  const [subjects, setSubjects] = useState<string[]>([]);
-  const [baselineData, setBaselineData] = useState<any[]>([]);
-  const [activitiesData, setActivitiesData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const classGrade = mappings?.class_grade || "";
-  const classSection = mappings?.class_section || "";
-
-  useEffect(() => {
-    if (classGrade && classSection) fetchAll();
-  }, [classGrade, classSection, academicYear]);
-
-  const fetchAll = async () => {
-    setLoading(true);
-    try {
-      const [sr, br, ar] = await Promise.allSettled([
-        axios.get(`${API}/students?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`),
-        axios.get(`${API}/baseline/section?academic_year=${academicYear}&grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`),
-        axios.get(`${API}/activities/section?academic_year=${academicYear}&grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`),
-      ]);
-      const studs = sr.status === "fulfilled" ? (sr.value.data?.data || sr.value.data || []).filter((s: any) => s.is_active !== false) : [];
-      setStudents(studs);
-      setBaselineData(br.status === "fulfilled" ? (br.value.data || []) : []);
-      setActivitiesData(ar.status === "fulfilled" ? (ar.value.data || []) : []);
-      const subj = [...new Set((mappings?.mappings || []).filter((m: any) => m.grade === classGrade && m.section === classSection).map((m: any) => m.subject).filter(Boolean))] as string[];
-      setSubjects(subj);
-    } catch {}
-    setLoading(false);
-  };
-
-  if (!classGrade || !classSection) return (
-    <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">
-      No class assigned. Contact admin to set your class teacher assignment.
-    </div>
-  );
-
-  if (loading) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Loading...</div>;
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-indigo-800">🏛 My Class — {classGrade} · {classSection}</h3>
-        <p className="text-xs text-indigo-600 mt-0.5">{students.length} students</p>
-      </div>
-      <StudentAnalysisView
-        students={students}
-        subjects={subjects}
-        grade={classGrade}
-        section={classSection}
-        baselineData={baselineData}
-        activitiesData={activitiesData}
-        academicYear={academicYear}
-      />
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────
-// TAB 4: MY APPRAISAL
+// TAB 3: MY APPRAISAL
 // ─────────────────────────────────────────────────────────────────
 function AppraisalTab({ user, academicYear }: any) {
   const [data, setData] = useState<any>(null);
