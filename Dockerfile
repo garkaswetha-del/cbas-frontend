@@ -3,6 +3,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+ARG VITE_GROQ_API_KEY
+ENV VITE_GROQ_API_KEY=$VITE_GROQ_API_KEY
 RUN npm run build
 
 FROM node:22-alpine
