@@ -129,7 +129,7 @@ export default function ClassObservationPage() {
     setDashLoading(true);
     try {
       const [tRes, dRes] = await Promise.all([
-        axios.get(`${API}/observation/teachers`),
+        axios.get(`${API}/observation/teachers?academic_year=${academicYear}`),
         axios.get(`${API}/observation/dashboard?academic_year=${academicYear}`),
       ]);
       const emailMap: Record<string, string> = {};
