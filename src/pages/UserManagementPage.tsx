@@ -554,7 +554,7 @@ export default function UserManagementPage() {
   })();
 
   const hasAssignments = Object.keys(assignments).length > 0;
-  const teachers = users.filter(u => u.role === "teacher" && (!hasAssignments || assignments[u.id]));
+  const teachers = users.filter(u => u.role === "teacher");
   const admins = users.filter(u => u.role === "admin");
 
   // Year-specific stats derived from filtered teacher list
