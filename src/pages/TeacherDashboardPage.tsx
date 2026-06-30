@@ -200,14 +200,18 @@ function ProfileTab({ user }: { user: any }) {
   };
 
   const changePassword = async () => {
+    if (!pwForm.current) { setPwMsg("❌ Please enter your current password"); setTimeout(() => setPwMsg(""), 3000); return; }
     if (!pwForm.newPw || pwForm.newPw !== pwForm.confirm) { setPwMsg("❌ Passwords do not match"); setTimeout(() => setPwMsg(""), 3000); return; }
     if (pwForm.newPw.length < 6) { setPwMsg("❌ Password must be at least 6 characters"); setTimeout(() => setPwMsg(""), 3000); return; }
     try {
-      await axios.patch(`${API}/users/${user.id}`, { password: pwForm.newPw });
+      await axios.patch(`${API}/users/${user.id}/change-password`, { current_password: pwForm.current, new_password: pwForm.newPw });
       setPwMsg("✅ Password changed successfully");
       setPwForm({ current: "", newPw: "", confirm: "" });
-    } catch { setPwMsg("❌ Error changing password"); }
-    setTimeout(() => setPwMsg(""), 3000);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || "Error changing password";
+      setPwMsg(`❌ ${msg}`);
+    }
+    setTimeout(() => setPwMsg(""), 4000);
   };
 
   return (
@@ -269,6 +273,11 @@ function ProfileTab({ user }: { user: any }) {
       <div className="bg-white rounded-xl shadow p-6">
         <h2 className="text-sm font-bold text-gray-700 mb-4">Change Password</h2>
         <div className="grid grid-cols-1 gap-3 max-w-sm">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Current Password</label>
+            <input type="password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))}
+              className="border border-gray-300 rounded px-3 py-2 text-sm w-full" placeholder="Enter current password" />
+          </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">New Password</label>
             <input type="password" value={pwForm.newPw} onChange={e => setPwForm(f => ({ ...f, newPw: e.target.value }))}
