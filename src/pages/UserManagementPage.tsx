@@ -552,7 +552,7 @@ export default function UserManagementPage() {
     return `${yr}-${String(yr + 1).slice(2)}`;
   })();
 
-  const teachers = users.filter(u => u.role === "teacher" && (!academicYear || assignments[u.id] != null));
+  const teachers = users.filter(u => u.role === "teacher");
   const admins = users.filter(u => u.role === "admin");
 
   const filtered = teachers.filter(u => {
