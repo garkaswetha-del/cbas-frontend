@@ -5085,7 +5085,8 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
   const [qTypes, setQTypes] = useState<string[]>(["Multiple Choice (MCQ)","Short Answer","Case-Based Short Answer"]);
   const [extraInstructions, setExtraInstructions] = useState("");
   const [totalMarks, setTotalMarks] = useState(50);
-  const [paperOutput, setPaperOutput] = useState("");
+  const [practiceOutput, setPracticeOutput] = useState("");
+  const [assessmentOutput, setAssessmentOutput] = useState("");
   const MAX_STUDENTS = 10;
 
   // Parent suggestions
@@ -5282,7 +5283,7 @@ Make each question clear, age-appropriate, directly testing the competency.`;
   // Generate Practice or Assessment paper — one student at a time to stay under TPM limit
   const generatePaper = async (type: "Practice"|"Assessment") => {
     if (!selectedStudents.length) { setMsg("❌ Select at least one student"); return; }
-    setGenerating(true); setPaperOutput(""); setMsg(""); setGapStatus("");
+    setGenerating(true); setPracticeOutput(""); setAssessmentOutput(""); setMsg(""); setGapStatus("");
     const diffNote: Record<string,string> = {
       Easy:"All questions: recall and basic application only.",
       Moderate:"Mix of recall, application and simple analysis.",
@@ -5312,7 +5313,8 @@ Format: [MCQ] A/B/C/D with ✓ answer | [SA] 2-3 sentence answer | [FIB] with an
         // Small delay between students to avoid burst rate limiting
         if (i < selectedStudents.length - 1) await new Promise(r => setTimeout(r, 2000));
       }
-      setPaperOutput(outputs.join("\n\n"));
+      if (type === "Practice") setPracticeOutput(outputs.join("\n\n"));
+      else setAssessmentOutput(outputs.join("\n\n"));
     } catch(err: any) { setMsg(`❌ ${err?.message || "Generation failed — check AI key."}`); }
     setGapStatus("");
     setGenerating(false);
@@ -5574,18 +5576,22 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
             {generating?"Generating...":"⚡ Generate "+(subTab==="practice"?"Practice Paper":"Assessment Paper")+(selectedStudents.length>0?` (${selectedStudents.length} student${selectedStudents.length!==1?"s":""})`:" — select students")}
           </button>
 
-          {paperOutput && (
-            <div className="bg-white rounded-xl shadow p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-gray-700">{subTab==="practice"?"Practice":"Assessment"} Paper</h3>
-                <div className="flex gap-2">
-                  <button onClick={()=>printContent(paperOutput,`${subTab==="practice"?"Practice":"Assessment"} Paper — ${selectedSubject||"Mixed"}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
-                  <button onClick={()=>saveRecord(subTab==="practice"?"Practice":"Assessment",{content:paperOutput,student_name:students.filter((s:any)=>selectedStudents.includes(s.id)).map((s:any)=>s.name).join(", ")})} disabled={saving} className="text-xs text-green-600 hover:underline">{saving?"Saving...":"💾 Save"}</button>
+          {(subTab==="practice" ? practiceOutput : assessmentOutput) && (() => {
+            const output = subTab==="practice" ? practiceOutput : assessmentOutput;
+            const label = subTab==="practice" ? "Practice" : "Assessment";
+            return (
+              <div className="bg-white rounded-xl shadow p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-gray-700">{label} Paper</h3>
+                  <div className="flex gap-2">
+                    <button onClick={()=>printContent(output,`${label} Paper — ${selectedSubject||"Mixed"}`)} className="text-xs text-indigo-600 hover:underline">🖨 Print</button>
+                    <button onClick={()=>saveRecord(label,{content:output,student_name:students.filter((s:any)=>selectedStudents.includes(s.id)).map((s:any)=>s.name).join(", ")})} disabled={saving} className="text-xs text-green-600 hover:underline">{saving?"Saving...":"💾 Save"}</button>
+                  </div>
                 </div>
+                <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words overflow-x-auto font-sans leading-relaxed">{output}</pre>
               </div>
-              <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words overflow-x-auto font-sans leading-relaxed">{paperOutput}</pre>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
