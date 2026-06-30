@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 import axios from 'axios';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,7 +19,7 @@ import axios from 'axios';
 //   check integrity → verify sync → test full sequence → check return values.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API = 'https://cbas-backend-bxiu.onrender.com';
+const API = 'https://cbas-backend-production.up.railway.app';
 const ACADEMIC_YEAR = '2025-26';
 
 // Real teacher with known baseline data
@@ -480,3 +480,4 @@ test('INT1 — Competency data integrity: every competency has code + descriptio
   expect(missing).toBe(0);
   console.log(`✅ INT1: ${total} competencies checked — all have code + description + domain`);
 });
+

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 import axios from 'axios';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -20,7 +20,7 @@ import axios from 'axios';
 // checks teacher↔admin sync, tests reversibility. Cleans up on completion.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API = 'https://cbas-backend-bxiu.onrender.com';
+const API = 'https://cbas-backend-production.up.railway.app';
 const ACADEMIC_YEAR = '2025-26';
 
 // Disable retries — tests are sequential and share state; retries cause afterAll to wipe the user
@@ -383,3 +383,4 @@ test('U10 — Permanent delete: user completely removed, GET returns 404', async
   createdUserId = ''; // prevent afterAll from trying to delete again
   console.log(`✅ U10: Permanently deleted — GET /users/:id returns ${getR.status}, absent from all lists, login fails`);
 });
+

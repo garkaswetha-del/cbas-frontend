@@ -104,7 +104,6 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
   const TAB_LABELS: Record<string, string> = {
     students:       "My Students",
     pasa:           "PA/SA Marks",
-    baseline_entry: "Baseline",
     activities:     "Activities",
     ai_tools:       "AI Tools",
     alerts:         "Alerts",
@@ -149,7 +148,6 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
       <div className="p-4 sm:p-6">
         {activeTab === "students"       && <StudentsTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "pasa"           && <PASATab user={user} mappings={mappings} academicYear={academicYear} />}
-        {activeTab === "baseline_entry" && <BaselineCombinedTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "activities"     && <ActivitiesTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "ai_tools"       && <AIToolsTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "alerts"         && <AlertsTab user={user} mappings={mappings} academicYear={academicYear} />}
@@ -383,11 +381,312 @@ function StudentDetailModal({ student, academicYear, onClose }: any) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// INLINE BASELINE TAB — deep analysis + entry form inside My Students
+// ─────────────────────────────────────────────────────────────────
+function InlineBaselineTab({ grade, section, academicYear, mappings, user }: any) {
+  const [roundsData, setRoundsData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [showEntry, setShowEntry] = useState(false);
+
+  const classMappingEntry = (mappings?.mappings || []).find((m: any) => m.is_class_teacher);
+  const isClassTeacherHere =
+    (classMappingEntry?.grade?.toLowerCase() === grade?.toLowerCase() &&
+     classMappingEntry?.section?.toLowerCase() === section?.toLowerCase()) ||
+    (mappings?.class_grade?.toLowerCase() === grade?.toLowerCase() &&
+     mappings?.class_section?.toLowerCase() === section?.toLowerCase());
+
+  useEffect(() => {
+    if (!grade || !section) return;
+    setRoundsData(null);
+    setShowEntry(false);
+    const doFetch = async () => {
+      setLoading(true);
+      try {
+        const r = await axios.get(`${API}/baseline/section/rounds?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}&academic_year=${academicYear}`);
+        setRoundsData(r.data);
+      } catch { setRoundsData(null); }
+      setLoading(false);
+    };
+    doFetch();
+  }, [grade, section, academicYear, refreshKey]);
+
+  const computeStats = () => {
+    if (!roundsData?.students?.length) return null;
+    const students = roundsData.students;
+    const latestRound = roundsData.rounds?.[roundsData.rounds.length - 1];
+    if (!latestRound) return null;
+    const prevRound = roundsData.rounds?.length >= 2 ? roundsData.rounds[roundsData.rounds.length - 2] : null;
+
+    const studentStats = students.map((s: any) => {
+      const rnd = s.rounds?.find((r: any) => r.round === latestRound);
+      if (!rnd?.exists) return null;
+      const lit = rnd.literacy_total != null ? +rnd.literacy_total : null;
+      const num = rnd.numeracy_total != null ? +rnd.numeracy_total : null;
+      const overall = rnd.overall != null ? +rnd.overall
+        : (lit !== null && num !== null ? (lit + num) / 2 : lit ?? num ?? null);
+      if (overall === null) return null;
+      const level = overall >= 80 ? "L4" : overall >= 60 ? "L3" : overall >= 40 ? "L2" : "L1";
+
+      let prevOverall: number | null = null;
+      if (prevRound) {
+        const prnd = s.rounds?.find((r: any) => r.round === prevRound);
+        if (prnd?.exists) {
+          const pl = prnd.literacy_total != null ? +prnd.literacy_total : null;
+          const pn = prnd.numeracy_total != null ? +prnd.numeracy_total : null;
+          prevOverall = prnd.overall != null ? +prnd.overall
+            : (pl !== null && pn !== null ? (pl + pn) / 2 : pl ?? pn ?? null);
+        }
+      }
+
+      const gaps: string[] = [];
+      if (rnd.literacy_scores) Object.entries(rnd.literacy_scores).forEach(([d, v]: [string, any]) => {
+        const max = rnd.max_marks?.[d] || 0;
+        const pct = max > 0 ? (+v / max) * 100 : +v;
+        if (pct < 60) gaps.push(d);
+      });
+      if (rnd.numeracy_scores) Object.entries(rnd.numeracy_scores).forEach(([d, v]: [string, any]) => {
+        const max = rnd.max_marks?.[d] || 0;
+        const pct = max > 0 ? (+v / max) * 100 : +v;
+        if (pct < 60) gaps.push(d);
+      });
+
+      return { name: s.student_name, student_id: s.student_id, lit, num, overall, level, prevOverall, gaps };
+    }).filter(Boolean);
+
+    if (!studentStats.length) return null;
+    const avg = (arr: (number | null)[]) => {
+      const v = arr.filter((x): x is number => x !== null);
+      return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+    };
+    const litAvg = avg(studentStats.map((s: any) => s.lit));
+    const numAvg = avg(studentStats.map((s: any) => s.num));
+    const overallAvg = avg(studentStats.map((s: any) => s.overall));
+    const levelDist: Record<string, number> = { L4: 0, L3: 0, L2: 0, L1: 0 };
+    studentStats.forEach((s: any) => { levelDist[s.level] = (levelDist[s.level] || 0) + 1; });
+    const belowAvg = studentStats.filter((s: any) => s.overall < 60).sort((a: any, b: any) => a.overall - b.overall);
+    const gapCount: Record<string, number> = {};
+    studentStats.forEach((s: any) => s.gaps.forEach((g: string) => { gapCount[g] = (gapCount[g] || 0) + 1; }));
+    const topGaps = Object.entries(gapCount).sort((a, b) => b[1] - a[1]).slice(0, 6);
+
+    return { studentStats, litAvg, numAvg, overallAvg, levelDist, belowAvg, topGaps, latestRound, prevRound, total: studentStats.length };
+  };
+
+  const stats = computeStats();
+  const roundCount = roundsData?.rounds?.length || 0;
+
+  if (loading) return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Loading baseline data...</div>;
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="bg-white rounded-xl shadow p-4 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-indigo-800">Baseline Assessment — {grade} · {section}</h3>
+          <p className="text-xs text-gray-500 mt-0.5">{roundCount} round{roundCount !== 1 ? "s" : ""} completed · {stats?.total || 0} students assessed</p>
+        </div>
+        {isClassTeacherHere && (
+          <button
+            onClick={() => setShowEntry(v => !v)}
+            className={`px-4 py-2 text-sm rounded-lg font-medium border transition-all ${showEntry ? "bg-gray-100 text-gray-700 border-gray-300" : "bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700"}`}>
+            {showEntry ? "✕ Close Entry" : "+ Enter / Edit Scores"}
+          </button>
+        )}
+      </div>
+
+      {/* Inline entry form */}
+      {showEntry && isClassTeacherHere && (
+        <div className="border-2 border-indigo-200 rounded-xl overflow-hidden">
+          <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200">
+            <p className="text-xs font-semibold text-indigo-700">Score Entry — {grade} · {section}</p>
+          </div>
+          <div className="p-1">
+            <BaselineEntryTab
+              key={`${grade}-${section}-${refreshKey}`}
+              user={user}
+              academicYear={academicYear}
+              grade={grade}
+              section={section}
+              onSaved={() => setRefreshKey(k => k + 1)}
+            />
+          </div>
+        </div>
+      )}
+
+      {!stats && !loading && (
+        <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400">
+          <p className="text-sm">No baseline assessments recorded for this section yet.</p>
+          {isClassTeacherHere && <p className="text-xs mt-1 text-indigo-500">Click "+ Enter / Edit Scores" above to start.</p>}
+        </div>
+      )}
+
+      {stats && (
+        <>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: "Students Assessed", value: stats.total, color: "border-indigo-500" },
+              { label: "Literacy Avg", value: `${stats.litAvg.toFixed(1)}%`, color: "border-blue-500" },
+              { label: "Numeracy Avg", value: `${stats.numAvg.toFixed(1)}%`, color: "border-purple-500" },
+              { label: "Overall Avg", value: `${stats.overallAvg.toFixed(1)}%`, color: "border-green-500" },
+            ].map(s => (
+              <div key={s.label} className={`bg-white rounded-xl shadow p-4 border-l-4 ${s.color}`}>
+                <p className="text-xs text-gray-500">{s.label}</p>
+                <p className="text-2xl font-bold text-gray-800">{s.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Level Distribution */}
+          <div className="bg-white rounded-xl shadow p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">
+              Level Distribution — {stats.latestRound?.replace("baseline_", "Round ")}
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { key: "L4", label: "L4 — Exceeding", color: "#059669", bg: "bg-green-50 border-green-200" },
+                { key: "L3", label: "L3 — Meeting", color: "#0284c7", bg: "bg-blue-50 border-blue-200" },
+                { key: "L2", label: "L2 — Approaching", color: "#d97706", bg: "bg-yellow-50 border-yellow-200" },
+                { key: "L1", label: "L1 — Beginning", color: "#dc2626", bg: "bg-red-50 border-red-200" },
+              ].map(l => (
+                <div key={l.key} className={`rounded-xl p-4 text-center border ${l.bg}`}>
+                  <p className="text-xs font-medium mb-1" style={{ color: l.color }}>{l.label}</p>
+                  <p className="text-3xl font-bold text-gray-800">{stats.levelDist[l.key] || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {stats.total > 0 ? (((stats.levelDist[l.key] || 0) / stats.total) * 100).toFixed(0) : 0}%
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Below Average + Gap Analysis */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-white rounded-xl shadow p-4 border-t-4 border-red-400">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                ⚠️ Needs Attention (below 60%)
+                <span className="ml-auto bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">{stats.belowAvg.length}</span>
+              </h3>
+              {stats.belowAvg.length === 0 ? (
+                <p className="text-xs text-green-600">✅ All students above 60%</p>
+              ) : (
+                <div className="space-y-1 max-h-52 overflow-y-auto">
+                  {stats.belowAvg.map((s: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between px-2 py-1.5 bg-red-50 rounded border border-red-100 text-xs">
+                      <span className="font-medium text-gray-800">{s.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-bold px-1.5 py-0.5 rounded-full ${scoreBg(s.overall)}`}>{s.overall.toFixed(1)}%</span>
+                        {s.prevOverall !== null && (
+                          <span className={s.overall >= s.prevOverall ? "text-green-600 text-xs font-bold" : "text-red-600 text-xs font-bold"}>
+                            {s.overall >= s.prevOverall ? "▲" : "▼"}{Math.abs(s.overall - s.prevOverall).toFixed(1)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl shadow p-4 border-t-4 border-orange-400">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">🎯 Major Gap Areas</h3>
+              {stats.topGaps.length === 0 ? (
+                <p className="text-xs text-green-600">✅ No significant gaps detected</p>
+              ) : (
+                <div className="space-y-2">
+                  {stats.topGaps.map(([domain, count]: [string, any]) => (
+                    <div key={domain} className="flex items-center gap-2 text-xs">
+                      <span className="min-w-[110px] font-medium text-gray-700 truncate">{domain}</span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-2">
+                        <div className="bg-orange-400 h-2 rounded-full" style={{ width: `${(count / stats.total) * 100}%` }} />
+                      </div>
+                      <span className="text-orange-700 font-bold whitespace-nowrap">{count}/{stats.total}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Student Breakdown Table */}
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-700">
+                Student Breakdown — {stats.latestRound?.replace("baseline_", "Round ")}
+              </h3>
+              {stats.prevRound && (
+                <span className="text-xs text-gray-400">vs. {stats.prevRound.replace("baseline_", "Round ")}</span>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-indigo-700 text-white">
+                    <th className="px-3 py-2 text-left min-w-[160px]">Student</th>
+                    <th className="px-3 py-2 text-center">Literacy</th>
+                    <th className="px-3 py-2 text-center">Numeracy</th>
+                    <th className="px-3 py-2 text-center">Overall</th>
+                    {stats.prevRound && <th className="px-3 py-2 text-center">vs. Prev</th>}
+                    <th className="px-3 py-2 text-center">Level</th>
+                    <th className="px-3 py-2 text-left">Gap Domains</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...stats.studentStats]
+                    .sort((a: any, b: any) => b.overall - a.overall)
+                    .map((s: any, i: number) => (
+                      <tr key={s.student_id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                        <td className="px-3 py-2 font-medium text-gray-800">{s.name}</td>
+                        <td className="px-3 py-2 text-center">
+                          {s.lit !== null
+                            ? <span className={`font-bold px-1.5 py-0.5 rounded-full ${scoreBg(s.lit)}`}>{s.lit.toFixed(1)}%</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {s.num !== null
+                            ? <span className={`font-bold px-1.5 py-0.5 rounded-full ${scoreBg(s.num)}`}>{s.num.toFixed(1)}%</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`font-bold px-1.5 py-0.5 rounded-full ${scoreBg(s.overall)}`}>{s.overall.toFixed(1)}%</span>
+                        </td>
+                        {stats.prevRound && (
+                          <td className="px-3 py-2 text-center">
+                            {s.prevOverall !== null
+                              ? <span className={s.overall >= s.prevOverall ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+                                  {s.overall >= s.prevOverall ? "▲" : "▼"}{Math.abs(s.overall - s.prevOverall).toFixed(1)}
+                                </span>
+                              : <span className="text-gray-300">—</span>}
+                          </td>
+                        )}
+                        <td className="px-3 py-2 text-center">
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${scoreBg(s.overall)}`}>{s.level}</span>
+                        </td>
+                        <td className="px-3 py-2">
+                          {s.gaps.length > 0
+                            ? <div className="flex flex-wrap gap-1">
+                                {s.gaps.map((g: string) => <span key={g} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{g}</span>)}
+                              </div>
+                            : <span className="text-green-600 text-xs">✅</span>}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
 // SHARED: Student Analysis View (used by Tab 2 + Tab 3)
 // Fix #1 baseline fields, #2 activities format, #3 empty rows,
 // #4 lazy PASA fetch, #5 section case, #6 search, #7 drill-down
 // ─────────────────────────────────────────────────────────────────
-function StudentAnalysisView({ students, subjects, baselineData, activitiesData, academicYear, grade, section }: any) {
+function StudentAnalysisView({ students, subjects, baselineData, activitiesData, academicYear, grade, section, mappings, user }: any) {
   const [subTab, setSubTab] = useState<"pasa" | "baseline" | "activities">("pasa");
   const [selectedExam, setSelectedExam] = useState("PA1");
   // Fix #4: lazy PASA cache — only fetch on demand, one exam at a time
@@ -429,7 +728,7 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
 
   const SUB_TABS = [
     { id: "pasa",       label: "📊 PA/SA Marks" },
-    { id: "baseline",   label: `📈 Baseline${assessedBaseline.length ? ` (${assessedBaseline.length})` : ""}` },
+    { id: "baseline",   label: "📈 Baseline" },
     { id: "activities", label: `🎯 Activities${activitiesData?.length ? ` (${activitiesData.length})` : ""}` },
   ];
 
@@ -602,69 +901,15 @@ function StudentAnalysisView({ students, subjects, baselineData, activitiesData,
         </div>
       )}
 
-      {/* ── Baseline Sub-tab — Fix #1 field mapping, #3 empty rows, #6 search, #7 click ── */}
+      {/* ── Baseline Sub-tab — deep analysis + inline entry ── */}
       {subTab === "baseline" && (
-        <div className="space-y-4">
-          {assessedBaseline.length > 0 ? (
-            <div className="bg-white rounded-xl shadow p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-1">
-                Baseline Assessments — {assessedBaseline.length} of {students.length || (baselineData || []).length} students assessed
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-indigo-700 text-white">
-                      <th className="px-3 py-2 text-left min-w-[160px]">Student</th>
-                      <th className="px-3 py2 text-center">Round</th>
-                      <th className="px-3 py-2 text-center">Stage</th>
-                      <th className="px-3 py-2 text-center">Literacy %</th>
-                      <th className="px-3 py-2 text-center">Numeracy %</th>
-                      <th className="px-3 py-2 text-center">Overall %</th>
-                      <th className="px-3 py-2 text-center">Level</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {assessedBaseline
-                      .filter((b: any) => matchSearch(b.student_name))
-                      .map((b: any, i: number) => {
-                        const a = b.assessment;
-                        const lit = n(a?.literacy_total);
-                        const num = n(a?.numeracy_total);
-                        const overall = n(a?.overall_score);
-                        const stuObj = students.find((s: any) => s.id === b.student_id);
-                        return (
-                          <tr key={i}
-                            className={`${i % 2 === 0 ? "bg-white" : "bg-gray-50"} ${stuObj ? "cursor-pointer hover:bg-indigo-50" : ""} transition-colors`}
-                            onClick={() => stuObj && setSelectedStudent(stuObj)}>
-                            <td className="px-3 py-2 font-medium text-gray-800">{b.student_name}</td>
-                            <td className="px-3 py-2 text-center text-gray-500">{a?.round?.replace("baseline_", "R") || "—"}</td>
-                            <td className="px-3 py-2 text-center text-gray-500 capitalize">{a?.stage || "—"}</td>
-                            <td className="px-3 py-2 text-center">
-                              {lit > 0 ? <span className={`font-bold px-2 py-0.5 rounded-full ${scoreBg(lit)}`}>{lit.toFixed(0)}%</span> : <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              {num > 0 ? <span className={`font-bold px-2 py-0.5 rounded-full ${scoreBg(num)}`}>{num.toFixed(0)}%</span> : <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <span className={`font-bold px-2 py-0.5 rounded-full ${scoreBg(overall)}`}>{overall.toFixed(0)}%</span>
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <span className="font-semibold px-2 py-0.5 rounded bg-purple-100 text-purple-700">{a?.level || "—"}</span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-xs text-gray-400 mt-2">Click a student row to view their full profile.</p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400">
-              <p className="text-sm">No baseline assessments recorded for this section yet.</p>
-            </div>
-          )}
-        </div>
+        <InlineBaselineTab
+          grade={grade}
+          section={section}
+          academicYear={academicYear}
+          mappings={mappings}
+          user={user}
+        />
       )}
 
       {/* ── Activities Sub-tab — Fix #2 show activity definitions ── */}
@@ -825,6 +1070,8 @@ function StudentsTab({ user, mappings, academicYear }: any) {
           baselineData={baselineData}
           activitiesData={activitiesData}
           academicYear={academicYear}
+          mappings={mappings}
+          user={user}
         />
       )}
     </div>
@@ -6835,42 +7082,6 @@ function getLevel(score: number) {
 }
 
 
-// ─────────────────────────────────────────────────────────────────
-// EXAM CONFIG TAB
-// ─────────────────────────────────────────────────────────────────
-
-function BaselineCombinedTab({ user, mappings, academicYear }: any) {
-  const isClassTeacher = !!(mappings?.is_class_teacher);
-  const [sub, setSub] = useState<'entry' | 'dashboard'>(isClassTeacher ? 'entry' : 'dashboard');
-
-  return (
-    <div>
-      <div className="flex gap-2 mb-4 border-b border-gray-200 pb-2">
-        {isClassTeacher && (
-          <button
-            onClick={() => setSub('entry')}
-            className={`px-4 py-1.5 rounded-t text-xs font-semibold border-b-2 transition-all ${
-              sub === 'entry' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Entry
-          </button>
-        )}
-        <button
-          onClick={() => setSub('dashboard')}
-          className={`px-4 py-1.5 rounded-t text-xs font-semibold border-b-2 transition-all ${
-            sub === 'dashboard' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Dashboard
-        </button>
-      </div>
-      {sub === 'entry' && isClassTeacher && <BaselineEntryTab user={user} mappings={mappings} academicYear={academicYear} />}
-      {sub === 'dashboard' && <BaselineDashTab user={user} mappings={mappings} academicYear={academicYear} />}
-    </div>
-  );
-}
-
 function BaselineDashTab({ user, mappings, academicYear }: any) {
   const API = "https://cbas-backend-production.up.railway.app";
   const ROUNDS = [
@@ -7191,8 +7402,7 @@ function BaselineDashTab({ user, mappings, academicYear }: any) {
   );
 }
 
-function BaselineEntryTab({ user, mappings, academicYear }: any) {
-  const API = "https://cbas-backend-production.up.railway.app";
+function BaselineEntryTab({ user, academicYear, grade: classGrade, section: classSection, onSaved }: any) {
   const GRADE_TO_STAGE: Record<string, string> = {
     "Pre-KG":"foundation","LKG":"foundation","UKG":"foundation",
     "Grade 1":"foundation","Grade 2":"foundation",
@@ -7200,11 +7410,6 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
     "Grade 6":"middle","Grade 7":"middle","Grade 8":"middle",
     "Grade 9":"secondary","Grade 10":"secondary",
   };
-
-  // Prefer the is_class_teacher entry in mappings[] — its section is correctly cased to match DB
-  const classMappingEntry = (mappings?.mappings || []).find((m: any) => m.is_class_teacher);
-  const classGrade = classMappingEntry?.grade || mappings?.class_grade || (mappings?.mappings || [])[0]?.grade || "";
-  const classSection = classMappingEntry?.section || mappings?.class_section || (mappings?.mappings || [])[0]?.section || "";
   const stage = GRADE_TO_STAGE[classGrade] || "foundation";
 
   const [sectionData, setSectionData] = useState<any>(null);
@@ -7324,7 +7529,7 @@ function BaselineEntryTab({ user, mappings, academicYear }: any) {
         grade: classGrade, section: classSection, academic_year: academicYear,
         round: roundKey, stage, assessment_date: assessmentDate, entries,
       });
-      setMsg(`✅ Round saved — ${entries.length} students`); fetchRounds(); setNewRoundOpen(false); setEditingRound(null);
+      setMsg(`✅ Round saved — ${entries.length} students`); fetchRounds(); setNewRoundOpen(false); setEditingRound(null); onSaved?.();
     } catch { setMsg("❌ Error saving"); }
     setSaving(false); setTimeout(() => setMsg(""), 3000);
   };

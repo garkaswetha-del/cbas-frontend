@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 import axios from 'axios';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,7 +19,7 @@ import axios from 'axios';
 // values, tests rename cascade, deactivate/reactivate lifecycle, then deletes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API = 'https://cbas-backend-bxiu.onrender.com';
+const API = 'https://cbas-backend-production.up.railway.app';
 const ACADEMIC_YEAR = '2025-26';
 
 test.describe.configure({ retries: 0 });
@@ -279,3 +279,4 @@ test('S9 — Delete blocked when section has records: returns 400', async () => 
   expect(deleteR.status).toBe(400);
   console.log(`✅ S9: Delete blocked for ${withStudents.grade}/${withStudents.name} (${withStudents.student_count} students) — status ${deleteR.status}`);
 });
+

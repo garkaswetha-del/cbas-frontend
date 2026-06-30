@@ -1,12 +1,12 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-const BASE = 'https://cbas-frontend.onrender.com';
-const API  = 'https://cbas-backend-bxiu.onrender.com';
+const BASE = 'https://cbas-frontend-production.up.railway.app';
+const API  = 'https://cbas-backend-production.up.railway.app';
 const ADMIN_EMAIL    = 'garkaswetha@gmail.com';
 const ADMIN_PASSWORD = 'swetha123';
 const YEAR = '2025-26';
@@ -215,7 +215,7 @@ test.describe('E2E — Appraisal Excel Import (comprehensive)', () => {
     const filename = download.suggestedFilename();
     expect(filename).toContain('appraisal_template_');
     expect(filename).toContain(YEAR);
-    expect(filename).toEndWith('.xlsx');
+    expect(filename.endsWith('.xlsx')).toBe(true);
     console.log(`✅ Template downloaded: "${filename}"`);
   });
 
@@ -232,9 +232,9 @@ test.describe('E2E — Appraisal Excel Import (comprehensive)', () => {
       await page.locator('input[type="file"]').setInputFiles(filePath);
       await page.waitForTimeout(2000);
 
-      await expect(page.locator('th:has-text("Teacher")')).toBeVisible({ timeout: 5000 });
-      await expect(page.locator('th:has-text("Type")')).toBeVisible();
-      await expect(page.locator('th:has-text("Match")')).toBeVisible();
+      await expect(page.locator('th').filter({ hasText: /^Teacher$/ }).first()).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('th').filter({ hasText: /^Type$/ }).first()).toBeVisible();
+      await expect(page.locator('th').filter({ hasText: /^Match$/ }).first()).toBeVisible();
 
       const previewRow = page.locator('tbody tr').filter({ hasText: G1_TEACHER });
       await expect(previewRow.locator('span:has-text("✓ Found")')).toBeVisible({ timeout: 5000 });
@@ -290,7 +290,9 @@ test.describe('E2E — Appraisal Excel Import (comprehensive)', () => {
       await page.locator('input[type="file"]').setInputFiles(filePath);
       await page.waitForTimeout(2000);
 
-      const previewRows = page.locator('table').last().locator('tbody tr');
+      // Scope to the preview table specifically by its unique "Match" column header
+      const previewTable = page.locator('table').filter({ has: page.locator('th').filter({ hasText: /^Match$/ }) });
+      const previewRows = previewTable.locator('tbody tr');
       await expect(previewRows).toHaveCount(2, { timeout: 5000 });
 
       await expect(page.locator('tbody tr').filter({ hasText: G1_TEACHER }).locator('td').nth(1)).toHaveText('Grade 1+');
@@ -613,3 +615,4 @@ test.describe('E2E — Appraisal Excel Import (comprehensive)', () => {
     }
   });
 });
+

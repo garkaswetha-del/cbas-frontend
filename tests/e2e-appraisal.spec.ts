@@ -1,8 +1,8 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 import axios from 'axios';
 
-const BASE = 'https://cbas-frontend.onrender.com';
-const API  = 'https://cbas-backend-bxiu.onrender.com';
+const BASE = 'https://cbas-frontend-production.up.railway.app';
+const API  = 'https://cbas-backend-production.up.railway.app';
 const ADMIN_EMAIL    = 'garkaswetha@gmail.com';
 const ADMIN_PASSWORD = 'swetha123';
 
@@ -766,18 +766,36 @@ test.describe('E2E — Teachers Appraisal (comprehensive)', () => {
   });
 
   test('42. Grade 1 onwards — exam_score = sum(PA1..SA2)/600*0.5 in backend', async ({ page }) => {
+    // Sets known PA values via UI so the formula check is self-contained regardless of prior DB state.
     await login(page);
+    await goToAppraisal(page);
+    await page.getByRole('button', { name: /Grade 1 onwards/ }).click();
+    await page.waitForTimeout(2000);
     const all = await apiAppraisals('2025-26');
     const others = all.filter((t: any) => {
       const cls = t.assigned_classes || [];
       return !cls.every((c: string) => ['Pre-KG','LKG','UKG','Nursery'].includes(c));
     });
-    const target = others.find((t: any) => t.appraisal?.exam_score && +t.appraisal.exam_score > 0);
-    if (!target) { console.log('ℹ️  No Grade 1+ with exam_score > 0 — skip'); return; }
-    const a = target.appraisal;
-    const expected = ((+a.pa1)+(+a.pa2)+(+a.pa3)+(+a.pa4)+(+a.sa1)+(+a.sa2)) / 600 * 0.5;
-    expect(Math.abs(+a.exam_score - expected)).toBeLessThan(0.001);
-    console.log(`✅ ${target.teacher_name} exam_score=${a.exam_score}, calculated=${expected.toFixed(6)} — match`);
+    const target = others.find((t: any) => t.appraisal?.id);
+    if (!target) { console.log('ℹ️  No Grade 1+ teacher with appraisal — skip'); return; }
+    const row = page.locator('tbody tr').filter({ hasText: target.teacher_name });
+    const knownPA = [90, 85, 80, 75, 95, 100]; // PA1, PA2, PA3, PA4, SA1, SA2
+    const inputs = row.locator('input[type="number"]');
+    for (let i = 0; i < 6; i++) await inputs.nth(i).fill(String(knownPA[i]));
+    const saveBtn = row.locator('td').first().locator('button:has-text("Save")');
+    await saveBtn.click();
+    await expect(page.locator('.bg-green-50').filter({ hasText: 'Saved' })).toBeVisible({ timeout: 8000 });
+    await page.waitForTimeout(500);
+    const updated = await teacherAppraisal(target.teacher_name);
+    const expected = (90 + 85 + 80 + 75 + 95 + 100) / 600 * 0.5; // = 0.4375
+    expect(Math.abs(+updated?.appraisal?.exam_score - expected)).toBeLessThan(0.001);
+    console.log(`✅ ${target.teacher_name} exam_score=${updated?.appraisal?.exam_score} (expected ${expected.toFixed(6)}) — match`);
+    // Restore original PA values
+    const orig = target.appraisal;
+    const origVals = [orig?.pa1, orig?.pa2, orig?.pa3, orig?.pa4, orig?.sa1, orig?.sa2].map(v => String(parseFloat(v || '0')));
+    for (let i = 0; i < 6; i++) await inputs.nth(i).fill(origVals[i]);
+    await saveBtn.click();
+    await page.waitForTimeout(1500);
   });
 
   test('43. Grade 1 onwards — Skills, Behaviour, Parents Feedback, Classroom, English Comm dropdowns present', async ({ page }) => {
@@ -903,3 +921,4 @@ function isNurseryGrade(classes: string[]): boolean {
   if (!classes?.length) return false;
   return classes.every((c: string) => ['Pre-KG', 'LKG', 'UKG', 'Nursery'].includes(c));
 }
+

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 import axios from 'axios';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ import axios from 'axios';
 // tests TC workflow, promotion chain. Cleans up on completion.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API = 'https://cbas-backend-bxiu.onrender.com';
+const API = 'https://cbas-backend-production.up.railway.app';
 
 test.describe.configure({ retries: 0 });
 
@@ -421,3 +421,4 @@ test('ST11 — Permanent delete: student completely removed, GET returns 404', a
   createdStudentId = ''; // prevent afterAll from trying again
   console.log(`✅ ST11: Permanently deleted — GET returns 404, absent from all lists`);
 });
+

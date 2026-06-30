@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 import axios from 'axios';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
-const BASE = 'https://cbas-frontend.onrender.com';
-const API  = 'https://cbas-backend-bxiu.onrender.com';
+const BASE = 'https://cbas-frontend-production.up.railway.app';
+const API  = 'https://cbas-backend-production.up.railway.app';
 const ACADEMIC_YEAR = '2025-26';
 
 const TEACHER = {
@@ -1586,3 +1586,4 @@ test.describe('Q — Regression & Edge Cases', () => {
     console.log('✅ Q7: My Baseline tab loaded, /baseline/teacher/:id endpoint 200');
   });
 });
+

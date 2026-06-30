@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 import axios from 'axios';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -9,7 +9,7 @@ import axios from 'axios';
 //   - Works for baseline (per domain), PASA (per competency), activities
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API = 'https://cbas-backend-bxiu.onrender.com';
+const API = 'https://cbas-backend-production.up.railway.app';
 const ACADEMIC_YEAR = '2025-26';
 
 const GRADE_ORDER = [
@@ -402,3 +402,4 @@ test.describe('R — Gap Logic: Current Gaps Reflect Latest Score', () => {
     console.log(`✅ R7: Portfolio returns all ${rounds.length} rounds without needing a round filter: [${rounds.join(', ')}]`);
   });
 });
+

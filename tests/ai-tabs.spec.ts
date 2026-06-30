@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 import axios from 'axios';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ import axios from 'axios';
 //   R12 – Learning Resources URLs: search URLs for gap domains are well-formed
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API = 'https://cbas-backend-bxiu.onrender.com';
+const API = 'https://cbas-backend-production.up.railway.app';
 const ACADEMIC_YEAR = '2025-26';
 
 // ── Context shared across all tests ───────────────────────────────────────────
@@ -799,3 +799,4 @@ test('R13 — Data integrity: all saved homework records have required fields, n
 
   console.log(`✅ R13: ${ourRecords.length} records verified — all have required fields, no orphaned data`);
 });
+
