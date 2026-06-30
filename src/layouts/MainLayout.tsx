@@ -114,8 +114,8 @@ export default function MainLayout({ user, onLogout, academicOnly = false }: Mai
       {/* ── DESKTOP SIDEBAR ── */}
       <div className="hidden md:flex w-64 bg-indigo-900 flex-col flex-shrink-0">
         <div className="px-4 py-4 border-b border-indigo-700">
-          <h1 className="text-white text-sm font-bold leading-tight">Wisdom Techno School</h1>
-          <p className="text-indigo-300 text-xs mt-0.5">{academicOnly ? 'Academic Portal' : 'CBAS Portal'}</p>
+          <h1 className="text-white text-sm font-bold leading-tight">Wisdom School</h1>
+          <p className="text-indigo-300 text-xs mt-0.5">{academicOnly ? 'Academic Portal' : 'MetaCognition'}</p>
         </div>
         <div className="pt-3 pb-1">
           <TabSwitcher />
@@ -138,8 +138,8 @@ export default function MainLayout({ user, onLogout, academicOnly = false }: Mai
       <div className={`fixed top-0 left-0 h-full w-72 bg-indigo-900 z-50 flex flex-col transform transition-transform duration-300 md:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="px-4 py-4 border-b border-indigo-700 flex items-center justify-between">
           <div>
-            <h1 className="text-white text-sm font-bold leading-tight">Wisdom Techno School</h1>
-            <p className="text-indigo-300 text-xs mt-0.5">{academicOnly ? 'Academic Portal' : 'CBAS Portal'}</p>
+            <h1 className="text-white text-sm font-bold leading-tight">Wisdom School</h1>
+            <p className="text-indigo-300 text-xs mt-0.5">{academicOnly ? 'Academic Portal' : 'MetaCognition'}</p>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="text-indigo-300 hover:text-white text-xl p-1">✕</button>
         </div>
@@ -163,8 +163,8 @@ export default function MainLayout({ user, onLogout, academicOnly = false }: Mai
             </svg>
           </button>
           <div className="text-center">
-            <p className="text-white text-xs font-bold">Wisdom Techno School</p>
-            <p className="text-indigo-300 text-xs">{academicOnly ? 'Academic Portal' : 'CBAS Portal'}</p>
+            <p className="text-white text-xs font-bold">Wisdom School</p>
+            <p className="text-indigo-300 text-xs">{academicOnly ? 'Academic Portal' : 'MetaCognition'}</p>
           </div>
           <button onClick={onLogout} className="text-indigo-300 hover:text-red-400 text-xs p-1">
             🚪

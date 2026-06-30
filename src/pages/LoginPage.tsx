@@ -36,8 +36,9 @@ export default function LoginPage({ onLogin }: { onLogin: (user: any) => void })
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-indigo-800 to-blue-700 px-8 py-8 text-center">
-            <img src={LOGO} alt="Wisdom Techno School" className="h-24 mx-auto mb-3 object-contain" />
-            <p className="text-blue-200 text-xs font-semibold tracking-widest uppercase mt-1">Competency Based Assessment System</p>
+            <img src={LOGO} alt="Wisdom School" className="h-24 mx-auto mb-1 object-contain" />
+            <p className="text-white text-sm font-bold tracking-[0.3em] uppercase mb-2">Nanjangudu</p>
+            <p className="text-blue-200 text-xs font-semibold tracking-widest uppercase mt-1">MetaCognition</p>
           </div>
 
           {/* Form */}
@@ -111,7 +112,7 @@ export default function LoginPage({ onLogin }: { onLogin: (user: any) => void })
         </div>
 
         <p className="text-center text-blue-200 text-xs mt-4 opacity-60">
-          © 2025 Wisdom Techno School. All rights reserved.
+          © 2025 Wisdom School, Nanjangudu. All rights reserved.
         </p>
       </div>
     </div>

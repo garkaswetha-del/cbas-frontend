@@ -1,8 +1,8 @@
 export default function Dashboard() {
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-800 mb-2">Welcome to CBAS</h1>
-      <p className="text-gray-500 mb-6">Competency Based Assessment System — 2025-26</p>
+      <h1 className="text-2xl font-bold text-gray-800 mb-2">Welcome to MetaCognition</h1>
+      <p className="text-gray-500 mb-6">Wisdom School, Nanjangudu — 2025-26</p>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <div className="bg-white rounded-xl shadow p-4 border-l-4 border-indigo-500">
