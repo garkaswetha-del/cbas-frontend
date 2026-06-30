@@ -228,6 +228,7 @@ export default function UserManagementPage() {
   };
 
   const fetchAssignments = async () => {
+    setAssignments({});
     try {
       const r = await axios.get(`${API}/mappings/all?academic_year=${academicYear}`);
       const map: Record<string, any> = {};
@@ -552,7 +553,8 @@ export default function UserManagementPage() {
     return `${yr}-${String(yr + 1).slice(2)}`;
   })();
 
-  const teachers = users.filter(u => u.role === "teacher");
+  const hasAssignments = Object.keys(assignments).length > 0;
+  const teachers = users.filter(u => u.role === "teacher" && (!hasAssignments || assignments[u.id]));
   const admins = users.filter(u => u.role === "admin");
 
   const filtered = teachers.filter(u => {
