@@ -55,27 +55,6 @@ const GRADE_CAPS: Record<string,{cap:number}> = {
   "Grade 10": {cap:26000},
 };
 
-// Qualification hierarchy — higher rank satisfies lower-grade requirements.
-// Quals not in this map (e.g. plain "Graduation", plain "Post Graduation") are
-// unrecognised teaching credentials and always trigger the penalty.
-const QUAL_RANK: Record<string, number> = {
-  "NTT": 1,
-  "NST": 2,
-  "DED": 3,
-  "BED": 4,
-  "GRADUATION WITH BED": 5,
-  "POST GRADUATION WITH BED": 6,
-};
-
-// Minimum qualification rank required per grade.
-const GRADE_MIN_QUAL_RANK: Record<string, number> = {
-  "Nursery": 0, "Pre-KG": 0, "LKG": 0, "UKG": 0,
-  "Grade 1": 2, "Grade 2": 2, "Grade 3": 2,
-  "Grade 4": 3, "Grade 5": 3,
-  "Grade 6": 5, "Grade 7": 5,
-  "Grade 8": 6, "Grade 9": 6, "Grade 10": 6,
-};
-
 function calcIncrement(overallPct: number, respCount: number, overCap: boolean, highestGrade: string|null, qualification: string|null) {
   if (!overallPct) return { base: 0, extra: 0, penalty: 0, total: 0, note: "-", overCap: false, band: "" };
 
@@ -94,15 +73,9 @@ function calcIncrement(overallPct: number, respCount: number, overCap: boolean, 
   }
 
   const extra = respCount > 0 ? 7 : 0;
-
-  const minRank = highestGrade ? (GRADE_MIN_QUAL_RANK[highestGrade] ?? 0) : 0;
-  const qualRank = qualification !== null ? (QUAL_RANK[qualification.toUpperCase()] ?? -1) : null;
-  const hasQualPenalty = qualRank !== null && minRank > 0 && qualRank < minRank;
-  const penalty = hasQualPenalty ? 2 : 0;
-
-  const total = base + extra - penalty;
-  const note = `Base:${base}%${extra>0?` + Resp:${extra}%`:""}${penalty>0?` - Penalty:${penalty}%`:""}`;
-  return { base, extra, penalty, total, note, overCap, band };
+  const total = base + extra;
+  const note = `Base:${base}%${extra>0?` + Resp:${extra}%`:""}`;
+  return { base, extra, penalty: 0, total, note, overCap, band };
 }
 
 function timeAgo(dateStr: string|null|undefined): string {
