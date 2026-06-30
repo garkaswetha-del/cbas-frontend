@@ -557,6 +557,20 @@ export default function UserManagementPage() {
   const teachers = users.filter(u => u.role === "teacher" && (!hasAssignments || assignments[u.id]));
   const admins = users.filter(u => u.role === "admin");
 
+  // Year-specific stats derived from filtered teacher list
+  const yearStats = hasAssignments ? {
+    total: teachers.length,
+    inactive: inactiveUsers.filter((u: any) => u.role === "teacher").length,
+    byQualification: Object.entries(
+      teachers.reduce((acc: Record<string, number>, u: any) => {
+        const q = (u.appraisal_qualification || u.qualification || "Unknown").toUpperCase();
+        acc[q] = (acc[q] || 0) + 1;
+        return acc;
+      }, {})
+    ).map(([qualification, count]) => ({ qualification, count }))
+      .sort((a, b) => (b.count as number) - (a.count as number)),
+  } : stats;
+
   const filtered = teachers.filter(u => {
     const q = search.toLowerCase();
     const matchSearch = !search ||
@@ -613,21 +627,21 @@ export default function UserManagementPage() {
       </div>
 
       {/* ── STATS BAR ── */}
-      {stats && (
+      {yearStats && (
         <div className="space-y-3 mb-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
-              <p className="text-2xl font-bold text-indigo-700">{stats.total}</p>
+              <p className="text-2xl font-bold text-indigo-700">{yearStats.total}</p>
               <p className="text-xs text-gray-500 mt-0.5">Active Teachers</p>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
-              <p className="text-2xl font-bold text-red-500">{stats.inactive}</p>
+              <p className="text-2xl font-bold text-red-500">{yearStats.inactive}</p>
               <p className="text-xs text-gray-500 mt-0.5">Deactivated</p>
             </div>
           </div>
-          {(stats.byQualification || []).length > 0 && (
+          {(yearStats.byQualification || []).length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {(stats.byQualification || []).map((q: any) => (
+              {(yearStats.byQualification || []).map((q: any) => (
                 <div key={q.qualification} className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
                   <p className="text-2xl font-bold text-green-700">{q.count}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{q.qualification}</p>
