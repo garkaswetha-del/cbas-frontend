@@ -115,7 +115,7 @@ export default function MainLayout({ user, onLogout, academicOnly = false }: Mai
       <div className="hidden md:flex w-64 bg-indigo-900 flex-col flex-shrink-0">
         <div className="px-4 py-4 border-b border-indigo-700">
           <h1 className="text-white text-sm font-bold leading-tight">Wisdom School</h1>
-          <p className="text-indigo-300 text-xs mt-0.5">{academicOnly ? 'Academic Portal' : 'MetaCognition'}</p>
+          <p className="text-indigo-300 text-xs mt-0.5">{academicOnly ? 'Academic Portal' : 'Competence Based Assessment System'}</p>
         </div>
         <div className="pt-3 pb-1">
           <TabSwitcher />
@@ -139,7 +139,7 @@ export default function MainLayout({ user, onLogout, academicOnly = false }: Mai
         <div className="px-4 py-4 border-b border-indigo-700 flex items-center justify-between">
           <div>
             <h1 className="text-white text-sm font-bold leading-tight">Wisdom School</h1>
-            <p className="text-indigo-300 text-xs mt-0.5">{academicOnly ? 'Academic Portal' : 'MetaCognition'}</p>
+            <p className="text-indigo-300 text-xs mt-0.5">{academicOnly ? 'Academic Portal' : 'Competence Based Assessment System'}</p>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="text-indigo-300 hover:text-white text-xl p-1">✕</button>
         </div>
@@ -164,7 +164,7 @@ export default function MainLayout({ user, onLogout, academicOnly = false }: Mai
           </button>
           <div className="text-center">
             <p className="text-white text-xs font-bold">Wisdom School</p>
-            <p className="text-indigo-300 text-xs">{academicOnly ? 'Academic Portal' : 'MetaCognition'}</p>
+            <p className="text-indigo-300 text-xs">{academicOnly ? 'Academic Portal' : 'Competence Based Assessment System'}</p>
           </div>
           <button onClick={onLogout} className="text-indigo-300 hover:text-red-400 text-xs p-1">
             🚪

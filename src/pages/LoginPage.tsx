@@ -38,7 +38,7 @@ export default function LoginPage({ onLogin }: { onLogin: (user: any) => void })
           <div className="bg-gradient-to-r from-indigo-800 to-blue-700 px-8 py-8 text-center">
             <img src={LOGO} alt="Wisdom School" className="h-24 mx-auto mb-1 object-contain" />
             <p className="text-white text-sm font-bold tracking-[0.3em] uppercase mb-2">Nanjangudu</p>
-            <p className="text-blue-200 text-xs font-semibold tracking-widest uppercase mt-1">MetaCognition</p>
+            <p className="text-blue-200 text-xs font-semibold tracking-widest uppercase mt-1">Competence Based Assessment System</p>
           </div>
 
           {/* Form */}
