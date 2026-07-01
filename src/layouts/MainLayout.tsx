@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 
 const ADMINISTRATIVE_NAV = [
-  { path: '/users',    label: 'User Management',   icon: '👥' },
-  { path: '/students', label: 'Student Management', icon: '🎓' },
-  { path: '/sections', label: 'Section Management', icon: '🏫' },
-  { path: '/appraisal',label: 'Teachers Appraisal', icon: '📋' },
-  { path: '/memos',    label: 'Memos',              icon: '📩' },
+  { path: '/super-dashboard', label: 'Super Dashboard',   icon: '📊' },
+  { path: '/users',           label: 'User Management',   icon: '👥' },
+  { path: '/students',        label: 'Student Management', icon: '🎓' },
+  { path: '/sections',        label: 'Section Management', icon: '🏫' },
+  { path: '/appraisal',       label: 'Teachers Appraisal', icon: '📋' },
+  { path: '/memos',           label: 'Memos',              icon: '📩' },
 ];
 
 const ACADEMIC_NAV = [

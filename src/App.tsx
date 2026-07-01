@@ -17,6 +17,7 @@ import ClassObservationPage from "./pages/ClassObservationPage";
 import PASAPage from "./pages/PASAPage";
 import TeacherDashboardPage from "./pages/TeacherDashboardPage";
 import MemosPage from "./pages/MemosPage";
+import SuperDashboardPage from "./pages/SuperDashboardPage";
 
 const ACADEMIC_YEARS = Array.from({ length: 5 }, (_, i) => {
   const y = 2025 + i;
@@ -270,7 +271,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<MainLayout user={user} onLogout={handleLogout} />}>
-          <Route index element={<UserManagementPage />} />
+          <Route index element={<Navigate to="/super-dashboard" replace />} />
+          <Route path="super-dashboard" element={<SuperDashboardPage />} />
           <Route path="users" element={<UserManagementPage />} />
           <Route path="students" element={<StudentManagementPage />} />
           <Route path="sections" element={<SectionManagementPage />} />
@@ -281,7 +283,7 @@ function App() {
           <Route path="observation" element={<ClassObservationPage />} />
           <Route path="pasa" element={<PASAPage />} />
           <Route path="memos" element={<MemosPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/super-dashboard" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>
