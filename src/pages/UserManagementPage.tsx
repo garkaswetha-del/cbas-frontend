@@ -196,6 +196,9 @@ export default function UserManagementPage() {
   const [customSubject, setCustomSubject] = useState("");
 
   useEffect(() => {
+    // Reset synchronously so no render ever sees new users with old-year assignments
+    setAssignmentsLoaded(false);
+    setAssignments({});
     fetchUsers();
     fetchStats();
     fetchInactive();
@@ -229,8 +232,6 @@ export default function UserManagementPage() {
   };
 
   const fetchAssignments = async () => {
-    setAssignments({});
-    setAssignmentsLoaded(false);
     try {
       const r = await axios.get(`${API}/mappings/all?academic_year=${academicYear}`);
       const map: Record<string, any> = {};
