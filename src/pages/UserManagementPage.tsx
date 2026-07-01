@@ -151,6 +151,7 @@ export default function UserManagementPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [inactiveUsers, setInactiveUsers] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<Record<string, any>>({});
+  const [assignmentsLoaded, setAssignmentsLoaded] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -229,6 +230,7 @@ export default function UserManagementPage() {
 
   const fetchAssignments = async () => {
     setAssignments({});
+    setAssignmentsLoaded(false);
     try {
       const r = await axios.get(`${API}/mappings/all?academic_year=${academicYear}`);
       const map: Record<string, any> = {};
@@ -239,6 +241,7 @@ export default function UserManagementPage() {
         if (m.is_class_teacher && m.grade && m.section) map[m.teacher_id].class_teacher_of = `${m.grade} ${m.section}`;
       });
       setAssignments(map);
+      setAssignmentsLoaded(true);
     } catch { }
   };
 
@@ -554,7 +557,11 @@ export default function UserManagementPage() {
   })();
 
   const hasAssignments = Object.keys(assignments).length > 0;
-  const teachers = users.filter(u => u.role === "teacher");
+  // Only show teachers who have active mappings in the selected academic year.
+  // While assignments are still loading, show nothing (avoid flash of all-teacher list).
+  const teachers = users.filter(u =>
+    u.role === "teacher" && (!assignmentsLoaded || !!assignments[u.id])
+  );
   const admins = users.filter(u => u.role === "admin");
 
   // Year-specific stats derived from filtered teacher list
