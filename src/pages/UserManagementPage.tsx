@@ -563,7 +563,7 @@ export default function UserManagementPage() {
     inactive: inactiveUsers.filter((u: any) => u.role === "teacher").length,
     byQualification: Object.entries(
       teachers.reduce((acc: Record<string, number>, u: any) => {
-        const q = (u.appraisal_qualification || u.qualification || "Unknown").toUpperCase();
+        const q = (u.appraisal_qualification || u.qualification || "Unknown").toUpperCase().replace(/B\.ED/g, 'BED').replace(/D\.ED/g, 'DED');
         acc[q] = (acc[q] || 0) + 1;
         return acc;
       }, {})
