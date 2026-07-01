@@ -115,13 +115,13 @@ export default function SuperDashboardPage() {
           const school     = r.value[0].data;
           const teacherBL  = r.value[1].data;
           const appraisal  = r.value[2].data;
+          const totalTeachers = appraisal?.totalTeachers ?? 1;
+          const minAppraisals = Math.max(5, Math.ceil(totalTeachers * 0.15)); // at least 15% or 5
           data[y] = {
-            // null out school baseline if nothing assessed
-            school:     (school?.assessed    ?? 0) > 0 ? school    : null,
-            teacherBL:  (teacherBL?.assessed ?? 0) > 0 ? teacherBL : null,
-            // null out appraisal if nothing submitted
-            appraisal:  (appraisal?.appraised ?? 0) > 0 ? appraisal : null,
-            // keep raw counts even when zeroed (for KPI cards)
+            school:    (school?.assessed    ?? 0) > 0  ? school    : null,
+            teacherBL: (teacherBL?.assessed ?? 0) > 0  ? teacherBL : null,
+            // only plot appraisal line when enough submissions for it to be meaningful
+            appraisal: (appraisal?.appraised ?? 0) >= minAppraisals ? appraisal : null,
             raw: { school, teacherBL, appraisal },
           };
         }
@@ -314,7 +314,7 @@ export default function SuperDashboardPage() {
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={schoolLineData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="year" tick={{ fontSize: 11 }} padding={{ left: 60, right: 60 }} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
                   <Tooltip content={<LineTooltip />} />
                   <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
@@ -333,7 +333,7 @@ export default function SuperDashboardPage() {
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={gradeLineData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="year" tick={{ fontSize: 11 }} padding={{ left: 60, right: 60 }} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
                   <Tooltip content={<LineTooltip />} />
                   <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
@@ -377,7 +377,7 @@ export default function SuperDashboardPage() {
                       <ResponsiveContainer width="100%" height={200}>
                         <LineChart data={sectionLineData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="year" tick={{ fontSize: 10 }} />
+                          <XAxis dataKey="year" tick={{ fontSize: 10 }} padding={{ left: 60, right: 60 }} />
                           <YAxis domain={[0, 100]} tick={{ fontSize: 9 }} unit="%" />
                           <Tooltip content={<LineTooltip />} />
                           <Legend iconSize={8} wrapperStyle={{ fontSize: 9 }} />
@@ -518,7 +518,7 @@ export default function SuperDashboardPage() {
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={appraisalLineData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="year" tick={{ fontSize: 11 }} padding={{ left: 60, right: 60 }} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
                   <Tooltip content={<LineTooltip />} />
                   <Line type="monotone" dataKey="Avg %" stroke="#a855f7" strokeWidth={2.5}
@@ -531,10 +531,17 @@ export default function SuperDashboardPage() {
                   const raw = yearData[y]?.raw?.appraisal;
                   if (!raw) return null;
                   const pct = Math.round((raw.appraised/(raw.totalTeachers||1))*100);
+                  const minNeeded = Math.max(5, Math.ceil((raw.totalTeachers||1)*0.15));
+                  const inGraph = raw.appraised >= minNeeded;
                   return (
                     <div key={y}>
                       <div className="flex justify-between text-xs text-gray-500 mb-0.5">
-                        <span>{y} — {raw.appraised}/{raw.totalTeachers} appraised</span>
+                        <span>
+                          {y} — {raw.appraised}/{raw.totalTeachers} appraised
+                          {!inGraph && raw.appraised > 0 && (
+                            <span className="ml-1 text-orange-400">(too few for graph)</span>
+                          )}
+                        </span>
                         <span className="text-purple-600 font-semibold">{pct}%</span>
                       </div>
                       <div className="bg-gray-100 rounded-full h-1.5">
@@ -642,7 +649,7 @@ export default function SuperDashboardPage() {
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={teacherBLLineData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="year" tick={{ fontSize: 11 }} padding={{ left: 60, right: 60 }} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
                   <Tooltip content={<LineTooltip />} />
                   <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
