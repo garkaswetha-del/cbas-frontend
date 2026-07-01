@@ -558,10 +558,10 @@ export default function UserManagementPage() {
 
   const hasAssignments = Object.keys(assignments).length > 0;
   // Only show teachers who have active mappings in the selected academic year.
-  // While assignments are still loading, show nothing (avoid flash of all-teacher list).
-  const teachers = users.filter(u =>
-    u.role === "teacher" && (!assignmentsLoaded || !!assignments[u.id])
-  );
+  // While assignments are still loading, return empty so no stale data flashes.
+  const teachers = !assignmentsLoaded
+    ? []
+    : users.filter(u => u.role === "teacher" && !!assignments[u.id]);
   const admins = users.filter(u => u.role === "admin");
 
   // Year-specific stats derived from filtered teacher list
