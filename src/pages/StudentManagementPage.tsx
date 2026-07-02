@@ -324,7 +324,7 @@ export default function StudentManagementPage() {
           <p className="text-sm text-gray-500">{stats.total} active students · {stats.tcCount || 0} TC'd</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={openPromotion}
+          <button onClick={() => setShowPromotion(true)}
             className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 font-medium">
             🎓 Promote Students
           </button>
