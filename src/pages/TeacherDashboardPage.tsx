@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import { currentAcademicYear } from "../utils/academicYear";
 import axios from "axios";
+import PromotionWizard from "../components/PromotionWizard";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Cell,
@@ -151,7 +152,20 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
         {activeTab === "activities"     && <ActivitiesTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "ai_tools"       && <AIToolsTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "alerts"         && <AlertsTab user={user} mappings={mappings} academicYear={academicYear} />}
-        {activeTab === "promotion"      && <PromotionTab user={user} mappings={mappings} academicYear={academicYear} />}
+        {activeTab === "promotion"      && (
+          <div className="p-4 md:p-6 w-full max-w-4xl">
+            {!mappings?.is_class_teacher
+              ? <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Only class teachers can access the Promotion tab.</div>
+              : (!mappings?.class_grade || !mappings?.class_section)
+                ? <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Class assignment not loaded yet. Please wait a moment and try again.</div>
+                : <PromotionWizard
+                    academicYear={academicYear}
+                    fixedGrade={mappings.class_grade}
+                    fixedSection={mappings.class_section}
+                  />
+            }
+          </div>
+        )}
         {activeTab === "portfolio"      && <PortfolioTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "profile"        && <ProfileTab user={user} />}
         {activeTab === "self_baseline"  && <BaselineTab user={user} academicYear={academicYear} />}
@@ -6284,295 +6298,6 @@ function PortfolioTab({ user, mappings, academicYear }: any) {
   );
 }
 
-function PromotionTab({ user, mappings, academicYear }: any) {
-  const GRADE_ORDER = ["Pre-KG","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
-
-  const classGrade = mappings?.class_grade || "";
-  const classSection = mappings?.class_section || "";
-  const isClassTeacher = !!(mappings?.is_class_teacher);
-
-  const nextGradeIdx = GRADE_ORDER.indexOf(classGrade) + 1;
-  const nextGrade = nextGradeIdx < GRADE_ORDER.length ? GRADE_ORDER[nextGradeIdx] : null;
-  const isGrade10 = classGrade === "Grade 10";
-
-  const [students, setStudents] = useState<any[]>([]);
-  const [nextSections, setNextSections] = useState<string[]>([]);
-  const [studentSections, setStudentSections] = useState<Record<string, string>>({});
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [defaultSection, setDefaultSection] = useState("");
-  const [promoting, setPromoting] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [msg, setMsg] = useState("");
-  const [step, setStep] = useState<"preview"|"confirm"|"done">("preview");
-  const [loading, setLoading] = useState(false);
-  const [graduationYear, setGraduationYear] = useState(new Date().getFullYear().toString());
-
-  // Load students and next grade sections
-  const loadStudents = async () => {
-    setLoading(true);
-    try {
-      const [studRes, secRes] = await Promise.all([
-        axios.get(`${API}/students?grade=${encodeURIComponent(classGrade)}&section=${encodeURIComponent(classSection)}`),
-        nextGrade ? axios.get(`${API}/sections?grade=${encodeURIComponent(nextGrade)}&academic_year=${academicYear}`) : Promise.resolve({ data: [] }),
-      ]);
-      const list = (studRes.data?.data || studRes.data || []).filter((s:any) => s.is_active !== false);
-      setStudents(list);
-      setSelectedIds(list.map((s:any) => s.id));
-      const initSections: Record<string,string> = {};
-      list.forEach((s:any) => { initSections[s.id] = ""; });
-      setStudentSections(initSections);
-
-      // Primary: sections registry table
-      let sections: string[] = (Array.isArray(secRes.data) ? secRes.data : [])
-        .map((s: any) => s.name || s)
-        .filter(Boolean);
-
-      // Fallback: derive sections from actual students in the next grade
-      // (the sections table may not be seeded even when students exist)
-      if (sections.length === 0 && nextGrade) {
-        const nextStudRes = await axios.get(`${API}/students?grade=${encodeURIComponent(nextGrade)}&limit=2000`);
-        const nextStudents: any[] = nextStudRes.data?.data || nextStudRes.data || [];
-        const unique = [...new Set(
-          nextStudents.filter((s:any) => s.is_active !== false && s.section)
-                      .map((s:any) => (s.section as string).toUpperCase())
-        )].sort();
-        sections = unique;
-      }
-
-      setNextSections(sections);
-      setStep("confirm");
-    } catch { setMsg("❌ Could not load students."); }
-    setLoading(false);
-  };
-
-  const applyDefaultSection = (section: string) => {
-    setDefaultSection(section);
-    const updated = { ...studentSections };
-    selectedIds.forEach(id => { updated[id] = section; });
-    setStudentSections(updated);
-  };
-
-  const executePromotion = async () => {
-    const missing = selectedIds.filter(id => !studentSections[id]);
-    if (missing.length) { setMsg(`❌ Please select a section for all ${missing.length} student(s).`); return; }
-    setPromoting(true);
-    try {
-      const sectionGroups: Record<string, string[]> = {};
-      selectedIds.forEach(id => {
-        const sec = studentSections[id];
-        if (!sectionGroups[sec]) sectionGroups[sec] = [];
-        sectionGroups[sec].push(id);
-      });
-      let totalPromoted = 0;
-      for (const [targetSection, ids] of Object.entries(sectionGroups)) {
-        const r = await axios.post(`${API}/students/promotion/execute`, {
-          grade: classGrade, section: classSection,
-          new_section: targetSection, student_ids: ids,
-        });
-        totalPromoted += r.data?.promoted_count || ids.length;
-      }
-      setResult({ promoted: totalPromoted, type: "promotion" });
-      setStep("done");
-    } catch { setMsg("❌ Promotion failed. Try again."); }
-    setPromoting(false);
-  };
-
-  const executeGraduation = async () => {
-    if (!graduationYear) { setMsg("❌ Enter graduation year"); return; }
-    setPromoting(true);
-    try {
-      const r = await axios.post(`${API}/students/graduation/execute`, {
-        grade: classGrade, section: classSection,
-        student_ids: selectedIds, graduation_year: graduationYear,
-      });
-      setResult({ promoted: r.data?.graduated || selectedIds.length, type: "graduation" });
-      setStep("done");
-    } catch { setMsg("❌ Graduation failed. Try again."); }
-    setPromoting(false);
-  };
-
-  const toggleStudent = (id: string) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  };
-
-  if (!isClassTeacher) {
-    return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Only class teachers can access the Promotion tab.</div>;
-  }
-  if (!classGrade || !classSection) {
-    return <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400 text-sm">Class assignment not loaded yet. Please wait a moment and try again.</div>;
-  }
-
-  return (
-    <div className="space-y-4 w-full max-w-4xl">
-      <div className={`border rounded-xl p-4 ${isGrade10 ? "bg-amber-50 border-amber-200" : "bg-indigo-50 border-indigo-200"}`}>
-        <h3 className={`text-sm font-bold mb-1 ${isGrade10 ? "text-amber-800" : "text-indigo-800"}`}>
-          {isGrade10 ? "🎓 Student Graduation" : "🎓 Student Promotion"}
-        </h3>
-        <p className={`text-xs ${isGrade10 ? "text-amber-600" : "text-indigo-600"}`}>
-          {isGrade10
-            ? `Graduate students from ${classGrade} · ${classSection}. They will be marked as alumni and their data preserved.`
-            : `Promote students from ${classGrade} · ${classSection} to ${nextGrade}. Assign each student to their new section.`}
-        </p>
-      </div>
-
-      {msg && <div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
-
-      {step === "preview" && (
-        <div className="bg-white rounded-xl shadow p-6 text-center">
-          <p className="text-sm text-gray-600 mb-1">Your class: <strong>{classGrade} · {classSection}</strong></p>
-          {isGrade10 ? (
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-3">These students will be graduated and marked as alumni.</p>
-              <div className="flex items-center justify-center gap-3">
-                <label className="text-sm text-gray-600">Graduation Year:</label>
-                <input type="text" value={graduationYear} onChange={e => setGraduationYear(e.target.value)}
-                  className="border border-gray-300 rounded px-3 py-1.5 text-sm w-24 text-center" />
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-gray-600 mb-4">Will be promoted to: <strong>{nextGrade}</strong></p>
-          )}
-          <button onClick={loadStudents} disabled={loading}
-            className={`px-6 py-2.5 text-white text-sm rounded-lg font-semibold disabled:opacity-50 ${isGrade10 ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"}`}>
-            {loading ? "Loading..." : "📋 Load Student List"}
-          </button>
-        </div>
-      )}
-
-      {step === "confirm" && students.length > 0 && (
-        <div className="space-y-4">
-          {/* For promotion — section selector */}
-          {!isGrade10 && (
-            <div className="bg-white rounded-xl shadow p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Apply same section to all students</h3>
-              {nextSections.length > 0 ? (
-                <div className="flex gap-3 items-center flex-wrap">
-                  <select value={defaultSection} onChange={e => applyDefaultSection(e.target.value)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm flex-1 max-w-xs">
-                    <option value="">-- Select default section for all --</option>
-                    {nextSections.map(s => <option key={s} value={s}>{nextGrade} · {s}</option>)}
-                  </select>
-                  <span className="text-xs text-gray-400">Or assign individually per student below</span>
-                </div>
-              ) : (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-xs text-yellow-700">⚠️ No sections found for {nextGrade}. Please add sections in Section Management first, or sections will be created when students are assigned.</p>
-                  <input type="text" placeholder="Type section name manually (e.g. KARANTHA)"
-                    value={defaultSection} onChange={e => applyDefaultSection(e.target.value.toUpperCase())}
-                    className="mt-2 border border-gray-300 rounded px-3 py-1.5 text-sm w-full" />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Student list */}
-          <div className="bg-white rounded-xl shadow overflow-hidden">
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-700">
-                {students.length} students in {classGrade} · {classSection}
-                <span className="ml-2 text-xs text-gray-400">({selectedIds.length} selected)</span>
-              </h3>
-              <div className="flex gap-2">
-                <button onClick={() => setSelectedIds(students.map(s => s.id))} className="text-xs text-indigo-600 hover:underline">Select All</button>
-                <button onClick={() => setSelectedIds([])} className="text-xs text-gray-400 hover:underline">Clear All</button>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className={`text-white text-xs ${isGrade10 ? "bg-amber-700" : "bg-indigo-700"}`}>
-                    <th className="px-3 py-2 w-8"></th>
-                    <th className="px-3 py-2 text-left">Student Name</th>
-                    <th className="px-3 py-2 text-left">Admission No</th>
-                    {!isGrade10 && <th className="px-3 py-2 text-left min-w-[200px]">New Section in {nextGrade} *</th>}
-                    {isGrade10 && <th className="px-3 py-2 text-center">Status</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((s:any, i:number) => (
-                    <tr key={s.id} className={`${i%2===0?"bg-white":"bg-gray-50"} ${!selectedIds.includes(s.id)?"opacity-40":""}`}>
-                      <td className="px-3 py-2 text-center">
-                        <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => toggleStudent(s.id)} className="accent-indigo-600" />
-                      </td>
-                      <td className="px-3 py-2 font-medium text-gray-800">{s.name}</td>
-                      <td className="px-3 py-2 text-gray-400 text-xs">{s.admission_no || "—"}</td>
-                      {!isGrade10 && (
-                        <td className="px-3 py-2">
-                          {nextSections.length > 0 ? (
-                            <select value={studentSections[s.id] || ""} onChange={e => setStudentSections(prev => ({ ...prev, [s.id]: e.target.value }))}
-                              disabled={!selectedIds.includes(s.id)}
-                              className={`border rounded px-2 py-1 text-xs w-full ${!studentSections[s.id] && selectedIds.includes(s.id) ? "border-red-300 bg-red-50" : "border-gray-300"}`}>
-                              <option value="">-- Select section --</option>
-                              {nextSections.map(sec => <option key={sec} value={sec}>{sec}</option>)}
-                            </select>
-                          ) : (
-                            <input type="text" value={studentSections[s.id] || ""} placeholder="Enter section"
-                              onChange={e => setStudentSections(prev => ({ ...prev, [s.id]: e.target.value.toUpperCase() }))}
-                              disabled={!selectedIds.includes(s.id)}
-                              className="border border-gray-300 rounded px-2 py-1 text-xs w-full" />
-                          )}
-                        </td>
-                      )}
-                      {isGrade10 && (
-                        <td className="px-3 py-2 text-center">
-                          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs">Will Graduate {graduationYear}</span>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className={`border rounded-xl p-4 ${isGrade10 ? "bg-amber-50 border-amber-200" : "bg-yellow-50 border-yellow-200"}`}>
-            <p className={`text-sm font-bold mb-1 ${isGrade10 ? "text-amber-800" : "text-yellow-800"}`}>⚠️ Important</p>
-            <ul className={`text-xs space-y-1 list-disc ml-4 ${isGrade10 ? "text-amber-700" : "text-yellow-700"}`}>
-              {isGrade10 ? (
-                <>
-                  <li>Selected students will be marked as graduated alumni for {graduationYear}.</li>
-                  <li>All their data (baseline, PASA, activities) is permanently preserved.</li>
-                  <li>They will no longer appear in active class lists.</li>
-                  <li>This cannot be undone from the teacher dashboard.</li>
-                </>
-              ) : (
-                <>
-                  <li>Students will be moved to {nextGrade} with their selected sections immediately.</li>
-                  <li>All historical data (PA/SA marks, activities, baseline) is preserved.</li>
-                  <li>Unselected students remain in {classGrade} · {classSection}.</li>
-                  <li>This cannot be undone from the teacher dashboard.</li>
-                </>
-              )}
-            </ul>
-          </div>
-
-          <button onClick={isGrade10 ? executeGraduation : executePromotion} disabled={promoting || !selectedIds.length}
-            className={`px-6 py-2.5 text-white text-sm rounded-lg font-semibold disabled:opacity-50 ${isGrade10 ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"}`}>
-            {promoting ? "Processing..." : isGrade10
-              ? `🎓 Graduate ${selectedIds.length} Students (${graduationYear})`
-              : `✅ Promote ${selectedIds.length} Students to ${nextGrade}`}
-          </button>
-        </div>
-      )}
-
-      {step === "done" && result && (
-        <div className="bg-white rounded-xl shadow p-8 text-center">
-          <div className="text-5xl mb-4">{result.type === "graduation" ? "🎓" : "🎉"}</div>
-          <h3 className="text-xl font-bold text-green-700 mb-2">
-            {result.type === "graduation" ? "Graduation Complete!" : "Promotion Complete!"}
-          </h3>
-          <p className="text-gray-600">
-            {result.promoted} students {result.type === "graduation" ? `graduated (${graduationYear})` : `promoted to ${nextGrade}`}
-          </p>
-          <button onClick={() => { setStep("preview"); setStudents([]); setResult(null); setMsg(""); }}
-            className="mt-4 px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
-            ↩ Back
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 
 // ─────────────────────────────────────────────────────────────────

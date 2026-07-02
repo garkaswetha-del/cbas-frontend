@@ -2,6 +2,7 @@
 import axios from "axios";
 import * as XLSX from "xlsx";
 import SectionManagementPage from "./SectionManagementPage";
+import PromotionWizard from "../components/PromotionWizard";
 
 const API = "https://cbas-backend-production.up.railway.app";
 const CLASSES = [
@@ -55,18 +56,6 @@ export default function StudentManagementPage() {
 
   // Promotion wizard
   const [showPromotion, setShowPromotion] = useState(false);
-  const [promoGrade, setPromoGrade] = useState("");
-  const [promoSection, setPromoSection] = useState("");
-  const [promoNewSection, setPromoNewSection] = useState("");
-  const [promoNewSectionCustom, setPromoNewSectionCustom] = useState("");
-  const [promoPreview, setPromoPreview] = useState<any>(null);
-  const [promoStep, setPromoStep] = useState<"select" | "preview" | "done">("select");
-  const [promoSections, setPromoSections] = useState<string[]>([]);
-  const [promoNextSections, setPromoNextSections] = useState<string[]>([]);
-  const [promoGradYear, setPromoGradYear] = useState(new Date().getFullYear().toString());
-  const [promoAssignments, setPromoAssignments] = useState<Record<string, string>>({});
-  const [promoSelected, setPromoSelected] = useState<string[]>([]);
-  const [promoBulkSection, setPromoBulkSection] = useState("");
 
   // Profile modal
   const [profileStudent, setProfileStudent] = useState<any>(null);
@@ -224,94 +213,6 @@ export default function StudentManagementPage() {
       showMsg(`✅ ${name} permanently deleted`);
       fetchTCRegister(); fetchStats();
     } catch { showMsg("❌ Error deleting student"); }
-  };
-
-  // Promotion wizard
-  const openPromotion = () => {
-    setPromoGrade(""); setPromoSection(""); setPromoNewSection(""); setPromoNewSectionCustom("");
-    setPromoPreview(null); setPromoStep("select"); setPromoSections([]);
-    setPromoNextSections([]); setPromoGradYear(new Date().getFullYear().toString());
-    setPromoAssignments({}); setPromoSelected([]); setPromoBulkSection("");
-    setShowPromotion(true);
-  };
-
-  const loadPromoSections = async (grade: string) => {
-    setPromoGrade(grade); setPromoSection(""); setPromoPreview(null);
-    try {
-      const res = await axios.get(`${API}/students/sections/${encodeURIComponent(grade)}`);
-      setPromoSections(res.data?.sections || []);
-    } catch { setPromoSections([]); }
-  };
-
-  const previewPromotion = async () => {
-    if (!promoGrade || !promoSection) { showMsg("❌ Select grade and section"); return; }
-    try {
-      const res = await axios.get(`${API}/students/promotion/preview`, {
-        params: { grade: promoGrade, section: promoSection },
-      });
-      setPromoPreview(res.data);
-      setPromoStep("preview");
-      setPromoNewSection(""); setPromoNewSectionCustom("");
-      setPromoAssignments({}); setPromoSelected([]); setPromoBulkSection("");
-      // Fetch sections for the next grade to populate the dropdown
-      if (res.data.next_grade) {
-        try {
-          const now = new Date();
-          const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
-          const academicYear = `${yr}-${String(yr + 1).slice(2)}`;
-          const secRes = await axios.get(`${API}/sections`, { params: { grade: res.data.next_grade, academic_year: academicYear } });
-          setPromoNextSections((secRes.data || []).map((s: any) => s.name).filter(Boolean));
-        } catch { setPromoNextSections([]); }
-      }
-    } catch { showMsg("❌ Error loading preview"); }
-  };
-
-  const executePromotion = async () => {
-    if (!promoNewSection.trim()) { showMsg("❌ Select the new section"); return; }
-    try {
-      const res = await axios.post(`${API}/students/promotion/execute`, {
-        grade: promoGrade, section: promoSection, new_section: promoNewSection,
-      });
-      showMsg(`✅ ${res.data.message}`);
-      setPromoStep("done");
-      fetchStudents(); fetchStats(); fetchAllSections();
-    } catch { showMsg("❌ Promotion failed"); }
-  };
-
-  const executeGraduation = async () => {
-    if (!promoGradYear) { showMsg("❌ Select graduation year"); return; }
-    try {
-      const res = await axios.post(`${API}/students/graduation/execute`, {
-        grade: promoGrade, section: promoSection, graduation_year: promoGradYear,
-      });
-      showMsg(`✅ ${res.data.message}`);
-      setPromoStep("done");
-      fetchStudents(); fetchStats(); fetchAllSections();
-    } catch { showMsg("❌ Graduation failed"); }
-  };
-
-  const assignSelectedStudents = () => {
-    if (!promoBulkSection || promoSelected.length === 0) return;
-    setPromoAssignments(prev => {
-      const next = { ...prev };
-      promoSelected.forEach(id => { next[id] = promoBulkSection; });
-      return next;
-    });
-    setPromoSelected([]);
-    setPromoBulkSection("");
-  };
-
-  const executeBatchPromotion = async () => {
-    const students: any[] = promoPreview?.students || [];
-    const unassigned = students.filter((s: any) => !promoAssignments[s.id]);
-    if (unassigned.length > 0) { showMsg(`❌ ${unassigned.length} students still unassigned`); return; }
-    try {
-      const assignments = students.map((s: any) => ({ student_id: s.id, to_section: promoAssignments[s.id] }));
-      const res = await axios.post(`${API}/students/promotion/execute-batch`, { from_grade: promoGrade, assignments });
-      showMsg(`✅ ${res.data.message}`);
-      setPromoStep("done");
-      fetchStudents(); fetchStats(); fetchAllSections();
-    } catch { showMsg("❌ Promotion failed"); }
   };
 
   // Export current filtered list as Excel
@@ -981,176 +882,13 @@ export default function StudentManagementPage() {
 
       {/* ── PROMOTION WIZARD ── */}
       {showPromotion && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold text-gray-800">🎓 Promote Students</h3>
-              <button onClick={() => setShowPromotion(false)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
-            </div>
-
-            {promoStep === "select" && (
-              <div className="space-y-4">
-                <p className="text-xs text-gray-500">Select the current grade and section to promote all students to the next grade.</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Current Grade</label>
-                    <select value={promoGrade} onChange={e => loadPromoSections(e.target.value)}
-                      className="border border-gray-300 rounded px-3 py-2 text-sm w-full">
-                      <option value="">-- Select Grade --</option>
-                      {CLASSES.map(c => <option key={c} value={c}>{c}{c === "Grade 10" ? " (→ Alumni)" : ""}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Current Section</label>
-                    <select value={promoSection} onChange={e => setPromoSection(e.target.value)}
-                      disabled={!promoGrade}
-                      className="border border-gray-300 rounded px-3 py-2 text-sm w-full disabled:opacity-50">
-                      <option value="">-- Select Section --</option>
-                      {promoSections.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <button onClick={previewPromotion} disabled={!promoGrade || !promoSection}
-                  className="px-6 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold">
-                  Preview Promotion →
-                </button>
-              </div>
-            )}
-
-            {promoStep === "preview" && promoPreview && (
-              <div className="space-y-3">
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                  <p className="text-sm font-semibold text-purple-800">
-                    {promoPreview.student_count} students: <strong>{promoPreview.current_grade} {promoPreview.current_section}</strong> → <strong>{promoPreview.next_grade || "Alumni"}</strong>
-                  </p>
-                </div>
-
-                {promoPreview.next_grade ? (
-                  <>
-                    {/* Bulk assign bar */}
-                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2">
-                      <input type="checkbox"
-                        checked={promoSelected.length === promoPreview.students.length && promoPreview.students.length > 0}
-                        onChange={e => setPromoSelected(e.target.checked ? promoPreview.students.map((s: any) => s.id) : [])}
-                        className="h-4 w-4 rounded border-gray-300 cursor-pointer" />
-                      <span className="text-xs text-gray-500 mr-1">All</span>
-                      <select value={promoBulkSection} onChange={e => setPromoBulkSection(e.target.value)}
-                        className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-xs">
-                        <option value="">Assign selected to section...</option>
-                        {promoNextSections.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                      <button onClick={assignSelectedStudents}
-                        disabled={!promoBulkSection || promoSelected.length === 0}
-                        className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-40 font-semibold whitespace-nowrap">
-                        Assign →
-                      </button>
-                    </div>
-
-                    {/* Section tally */}
-                    {(() => {
-                      const tally: Record<string, number> = {};
-                      let unassigned = 0;
-                      promoPreview.students.forEach((s: any) => {
-                        const sec = promoAssignments[s.id];
-                        if (sec) tally[sec] = (tally[sec] || 0) + 1;
-                        else unassigned++;
-                      });
-                      return (
-                        <div className="flex flex-wrap gap-1.5 text-xs">
-                          {Object.entries(tally).map(([sec, count]) => (
-                            <span key={sec} className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">{sec}: {count}</span>
-                          ))}
-                          {unassigned > 0 && <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">Unassigned: {unassigned}</span>}
-                        </div>
-                      );
-                    })()}
-
-                    {/* Student table */}
-                    <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-50 sticky top-0">
-                          <tr>
-                            <th className="px-2 py-2 w-8"></th>
-                            <th className="px-3 py-2 text-left">Name</th>
-                            <th className="px-3 py-2 text-left">Adm. No.</th>
-                            <th className="px-3 py-2 text-left">→ Section</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {promoPreview.students.map((s: any) => {
-                            const assigned = promoAssignments[s.id];
-                            const isSelected = promoSelected.includes(s.id);
-                            return (
-                              <tr key={s.id} className={`border-t border-gray-100 ${isSelected ? "bg-indigo-50" : assigned ? "bg-green-50" : ""}`}>
-                                <td className="px-2 py-1.5 text-center">
-                                  <input type="checkbox" checked={isSelected}
-                                    onChange={e => setPromoSelected(prev => e.target.checked ? [...prev, s.id] : prev.filter(id => id !== s.id))}
-                                    className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer" />
-                                </td>
-                                <td className="px-3 py-1.5 font-medium text-gray-700">{s.name}</td>
-                                <td className="px-3 py-1.5 text-gray-500">{s.admission_no || "-"}</td>
-                                <td className="px-3 py-1.5">
-                                  <select value={assigned || ""} onChange={e => setPromoAssignments(prev => ({ ...prev, [s.id]: e.target.value }))}
-                                    className={`border rounded px-2 py-0.5 text-xs w-full ${assigned ? "border-green-300 text-green-700" : "border-orange-300 text-orange-500"}`}>
-                                    <option value="">-- unassigned --</option>
-                                    {promoNextSections.map(sec => <option key={sec} value={sec}>{sec}</option>)}
-                                  </select>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {promoNextSections.length === 0 && (
-                      <p className="text-xs text-orange-500">No sections configured for {promoPreview.next_grade}. Add them in Section Management first.</p>
-                    )}
-
-                    <div className="flex gap-2">
-                      <button onClick={executeBatchPromotion}
-                        disabled={promoPreview.students.some((s: any) => !promoAssignments[s.id])}
-                        className="flex-1 px-6 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold">
-                        ✅ Confirm Promotion
-                      </button>
-                      <button onClick={() => setPromoStep("select")}
-                        className="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">← Back</button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="space-y-3">
-                    <label className="text-xs text-gray-500 block mb-1">Graduation Year *</label>
-                    <select value={promoGradYear} onChange={e => setPromoGradYear(e.target.value)}
-                      className="border border-gray-300 rounded px-3 py-2 text-sm w-full">
-                      {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i).map(y => (
-                        <option key={y} value={String(y)}>{y}</option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-400">These {promoPreview.student_count} students will be moved to Alumni records</p>
-                    <div className="flex gap-2">
-                      <button onClick={executeGraduation}
-                        className="flex-1 px-6 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-semibold">
-                        🎓 Graduate to Alumni
-                      </button>
-                      <button onClick={() => setPromoStep("select")}
-                        className="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">← Back</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {promoStep === "done" && (
-              <div className="text-center py-6">
-                <p className="text-4xl mb-3">🎉</p>
-                <p className="text-sm font-semibold text-gray-800">Promotion Complete!</p>
-                <p className="text-xs text-gray-500 mt-1">Students have been moved to the next grade.</p>
-                <button onClick={() => setShowPromotion(false)}
-                  className="mt-4 px-6 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-semibold">
-                  Close
-                </button>
-              </div>
-            )}
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <PromotionWizard
+              academicYear={(() => { const now = new Date(); const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1; return `${yr}-${String(yr + 1).slice(2)}`; })()}
+              onComplete={() => { fetchStudents(); fetchStats(); fetchAllSections(); }}
+              onClose={() => setShowPromotion(false)}
+            />
           </div>
         </div>
       )}
