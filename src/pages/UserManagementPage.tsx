@@ -151,7 +151,7 @@ export default function UserManagementPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [inactiveUsers, setInactiveUsers] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<Record<string, any>>({});
-  const [assignmentsLoaded, setAssignmentsLoaded] = useState(false);
+  const [assignmentsYear, setAssignmentsYear] = useState("");
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -196,9 +196,6 @@ export default function UserManagementPage() {
   const [customSubject, setCustomSubject] = useState("");
 
   useEffect(() => {
-    // Reset synchronously so no render ever sees new users with old-year assignments
-    setAssignmentsLoaded(false);
-    setAssignments({});
     fetchUsers();
     fetchStats();
     fetchInactive();
@@ -232,8 +229,9 @@ export default function UserManagementPage() {
   };
 
   const fetchAssignments = async () => {
+    const year = academicYear; // capture so we can tag the result
     try {
-      const r = await axios.get(`${API}/mappings/all?academic_year=${academicYear}`);
+      const r = await axios.get(`${API}/mappings/all?academic_year=${year}`);
       const map: Record<string, any> = {};
       (r.data || []).forEach((m: any) => {
         if (!map[m.teacher_id]) map[m.teacher_id] = { subjects: [], assigned_classes: [], class_teacher_of: '' };
@@ -242,7 +240,7 @@ export default function UserManagementPage() {
         if (m.is_class_teacher && m.grade && m.section) map[m.teacher_id].class_teacher_of = `${m.grade} ${m.section}`;
       });
       setAssignments(map);
-      setAssignmentsLoaded(true);
+      setAssignmentsYear(year); // tag so filter knows which year this data belongs to
     } catch { }
   };
 
@@ -557,10 +555,11 @@ export default function UserManagementPage() {
     return `${yr}-${String(yr + 1).slice(2)}`;
   })();
 
-  const hasAssignments = Object.keys(assignments).length > 0;
-  // Only show teachers who have active mappings in the selected academic year.
-  // While assignments are still loading, return empty so no stale data flashes.
-  const teachers = !assignmentsLoaded
+  // assignments are tagged with the year they were fetched for.
+  // If the tag doesn't match the current year, the fetch is still in flight — show nothing.
+  const assignmentsReady = assignmentsYear === academicYear;
+  const hasAssignments = assignmentsReady && Object.keys(assignments).length > 0;
+  const teachers = !assignmentsReady
     ? []
     : users.filter(u => u.role === "teacher" && !!assignments[u.id]);
   const admins = users.filter(u => u.role === "admin");
