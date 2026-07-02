@@ -282,31 +282,25 @@ export default function PromotionWizard({ academicYear, fixedGrade, fixedSection
           /* Promotion flow */
           <div className="space-y-3">
 
-            {/* Quick-assign shortcut bar */}
-            <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg p-2">
-              <span className="text-xs text-indigo-700 font-medium whitespace-nowrap">Quick assign all unassigned →</span>
-              <select value={bulkSection} onChange={e => setBulkSection(e.target.value)}
-                className="flex-1 border border-indigo-300 rounded px-2 py-1.5 text-xs bg-white">
-                <option value="">Pick a section...</option>
-                {nextSections.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <button
-                onClick={() => {
-                  if (!bulkSection) return;
-                  setAssignments(prev => {
-                    const next = { ...prev };
-                    students.forEach(s => { if (!next[s.id]) next[s.id] = bulkSection; });
-                    return next;
-                  });
-                  setBulkSection("");
-                }}
-                disabled={!bulkSection}
-                className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-40 font-semibold whitespace-nowrap">
-                Apply
-              </button>
+            {/* Step A: select students → pick section → assign */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
+              <p className="text-xs font-semibold text-gray-600">① Check students &nbsp;→&nbsp; ② Pick section &nbsp;→&nbsp; ③ Click Assign</p>
+              <div className="flex items-center gap-2">
+                <select value={bulkSection} onChange={e => setBulkSection(e.target.value)}
+                  className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm bg-white">
+                  <option value="">-- select target section --</option>
+                  {nextSections.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <button
+                  onClick={assignSelected}
+                  disabled={!bulkSection || selected.length === 0}
+                  className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed font-semibold whitespace-nowrap">
+                  Assign {selected.length > 0 ? `(${selected.length})` : ""} →
+                </button>
+              </div>
             </div>
 
-            {/* Section tally */}
+            {/* Tally */}
             {(() => {
               const { counts, unassigned } = tally();
               return (
@@ -321,50 +315,69 @@ export default function PromotionWizard({ academicYear, fixedGrade, fixedSection
               );
             })()}
 
-            {/* Student table — per-row dropdown is the primary way to assign */}
-            <div className="max-h-72 overflow-y-auto border border-gray-200 rounded-lg">
-              <table className="w-full text-xs">
-                <thead className="bg-gray-50 sticky top-0 border-b border-gray-200">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">#</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Name</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Adm. No.</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">→ Section in {ng}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((s, idx) => {
-                    const assigned = assignments[s.id];
-                    return (
-                      <tr key={s.id} className={`border-t border-gray-100 ${assigned ? "bg-green-50" : ""}`}>
-                        <td className="px-3 py-2 text-gray-400 w-8">{idx + 1}</td>
-                        <td className="px-3 py-2 font-medium text-gray-800">{s.name}</td>
-                        <td className="px-3 py-2 text-gray-400">{s.admission_no || "—"}</td>
-                        <td className="px-3 py-2">
-                          {nextSections.length > 0 ? (
-                            <select value={assigned || ""}
-                              onChange={e => setAssignments(prev => ({ ...prev, [s.id]: e.target.value }))}
-                              className={`border rounded px-2 py-1 text-xs w-full ${assigned ? "border-green-400 bg-green-50 text-green-800 font-medium" : "border-orange-300 text-gray-500"}`}>
-                              <option value="">-- select section --</option>
-                              {nextSections.map(sec => <option key={sec} value={sec}>{sec}</option>)}
-                            </select>
-                          ) : (
-                            <input type="text" value={assigned || ""} placeholder="Type section name"
-                              onChange={e => setAssignments(prev => ({ ...prev, [s.id]: e.target.value.toUpperCase() }))}
-                              className="border border-gray-300 rounded px-2 py-1 text-xs w-full" />
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            {/* Student table with checkboxes */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="max-h-72 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 w-10 text-center">
+                        <input type="checkbox"
+                          checked={selected.length === students.filter(s => !assignments[s.id]).length && students.filter(s => !assignments[s.id]).length > 0}
+                          onChange={e => setSelected(e.target.checked ? students.filter(s => !assignments[s.id]).map(s => s.id) : [])}
+                          className="h-4 w-4 cursor-pointer accent-indigo-600"
+                          title="Select all unassigned"
+                        />
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Name</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Adm. No.</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">→ {ng}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.map((s, idx) => {
+                      const assigned = assignments[s.id];
+                      const isChecked = selected.includes(s.id);
+                      return (
+                        <tr key={s.id}
+                          className={`border-t border-gray-100 cursor-pointer select-none
+                            ${assigned ? "bg-green-50" : isChecked ? "bg-indigo-50" : idx % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
+                          onClick={() => {
+                            if (assigned) return; // already assigned, can't re-select
+                            setSelected(prev => isChecked ? prev.filter(id => id !== s.id) : [...prev, s.id]);
+                          }}
+                        >
+                          <td className="px-3 py-2 text-center">
+                            {assigned ? (
+                              <span className="text-green-500 text-base">✓</span>
+                            ) : (
+                              <input type="checkbox" checked={isChecked} readOnly
+                                className="h-4 w-4 accent-indigo-600 pointer-events-none" />
+                            )}
+                          </td>
+                          <td className="px-3 py-2 font-medium text-gray-800">{s.name}</td>
+                          <td className="px-3 py-2 text-gray-400 text-xs">{s.admission_no || "—"}</td>
+                          <td className="px-3 py-2">
+                            {assigned ? (
+                              <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+                                {assigned}
+                                <button onClick={e => { e.stopPropagation(); setAssignments(prev => { const n = { ...prev }; delete n[s.id]; return n; }); }}
+                                  className="text-green-600 hover:text-red-500 font-bold leading-none ml-0.5">×</button>
+                              </span>
+                            ) : (
+                              <span className="text-orange-400 text-xs">— unassigned —</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {nextSections.length === 0 && (
-              <p className="text-xs text-orange-500">
-                No sections found for {ng}. Add them in Section Management first, or type section names manually above.
-              </p>
+              <p className="text-xs text-orange-500">No sections found for {ng}. Add them in Section Management first.</p>
             )}
 
             {(() => {
