@@ -61,7 +61,7 @@ export default function PromotionWizard({ academicYear, fixedGrade, fixedSection
 
       const list: any[] = studRes.data?.students || [];
       setStudents(list);
-      setSelected(list.map(st => st.id));
+      setSelected([]); // nothing pre-selected — teacher picks groups manually
       const init: Record<string, string> = {};
       list.forEach(st => { init[st.id] = ""; });
       setAssignments(init);
@@ -365,17 +365,29 @@ export default function PromotionWizard({ academicYear, fixedGrade, fixedSection
               </p>
             )}
 
-            <div className="flex gap-2">
-              <button onClick={executePromotion}
-                disabled={submitting || students.some(s => !assignments[s.id])}
-                className="flex-1 px-6 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold">
-                {submitting ? "Promoting..." : "✅ Confirm Promotion"}
-              </button>
-              {!isTeacherMode && (
-                <button onClick={() => setStep("select")}
-                  className="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">← Back</button>
-              )}
-            </div>
+            {(() => {
+              const { unassigned } = tally();
+              return (
+                <div className="space-y-1.5">
+                  {unassigned > 0 && (
+                    <p className="text-xs text-orange-600 text-center font-medium">
+                      {unassigned} student{unassigned > 1 ? "s" : ""} still unassigned — assign all before confirming
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <button onClick={executePromotion}
+                      disabled={submitting || unassigned > 0}
+                      className="flex-1 px-6 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed font-semibold">
+                      {submitting ? "Promoting..." : "✅ Confirm Promotion"}
+                    </button>
+                    {!isTeacherMode && (
+                      <button onClick={() => setStep("select")}
+                        className="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">← Back</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )
       )}
