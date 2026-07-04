@@ -18,6 +18,7 @@ import PASAPage from "./pages/PASAPage";
 import TeacherDashboardPage from "./pages/TeacherDashboardPage";
 import MemosPage from "./pages/MemosPage";
 import SuperDashboardPage from "./pages/SuperDashboardPage";
+import AuditLogPage from "./pages/AuditLogPage";
 
 const ACADEMIC_YEARS = Array.from({ length: 5 }, (_, i) => {
   const y = 2025 + i;
@@ -283,6 +284,7 @@ function App() {
           <Route path="observation" element={<ClassObservationPage />} />
           <Route path="pasa" element={<PASAPage />} />
           <Route path="memos" element={<MemosPage />} />
+          <Route path="audit-log" element={<AuditLogPage />} />
           <Route path="*" element={<Navigate to="/super-dashboard" replace />} />
         </Route>
       </Routes>
