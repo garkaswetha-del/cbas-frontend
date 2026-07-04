@@ -221,6 +221,13 @@ function App() {
   };
 
   const handleLogout = () => {
+    const stored = localStorage.getItem("cbas_user");
+    if (stored) {
+      try {
+        const u = JSON.parse(stored);
+        axios.post(`${API}/users/logout`, { user_name: u.name, user_id: u.id, user_role: u.role }).catch(() => {});
+      } catch {}
+    }
     localStorage.removeItem("cbas_user");
     setUser(null);
   };

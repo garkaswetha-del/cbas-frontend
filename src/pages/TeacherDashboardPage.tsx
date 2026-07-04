@@ -2416,7 +2416,7 @@ function ActivitiesTab({ user, mappings, academicYear }: any) {
         };
       });
       const res = await axios.post(`${API}/activities`, {
-        ...form, stage, academic_year: academicYear, created_by: user?.id,
+        ...form, stage, academic_year: academicYear, created_by: user?.id, teacher_name: user?.name,
         sections: form.sections,
         competency_mappings: selectedComps,
         rubrics: rubricsArr,
