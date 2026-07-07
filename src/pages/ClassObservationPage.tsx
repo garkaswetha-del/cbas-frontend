@@ -109,6 +109,7 @@ export default function ClassObservationPage() {
   const [teacherStageMap, setTeacherStageMap] = useState<Record<string, string>>({});
   const [teacherSubjects, setTeacherSubjects] = useState<Record<string, string[]>>({});
   const [teacherGrades, setTeacherGrades] = useState<Record<string, string[]>>({});
+  const [teacherSections, setTeacherSections] = useState<Record<string, string[]>>({});
   const [sortOrder, setSortOrder] = useState<"az" | "pct_desc" | "pct_asc">("az");
   const [filterMin, setFilterMin] = useState("");
   const [filterMax, setFilterMax] = useState("");
@@ -139,12 +140,14 @@ export default function ClassObservationPage() {
       const stageMap: Record<string, string> = {};
       const subjectMap: Record<string, string[]> = {};
       const gradesMap: Record<string, string[]> = {};
+      const sectionMap: Record<string, string[]> = {};
       const names: string[] = (tRes.data || []).map((t: any) => {
         emailMap[t.name] = t.email || "";
         idMap[t.name] = t.id || "";
         subjectMap[t.name] = (t.subjects || []).filter((s: string) => s?.trim());
         const grades: string[] = t.assigned_classes || [];
         gradesMap[t.name] = grades;
+        sectionMap[t.name] = (t.assigned_sections || []).filter((s: string) => s?.trim());
         let stage = "";
         for (const s of STAGE_ORDER) {
           if (STAGE_GRADES[s].some(g => grades.includes(g))) { stage = s; break; }
@@ -161,6 +164,7 @@ export default function ClassObservationPage() {
       setTeacherStageMap(stageMap);
       setTeacherSubjects(subjectMap);
       setTeacherGrades(gradesMap);
+      setTeacherSections(sectionMap);
     } catch { }
     setDashLoading(false);
   };
@@ -521,11 +525,11 @@ export default function ClassObservationPage() {
             <span className="text-gray-400 ml-2">Max = 24 pts</span>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" style={{ overflowY: "auto", maxHeight: "calc(100vh - 280px)" }}>
             <table className="w-full text-xs border-collapse" style={{ minWidth: "2200px" }}>
-              <thead>
+              <thead className="sticky top-0 z-30">
                 <tr className="bg-indigo-700 text-white text-xs">
-                  <th className="px-3 py-3 text-left sticky left-0 z-30 bg-indigo-700 border-r border-indigo-600 min-w-[170px]">Teacher</th>
+                  <th className="px-3 py-3 text-left sticky left-0 z-40 bg-indigo-700 border-r border-indigo-600 min-w-[170px]">Teacher</th>
                   <th className="px-2 py-3 text-center min-w-[115px]">Date</th>
                   <th className="px-2 py-3 text-center min-w-[100px]">Grade</th>
                   <th className="px-2 py-3 text-center min-w-[80px]">Section</th>
@@ -546,9 +550,9 @@ export default function ClassObservationPage() {
                   <th className="px-2 py-3 text-center min-w-[160px] border-l border-indigo-600">✅ Continue</th>
                   <th className="px-2 py-3 text-center min-w-[160px]">🛑 Stop</th>
                   <th className="px-2 py-3 text-center min-w-[160px]">🚀 Start</th>
-                  <th className="px-2 py-3 text-center sticky right-[140px] z-30 bg-indigo-700 border-l border-indigo-600 min-w-[70px]">Total</th>
-                  <th className="px-2 py-3 text-center sticky right-[70px] z-30 bg-indigo-700 min-w-[70px]">%</th>
-                  <th className="px-2 py-3 text-center sticky right-0 z-30 bg-indigo-700 border-l border-indigo-600 min-w-[70px]">Save</th>
+                  <th className="px-2 py-3 text-center sticky right-[140px] z-40 bg-indigo-700 border-l border-indigo-600 min-w-[70px]">Total</th>
+                  <th className="px-2 py-3 text-center sticky right-[70px] z-40 bg-indigo-700 min-w-[70px]">%</th>
+                  <th className="px-2 py-3 text-center sticky right-0 z-40 bg-indigo-700 border-l border-indigo-600 min-w-[70px]">Save</th>
                 </tr>
               </thead>
               <tbody>
@@ -615,10 +619,14 @@ export default function ClassObservationPage() {
                           </select>
                         </td>
                         <td className={`px-1 py-1.5 ${bg}`}>
-                          <input value={row.section_observed || ""}
-                            onChange={e => updateRow(name, "section_observed", e.target.value.toUpperCase())}
-                            placeholder="Section"
-                            className="border border-gray-300 rounded px-1 py-1 text-xs w-full" />
+                          <select value={row.section_observed || ""}
+                            onChange={e => updateRow(name, "section_observed", e.target.value)}
+                            className="border border-gray-300 rounded px-1 py-1 text-xs w-full">
+                            <option value="">—</option>
+                            {(teacherSections[name]?.length > 0 ? teacherSections[name] : ["A","B","C","D","E"]).map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
                         </td>
                         <td className={`px-1 py-1.5 ${bg}`}>
                           {(teacherSubjects[name] || []).length > 0 ? (
