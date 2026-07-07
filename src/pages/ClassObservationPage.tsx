@@ -82,7 +82,7 @@ const scoreBg = (pct: number) => pct >= 80 ? "bg-green-100 text-green-800" : pct
 const emptyRow = (name: string) => ({
   teacher_name: name,
   observation_date: new Date().toISOString().split("T")[0],
-  grade_observed: "Grade 1", section_observed: "", subject_observed: "", block_number: "",
+  grade_observed: "Grade 1", section_observed: "", subject_observed: "", block_number: "", lp_no: "",
   number_of_students: "", classroom_norms_discussed: false,
   lesson_plan_available: false, observed_by: "",
   preparation: "not_done", purposeful_class: "not_done", action: "not_done",
@@ -107,6 +107,8 @@ export default function ClassObservationPage() {
   const [dashTeacher, setDashTeacher] = useState<string | null>(null);
   const [teacherObs, setTeacherObs] = useState<Record<string, any>>({});
   const [teacherStageMap, setTeacherStageMap] = useState<Record<string, string>>({});
+  const [teacherSubjects, setTeacherSubjects] = useState<Record<string, string[]>>({});
+  const [teacherGrades, setTeacherGrades] = useState<Record<string, string[]>>({});
   const [sortOrder, setSortOrder] = useState<"az" | "pct_desc" | "pct_asc">("az");
   const [filterMin, setFilterMin] = useState("");
   const [filterMax, setFilterMax] = useState("");
@@ -135,10 +137,14 @@ export default function ClassObservationPage() {
       const emailMap: Record<string, string> = {};
       const idMap: Record<string, string> = {};
       const stageMap: Record<string, string> = {};
+      const subjectMap: Record<string, string[]> = {};
+      const gradesMap: Record<string, string[]> = {};
       const names: string[] = (tRes.data || []).map((t: any) => {
         emailMap[t.name] = t.email || "";
         idMap[t.name] = t.id || "";
+        subjectMap[t.name] = (t.subjects || []).filter((s: string) => s?.trim());
         const grades: string[] = t.assigned_classes || [];
+        gradesMap[t.name] = grades;
         let stage = "";
         for (const s of STAGE_ORDER) {
           if (STAGE_GRADES[s].some(g => grades.includes(g))) { stage = s; break; }
@@ -153,6 +159,8 @@ export default function ClassObservationPage() {
       setAllTeachers([...names, ...extra]);
       setDashboard(dRes.data);
       setTeacherStageMap(stageMap);
+      setTeacherSubjects(subjectMap);
+      setTeacherGrades(gradesMap);
     } catch { }
     setDashLoading(false);
   };
@@ -172,7 +180,14 @@ export default function ClassObservationPage() {
     }));
   };
 
-  const getRow = (name: string) => newRows[name] || emptyRow(name);
+  const getRow = (name: string) => {
+    const row = newRows[name] || emptyRow(name);
+    const allowed = teacherGrades[name] || [];
+    if (allowed.length > 0 && !allowed.includes(row.grade_observed)) {
+      return { ...row, grade_observed: allowed[0] };
+    }
+    return row;
+  };
 
   const handleSave = async (name: string) => {
     const row = getRow(name);
@@ -218,6 +233,7 @@ export default function ClassObservationPage() {
         section_observed: o.section_observed || "",
         subject_observed: o.subject_observed || "",
         block_number: o.block_number || "",
+        lp_no: o.lp_no || "",
         number_of_students: o.number_of_students || "",
         classroom_norms_discussed: o.classroom_norms_discussed || false,
         lesson_plan_available: o.lesson_plan_available || false,
@@ -515,6 +531,7 @@ export default function ClassObservationPage() {
                   <th className="px-2 py-3 text-center min-w-[80px]">Section</th>
                   <th className="px-2 py-3 text-center min-w-[95px]">Subject</th>
                   <th className="px-2 py-3 text-center min-w-[65px]">Block</th>
+                  <th className="px-2 py-3 text-center min-w-[65px]">LP No.</th>
                   <th className="px-2 py-3 text-center min-w-[60px]">Stdnts</th>
                   <th className="px-2 py-3 text-center min-w-[55px]">Norms</th>
                   <th className="px-2 py-3 text-center min-w-[45px]">LP</th>
@@ -539,7 +556,7 @@ export default function ClassObservationPage() {
                   const hdrColor = stage === "Foundation" ? "bg-emerald-700" : stage === "Preparatory" ? "bg-blue-700" : stage === "Middle" ? "bg-purple-700" : stage === "Secondary" ? "bg-orange-700" : "bg-gray-600";
                   const rows: React.ReactNode[] = [
                     <tr key={`hdr-${stage}`}>
-                      <td colSpan={22} className={`px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-white ${hdrColor}`}>
+                      <td colSpan={23} className={`px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-white ${hdrColor}`}>
                         {label} Stage — {teachers.length} teacher{teachers.length !== 1 ? "s" : ""}
                       </td>
                     </tr>
@@ -594,7 +611,7 @@ export default function ClassObservationPage() {
                           <select value={row.grade_observed}
                             onChange={e => updateRow(name, "grade_observed", e.target.value)}
                             className="border border-gray-300 rounded px-1 py-1 text-xs w-full">
-                            {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                            {(teacherGrades[name]?.length > 0 ? teacherGrades[name] : CLASSES).map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                         </td>
                         <td className={`px-1 py-1.5 ${bg}`}>
@@ -604,15 +621,30 @@ export default function ClassObservationPage() {
                             className="border border-gray-300 rounded px-1 py-1 text-xs w-full" />
                         </td>
                         <td className={`px-1 py-1.5 ${bg}`}>
-                          <input value={row.subject_observed}
-                            onChange={e => updateRow(name, "subject_observed", e.target.value)}
-                            placeholder="Subject"
-                            className="border border-gray-300 rounded px-1 py-1 text-xs w-full" />
+                          {(teacherSubjects[name] || []).length > 0 ? (
+                            <select value={row.subject_observed}
+                              onChange={e => updateRow(name, "subject_observed", e.target.value)}
+                              className="border border-gray-300 rounded px-1 py-1 text-xs w-full">
+                              <option value="">— select —</option>
+                              {teacherSubjects[name].map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          ) : (
+                            <input value={row.subject_observed}
+                              onChange={e => updateRow(name, "subject_observed", e.target.value)}
+                              placeholder="Subject"
+                              className="border border-gray-300 rounded px-1 py-1 text-xs w-full" />
+                          )}
                         </td>
                         <td className={`px-1 py-1.5 ${bg}`}>
                           <input value={row.block_number}
                             onChange={e => updateRow(name, "block_number", e.target.value)}
                             placeholder="B1"
+                            className="border border-gray-300 rounded px-1 py-1 text-xs w-full" />
+                        </td>
+                        <td className={`px-1 py-1.5 ${bg}`}>
+                          <input value={row.lp_no || ""}
+                            onChange={e => updateRow(name, "lp_no", e.target.value)}
+                            placeholder="LP#"
                             className="border border-gray-300 rounded px-1 py-1 text-xs w-full" />
                         </td>
                         <td className={`px-1 py-1.5 ${bg}`}>
@@ -691,7 +723,7 @@ export default function ClassObservationPage() {
                       </tr>);
                   if (isExpanded) rows.push(
                         <tr key={`exp-${name}`}>
-                          <td colSpan={22} className="p-0 border-b border-indigo-200">
+                          <td colSpan={23} className="p-0 border-b border-indigo-200">
                             <div className="bg-white border-l-4 border-indigo-500 p-4">
                               {expandLoading === name ? (
                                 <p className="text-xs text-indigo-500 py-4 text-center">Loading observations...</p>
@@ -709,6 +741,7 @@ export default function ClassObservationPage() {
                                       <th className="px-3 py-2">Section</th>
                                       <th className="px-3 py-2">Subject</th>
                                       <th className="px-3 py-2">Block</th>
+                                      <th className="px-3 py-2">LP No.</th>
                                       <th className="px-3 py-2">Stdnts</th>
                                       <th className="px-3 py-2">Norms</th>
                                       <th className="px-3 py-2">LP</th>
@@ -734,6 +767,7 @@ export default function ClassObservationPage() {
                                         <td className="px-3 py-2">{o.section_observed || "—"}</td>
                                         <td className="px-3 py-2">{o.subject_observed}</td>
                                         <td className="px-3 py-2">{o.block_number || "—"}</td>
+                                        <td className="px-3 py-2">{o.lp_no || "—"}</td>
                                         <td className="px-3 py-2 text-center">{o.number_of_students || "—"}</td>
                                         <td className="px-3 py-2 text-center">{o.classroom_norms_discussed ? "✅" : "—"}</td>
                                         <td className="px-3 py-2 text-center">{o.lesson_plan_available ? "✅" : "—"}</td>
@@ -775,7 +809,7 @@ export default function ClassObservationPage() {
                                     ))}
                                     {obs.length > 1 && (
                                       <tr className="bg-indigo-50 border-t-2 border-indigo-300 font-bold">
-                                        <td colSpan={9} className="px-3 py-2 text-indigo-700">
+                                        <td colSpan={10} className="px-3 py-2 text-indigo-700">
                                           Average ({obs.length} obs)
                                         </td>
                                         {CRITERIA.map(c => {
