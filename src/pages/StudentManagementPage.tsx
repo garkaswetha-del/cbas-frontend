@@ -65,7 +65,15 @@ export default function StudentManagementPage() {
   const [parentFilterGrade, setParentFilterGrade] = useState("");
   const [parentFilterSection, setParentFilterSection] = useState("");
 
-  useEffect(() => { fetchStudents(); fetchStats(); fetchAllSections(); }, [filterGrade, filterSection, search]);
+  // Academic year selector — defaults to current year based on month
+  const currentAcademicYear = (() => {
+    const now = new Date(); const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+    return `${yr}-${String(yr + 1).slice(2)}`;
+  })();
+  const AVAILABLE_YEARS = ["2025-26", "2026-27"];
+  const [selectedYear, setSelectedYear] = useState(currentAcademicYear);
+
+  useEffect(() => { fetchStudents(); fetchStats(); fetchAllSections(); }, [filterGrade, filterSection, search, selectedYear]);
   useEffect(() => { if (activeTab === "tc") fetchTCRegister(); }, [activeTab]);
   useEffect(() => { if (activeTab === "alumni") fetchAlumni(); }, [activeTab, alumniYear]);
   useEffect(() => { if (activeTab === "parent") fetchParentAnalytics(); }, [activeTab, parentFilterGrade, parentFilterSection]);
@@ -74,7 +82,7 @@ export default function StudentManagementPage() {
 
   const fetchStudents = async () => {
     try {
-      const params: any = {};
+      const params: any = { academic_year: selectedYear };
       if (filterGrade) params.grade = filterGrade;
       if (filterSection) params.section = filterSection;
       if (search) params.search = search;
@@ -297,7 +305,7 @@ export default function StudentManagementPage() {
         });
       }
 
-      const res = await axios.post(`${API}/students/bulk-import`, { students: parsed });
+      const res = await axios.post(`${API}/students/bulk-import`, { students: parsed, academic_year: selectedYear });
       setImportResult(res.data);
       fetchStudents(); fetchStats(); fetchAllSections();
     } catch (e: any) {
@@ -322,6 +330,19 @@ export default function StudentManagementPage() {
         <div>
           <h1 className="text-xl font-bold text-gray-800">Student Management</h1>
           <p className="text-sm text-gray-500">{stats.total} active students · {stats.tcCount || 0} TC'd</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-gray-500">Academic Year:</span>
+            <select
+              value={selectedYear}
+              onChange={e => { setSelectedYear(e.target.value); setFilterGrade(""); setFilterSection(""); }}
+              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 font-medium"
+            >
+              {AVAILABLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            {selectedYear !== currentAcademicYear && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-300">Historical view</span>
+            )}
+          </div>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button onClick={() => setShowPromotion(true)}
