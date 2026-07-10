@@ -14,6 +14,13 @@ function getNextGrade(grade: string): string | null {
   return GRADE_ORDER[idx + 1];
 }
 
+// "2025-26" → "2026-27"
+function getNextYear(year: string): string {
+  const startYear = parseInt(year.split("-")[0], 10);
+  if (isNaN(startYear)) return year;
+  return `${startYear + 1}-${String(startYear + 2).slice(-2)}`;
+}
+
 interface Props {
   academicYear: string;
   // Teacher mode: grade/section are fixed to their own class, skip selector step
@@ -123,6 +130,7 @@ export default function PromotionWizard({ academicYear, fixedGrade, fixedSection
       const res = await axios.post(`${API}/students/promotion/execute-batch`, {
         from_grade: grade,
         assignments: students.map(s => ({ student_id: s.id, to_section: assignments[s.id] })),
+        to_year: getNextYear(academicYear),
       });
       setResult({ count: res.data?.promoted_count || students.length, type: "promotion", toGrade: ng || "" });
       setStep("done");

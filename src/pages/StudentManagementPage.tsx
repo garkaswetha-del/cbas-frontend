@@ -70,9 +70,10 @@ export default function StudentManagementPage() {
     const now = new Date(); const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
     return `${yr}-${String(yr + 1).slice(2)}`;
   })();
-  const AVAILABLE_YEARS = ["2025-26", "2026-27"];
+  const [availableYears, setAvailableYears] = useState<string[]>([currentAcademicYear]);
   const [selectedYear, setSelectedYear] = useState(currentAcademicYear);
 
+  useEffect(() => { fetchAcademicYears(); }, []);
   useEffect(() => { fetchStudents(); fetchStats(); fetchAllSections(); }, [filterGrade, filterSection, search, selectedYear]);
   useEffect(() => { if (activeTab === "tc") fetchTCRegister(); }, [activeTab]);
   useEffect(() => { if (activeTab === "alumni") fetchAlumni(); }, [activeTab, alumniYear]);
@@ -145,6 +146,16 @@ export default function StudentManagementPage() {
     try {
       const res = await axios.get(`${API}/students/sections/all`);
       setSections(res.data || {});
+    } catch { }
+  };
+
+  const fetchAcademicYears = async () => {
+    try {
+      const res = await axios.get(`${API}/students/academic-years`);
+      const years: string[] = res.data || [];
+      if (!years.includes(currentAcademicYear)) years.push(currentAcademicYear);
+      years.sort();
+      setAvailableYears(years);
     } catch { }
   };
 
@@ -307,7 +318,7 @@ export default function StudentManagementPage() {
 
       const res = await axios.post(`${API}/students/bulk-import`, { students: parsed, academic_year: selectedYear });
       setImportResult(res.data);
-      fetchStudents(); fetchStats(); fetchAllSections();
+      fetchStudents(); fetchStats(); fetchAllSections(); fetchAcademicYears();
     } catch (e: any) {
       showMsg(`❌ Import failed: ${e.message}`);
     }
@@ -337,7 +348,7 @@ export default function StudentManagementPage() {
               onChange={e => { setSelectedYear(e.target.value); setFilterGrade(""); setFilterSection(""); }}
               className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 font-medium"
             >
-              {AVAILABLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
             {selectedYear !== currentAcademicYear && (
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-300">Historical view</span>
@@ -906,8 +917,8 @@ export default function StudentManagementPage() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
             <PromotionWizard
-              academicYear={(() => { const now = new Date(); const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1; return `${yr}-${String(yr + 1).slice(2)}`; })()}
-              onComplete={() => { fetchStudents(); fetchStats(); fetchAllSections(); }}
+              academicYear={selectedYear}
+              onComplete={() => { fetchStudents(); fetchStats(); fetchAllSections(); fetchAcademicYears(); }}
               onClose={() => setShowPromotion(false)}
             />
           </div>
