@@ -149,6 +149,57 @@ export default function StudentManagementPage() {
     } catch { }
   };
 
+  const downloadPortfolio = async (student: any) => {
+    try {
+      const res = await axios.get(`${API}/students/${student.id}/portfolio`);
+      const { student: s, enrollments, baselineRows, examRows, activityRows, competencyRows } = res.data;
+      const wb = XLSX.utils.book_new();
+
+      // Sheet 1: Student Info
+      const info = [
+        ["Field", "Value"],
+        ["Name", s.name], ["Admission No", s.admission_no || ""], ["Gender", s.gender || ""],
+        ["DOB", s.dob || ""], ["Admission Year", s.admission_year || ""],
+        ["Father Name", s.father_name || ""], ["Mother Name", s.mother_name || ""],
+        ["Parent Phone", s.parent_phone || ""], ["Address", s.address || ""],
+        ["Father Qualification", s.father_qualification || ""], ["Mother Qualification", s.mother_qualification || ""],
+        ["Father Working Status", s.father_working_status || ""], ["Mother Working Status", s.mother_working_status || ""],
+        ["Caste", s.caste || ""], ["Graduation Year", s.graduation_year || ""],
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(info), "Student Info");
+
+      // Sheet 2: Enrollment History
+      if (enrollments.length > 0) {
+        const ws = XLSX.utils.json_to_sheet(enrollments);
+        XLSX.utils.book_append_sheet(wb, ws, "Class History");
+      }
+
+      // Sheet 3: Baseline Assessments
+      if (baselineRows.length > 0) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(baselineRows), "Baseline");
+      }
+
+      // Sheet 4: Exam Marks
+      if (examRows.length > 0) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(examRows), "Exam Marks");
+      }
+
+      // Sheet 5: Activity Assessments
+      if (activityRows.length > 0) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(activityRows), "Activities");
+      }
+
+      // Sheet 6: Competency Scores
+      if (competencyRows.length > 0) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(competencyRows), "Competencies");
+      }
+
+      XLSX.writeFile(wb, `${s.name.replace(/\s+/g, "_")}_portfolio.xlsx`);
+    } catch {
+      showMsg("Failed to download portfolio");
+    }
+  };
+
   const fetchAcademicYears = async () => {
     try {
       const res = await axios.get(`${API}/students/academic-years`);
@@ -749,6 +800,7 @@ export default function StudentManagementPage() {
                     <th className="px-3 py-2 text-left">Admission No.</th>
                     <th className="px-3 py-2 text-left">Gender</th>
                     <th className="px-3 py-2 text-left">Graduated</th>
+                    <th className="px-3 py-2 text-center">Archive</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -759,6 +811,12 @@ export default function StudentManagementPage() {
                       <td className="px-3 py-2 text-gray-500">{s.admission_no || "-"}</td>
                       <td className="px-3 py-2 text-gray-500">{s.gender || "-"}</td>
                       <td className="px-3 py-2 text-green-600 font-medium">{s.graduation_year || "-"}</td>
+                      <td className="px-3 py-2 text-center">
+                        <button onClick={() => downloadPortfolio(s)}
+                          className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 font-medium">
+                          Download
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
