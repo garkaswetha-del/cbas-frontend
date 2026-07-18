@@ -2,6 +2,7 @@
 import { currentAcademicYear } from "../utils/academicYear";
 import axios from "axios";
 import PromotionWizard from "../components/PromotionWizard";
+import AcademicCalendarPage from "./AcademicCalendarPage";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Cell,
@@ -116,6 +117,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
     observations:   "My Observations",
     self_ai:        "My AI",
     memos:          "Memos",
+    calendar:       "Academic Calendar",
   };
 
   return (
@@ -173,6 +175,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
         {activeTab === "observations"   && <ObservationsTab user={user} academicYear={academicYear} />}
         {activeTab === "self_ai"        && <SelfAITab user={user} academicYear={academicYear} />}
         {activeTab === "memos"          && <MemosTab user={user} academicYear={academicYear} />}
+        {activeTab === "calendar"       && <AcademicCalendarPage readOnly />}
       </div>
     </div>
   );

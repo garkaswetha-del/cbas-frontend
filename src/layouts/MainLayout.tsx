@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 
+const SUBSTITUTION_NAV_ITEM = { path: '/substitution', label: 'Substitution', icon: '🔄' };
+
 const ADMINISTRATIVE_NAV = [
   { path: '/super-dashboard', label: 'Super Dashboard',   icon: '📊' },
   { path: '/users',           label: 'User Management',   icon: '👥' },
@@ -9,15 +11,21 @@ const ADMINISTRATIVE_NAV = [
   { path: '/appraisal',       label: 'Teachers Appraisal', icon: '📋' },
   { path: '/memos',           label: 'Memos',              icon: '📩' },
   { path: '/audit-log',       label: 'Audit Log',          icon: '🔍' },
+  SUBSTITUTION_NAV_ITEM,
 ];
 
 const ACADEMIC_NAV = [
+  { path: '/calendar',     label: 'Academic Calendar',   icon: '📅' },
   { path: '/baseline',     label: 'Baseline Entry',      icon: '📈' },
   { path: '/competencies', label: 'Competency Registry',  icon: '🗂️' },
   { path: '/activities',   label: 'Activities & Marks',   icon: '🎯' },
   { path: '/pasa',         label: 'PA/SA Marks',          icon: '📝' },
   { path: '/observation',  label: 'Class Observation',    icon: '👁' },
 ];
+
+// AHM (academicOnly mode) doesn't get the Administrative tab, so Substitution
+// is appended here to stay reachable for that role too.
+const ACADEMIC_NAV_WITH_SUBSTITUTION = [...ACADEMIC_NAV, SUBSTITUTION_NAV_ITEM];
 
 const ADMIN_PATHS = ADMINISTRATIVE_NAV.map(n => n.path);
 const ACADEMIC_PATHS = ACADEMIC_NAV.map(n => n.path);
@@ -41,7 +49,9 @@ export default function MainLayout({ user, onLogout, academicOnly = false }: Mai
     setNavTab(detectTab(location.pathname));
   }, [location.pathname]);
 
-  const currentNav = navTab === 'administrative' ? ADMINISTRATIVE_NAV : ACADEMIC_NAV;
+  const currentNav = navTab === 'administrative'
+    ? ADMINISTRATIVE_NAV
+    : (academicOnly ? ACADEMIC_NAV_WITH_SUBSTITUTION : ACADEMIC_NAV);
 
   const TabSwitcher = () => academicOnly ? null : (
     <div className="flex mx-3 mb-2 rounded-lg overflow-hidden border border-indigo-700">
