@@ -105,6 +105,7 @@ export default function AcademicCalendarPage({ readOnly = false }: { readOnly?: 
   const [editingTmpl,   setEditingTmpl]  = useState<Template | null>(null);
   const [tmplForm,      setTmplForm]     = useState({ ...BLANK_TMPL_FORM });
   const [tmplFormSaving, setTmplFormSaving] = useState(false);
+  const [tmplFormError,  setTmplFormError]  = useState('');
 
   const months = getAcademicMonths(academicYear);
 
@@ -237,17 +238,21 @@ export default function AcademicCalendarPage({ readOnly = false }: { readOnly?: 
     setTmplForm(t ? { title: t.title, event_type: t.event_type, category: t.category,
                        default_mmdd: t.default_mmdd ?? '', multi_day: t.multi_day }
                   : { ...BLANK_TMPL_FORM });
+    setTmplFormError('');
     setManageMode('form');
   }
 
   async function saveTmplForm() {
     if (!tmplForm.title.trim() || !tmplForm.category.trim() || tmplFormSaving) return;
     setTmplFormSaving(true);
+    setTmplFormError('');
     try {
       const payload = { ...tmplForm, default_mmdd: tmplForm.default_mmdd.trim() || null };
       if (editingTmpl) await axios.patch(`${API}/calendar/templates/${editingTmpl.id}`, payload);
       else             await axios.post(`${API}/calendar/templates`, payload);
       await loadTemplates(); setManageMode('list');
+    } catch (err: any) {
+      setTmplFormError(err?.response?.data?.message || err?.message || 'Save failed — please try again.');
     } finally { setTmplFormSaving(false); }
   }
 
@@ -593,7 +598,11 @@ export default function AcademicCalendarPage({ readOnly = false }: { readOnly?: 
             )}
 
             {/* Modal footer */}
-            <div className="flex justify-end gap-3 px-5 py-3 border-t border-gray-200 flex-shrink-0">
+            <div className="px-5 py-3 border-t border-gray-200 flex-shrink-0">
+              {tmplFormError && manageMode === 'form' && (
+                <p className="text-xs text-red-600 mb-2 bg-red-50 border border-red-200 rounded px-3 py-1.5">{tmplFormError}</p>
+              )}
+              <div className="flex justify-end gap-3">
               {manageMode === 'list' ? (
                 <button onClick={() => openTmplForm()}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium">
@@ -608,6 +617,7 @@ export default function AcademicCalendarPage({ readOnly = false }: { readOnly?: 
                   </button>
                 </>
               )}
+              </div>
             </div>
           </div>
         </div>
