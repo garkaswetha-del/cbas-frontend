@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import SectionManagementPage from "./SectionManagementPage";
 import PromotionWizard from "../components/PromotionWizard";
 import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
+import AcademicYearSelect from "../components/AcademicYearSelect";
 
 const STANDARD_YEARS = generateAcademicYears();
 
