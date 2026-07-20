@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { currentAcademicYear } from "../utils/academicYear";
+import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis,
@@ -9,11 +9,6 @@ import {
 
 const API = "https://cbas-backend-production.up.railway.app";
 
-const generateAcademicYears = () => {
-  const years = [];
-  for (let i = 2025; i <= 2035; i++) years.push(`${i}-${String(i + 1).slice(2)}`);
-  return years;
-};
 const ACADEMIC_YEARS = generateAcademicYears();
 
 const CLASSES = [

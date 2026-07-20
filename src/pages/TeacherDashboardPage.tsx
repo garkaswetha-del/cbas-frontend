@@ -66,7 +66,7 @@ function calcHike(overallPct: number, respCount: number, overCap: boolean, highe
   const penalty = hasQualPenalty ? 2 : 0;
   return { base, extra, penalty, total: base + extra - penalty, band, overCap };
 }
-const ACADEMIC_YEARS = generateAcademicYears(2, 2);
+const ACADEMIC_YEARS = generateAcademicYears();
 
 // Map curriculum subject names → competency framework subject keys
 const SUBJECT_TO_COMPETENCY: Record<string, string> = {

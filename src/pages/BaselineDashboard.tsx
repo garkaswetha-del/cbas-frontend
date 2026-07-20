@@ -11,7 +11,7 @@ const ROUNDS = [
   { value: "baseline_7", label: "Baseline 7" }, { value: "baseline_8", label: "Baseline 8" },
   { value: "baseline_9", label: "Baseline 9" }, { value: "baseline_10", label: "Baseline 10" },
 ];
-const ACADEMIC_YEARS = generateAcademicYears(3, 5);
+const ACADEMIC_YEARS = generateAcademicYears();
 const CLASSES = ["Pre-KG", "LKG", "UKG", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10"];
 const LEVEL_COLORS_ARR = ["#ef4444", "#f59e0b", "#22c55e", "#a855f7"];
 

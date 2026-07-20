@@ -3,6 +3,9 @@ import axios from "axios";
 import * as XLSX from "xlsx";
 import SectionManagementPage from "./SectionManagementPage";
 import PromotionWizard from "../components/PromotionWizard";
+import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
+
+const STANDARD_YEARS = generateAcademicYears();
 
 const API = "https://cbas-backend-production.up.railway.app";
 const CLASSES = [
@@ -65,13 +68,8 @@ export default function StudentManagementPage() {
   const [parentFilterGrade, setParentFilterGrade] = useState("");
   const [parentFilterSection, setParentFilterSection] = useState("");
 
-  // Academic year selector — defaults to current year based on month
-  const currentAcademicYear = (() => {
-    const now = new Date(); const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
-    return `${yr}-${String(yr + 1).slice(2)}`;
-  })();
-  const [availableYears, setAvailableYears] = useState<string[]>([currentAcademicYear]);
-  const [selectedYear, setSelectedYear] = useState(currentAcademicYear);
+  const [availableYears, setAvailableYears] = useState<string[]>(STANDARD_YEARS);
+  const [selectedYear, setSelectedYear] = useState(currentAcademicYear());
 
   useEffect(() => { fetchAcademicYears(); }, []);
   useEffect(() => { fetchStudents(); fetchStats(); fetchAllSections(); }, [filterGrade, filterSection, search, selectedYear]);
@@ -203,10 +201,9 @@ export default function StudentManagementPage() {
   const fetchAcademicYears = async () => {
     try {
       const res = await axios.get(`${API}/students/academic-years`);
-      const years: string[] = res.data || [];
-      if (!years.includes(currentAcademicYear)) years.push(currentAcademicYear);
-      years.sort();
-      setAvailableYears(years);
+      const dbYears: string[] = res.data || [];
+      const merged = Array.from(new Set([...STANDARD_YEARS, ...dbYears])).sort();
+      setAvailableYears(merged);
     } catch { }
   };
 
@@ -401,7 +398,7 @@ export default function StudentManagementPage() {
             >
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-            {selectedYear !== currentAcademicYear && (
+            {selectedYear !== currentAcademicYear() && (
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-300">Historical view</span>
             )}
           </div>

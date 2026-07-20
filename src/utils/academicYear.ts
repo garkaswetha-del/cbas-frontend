@@ -10,7 +10,7 @@ export function currentAcademicYear(): string {
 }
 
 // past + current + future — always relative to today
-export function generateAcademicYears(past = 2, future = 2): string[] {
+export function generateAcademicYears(past = 1, future = 0): string[] {
   const yr = startYear();
   return Array.from({ length: past + 1 + future }, (_, i) => {
     const y = yr - past + i;

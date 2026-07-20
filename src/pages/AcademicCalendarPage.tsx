@@ -4,7 +4,7 @@ import { currentAcademicYear, generateAcademicYears } from '../utils/academicYea
 
 const API = 'https://cbas-backend-production.up.railway.app';
 
-const ACADEMIC_YEARS = generateAcademicYears(2, 3);
+const ACADEMIC_YEARS = generateAcademicYears();
 
 const EVENT_TYPES = [
   { value: 'holiday',  label: 'Holiday',    color: 'bg-red-100 text-red-800 border-red-200',          dot: 'bg-red-500',    ring: 'ring-red-400' },

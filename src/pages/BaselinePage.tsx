@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
-import { currentAcademicYear } from "../utils/academicYear";
+import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, LineChart, Line, Cell,
@@ -33,11 +33,6 @@ const GRADE_TO_STAGE: Record<string, string> = {
 const DEFAULT_LIT_DOMAINS = ["Listening","Speaking","Reading","Writing"];
 const DEFAULT_NUM_DOMAINS = ["Operations","Base 10","Measurement","Geometry"];
 
-const generateAcademicYears = () => {
-  const years = [];
-  for (let i = 2025; i <= 2035; i++) years.push(`${i}-${String(i+1).slice(2)}`);
-  return years;
-};
 const ACADEMIC_YEARS = generateAcademicYears();
 
 const ROUNDS = [

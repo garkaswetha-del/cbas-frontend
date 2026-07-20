@@ -5,7 +5,7 @@ import { generateAcademicYears } from "../utils/academicYear";
 
 const API = "https://cbas-backend-production.up.railway.app";
 
-const ACADEMIC_YEARS = generateAcademicYears(3, 5);
+const ACADEMIC_YEARS = generateAcademicYears();
 
 const CLASSES = [
   "Pre-KG", "LKG", "UKG",

@@ -4,7 +4,7 @@ import { currentAcademicYear, generateAcademicYears } from "../utils/academicYea
 
 const API = "https://cbas-backend-production.up.railway.app";
 const STAGES = ["Foundation", "Preparatory", "Middle", "Secondary"];
-const ACADEMIC_YEARS = generateAcademicYears(2, 3);
+const ACADEMIC_YEARS = generateAcademicYears();
 
 interface Memo {
   id: string;

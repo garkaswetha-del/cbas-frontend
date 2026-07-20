@@ -22,7 +22,7 @@ import AuditLogPage from "./pages/AuditLogPage";
 import SubstitutionPage from "./pages/SubstitutionPage";
 import AcademicCalendarPage from "./pages/AcademicCalendarPage";
 
-const ACADEMIC_YEARS = generateAcademicYears(2, 3);
+const ACADEMIC_YEARS = generateAcademicYears();
 
 const CLASS_TABS = (isClassTeacher: boolean) => [
   { id: 'students',       label: 'My Students',        show: true },
