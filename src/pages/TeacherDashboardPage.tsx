@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from "react";
-import { currentAcademicYear } from "../utils/academicYear";
+import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
 import axios from "axios";
 import PromotionWizard from "../components/PromotionWizard";
 import AcademicCalendarPage from "./AcademicCalendarPage";
@@ -66,11 +66,7 @@ function calcHike(overallPct: number, respCount: number, overCap: boolean, highe
   const penalty = hasQualPenalty ? 2 : 0;
   return { base, extra, penalty, total: base + extra - penalty, band, overCap };
 }
-const ACADEMIC_YEARS = ((): string[] => {
-  const now = new Date();
-  const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
-  return Array.from({ length: 5 }, (_, i) => { const y = yr - 2 + i; return `${y}-${String(y + 1).slice(2)}`; });
-})();
+const ACADEMIC_YEARS = generateAcademicYears(2, 2);
 
 // Map curriculum subject names → competency framework subject keys
 const SUBJECT_TO_COMPETENCY: Record<string, string> = {

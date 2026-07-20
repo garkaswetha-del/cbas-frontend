@@ -1,13 +1,11 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
+import { generateAcademicYears } from "../utils/academicYear";
 
 const API = "https://cbas-backend-production.up.railway.app";
 
-const ACADEMIC_YEARS = Array.from({ length: 10 }, (_, i) => {
-  const y = 2025 + i;
-  return `${y}-${String(y + 1).slice(2)}`;
-});
+const ACADEMIC_YEARS = generateAcademicYears(3, 5);
 
 const CLASSES = [
   "Pre-KG", "LKG", "UKG",

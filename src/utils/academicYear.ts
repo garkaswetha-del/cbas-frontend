@@ -1,14 +1,19 @@
-export function currentAcademicYear(): string {
+function startYear(): number {
   const now = new Date();
-  const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+  // Academic year starts in May (month index 4)
+  return now.getMonth() >= 4 ? now.getFullYear() : now.getFullYear() - 1;
+}
+
+export function currentAcademicYear(): string {
+  const yr = startYear();
   return `${yr}-${String(yr + 1).slice(2)}`;
 }
 
-export function generateAcademicYears(): string[] {
-  const now = new Date();
-  const yr = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
-  return Array.from({ length: 5 }, (_, i) => {
-    const y = yr - 3 + i;
+// past + current + future — always relative to today
+export function generateAcademicYears(past = 2, future = 2): string[] {
+  const yr = startYear();
+  return Array.from({ length: past + 1 + future }, (_, i) => {
+    const y = yr - past + i;
     return `${y}-${String(y + 1).slice(2)}`;
   });
 }

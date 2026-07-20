@@ -1,13 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import { currentAcademicYear } from '../utils/academicYear';
+import { currentAcademicYear, generateAcademicYears } from '../utils/academicYear';
 
 const API = 'https://cbas-backend-production.up.railway.app';
 
-const ACADEMIC_YEARS = Array.from({ length: 5 }, (_, i) => {
-  const y = 2025 + i;
-  return `${y}-${String(y + 1).slice(2)}`;
-});
+const ACADEMIC_YEARS = generateAcademicYears(2, 3);
 
 const EVENT_TYPES = [
   { value: 'holiday',  label: 'Holiday',    color: 'bg-red-100 text-red-800 border-red-200',          dot: 'bg-red-500',    ring: 'ring-red-400' },

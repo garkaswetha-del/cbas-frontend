@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { currentAcademicYear } from './utils/academicYear';
+import { currentAcademicYear, generateAcademicYears } from './utils/academicYear';
 
 const API = 'https://cbas-backend-production.up.railway.app';
 import MainLayout from './layouts/MainLayout';
@@ -22,10 +22,7 @@ import AuditLogPage from "./pages/AuditLogPage";
 import SubstitutionPage from "./pages/SubstitutionPage";
 import AcademicCalendarPage from "./pages/AcademicCalendarPage";
 
-const ACADEMIC_YEARS = Array.from({ length: 5 }, (_, i) => {
-  const y = 2025 + i;
-  return `${y}-${String(y + 1).slice(2)}`;
-});
+const ACADEMIC_YEARS = generateAcademicYears(2, 3);
 
 const CLASS_TABS = (isClassTeacher: boolean) => [
   { id: 'students',       label: 'My Students',        show: true },
