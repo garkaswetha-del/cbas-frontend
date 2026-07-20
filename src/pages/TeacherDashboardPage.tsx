@@ -4,6 +4,7 @@ import AcademicYearSelect from "../components/AcademicYearSelect";
 import axios from "axios";
 import PromotionWizard from "../components/PromotionWizard";
 import AcademicCalendarPage from "./AcademicCalendarPage";
+import { TeacherSOW } from "./SOWPage";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Cell,
@@ -166,6 +167,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
         {activeTab === "self_ai"        && <SelfAITab user={user} academicYear={academicYear} />}
         {activeTab === "memos"          && <MemosTab user={user} academicYear={academicYear} />}
         {activeTab === "calendar"       && <AcademicCalendarPage readOnly />}
+        {activeTab === "sow"            && <TeacherSOW user={user} mappings={mappings} academicYear={academicYear} />}
       </div>
     </div>
   );

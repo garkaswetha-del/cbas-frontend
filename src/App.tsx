@@ -21,6 +21,8 @@ import SuperDashboardPage from "./pages/SuperDashboardPage";
 import AuditLogPage from "./pages/AuditLogPage";
 import SubstitutionPage from "./pages/SubstitutionPage";
 import AcademicCalendarPage from "./pages/AcademicCalendarPage";
+import SOWPage from "./pages/SOWPage";
+import { TeacherSOW } from "./pages/SOWPage";
 
 const ACADEMIC_YEARS = generateAcademicYears();
 
@@ -42,6 +44,7 @@ const SELF_TABS = [
   { id: 'self_ai',       label: 'My AI',              show: true },
   { id: 'memos',         label: 'Memos',              show: true },
   { id: 'calendar',     label: 'Academic Calendar',  show: true },
+  { id: 'sow',          label: 'Scheme of Work',     show: true },
 ];
 
 const SELF_TAB_IDS = new Set(SELF_TABS.map(t => t.id));
@@ -269,6 +272,7 @@ function App() {
             <Route path="observation" element={<ClassObservationPage />} />
             <Route path="substitution" element={<SubstitutionPage />} />
             <Route path="calendar" element={<AcademicCalendarPage />} />
+            <Route path="sow" element={<SOWPage user={user} />} />
             <Route path="*" element={<Navigate to="/baseline" replace />} />
           </Route>
         </Routes>
@@ -296,6 +300,7 @@ function App() {
           <Route path="audit-log" element={<AuditLogPage />} />
           <Route path="substitution" element={<SubstitutionPage />} />
           <Route path="calendar" element={<AcademicCalendarPage />} />
+          <Route path="sow" element={<SOWPage user={user} />} />
           <Route path="*" element={<Navigate to="/super-dashboard" replace />} />
         </Route>
       </Routes>
