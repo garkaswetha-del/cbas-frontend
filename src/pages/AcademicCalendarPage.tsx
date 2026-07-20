@@ -530,9 +530,9 @@ export default function AcademicCalendarPage({ readOnly = false }: { readOnly?: 
                                 <span className={`text-xs px-1.5 py-0.5 rounded border ${td?.color ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>{td?.label}</span>
                                 {t.default_mmdd && <span className="text-xs text-gray-400 hidden sm:block">{t.default_mmdd}</span>}
                                 {t.multi_day   && <span className="text-xs text-blue-500 hidden sm:block">multi-day</span>}
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => openTmplForm(t)} className="text-xs text-gray-400 hover:text-indigo-600 px-1.5 py-0.5 rounded hover:bg-indigo-50">Edit</button>
-                                  <button onClick={() => deleteTmpl(t.id)}  className="text-xs text-gray-400 hover:text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50">✕</button>
+                                <div className="flex gap-1">
+                                  <button onClick={() => openTmplForm(t)} className="text-xs text-gray-500 hover:text-indigo-600 px-2 py-0.5 rounded hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300">Edit</button>
+                                  <button onClick={() => deleteTmpl(t.id)}  className="text-xs text-gray-500 hover:text-red-600 px-2 py-0.5 rounded hover:bg-red-50 border border-gray-200 hover:border-red-300">Delete</button>
                                 </div>
                               </div>
                             );
@@ -683,12 +683,20 @@ export default function AcademicCalendarPage({ readOnly = false }: { readOnly?: 
                 )}
               </div>
             </div>
-            <div className="flex justify-end gap-3 px-5 pb-4">
-              <button onClick={() => setModal(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-              <button onClick={modalSave} disabled={saving || !form.title.trim() || !form.start_date || !form.end_date}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium disabled:opacity-50">
-                {saving ? 'Saving…' : modal.mode === 'add' ? 'Add Event' : 'Save Changes'}
-              </button>
+            <div className="flex items-center justify-between px-5 pb-4">
+              {modal.mode === 'edit' && modal.event ? (
+                <button onClick={async () => { await remove(modal.event!.id); setModal(null); }}
+                  className="px-4 py-2 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg border border-red-200">
+                  Delete Event
+                </button>
+              ) : <span />}
+              <div className="flex gap-3">
+                <button onClick={() => setModal(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+                <button onClick={modalSave} disabled={saving || !form.title.trim() || !form.start_date || !form.end_date}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium disabled:opacity-50">
+                  {saving ? 'Saving…' : modal.mode === 'add' ? 'Add Event' : 'Save Changes'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -719,9 +727,9 @@ function EventRow({ ev, onEdit, onDelete, readOnly = false }: {
       </div>
       <span className={`text-xs px-2 py-0.5 rounded-full border flex-shrink-0 ${t?.color ?? 'bg-gray-100 text-gray-700 border-gray-200'}`}>{t?.label ?? ev.event_type}</span>
       {!readOnly && (
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          <button onClick={() => onEdit(ev)}   className="text-xs text-gray-500 hover:text-indigo-600 px-1.5 py-0.5 rounded hover:bg-indigo-50">Edit</button>
-          <button onClick={() => onDelete(ev.id)} className="text-xs text-gray-500 hover:text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50">Delete</button>
+        <div className="flex gap-1 flex-shrink-0">
+          <button onClick={() => onEdit(ev)}      className="text-xs text-gray-500 hover:text-indigo-600 px-2 py-0.5 rounded hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300">Edit</button>
+          <button onClick={() => onDelete(ev.id)} className="text-xs text-gray-500 hover:text-red-600 px-2 py-0.5 rounded hover:bg-red-50 border border-gray-200 hover:border-red-300">Delete</button>
         </div>
       )}
     </div>
