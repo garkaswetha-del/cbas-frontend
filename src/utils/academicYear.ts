@@ -1,7 +1,7 @@
 function startYear(): number {
   const now = new Date();
-  // Academic year starts in May (month index 4)
-  return now.getMonth() >= 4 ? now.getFullYear() : now.getFullYear() - 1;
+  // Switch to next academic year on April 1 (month index 3) for 2-month pre-work window
+  return now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
 }
 
 export function currentAcademicYear(): string {
