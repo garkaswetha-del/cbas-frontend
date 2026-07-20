@@ -1,7 +1,8 @@
 ﻿import { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
-import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
+import { currentAcademicYear } from "../utils/academicYear";
+import AcademicYearSelect from "../components/AcademicYearSelect";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, LineChart, Line, Cell,
@@ -33,7 +34,6 @@ const GRADE_TO_STAGE: Record<string, string> = {
 const DEFAULT_LIT_DOMAINS = ["Listening","Speaking","Reading","Writing"];
 const DEFAULT_NUM_DOMAINS = ["Operations","Base 10","Measurement","Geometry"];
 
-const ACADEMIC_YEARS = generateAcademicYears();
 
 const ROUNDS = [
   { value:"baseline_1",label:"Round 1"},{ value:"baseline_2",label:"Round 2"},
@@ -1409,9 +1409,7 @@ export default function BaselinePage() {
       <div className="flex gap-3 mb-4 flex-wrap items-end">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Academic Year</label>
-          <select value={academicYear} onChange={e => setAcademicYear(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-            {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <AcademicYearSelect value={academicYear} onChange={setAcademicYear} />
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Round</label>

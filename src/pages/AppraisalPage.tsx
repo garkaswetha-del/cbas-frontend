@@ -1,7 +1,8 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
-import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
+import { currentAcademicYear } from "../utils/academicYear";
+import AcademicYearSelect from "../components/AcademicYearSelect";
 
 const API = "https://cbas-backend-production.up.railway.app";
 
@@ -173,7 +174,6 @@ function isNurseryTeacher(assigned_classes: string[]): boolean {
   return assigned_classes.every(c => NURSERY_GRADES.includes(c));
 }
 
-const YEARS = generateAcademicYears();
 
 const RESP = [
   {key:"resp_phonics",label:"Phonics"},
@@ -722,10 +722,7 @@ export default function AppraisalPage() {
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <label className="text-xs text-gray-500 font-medium">Academic Year:</label>
-            <select value={year} onChange={e=>{ setYear(e.target.value); setSearch(""); setFilterStatus(""); }}
-              className="border border-gray-300 rounded px-2 py-1.5 text-sm font-semibold text-indigo-700 bg-white">
-              {YEARS.map(y=><option key={y} value={y}>{y}</option>)}
-            </select>
+            <AcademicYearSelect value={year} onChange={v => { setYear(v); setSearch(""); setFilterStatus(""); }} />
           </div>
           {STAGE_ORDER_LIST.map(stage => {
             const count = teachers.filter(t => getStage(t.assigned_classes) === stage).length;

@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from "react";
 import axios from "axios";
-import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
+import { currentAcademicYear } from "../utils/academicYear";
+import AcademicYearSelect from "../components/AcademicYearSelect";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 const API = "https://cbas-backend-production.up.railway.app";
@@ -11,7 +12,6 @@ const ROUNDS = [
   { value: "baseline_7", label: "Baseline 7" }, { value: "baseline_8", label: "Baseline 8" },
   { value: "baseline_9", label: "Baseline 9" }, { value: "baseline_10", label: "Baseline 10" },
 ];
-const ACADEMIC_YEARS = generateAcademicYears();
 const CLASSES = ["Pre-KG", "LKG", "UKG", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10"];
 const LEVEL_COLORS_ARR = ["#ef4444", "#f59e0b", "#22c55e", "#a855f7"];
 
@@ -131,10 +131,7 @@ export default function BaselineDashboard() {
       <div className="flex gap-3 mb-5 flex-wrap items-end">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Academic Year</label>
-          <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}
-            className="border border-gray-300 rounded px-3 py-1.5 text-sm">
-            {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <AcademicYearSelect value={academicYear} onChange={setAcademicYear} />
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Round</label>

@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
+import { currentAcademicYear } from "../utils/academicYear";
+import AcademicYearSelect from "../components/AcademicYearSelect";
 
 const API = "https://cbas-backend-production.up.railway.app";
 const STAGES = ["Foundation", "Preparatory", "Middle", "Secondary"];
-const ACADEMIC_YEARS = generateAcademicYears();
 
 interface Memo {
   id: string;
@@ -235,10 +235,7 @@ export default function MemosPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold text-gray-800">Memos</h1>
-        <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}
-          className="border border-gray-300 rounded px-2 py-1 text-sm">
-          {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
+        <AcademicYearSelect value={academicYear} onChange={setAcademicYear} />
       </div>
 
       {/* ── COMPOSE FORM ── */}

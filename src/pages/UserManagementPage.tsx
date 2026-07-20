@@ -1,11 +1,10 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
-import { generateAcademicYears } from "../utils/academicYear";
+import AcademicYearSelect from "../components/AcademicYearSelect";
 
 const API = "https://cbas-backend-production.up.railway.app";
 
-const ACADEMIC_YEARS = generateAcademicYears();
 
 const CLASSES = [
   "Pre-KG", "LKG", "UKG",
@@ -611,10 +610,7 @@ export default function UserManagementPage() {
         <div className="flex gap-3 items-end flex-wrap overflow-x-auto pb-1">
           <div>
             <label className="text-xs text-gray-500 block mb-1">Academic Year</label>
-            <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}
-              className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-              {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+            <AcademicYearSelect value={academicYear} onChange={setAcademicYear} />
           </div>
           <button onClick={() => setShowImport(true)}
             className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium">

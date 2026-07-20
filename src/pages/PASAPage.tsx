@@ -1,10 +1,10 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
+import { currentAcademicYear } from "../utils/academicYear";
+import AcademicYearSelect from "../components/AcademicYearSelect";
 
 const API = "https://cbas-backend-production.up.railway.app";
 const EXAM_TYPES = ["FA1", "FA2", "SA1", "FA3", "FA4", "SA2", "Custom"];
-const ACADEMIC_YEARS = generateAcademicYears();
 
 function getBand(pct: number) {
   if (pct >= 90) return { label: "A+", color: "text-green-700 bg-green-100" };
@@ -35,9 +35,7 @@ export default function PASAPage() {
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Academic Year</label>
-          <select value={academicYear} onChange={e => setAcademicYear(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-            {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <AcademicYearSelect value={academicYear} onChange={setAcademicYear} />
         </div>
       </div>
       <div className="flex gap-2 mb-5 overflow-x-auto pb-1 flex-nowrap">

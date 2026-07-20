@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import { currentAcademicYear, generateAcademicYears } from '../utils/academicYear';
+import { currentAcademicYear } from '../utils/academicYear';
+import AcademicYearSelect from '../components/AcademicYearSelect';
 
 const API = 'https://cbas-backend-production.up.railway.app';
-
-const ACADEMIC_YEARS = generateAcademicYears();
 
 const EVENT_TYPES = [
   { value: 'holiday',  label: 'Holiday',    color: 'bg-red-100 text-red-800 border-red-200',          dot: 'bg-red-500',    ring: 'ring-red-400' },
@@ -282,10 +281,7 @@ export default function AcademicCalendarPage({ readOnly = false }: { readOnly?: 
           <p className="text-xs text-gray-500 mt-0.5">Plan holidays, exams, events and buffer days</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-            {ACADEMIC_YEARS.map(y => <option key={y}>{y}</option>)}
-          </select>
+          <AcademicYearSelect value={academicYear} onChange={setAcademicYear} />
           <div className="flex rounded overflow-hidden border border-gray-300 text-sm">
             <button onClick={() => setView('calendar')} className={`px-3 py-1.5 ${view === 'calendar' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Calendar</button>
             <button onClick={() => setView('list')}     className={`px-3 py-1.5 ${view === 'list'     ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>List</button>

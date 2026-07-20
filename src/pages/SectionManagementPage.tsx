@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
+import { currentAcademicYear } from "../utils/academicYear";
+import AcademicYearSelect from "../components/AcademicYearSelect";
 
 const API = "https://cbas-backend-production.up.railway.app";
 
@@ -9,8 +10,6 @@ const GRADES = [
   "Grade 1","Grade 2","Grade 3","Grade 4","Grade 5",
   "Grade 6","Grade 7","Grade 8","Grade 9","Grade 10",
 ];
-
-const ACADEMIC_YEARS = generateAcademicYears();
 
 interface SectionRow {
   id: string;
@@ -184,10 +183,7 @@ export default function SectionManagementPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
-            {ACADEMIC_YEARS.map(y => <option key={y}>{y}</option>)}
-          </select>
+          <AcademicYearSelect value={academicYear} onChange={setAcademicYear} />
           {!hasRealIds && (
             <button onClick={seedSections} disabled={seeding}
               className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50 font-medium">

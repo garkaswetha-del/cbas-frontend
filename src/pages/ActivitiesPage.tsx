@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
+import { currentAcademicYear } from "../utils/academicYear";
+import AcademicYearSelect from "../components/AcademicYearSelect";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis,
@@ -9,7 +10,6 @@ import {
 
 const API = "https://cbas-backend-production.up.railway.app";
 
-const ACADEMIC_YEARS = generateAcademicYears();
 
 const CLASSES = [
   "Pre-KG", "LKG", "UKG",
@@ -408,10 +408,7 @@ export default function ActivitiesPage() {
       <div className="flex gap-3 mb-4 items-end flex-wrap">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Academic Year</label>
-          <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-            {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <AcademicYearSelect value={academicYear} onChange={setAcademicYear} />
         </div>
       </div>
 

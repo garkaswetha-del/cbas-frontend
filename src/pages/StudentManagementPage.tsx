@@ -391,13 +391,12 @@ export default function StudentManagementPage() {
           <p className="text-sm text-gray-500">{stats.total} active students · {stats.tcCount || 0} TC'd</p>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-xs text-gray-500">Academic Year:</span>
-            <select
+            <AcademicYearSelect
               value={selectedYear}
-              onChange={e => { setSelectedYear(e.target.value); setFilterGrade(""); setFilterSection(""); }}
-              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 font-medium"
-            >
-              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+              onChange={v => { setSelectedYear(v); setFilterGrade(""); setFilterSection(""); }}
+              fullList={availableYears}
+              className="text-xs"
+            />
             {selectedYear !== currentAcademicYear() && (
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-300">Historical view</span>
             )}

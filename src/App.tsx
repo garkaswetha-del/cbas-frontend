@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { currentAcademicYear, generateAcademicYears } from './utils/academicYear';
+import { currentAcademicYear } from './utils/academicYear';
 
 const API = 'https://cbas-backend-production.up.railway.app';
 import MainLayout from './layouts/MainLayout';

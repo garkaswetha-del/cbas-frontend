@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef } from "react";
-import { currentAcademicYear, generateAcademicYears } from "../utils/academicYear";
+import { currentAcademicYear } from "../utils/academicYear";
+import AcademicYearSelect from "../components/AcademicYearSelect";
 import axios from "axios";
 import PromotionWizard from "../components/PromotionWizard";
 import AcademicCalendarPage from "./AcademicCalendarPage";
@@ -66,7 +67,6 @@ function calcHike(overallPct: number, respCount: number, overCap: boolean, highe
   const penalty = hasQualPenalty ? 2 : 0;
   return { base, extra, penalty, total: base + extra - penalty, band, overCap };
 }
-const ACADEMIC_YEARS = generateAcademicYears();
 
 // Map curriculum subject names → competency framework subject keys
 const SUBJECT_TO_COMPETENCY: Record<string, string> = {
@@ -132,13 +132,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
           )}
           <div>
             <label className="text-xs text-gray-400 block mb-0.5">Academic Year</label>
-            <select
-              value={academicYear}
-              onChange={e => setAcademicYear(e.target.value)}
-              className="border border-gray-300 rounded px-2 py-1 text-xs"
-            >
-              {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+            <AcademicYearSelect value={academicYear} onChange={setAcademicYear} className="text-xs" />
           </div>
         </div>
       </div>
