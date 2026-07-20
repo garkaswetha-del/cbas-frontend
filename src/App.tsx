@@ -22,9 +22,6 @@ import AuditLogPage from "./pages/AuditLogPage";
 import SubstitutionPage from "./pages/SubstitutionPage";
 import AcademicCalendarPage from "./pages/AcademicCalendarPage";
 import SOWPage from "./pages/SOWPage";
-import { TeacherSOW } from "./pages/SOWPage";
-
-const ACADEMIC_YEARS = generateAcademicYears();
 
 const CLASS_TABS = (isClassTeacher: boolean) => [
   { id: 'students',       label: 'My Students',        show: true },
