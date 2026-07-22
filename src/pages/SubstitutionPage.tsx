@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 
-// TEMPORARY for local testing — revert to the production URL before committing.
-const API = "http://localhost:3000";
+const API = "https://cbas-backend-production.up.railway.app";
 
 const DAYS = [
   { value: "Mo", label: "Monday" },
