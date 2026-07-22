@@ -375,8 +375,8 @@ function DayPlanner({ teacherId, academicYear, grade, section, subject, curricul
               const entry = scheduleMap[dk];
               const isWeekend = day.getDay() === 0 || day.getDay() === 6;
               const hasEvent = dayEvents.length > 0;
-              const isNonTeaching = isWeekend || hasEvent;
-              const rowBg = hasEvent ? "bg-red-50" : isWeekend ? "bg-gray-100" : "bg-white";
+              // Only lock days with calendar events — weekends may be working days
+              const rowBg = hasEvent ? "bg-red-50" : isWeekend ? "bg-gray-50" : "bg-white";
 
               return (
                 <tr key={dk} className={rowBg}>
@@ -392,15 +392,10 @@ function DayPlanner({ teacherId, academicYear, grade, section, subject, curricul
                         {dayEvents[0].title.length > 9 ? dayEvents[0].title.substring(0, 9) + "…" : dayEvents[0].title}
                       </span>
                     )}
-                    {isWeekend && !hasEvent && (
-                      <span className="text-xs text-gray-400 italic">Weekend</span>
-                    )}
                   </td>
                   <td className="border border-gray-200 px-1 py-1">
-                    {isNonTeaching ? (
-                      <span className="px-2 text-xs text-gray-400 italic">
-                        {hasEvent ? "Holiday / Event — no teaching" : "No teaching"}
-                      </span>
+                    {hasEvent ? (
+                      <span className="px-2 text-xs text-red-400 italic">Holiday / Event — no teaching</span>
                     ) : (
                       <select
                         value={entryToValue(entry)}
@@ -416,12 +411,12 @@ function DayPlanner({ teacherId, academicYear, grade, section, subject, curricul
                     )}
                   </td>
                   <td className="border border-gray-200 px-1 py-1">
-                    {!isNonTeaching && entry?.id && (
+                    {!hasEvent && entry?.id && (
                       <NotesInput value={entry.notes ?? ""} onBlur={v => handleNotes(day, v)} />
                     )}
                   </td>
                   <td className="border border-gray-200 px-2 py-1 text-center">
-                    {!isNonTeaching && entry?.id && (
+                    {!hasEvent && entry?.id && (
                       <input type="checkbox" checked={!!entry.done}
                         onChange={e => handleDone(day, e.target.checked)}
                         className="w-4 h-4 accent-indigo-600 cursor-pointer" />
@@ -653,11 +648,10 @@ function CurriculumSetupTab({ academicYear }: { academicYear: string }) {
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Subject</label>
-          <input value={subject} onChange={e => setSubject(e.target.value)} list="subject-list"
-            className="border border-gray-300 rounded px-3 py-1.5 text-sm w-48" placeholder="Subject…" />
-          <datalist id="subject-list">
-            {COMMON_SUBJECTS.map(s => <option key={s} value={s} />)}
-          </datalist>
+          <select value={subject} onChange={e => setSubject(e.target.value)}
+            className="border border-gray-300 rounded px-3 py-1.5 text-sm w-48">
+            {COMMON_SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
         </div>
         <div className="flex items-center gap-2 ml-auto">
           <input type="file" accept=".csv" ref={fileRef} onChange={handleCSVImport} className="hidden" />
