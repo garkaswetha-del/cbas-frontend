@@ -375,26 +375,32 @@ function DayPlanner({ teacherId, academicYear, grade, section, subject, curricul
               const entry = scheduleMap[dk];
               const isWeekend = day.getDay() === 0 || day.getDay() === 6;
               const hasEvent = dayEvents.length > 0;
-              const rowBg = hasEvent ? "bg-red-50" : isWeekend ? "bg-gray-50" : "bg-white";
+              const isNonTeaching = isWeekend || hasEvent;
+              const rowBg = hasEvent ? "bg-red-50" : isWeekend ? "bg-gray-100" : "bg-white";
 
               return (
                 <tr key={dk} className={rowBg}>
                   <td className="border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 whitespace-nowrap">
                     {day.getDate()} {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][day.getMonth()]}
                   </td>
-                  <td className={`border border-gray-200 px-2 py-1.5 text-xs ${isWeekend ? "text-orange-500 font-medium" : "text-gray-500"}`}>
+                  <td className={`border border-gray-200 px-2 py-1.5 text-xs font-medium ${isWeekend ? "text-orange-400" : "text-gray-500"}`}>
                     {DAYS[day.getDay()]}
                   </td>
                   <td className="border border-gray-200 px-2 py-1.5 text-xs">
                     {hasEvent && (
-                      <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs truncate max-w-[4rem]" title={dayEvents.map(e => e.title).join(", ")}>
-                        {dayEvents[0].title.length > 8 ? dayEvents[0].title.substring(0, 8) + "…" : dayEvents[0].title}
+                      <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs truncate max-w-[4.5rem]" title={dayEvents.map(e => e.title).join(", ")}>
+                        {dayEvents[0].title.length > 9 ? dayEvents[0].title.substring(0, 9) + "…" : dayEvents[0].title}
                       </span>
+                    )}
+                    {isWeekend && !hasEvent && (
+                      <span className="text-xs text-gray-400 italic">Weekend</span>
                     )}
                   </td>
                   <td className="border border-gray-200 px-1 py-1">
-                    {hasEvent ? (
-                      <span className="px-2 text-xs text-red-400 italic">Holiday / Event</span>
+                    {isNonTeaching ? (
+                      <span className="px-2 text-xs text-gray-400 italic">
+                        {hasEvent ? "Holiday / Event — no teaching" : "No teaching"}
+                      </span>
                     ) : (
                       <select
                         value={entryToValue(entry)}
@@ -410,12 +416,12 @@ function DayPlanner({ teacherId, academicYear, grade, section, subject, curricul
                     )}
                   </td>
                   <td className="border border-gray-200 px-1 py-1">
-                    {!hasEvent && entry?.id && (
+                    {!isNonTeaching && entry?.id && (
                       <NotesInput value={entry.notes ?? ""} onBlur={v => handleNotes(day, v)} />
                     )}
                   </td>
                   <td className="border border-gray-200 px-2 py-1 text-center">
-                    {!hasEvent && entry?.id && (
+                    {!isNonTeaching && entry?.id && (
                       <input type="checkbox" checked={!!entry.done}
                         onChange={e => handleDone(day, e.target.checked)}
                         className="w-4 h-4 accent-indigo-600 cursor-pointer" />
@@ -683,25 +689,37 @@ function CurriculumSetupTab({ academicYear }: { academicYear: string }) {
 
 // ── Admin Teacher Plans tab ───────────────────────────────────────────────────
 
-function TeacherPlansTab({ academicYear, user }: { academicYear: string; user: any }) {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<any>(null);
-  const [detail, setDetail] = useState<any>(null);
+// ── helpers for TeacherPlansTab ──────────────────────────────────────────────
+
+function worstStatus(statuses: string[]): string {
+  if (statuses.includes("needs_revision")) return "needs_revision";
+  if (statuses.includes("draft"))          return "draft";
+  if (statuses.includes("submitted"))      return "submitted";
+  if (statuses.includes("approved"))       return "approved";
+  return "draft";
+}
+
+function DonePill({ done, total }: { done: number; total: number }) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const color = pct >= 80 ? "bg-green-500" : pct >= 40 ? "bg-yellow-400" : "bg-gray-300";
+  return (
+    <div className="flex items-center gap-2 min-w-[90px]">
+      <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-xs text-gray-500 whitespace-nowrap">{done}/{total}</span>
+    </div>
+  );
+}
+
+// ── Detail drawer (shared) ────────────────────────────────────────────────────
+
+function SubjectDetailDrawer({ selected, detail, academicYear, onClose, onReviewSaved, user }: {
+  selected: any; detail: any; academicYear: string;
+  onClose: () => void; onReviewSaved: () => void; user: any;
+}) {
   const [reviewStatus, setReviewStatus] = useState("approved");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    setLoading(true);
-    fetch(`${API}/sow/all?academic_year=${encodeURIComponent(academicYear)}`)
-      .then(r => r.json()).then(d => setRows(Array.isArray(d) ? d : [])).finally(() => setLoading(false));
-  }, [academicYear]);
-
-  async function openDetail(row: any) {
-    setSelected(row); setDetail(null); setReviewStatus("approved");
-    const res = await fetch(`${API}/sow/teacher-schedule?teacher_id=${row.teacher_id}&academic_year=${encodeURIComponent(academicYear)}&grade=${encodeURIComponent(row.grade)}&section=${encodeURIComponent(row.section)}&subject=${encodeURIComponent(row.subject)}`);
-    setDetail(await res.json());
-  }
 
   async function saveReview() {
     if (!detail?.status?.id) return;
@@ -711,113 +729,314 @@ function TeacherPlansTab({ academicYear, user }: { academicYear: string; user: a
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: reviewStatus, reviewed_by: String(user.id) }),
       });
-      const r = await fetch(`${API}/sow/all?academic_year=${encodeURIComponent(academicYear)}`);
-      setRows(await r.json());
-      setSelected(null); setDetail(null);
+      onReviewSaved();
+      onClose();
     } finally { setSaving(false); }
   }
 
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      <div className="fixed inset-0 bg-black bg-opacity-40" onClick={onClose} />
+      <div className="relative ml-auto w-full max-w-2xl bg-white h-full flex flex-col shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 flex-shrink-0">
+          <div>
+            <p className="font-semibold text-gray-800">{selected.teacher_name} — {selected.subject}</p>
+            <p className="text-xs text-gray-500">{selected.grade} {selected.section} · {academicYear}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5">
+          {!detail && <div className="text-center py-10 text-gray-400 text-sm">Loading…</div>}
+          {detail && (
+            <>
+              {detail.schedule.length === 0 ? (
+                <p className="text-gray-400 text-sm text-center py-4">No schedule entries yet.</p>
+              ) : (
+                <table className="w-full text-sm mb-4">
+                  <thead>
+                    <tr className="text-xs text-gray-500 border-b border-gray-100">
+                      <th className="py-1 text-left">Date</th>
+                      <th className="py-1 text-left">What was planned</th>
+                      <th className="py-1 text-center w-10">Done</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.schedule.map((e: any) => (
+                      <tr key={e.id} className="border-b border-gray-50">
+                        <td className="py-1.5 text-xs text-gray-600 whitespace-nowrap">{e.entry_date?.substring(0, 10)}</td>
+                        <td className="py-1.5 text-xs">
+                          {e.entry_type === "lp" ? `Block ${e.block_number} LP ${e.lp_number}` : e.entry_type}
+                          {e.notes && <span className="text-gray-400 ml-1">· {e.notes}</span>}
+                        </td>
+                        <td className="py-1.5 text-center text-green-600">{e.done ? "✓" : ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {detail.status && (
+                <div className="border-t border-gray-200 pt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-3">Review decision</p>
+                  <div className="flex items-center gap-3">
+                    <select value={reviewStatus} onChange={e => setReviewStatus(e.target.value)}
+                      className="border border-gray-200 rounded px-2 py-1.5 text-sm">
+                      <option value="approved">Approve ✓</option>
+                      <option value="needs_revision">Needs Revision ⚠</option>
+                    </select>
+                    <button onClick={saveReview} disabled={saving}
+                      className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 disabled:opacity-50">
+                      {saving ? "Saving…" : "Save Review"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main TeacherPlansTab ──────────────────────────────────────────────────────
+
+function TeacherPlansTab({ academicYear, user }: { academicYear: string; user: any }) {
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<"teacher" | "grade">("teacher");
+  const [expandedTeachers, setExpandedTeachers] = useState<Set<string>>(new Set());
+  const [expandedGrades, setExpandedGrades] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<any>(null);
+  const [detail, setDetail] = useState<any>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const d = await fetch(`${API}/sow/all?academic_year=${encodeURIComponent(academicYear)}`).then(r => r.json());
+      setRows(Array.isArray(d) ? d : []);
+    } finally { setLoading(false); }
+  }, [academicYear]);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  async function openDetail(row: any) {
+    setSelected(row); setDetail(null);
+    const d = await fetch(`${API}/sow/teacher-schedule?teacher_id=${row.teacher_id}&academic_year=${encodeURIComponent(academicYear)}&grade=${encodeURIComponent(row.grade)}&section=${encodeURIComponent(row.section)}&subject=${encodeURIComponent(row.subject)}`).then(r => r.json());
+    setDetail(d);
+  }
+
+  function toggleTeacher(id: string) {
+    setExpandedTeachers(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  function toggleGrade(g: string) {
+    setExpandedGrades(s => { const n = new Set(s); n.has(g) ? n.delete(g) : n.add(g); return n; });
+  }
+
   if (loading) return <div className="text-center py-10 text-gray-400 text-sm">Loading…</div>;
-  if (rows.length === 0) return <div className="text-center py-10 text-gray-400 text-sm">No SOW entries for {academicYear} yet.</div>;
+
+  // ── Summary cards ──────────────────────────────────────────────────────────
+
+  const teacherIds = [...new Set(rows.map(r => r.teacher_id))];
+  const totalTeachers = teacherIds.length;
+
+  // Per-teacher aggregate
+  const byTeacher = new Map<string, { name: string; rows: any[] }>();
+  for (const r of rows) {
+    if (!byTeacher.has(r.teacher_id)) byTeacher.set(r.teacher_id, { name: r.teacher_name ?? r.teacher_id, rows: [] });
+    byTeacher.get(r.teacher_id)!.rows.push(r);
+  }
+
+  const teacherSummaries = [...byTeacher.entries()].map(([tid, { name, rows: trows }]) => {
+    const totalE = trows.reduce((s, r) => s + (r.total_entries ?? 0), 0);
+    const doneE  = trows.reduce((s, r) => s + (r.done_entries  ?? 0), 0);
+    const overallStatus = worstStatus(trows.map(r => r.status ?? "draft"));
+    return { tid, name, trows, totalE, doneE, overallStatus };
+  }).sort((a, b) => a.name.localeCompare(b.name));
+
+  const approvedCount     = teacherSummaries.filter(t => t.overallStatus === "approved").length;
+  const submittedCount    = teacherSummaries.filter(t => t.overallStatus === "submitted").length;
+  const needsRevCount     = teacherSummaries.filter(t => t.overallStatus === "needs_revision").length;
+  const draftCount        = teacherSummaries.filter(t => t.overallStatus === "draft").length;
+
+  // Per-grade aggregate
+  const gradeOrder = ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
+  const byGrade = new Map<string, any[]>();
+  for (const r of rows) {
+    if (!byGrade.has(r.grade)) byGrade.set(r.grade, []);
+    byGrade.get(r.grade)!.push(r);
+  }
+  const gradeSummaries = [...byGrade.entries()]
+    .sort(([a], [b]) => gradeOrder.indexOf(a) - gradeOrder.indexOf(b));
+
+  if (rows.length === 0) return (
+    <div className="text-center py-16 text-gray-400 text-sm">
+      <p className="text-2xl mb-2">📋</p>
+      No SOW entries for {academicYear} yet. Teachers need to start entering their plans.
+    </div>
+  );
 
   return (
     <>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-gray-500 border-b border-gray-200">
-              <th className="px-4 py-2 text-left">Teacher</th>
-              <th className="px-4 py-2 text-left">Grade / Section</th>
-              <th className="px-4 py-2 text-left">Subject</th>
-              <th className="px-4 py-2 text-left">Status</th>
-              <th className="px-4 py-2 text-left">Done</th>
-              <th className="px-4 py-2 text-left">Last Updated</th>
-              <th className="px-4 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                <td className="px-4 py-2">{row.teacher_name ?? "—"}</td>
-                <td className="px-4 py-2">{row.grade} {row.section}</td>
-                <td className="px-4 py-2">{row.subject}</td>
-                <td className="px-4 py-2"><StatusBadge status={row.status ?? "draft"} /></td>
-                <td className="px-4 py-2 text-xs text-gray-500">{row.done_entries}/{row.total_entries} classes</td>
-                <td className="px-4 py-2 text-xs text-gray-400">{row.last_updated ? new Date(row.last_updated).toLocaleDateString() : "—"}</td>
-                <td className="px-4 py-2">
-                  <button onClick={() => openDetail(row)} className="text-xs px-2 py-1 border border-indigo-300 text-indigo-600 rounded hover:bg-indigo-50">View</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* ── Summary cards ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        {[
+          { label: "Total Teachers", value: totalTeachers, color: "bg-indigo-50 border-indigo-200 text-indigo-700" },
+          { label: "Approved",       value: approvedCount,  color: "bg-green-50 border-green-200 text-green-700" },
+          { label: "Submitted",      value: submittedCount, color: "bg-blue-50 border-blue-200 text-blue-700" },
+          { label: "Needs Revision", value: needsRevCount,  color: "bg-yellow-50 border-yellow-200 text-yellow-700" },
+        ].map(c => (
+          <div key={c.label} className={`border rounded-xl px-4 py-3 ${c.color}`}>
+            <p className="text-2xl font-bold">{c.value}</p>
+            <p className="text-xs mt-0.5 opacity-80">{c.label}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Detail drawer */}
-      {selected && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black bg-opacity-40" onClick={() => { setSelected(null); setDetail(null); }} />
-          <div className="relative ml-auto w-full max-w-2xl bg-white h-full flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 flex-shrink-0">
-              <div>
-                <p className="font-semibold text-gray-800">{selected.teacher_name} — {selected.subject}</p>
-                <p className="text-xs text-gray-500">{selected.grade} {selected.section} · {academicYear}</p>
-              </div>
-              <button onClick={() => { setSelected(null); setDetail(null); }} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-5">
-              {!detail && <div className="text-center py-10 text-gray-400 text-sm">Loading…</div>}
-              {detail && (
-                <>
-                  {/* Schedule summary */}
-                  {detail.schedule.length === 0 ? (
-                    <p className="text-gray-400 text-sm text-center py-4">No schedule entries yet.</p>
-                  ) : (
-                    <table className="w-full text-sm mb-4">
-                      <thead>
-                        <tr className="text-xs text-gray-500 border-b border-gray-100">
-                          <th className="py-1 text-left">Date</th>
-                          <th className="py-1 text-left">What</th>
-                          <th className="py-1 text-center">Done</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detail.schedule.map((e: any) => (
-                          <tr key={e.id} className="border-b border-gray-50">
-                            <td className="py-1 text-xs text-gray-600">{e.entry_date?.substring(0, 10)}</td>
-                            <td className="py-1 text-xs">
-                              {e.entry_type === "lp" ? `Block ${e.block_number} LP ${e.lp_number}` : e.entry_type}
-                              {e.notes && <span className="text-gray-400 ml-1">· {e.notes}</span>}
-                            </td>
-                            <td className="py-1 text-center">{e.done ? "✓" : ""}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
+      {/* Draft count note */}
+      {draftCount > 0 && (
+        <p className="text-xs text-gray-400 mb-4">{draftCount} teacher{draftCount > 1 ? "s" : ""} have not yet submitted their SOW.</p>
+      )}
 
-                  {/* Review panel */}
-                  {detail.status && (
-                    <div className="border-t border-gray-200 pt-4">
-                      <h3 className="font-semibold text-gray-700 mb-3 text-sm">Review</h3>
-                      <div className="flex items-center gap-3">
-                        <select value={reviewStatus} onChange={e => setReviewStatus(e.target.value)}
-                          className="border border-gray-200 rounded px-2 py-1.5 text-sm">
-                          <option value="approved">Approve</option>
-                          <option value="needs_revision">Needs Revision</option>
-                        </select>
-                        <button onClick={saveReview} disabled={saving}
-                          className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 disabled:opacity-50">
-                          {saving ? "Saving…" : "Save Review"}
-                        </button>
+      {/* ── View toggle ── */}
+      <div className="flex gap-2 mb-4">
+        {(["teacher", "grade"] as const).map(m => (
+          <button key={m} onClick={() => setViewMode(m)}
+            className={`px-4 py-1.5 text-sm rounded-lg font-medium border transition ${viewMode === m ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"}`}>
+            {m === "teacher" ? "👤 By Teacher" : "🏫 By Grade"}
+          </button>
+        ))}
+      </div>
+
+      {/* ── BY TEACHER view ── */}
+      {viewMode === "teacher" && (
+        <div className="space-y-2">
+          {teacherSummaries.map(({ tid, name, trows, totalE, doneE, overallStatus }) => {
+            const isOpen = expandedTeachers.has(tid);
+            // Group this teacher's rows by grade
+            const gradeMap = new Map<string, any[]>();
+            for (const r of trows) {
+              if (!gradeMap.has(r.grade)) gradeMap.set(r.grade, []);
+              gradeMap.get(r.grade)!.push(r);
+            }
+
+            return (
+              <div key={tid} className="border border-gray-200 rounded-xl overflow-hidden">
+                {/* Teacher header row */}
+                <button onClick={() => toggleTeacher(tid)}
+                  className="w-full flex items-center gap-3 px-4 py-3 bg-white hover:bg-gray-50 text-left transition">
+                  <span className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                    {name[0]?.toUpperCase()}
+                  </span>
+                  <span className="font-medium text-gray-800 flex-1 text-sm">{name}</span>
+                  <span className="text-xs text-gray-400 mr-2">{trows.length} subject{trows.length > 1 ? "s" : ""}</span>
+                  <div className="mr-3 w-28">
+                    <DonePill done={doneE} total={totalE} />
+                  </div>
+                  <StatusBadge status={overallStatus} />
+                  <span className="ml-2 text-gray-400 text-xs">{isOpen ? "▲" : "▼"}</span>
+                </button>
+
+                {/* Expanded subject rows */}
+                {isOpen && (
+                  <div className="border-t border-gray-100">
+                    {[...gradeMap.entries()]
+                      .sort(([a], [b]) => gradeOrder.indexOf(a) - gradeOrder.indexOf(b))
+                      .map(([grade, grows]) => (
+                      <div key={grade}>
+                        <p className="px-5 py-1.5 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">{grade}</p>
+                        {grows.map((r, i) => (
+                          <div key={i} className="flex items-center gap-3 px-5 py-2 border-t border-gray-50 hover:bg-indigo-50 group">
+                            <span className="text-sm text-gray-700 flex-1">{r.subject}</span>
+                            <span className="text-xs text-gray-400">{r.section}</span>
+                            <div className="w-28">
+                              <DonePill done={r.done_entries ?? 0} total={r.total_entries ?? 0} />
+                            </div>
+                            <StatusBadge status={r.status ?? "draft"} />
+                            <button onClick={() => openDetail(r)}
+                              className="ml-2 text-xs px-2 py-1 border border-indigo-200 text-indigo-600 rounded opacity-0 group-hover:opacity-100 transition hover:bg-indigo-50">
+                              View
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
+      )}
+
+      {/* ── BY GRADE view ── */}
+      {viewMode === "grade" && (
+        <div className="space-y-2">
+          {gradeSummaries.map(([grade, grows]) => {
+            const isOpen = expandedGrades.has(grade);
+            const totalE = grows.reduce((s, r) => s + (r.total_entries ?? 0), 0);
+            const doneE  = grows.reduce((s, r) => s + (r.done_entries  ?? 0), 0);
+            const gradeStatus = worstStatus(grows.map(r => r.status ?? "draft"));
+            // Group by subject
+            const subjectMap = new Map<string, any[]>();
+            for (const r of grows) {
+              if (!subjectMap.has(r.subject)) subjectMap.set(r.subject, []);
+              subjectMap.get(r.subject)!.push(r);
+            }
+
+            return (
+              <div key={grade} className="border border-gray-200 rounded-xl overflow-hidden">
+                <button onClick={() => toggleGrade(grade)}
+                  className="w-full flex items-center gap-3 px-4 py-3 bg-white hover:bg-gray-50 text-left transition">
+                  <span className="font-semibold text-gray-800 flex-1 text-sm">{grade}</span>
+                  <span className="text-xs text-gray-400 mr-2">{subjectMap.size} subjects · {grows.length} entries</span>
+                  <div className="mr-3 w-28">
+                    <DonePill done={doneE} total={totalE} />
+                  </div>
+                  <StatusBadge status={gradeStatus} />
+                  <span className="ml-2 text-gray-400 text-xs">{isOpen ? "▲" : "▼"}</span>
+                </button>
+
+                {isOpen && (
+                  <div className="border-t border-gray-100">
+                    {[...subjectMap.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([subject, srows]) => {
+                      const sTotal = srows.reduce((s, r) => s + (r.total_entries ?? 0), 0);
+                      const sDone  = srows.reduce((s, r) => s + (r.done_entries  ?? 0), 0);
+                      return (
+                        <div key={subject}>
+                          <p className="px-5 py-1.5 bg-gray-50 text-xs font-semibold text-gray-500 flex items-center gap-2">
+                            <span className="flex-1">{subject}</span>
+                            <DonePill done={sDone} total={sTotal} />
+                          </p>
+                          {srows.map((r, i) => (
+                            <div key={i} className="flex items-center gap-3 px-5 py-2 border-t border-gray-50 hover:bg-indigo-50 group">
+                              <span className="text-sm text-gray-700 flex-1">{r.teacher_name ?? r.teacher_id}</span>
+                              <span className="text-xs text-gray-400">{r.section}</span>
+                              <DonePill done={r.done_entries ?? 0} total={r.total_entries ?? 0} />
+                              <StatusBadge status={r.status ?? "draft"} />
+                              <button onClick={() => openDetail(r)}
+                                className="ml-1 text-xs px-2 py-1 border border-indigo-200 text-indigo-600 rounded opacity-0 group-hover:opacity-100 transition hover:bg-indigo-50">
+                                View
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Detail drawer ── */}
+      {selected && (
+        <SubjectDetailDrawer
+          selected={selected} detail={detail} academicYear={academicYear}
+          onClose={() => { setSelected(null); setDetail(null); }}
+          onReviewSaved={reload} user={user}
+        />
       )}
     </>
   );
