@@ -22,6 +22,7 @@ const ALLOCATION_RULES = [
   { num: 7, text: "Prefer teachers with fewer total substitutions this term (last 90 days) to spread the load fairly." },
   { num: 8, text: "Avoid giving a teacher two consecutive substitution periods in a row." },
   { num: 9, text: "Avoid concentrating too many substitutions on one teacher in a single day." },
+  { num: 10, text: "A teacher's total workload per day — regular periods plus any substitutions — must not exceed 7 periods." },
 ];
 
 interface Teacher {
