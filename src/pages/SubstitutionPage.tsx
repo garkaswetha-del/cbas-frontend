@@ -163,6 +163,89 @@ export default function SubstitutionPage() {
     if (status?.hasActiveTimetable) runValidation();
   }, [status?.hasActiveTimetable, runValidation]);
 
+  const printPlan = () => {
+    if (!assignments) return;
+    const dateStr = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
+
+    const rows = grouped
+      .map((group) => {
+        const unresolved = group.periods.filter((p) => !p.substitute_id).length;
+        const headerColor = unresolved > 0 ? "#fef2f2" : "#eef2ff";
+        const periodRows = group.periods
+          .map((a) => {
+            const cls = a.classes?.length > 0
+              ? a.classes.join(", ")
+              : a.grades?.length > 0
+              ? a.grades.map((g) => `Grade ${g}`).join(", ")
+              : a.raw;
+            const sub = a.substitute_id
+              ? `<span style="color:#15803d;font-weight:600">${a.substitute_name}</span>`
+              : `<span style="color:#dc2626;font-weight:600">⚠ No substitute available</span>`;
+            const regPeriods = a.substitute_id ? a.substitute_regular_periods : "—";
+            const subToday = a.substitute_id ? a.substitute_subs_today : "—";
+            const reason = a.substitute_id
+              ? `<span style="background:#eef2ff;color:#4338ca;padding:2px 6px;border-radius:4px;font-size:11px">${a.reason}</span>`
+              : "";
+            return `<tr>
+              <td style="border:1px solid #e5e7eb;padding:6px 10px;text-align:center;font-weight:600">${a.period}</td>
+              <td style="border:1px solid #e5e7eb;padding:6px 10px;font-size:12px">${cls}</td>
+              <td style="border:1px solid #e5e7eb;padding:6px 10px">${sub}</td>
+              <td style="border:1px solid #e5e7eb;padding:6px 10px;text-align:center">${regPeriods}</td>
+              <td style="border:1px solid #e5e7eb;padding:6px 10px;text-align:center">${subToday}</td>
+              <td style="border:1px solid #e5e7eb;padding:6px 10px">${reason}</td>
+            </tr>`;
+          })
+          .join("");
+        return `
+          <div style="margin-bottom:20px;border:1px solid #d1d5db;border-radius:6px;overflow:hidden;page-break-inside:avoid">
+            <div style="background:${headerColor};padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-weight:700;font-size:14px">${group.teacherName}</span>
+              <span style="font-size:12px;color:#6b7280">${group.periods.length} period(s) to cover${unresolved > 0 ? ` · <span style="color:#dc2626">${unresolved} unresolved</span>` : ""}</span>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr style="background:#f9fafb;font-size:11px;color:#6b7280;text-transform:uppercase">
+                  <th style="border:1px solid #e5e7eb;padding:6px 10px;text-align:center;width:60px">Period</th>
+                  <th style="border:1px solid #e5e7eb;padding:6px 10px;text-align:left">Class / Grade</th>
+                  <th style="border:1px solid #e5e7eb;padding:6px 10px;text-align:left">Substitute</th>
+                  <th style="border:1px solid #e5e7eb;padding:6px 10px;text-align:center">Regular<br>Periods</th>
+                  <th style="border:1px solid #e5e7eb;padding:6px 10px;text-align:center">Sub Periods<br>Today</th>
+                  <th style="border:1px solid #e5e7eb;padding:6px 10px;text-align:left">Rule Applied</th>
+                </tr>
+              </thead>
+              <tbody>${periodRows}</tbody>
+            </table>
+          </div>`;
+      })
+      .join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Substitution Plan — ${dayLabel} ${dateStr}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .meta { font-size: 13px; color: #6b7280; margin-bottom: 20px; }
+    @media print { @page { margin: 15mm; } }
+  </style>
+</head>
+<body>
+  <h1>Substitution Plan</h1>
+  <p class="meta">${dayLabel}, ${dateStr} &nbsp;·&nbsp; ${assignments.length} period(s) to cover &nbsp;·&nbsp; ${unresolvedCount > 0 ? `${unresolvedCount} unresolved` : "All covered"}</p>
+  ${rows}
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { alert("Pop-up blocked — please allow pop-ups for this site and try again."); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 400);
+  };
+
   const runAllocation = async () => {
     setAllocating(true);
     try {
@@ -407,10 +490,10 @@ export default function SubstitutionPage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => window.print()}
+                  onClick={printPlan}
                   className="px-4 py-1.5 border border-gray-300 text-sm rounded-md hover:bg-gray-50"
                 >
-                  🖨 Print
+                  🖨 Print / Save PDF
                 </button>
               </div>
 
