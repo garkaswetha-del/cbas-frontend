@@ -12,6 +12,18 @@ const DAYS = [
   { value: "Sa", label: "Saturday" },
 ];
 
+const ALLOCATION_RULES = [
+  { num: 1, text: "Only teachers with a FREE period at that slot are eligible to substitute." },
+  { num: 2, text: "Absent teachers cannot substitute for others on the same day." },
+  { num: 3, text: "Teachers on the Permanent Exception List (e.g. Principal, AHM) are never assigned." },
+  { num: 4, text: "Temporarily unavailable teachers marked for the day are excluded." },
+  { num: 5, text: "Prefer teachers who teach the same grade level as the absent teacher's class." },
+  { num: 6, text: "Prefer teachers who already teach the same section/division." },
+  { num: 7, text: "Prefer teachers with fewer total substitutions this term (last 90 days) to spread the load fairly." },
+  { num: 8, text: "Avoid giving a teacher two consecutive substitution periods in a row." },
+  { num: 9, text: "Avoid concentrating too many substitutions on one teacher in a single day." },
+];
+
 interface Teacher {
   id: string;
   name: string;
@@ -37,9 +49,12 @@ interface Assignment {
   absent_teacher_name: string;
   substitute_id: string | null;
   substitute_name: string | null;
+  substitute_regular_periods: number;
+  substitute_subs_today: number;
   grades: number[];
   classes: string[];
   raw: string;
+  reason: string;
 }
 
 const SEVERITY_STYLES: Record<ValidationIssue["severity"], string> = {
@@ -52,6 +67,12 @@ function todayDay(): string {
   return ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"][new Date().getDay()];
 }
 
+function classLabel(a: Assignment): string {
+  if (a.classes?.length > 0) return a.classes.join(", ");
+  if (a.grades?.length > 0) return a.grades.map((g) => `Grade ${g}`).join(", ");
+  return a.raw;
+}
+
 export default function SubstitutionPage() {
   const [status, setStatus] = useState<TimetableStatus | null>(null);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -62,7 +83,7 @@ export default function SubstitutionPage() {
 
   const [day, setDay] = useState(() => {
     const d = todayDay();
-    return DAYS.find(x => x.value === d)?.value ?? "Mo";
+    return DAYS.find((x) => x.value === d)?.value ?? "Mo";
   });
   const [absentIds, setAbsentIds] = useState<string[]>([]);
   const [tempUnavailableIds, setTempUnavailableIds] = useState<string[]>([]);
@@ -74,6 +95,8 @@ export default function SubstitutionPage() {
 
   const [allocating, setAllocating] = useState(false);
   const [assignments, setAssignments] = useState<Assignment[] | null>(null);
+
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   const sortedTeachers = [...teachers].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -130,7 +153,7 @@ export default function SubstitutionPage() {
       });
       setIssues(res.data.issues);
       setHasBlockingErrors(res.data.hasBlockingErrors);
-      setAssignments(null); // clear old results when inputs change
+      setAssignments(null);
     } finally {
       setValidating(false);
     }
@@ -175,13 +198,48 @@ export default function SubstitutionPage() {
 
   const permanentExceptionIds = permanentExceptions.map((e) => e.teacher_id);
   const availableForException = sortedTeachers.filter((t) => !permanentExceptionIds.includes(t.id));
+  const dayLabel = DAYS.find((d) => d.value === day)?.label ?? day;
+  const unresolvedCount = assignments?.filter((a) => !a.substitute_id).length ?? 0;
 
-  const dayLabel = DAYS.find(d => d.value === day)?.label ?? day;
-  const unresolvedCount = assignments?.filter(a => !a.substitute_id).length ?? 0;
+  // Group assignments by absent teacher
+  const grouped: { teacherId: string; teacherName: string; periods: Assignment[] }[] = [];
+  if (assignments) {
+    const seen = new Map<string, number>();
+    for (const a of assignments) {
+      if (!seen.has(a.absent_teacher_id)) {
+        seen.set(a.absent_teacher_id, grouped.length);
+        grouped.push({ teacherId: a.absent_teacher_id, teacherName: a.absent_teacher_name, periods: [] });
+      }
+      grouped[seen.get(a.absent_teacher_id)!].periods.push(a);
+    }
+  }
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Teacher Substitution</h1>
+
+      {/* ── Allocation Rules ── */}
+      <div className="bg-white rounded-lg border border-gray-200 mb-6">
+        <button
+          onClick={() => setRulesOpen((o) => !o)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 rounded-lg"
+        >
+          <span>ℹ Allocation Rules</span>
+          <span className="text-gray-400 text-xs">{rulesOpen ? "▲ Hide" : "▼ Show"}</span>
+        </button>
+        {rulesOpen && (
+          <div className="border-t border-gray-100 px-4 pb-4 pt-3">
+            <ol className="space-y-1.5">
+              {ALLOCATION_RULES.map((r) => (
+                <li key={r.num} className="flex gap-2 text-sm text-gray-700">
+                  <span className="font-semibold text-indigo-600 min-w-[1.5rem]">{r.num}.</span>
+                  <span>{r.text}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+      </div>
 
       {/* ── Timetable upload ── */}
       <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
@@ -220,15 +278,21 @@ export default function SubstitutionPage() {
               {permanentExceptions.length === 0 && <span className="text-xs text-gray-400">None added yet.</span>}
             </div>
             <div className="flex gap-2">
-              <select value={newExceptionId} onChange={(e) => setNewExceptionId(e.target.value)}
-                className="border border-gray-300 rounded-md px-2 py-1 text-sm flex-1">
+              <select
+                value={newExceptionId}
+                onChange={(e) => setNewExceptionId(e.target.value)}
+                className="border border-gray-300 rounded-md px-2 py-1 text-sm flex-1"
+              >
                 <option value="">Select a teacher…</option>
                 {availableForException.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>
-              <button onClick={addPermanentException} disabled={!newExceptionId}
-                className="px-3 py-1 bg-gray-700 text-white text-sm rounded-md disabled:opacity-40">
+              <button
+                onClick={addPermanentException}
+                disabled={!newExceptionId}
+                className="px-3 py-1 bg-gray-700 text-white text-sm rounded-md disabled:opacity-40"
+              >
                 Add
               </button>
             </div>
@@ -238,8 +302,11 @@ export default function SubstitutionPage() {
           <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold text-gray-700">Daily Inputs</h2>
-              <select value={day} onChange={(e) => setDay(e.target.value)}
-                className="border border-gray-300 rounded-md px-2 py-1 text-sm">
+              <select
+                value={day}
+                onChange={(e) => setDay(e.target.value)}
+                className="border border-gray-300 rounded-md px-2 py-1 text-sm"
+              >
                 {DAYS.map((d) => (
                   <option key={d.value} value={d.value}>{d.label}</option>
                 ))}
@@ -253,8 +320,11 @@ export default function SubstitutionPage() {
                 <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-md p-2">
                   {sortedTeachers.map((t) => (
                     <label key={t.id} className="flex items-center gap-2 text-sm py-1 cursor-pointer hover:bg-gray-50 px-1 rounded">
-                      <input type="checkbox" checked={absentIds.includes(t.id)}
-                        onChange={() => toggleId(absentIds, setAbsentIds, t.id)} />
+                      <input
+                        type="checkbox"
+                        checked={absentIds.includes(t.id)}
+                        onChange={() => toggleId(absentIds, setAbsentIds, t.id)}
+                      />
                       {t.name}
                     </label>
                   ))}
@@ -267,8 +337,11 @@ export default function SubstitutionPage() {
                 <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-md p-2">
                   {sortedTeachers.map((t) => (
                     <label key={t.id} className="flex items-center gap-2 text-sm py-1 cursor-pointer hover:bg-gray-50 px-1 rounded">
-                      <input type="checkbox" checked={tempUnavailableIds.includes(t.id)}
-                        onChange={() => toggleId(tempUnavailableIds, setTempUnavailableIds, t.id)} />
+                      <input
+                        type="checkbox"
+                        checked={tempUnavailableIds.includes(t.id)}
+                        onChange={() => toggleId(tempUnavailableIds, setTempUnavailableIds, t.id)}
+                      />
                       {t.name}
                     </label>
                   ))}
@@ -283,12 +356,14 @@ export default function SubstitutionPage() {
               <h2 className="font-semibold text-gray-700">
                 Validation {validating && <span className="text-xs font-normal text-gray-400 ml-1">(checking…)</span>}
               </h2>
-              <button onClick={runValidation} disabled={validating}
-                className="text-xs px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40">
+              <button
+                onClick={runValidation}
+                disabled={validating}
+                className="text-xs px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40"
+              >
                 Re-check
               </button>
             </div>
-
             {issues.length === 0 && !validating && (
               <p className="text-sm text-green-700">✓ No issues found.</p>
             )}
@@ -300,7 +375,6 @@ export default function SubstitutionPage() {
                 </div>
               ))}
             </div>
-
             <button
               onClick={runAllocation}
               disabled={hasBlockingErrors || allocating || absentIds.length === 0}
@@ -317,7 +391,7 @@ export default function SubstitutionPage() {
             </button>
           </div>
 
-          {/* ── Allocation results ── */}
+          {/* ── Allocation results (teacher-wise) ── */}
           {assignments && (
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -340,51 +414,97 @@ export default function SubstitutionPage() {
                 </button>
               </div>
 
-              {assignments.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-6">No periods to cover for absent teachers on {dayLabel}.</p>
+              {grouped.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-6">
+                  No periods to cover for absent teachers on {dayLabel}.
+                </p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                        <th className="border border-gray-200 px-3 py-2 text-center w-16">Period</th>
-                        <th className="border border-gray-200 px-3 py-2 text-left">Absent Teacher</th>
-                        <th className="border border-gray-200 px-3 py-2 text-left">Class / Grade</th>
-                        <th className="border border-gray-200 px-3 py-2 text-left">Substitute Assigned</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {assignments.map((a, i) => (
-                        <tr key={i} className={a.substitute_id ? "bg-white hover:bg-gray-50" : "bg-red-50"}>
-                          <td className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700">
-                            {a.period}
-                          </td>
-                          <td className="border border-gray-200 px-3 py-2 text-gray-800">
-                            {a.absent_teacher_name}
-                          </td>
-                          <td className="border border-gray-200 px-3 py-2 text-gray-600 text-xs">
-                            {a.classes?.length > 0
-                              ? a.classes.join(", ")
-                              : a.grades?.length > 0
-                              ? a.grades.map(g => `Grade ${g}`).join(", ")
-                              : a.raw}
-                          </td>
-                          <td className="border border-gray-200 px-3 py-2">
-                            {a.substitute_id ? (
-                              <span className="text-green-700 font-medium">{a.substitute_name}</span>
-                            ) : (
-                              <span className="text-red-600 font-medium">⚠ No substitute available</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="space-y-6">
+                  {grouped.map((group) => {
+                    const unresolved = group.periods.filter((p) => !p.substitute_id).length;
+                    return (
+                      <div key={group.teacherId} className="border border-gray-200 rounded-lg overflow-hidden">
+                        {/* Teacher header */}
+                        <div className={`px-4 py-2.5 flex items-center justify-between ${unresolved > 0 ? "bg-red-50" : "bg-indigo-50"}`}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-800 text-sm">{group.teacherName}</span>
+                            <span className="text-xs text-gray-500">
+                              — {group.periods.length} period{group.periods.length !== 1 ? "s" : ""} to cover
+                            </span>
+                          </div>
+                          {unresolved > 0 && (
+                            <span className="text-xs text-red-600 font-medium">
+                              {unresolved} unresolved
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Periods table */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm border-collapse">
+                            <thead>
+                              <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide border-b border-gray-200">
+                                <th className="px-3 py-2 text-center w-16">Period</th>
+                                <th className="px-3 py-2 text-left">Class / Grade</th>
+                                <th className="px-3 py-2 text-left">Substitute</th>
+                                <th className="px-3 py-2 text-center" title="Substitute's regular periods on this day from timetable">
+                                  Regular<br/>Periods
+                                </th>
+                                <th className="px-3 py-2 text-center" title="Substitution periods assigned to this teacher today">
+                                  Sub Periods<br/>Today
+                                </th>
+                                <th className="px-3 py-2 text-left">Rule Applied</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {group.periods.map((a, i) => (
+                                <tr
+                                  key={i}
+                                  className={`border-b border-gray-100 last:border-0 ${
+                                    a.substitute_id ? "hover:bg-gray-50" : "bg-red-50"
+                                  }`}
+                                >
+                                  <td className="px-3 py-2 text-center font-medium text-gray-700">
+                                    {a.period}
+                                  </td>
+                                  <td className="px-3 py-2 text-gray-600 text-xs">
+                                    {classLabel(a)}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {a.substitute_id ? (
+                                      <span className="text-green-700 font-medium">{a.substitute_name}</span>
+                                    ) : (
+                                      <span className="text-red-600 font-medium">⚠ No substitute available</span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-center text-gray-700 tabular-nums">
+                                    {a.substitute_id ? a.substitute_regular_periods : "—"}
+                                  </td>
+                                  <td className="px-3 py-2 text-center text-gray-700 tabular-nums">
+                                    {a.substitute_id ? a.substitute_subs_today : "—"}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {a.substitute_id ? (
+                                      <span className="text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                        {a.reason}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-gray-400">—</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
               {unresolvedCount > 0 && (
-                <p className="mt-3 text-xs text-red-600">
+                <p className="mt-4 text-xs text-red-600">
                   {unresolvedCount} period{unresolvedCount > 1 ? "s" : ""} could not be covered — all eligible teachers are busy or excluded during those slots.
                 </p>
               )}
