@@ -13,16 +13,12 @@ const DAYS = [
 ];
 
 const ALLOCATION_RULES = [
-  { num: 1, text: "Only teachers with a FREE period at that slot are eligible to substitute." },
-  { num: 2, text: "Absent teachers cannot substitute for others on the same day." },
-  { num: 3, text: "Teachers on the Permanent Exception List (e.g. Principal, AHM) are never assigned." },
-  { num: 4, text: "Temporarily unavailable teachers marked for the day are excluded." },
-  { num: 5, text: "Prefer teachers who teach the same grade level as the absent teacher's class." },
-  { num: 6, text: "Prefer teachers who already teach the same section/division." },
-  { num: 7, text: "Prefer teachers with fewer total substitutions this term (last 90 days) to spread the load fairly." },
-  { num: 8, text: "Avoid giving a teacher two consecutive substitution periods in a row." },
-  { num: 9, text: "Avoid concentrating too many substitutions on one teacher in a single day." },
-  { num: 10, text: "A teacher's total workload per day — regular periods plus any substitutions — must not exceed 7 periods." },
+  { num: 1, text: "A teacher's total workload per day (regular periods + substitutions) must not exceed 7. Teachers at the cap are excluded." },
+  { num: 2, text: "Only teachers with a FREE period at that exact slot are eligible." },
+  { num: 3, text: "Absent teachers, permanent exceptions (Principal, AHM etc.), and temporarily unavailable teachers are excluded." },
+  { num: 4, text: "Stages: Preparatory = Grade 3–5 · Middle = Grade 6–8 · Secondary = Grade 9–10. For any absent teacher, substitutes are first chosen from the same stage." },
+  { num: 5, text: "If no same-stage teacher is free, a teacher from any other stage is assigned. This is shown in amber as 'cross-stage assigned'." },
+  { num: 6, text: "Among all eligible same-stage teachers, the one with the fewest total substitutions this term is chosen to maintain fair distribution." },
 ];
 
 interface Teacher {
@@ -56,6 +52,7 @@ interface Assignment {
   classes: string[];
   raw: string;
   reason: string;
+  cross_stage: boolean;
 }
 
 const SEVERITY_STYLES: Record<ValidationIssue["severity"], string> = {
@@ -185,7 +182,7 @@ export default function SubstitutionPage() {
             const regPeriods = a.substitute_id ? a.substitute_regular_periods : "—";
             const subToday = a.substitute_id ? a.substitute_subs_today : "—";
             const reason = a.substitute_id
-              ? `<span style="background:#eef2ff;color:#4338ca;padding:2px 6px;border-radius:4px;font-size:11px">${a.reason}</span>`
+              ? `<span style="background:${a.cross_stage ? '#fffbeb' : '#eef2ff'};color:${a.cross_stage ? '#92400e' : '#4338ca'};padding:2px 6px;border-radius:4px;font-size:11px">${a.reason}</span>`
               : "";
             return `<tr>
               <td style="border:1px solid #e5e7eb;padding:6px 10px;text-align:center;font-weight:600">${a.period}</td>
@@ -569,7 +566,11 @@ export default function SubstitutionPage() {
                                   </td>
                                   <td className="px-3 py-2">
                                     {a.substitute_id ? (
-                                      <span className="text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                        a.cross_stage
+                                          ? "text-amber-700 bg-amber-50"
+                                          : "text-indigo-600 bg-indigo-50"
+                                      }`}>
                                         {a.reason}
                                       </span>
                                     ) : (
