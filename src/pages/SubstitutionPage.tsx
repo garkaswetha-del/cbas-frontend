@@ -18,7 +18,7 @@ const ALLOCATION_RULES = [
   { num: 3, text: "Absent teachers, permanent exceptions (Principal, AHM etc.), and temporarily unavailable teachers are excluded." },
   { num: 4, text: "Stages: Preparatory = Grade 3–5 · Middle = Grade 6–8 · Secondary = Grade 9–10. For any absent teacher, substitutes are first chosen from the same stage." },
   { num: 5, text: "If no same-stage teacher is free, a teacher from any other stage is assigned. This is shown in amber as 'cross-stage assigned'." },
-  { num: 6, text: "Among all eligible same-stage teachers, the one with the fewest total substitutions this term is chosen to maintain fair distribution." },
+  { num: 6, text: "Among all eligible same-stage teachers, the one with the fewest substitutions in the past 7 days is chosen to maintain fair weekly distribution." },
 ];
 
 interface Teacher {
