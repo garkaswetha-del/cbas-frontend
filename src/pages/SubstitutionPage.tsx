@@ -78,12 +78,40 @@ interface TeacherSchedule {
   schedule: Record<string, Record<number, string>>;
 }
 
+interface SummaryRow {
+  teacher_id: string;
+  teacher_name: string;
+  count: number;
+}
+
+interface LogRow {
+  id: string;
+  date: string;
+  day: string;
+  period: number;
+  classes: string | null;
+  substitute_name: string;
+  absent_name: string;
+}
+
 export default function SubstitutionPage() {
-  const [activeTab, setActiveTab] = useState<"substitution" | "timetable">("substitution");
+  const [activeTab, setActiveTab] = useState<"substitution" | "timetable" | "history">("substitution");
 
   const [status, setStatus] = useState<TimetableStatus | null>(null);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [permanentExceptions, setPermanentExceptions] = useState<{ id: string; teacher_id: string; teacher: Teacher }[]>([]);
+
+  // History tab state
+  const [historyFrom, setHistoryFrom] = useState(() => {
+    const d = new Date(); d.setDate(1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [historyTo, setHistoryTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [historySummary, setHistorySummary] = useState<SummaryRow[]>([]);
+  const [historyLog, setHistoryLog] = useState<LogRow[]>([]);
+  const [historyFilterTeacher, setHistoryFilterTeacher] = useState("");
+  const [historyFilterDate, setHistoryFilterDate] = useState("");
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Timetable viewer state
   const [timetableSelectedIds, setTimetableSelectedIds] = useState<string[]>([]);
@@ -277,6 +305,27 @@ export default function SubstitutionPage() {
     }
   };
 
+  const loadHistory = useCallback(async (from: string, to: string, teacherId?: string, date?: string) => {
+    setHistoryLoading(true);
+    try {
+      const params: Record<string, string> = { from, to };
+      if (teacherId) params.substitute_teacher_id = teacherId;
+      if (date) params.date = date;
+      const [summaryRes, logRes] = await Promise.all([
+        axios.get(`${API}/substitution/history/summary`, { params: { from, to } }),
+        axios.get(`${API}/substitution/history/log`, { params }),
+      ]);
+      setHistorySummary(summaryRes.data);
+      setHistoryLog(logRes.data);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "history") loadHistory(historyFrom, historyTo, historyFilterTeacher, historyFilterDate);
+  }, [activeTab]);
+
   const toggleTimetableTeacher = async (id: string) => {
     const next = timetableSelectedIds.includes(id)
       ? timetableSelectedIds.filter((x) => x !== id)
@@ -343,7 +392,11 @@ export default function SubstitutionPage() {
 
       {/* ── Tab strip ── */}
       <div className="flex border-b border-gray-200 mb-6">
-        {(["substitution", "timetable"] as const).map((tab) => (
+        {([
+          ["substitution", "Substitution"],
+          ["timetable", "Timetable Viewer"],
+          ["history", "History & Dashboard"],
+        ] as const).map(([tab, label]) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -353,10 +406,132 @@ export default function SubstitutionPage() {
                 : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
           >
-            {tab === "substitution" ? "Substitution" : "Timetable Viewer"}
+            {label}
           </button>
         ))}
       </div>
+
+      {/* ══════════════════════════════════════════════
+           HISTORY & DASHBOARD TAB
+      ══════════════════════════════════════════════ */}
+      {activeTab === "history" && (
+        <div>
+          {/* Date range + filters */}
+          <div className="flex flex-wrap items-end gap-3 mb-6 bg-white border border-gray-200 rounded-lg p-4">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">From</label>
+              <input type="date" value={historyFrom} onChange={(e) => setHistoryFrom(e.target.value)}
+                className="border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">To</label>
+              <input type="date" value={historyTo} onChange={(e) => setHistoryTo(e.target.value)}
+                className="border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Filter by Substitute</label>
+              <select value={historyFilterTeacher} onChange={(e) => setHistoryFilterTeacher(e.target.value)}
+                className="border border-gray-300 rounded-md px-2 py-1.5 text-sm w-44">
+                <option value="">All teachers</option>
+                {sortedTeachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Filter by Date</label>
+              <input type="date" value={historyFilterDate} onChange={(e) => setHistoryFilterDate(e.target.value)}
+                className="border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+            </div>
+            <button
+              onClick={() => loadHistory(historyFrom, historyTo, historyFilterTeacher, historyFilterDate)}
+              disabled={historyLoading}
+              className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 disabled:opacity-40"
+            >
+              {historyLoading ? "Loading…" : "Apply"}
+            </button>
+            {(historyFilterTeacher || historyFilterDate) && (
+              <button onClick={() => { setHistoryFilterTeacher(""); setHistoryFilterDate(""); loadHistory(historyFrom, historyTo); }}
+                className="text-xs text-gray-400 hover:text-gray-600">Clear filters</button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* ── Summary panel ── */}
+            <div className="lg:col-span-1">
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                  <h2 className="font-semibold text-gray-800 text-sm">Substitution Count</h2>
+                  <span className="text-xs text-gray-400">{historySummary.length} teachers</span>
+                </div>
+                {historySummary.length === 0 ? (
+                  <p className="text-sm text-gray-400 p-4 text-center">No data for this period.</p>
+                ) : (
+                  <div className="divide-y divide-gray-50 max-h-[500px] overflow-y-auto">
+                    {(() => {
+                      const max = historySummary[0]?.count ?? 1;
+                      return historySummary.map((row, i) => (
+                        <div key={row.teacher_id} className="px-4 py-2.5 flex items-center gap-3">
+                          <span className="text-xs text-gray-400 w-5 text-right">{i + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate">{row.teacher_name}</p>
+                            <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-indigo-400"
+                                style={{ width: `${(row.count / max) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                          <span className="text-sm font-bold text-indigo-700 w-6 text-right">{row.count}</span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── Detailed log ── */}
+            <div className="lg:col-span-2">
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                  <h2 className="font-semibold text-gray-800 text-sm">Assignment Log</h2>
+                  <span className="text-xs text-gray-400">{historyLog.length} entries</span>
+                </div>
+                {historyLog.length === 0 ? (
+                  <p className="text-sm text-gray-400 p-4 text-center">No entries found.</p>
+                ) : (
+                  <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead className="sticky top-0 bg-gray-50 z-10">
+                        <tr className="text-xs text-gray-500 uppercase tracking-wide border-b border-gray-200">
+                          <th className="px-3 py-2 text-left">Date</th>
+                          <th className="px-3 py-2 text-center">Period</th>
+                          <th className="px-3 py-2 text-left">Absent Teacher</th>
+                          <th className="px-3 py-2 text-left">Substitute</th>
+                          <th className="px-3 py-2 text-left">Class</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {historyLog.map((row) => (
+                          <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50">
+                            <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
+                              {new Date(row.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                              <span className="text-gray-400 text-xs ml-1">({row.day})</span>
+                            </td>
+                            <td className="px-3 py-2 text-center text-gray-700 font-medium">{row.period}</td>
+                            <td className="px-3 py-2 text-gray-600">{row.absent_name}</td>
+                            <td className="px-3 py-2 font-medium text-indigo-700">{row.substitute_name}</td>
+                            <td className="px-3 py-2 text-gray-500 text-xs">{row.classes ?? "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════
            TIMETABLE VIEWER TAB
