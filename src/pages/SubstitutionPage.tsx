@@ -12,6 +12,8 @@ const DAYS = [
   { value: "Sa", label: "Saturday" },
 ];
 
+const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
 const ALLOCATION_RULES = [
   { num: 1, text: "A teacher's total workload per day (regular periods + substitutions) must not exceed 7. Teachers at the cap are excluded." },
   { num: 2, text: "Only teachers with a FREE period at that exact slot are eligible." },
@@ -71,10 +73,22 @@ function classLabel(a: Assignment): string {
   return a.raw;
 }
 
+interface TeacherSchedule {
+  teacher: Teacher;
+  schedule: Record<string, Record<number, string>>;
+}
+
 export default function SubstitutionPage() {
+  const [activeTab, setActiveTab] = useState<"substitution" | "timetable">("substitution");
+
   const [status, setStatus] = useState<TimetableStatus | null>(null);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [permanentExceptions, setPermanentExceptions] = useState<{ id: string; teacher_id: string; teacher: Teacher }[]>([]);
+
+  // Timetable viewer state
+  const [timetableTeacherId, setTimetableTeacherId] = useState("");
+  const [timetableData, setTimetableData] = useState<TeacherSchedule | null>(null);
+  const [timetableLoading, setTimetableLoading] = useState(false);
 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -261,6 +275,17 @@ export default function SubstitutionPage() {
     }
   };
 
+  const loadTimetable = async (teacherId: string) => {
+    if (!teacherId) { setTimetableData(null); return; }
+    setTimetableLoading(true);
+    try {
+      const res = await axios.get(`${API}/substitution/timetable/teacher`, { params: { teacher_id: teacherId } });
+      setTimetableData(res.data);
+    } finally {
+      setTimetableLoading(false);
+    }
+  };
+
   const toggleId = (list: string[], setList: (ids: string[]) => void, id: string) => {
     setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
   };
@@ -297,7 +322,102 @@ export default function SubstitutionPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Teacher Substitution</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-4">Teacher Substitution</h1>
+
+      {/* ── Tab strip ── */}
+      <div className="flex border-b border-gray-200 mb-6">
+        {(["substitution", "timetable"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-5 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === tab
+                ? "border-indigo-600 text-indigo-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {tab === "substitution" ? "Substitution" : "Timetable Viewer"}
+          </button>
+        ))}
+      </div>
+
+      {/* ══════════════════════════════════════════════
+           TIMETABLE VIEWER TAB
+      ══════════════════════════════════════════════ */}
+      {activeTab === "timetable" && (
+        <div>
+          {!status?.hasActiveTimetable ? (
+            <p className="text-sm text-gray-500">No timetable uploaded yet. Upload a PDF first from the Substitution tab.</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 mb-6">
+                <select
+                  value={timetableTeacherId}
+                  onChange={(e) => {
+                    setTimetableTeacherId(e.target.value);
+                    loadTimetable(e.target.value);
+                  }}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm w-64"
+                >
+                  <option value="">Select a teacher…</option>
+                  {sortedTeachers.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+                {timetableLoading && <span className="text-xs text-gray-400">Loading…</span>}
+              </div>
+
+              {timetableData && (
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-800 mb-4">
+                    {timetableData.teacher.name} — Weekly Timetable
+                  </h2>
+                  <div className="overflow-x-auto">
+                    <table className="border-collapse text-sm w-full">
+                      <thead>
+                        <tr className="bg-gray-100">
+                          <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold text-gray-600 w-20">Day</th>
+                          {PERIODS.map((p) => (
+                            <th key={p} className="border border-gray-300 px-3 py-2 text-center text-xs font-semibold text-gray-600 w-24">
+                              P{p}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {DAYS.map(({ value: d, label }) => (
+                          <tr key={d} className="even:bg-gray-50">
+                            <td className="border border-gray-300 px-3 py-2 font-medium text-gray-700 text-xs">{label}</td>
+                            {PERIODS.map((p) => {
+                              const cell = timetableData.schedule[d]?.[p];
+                              const isFree = !cell || cell === "FREE";
+                              return (
+                                <td
+                                  key={p}
+                                  className={`border border-gray-300 px-2 py-2 text-center text-xs ${
+                                    isFree ? "text-gray-300 bg-gray-50" : "text-gray-800"
+                                  }`}
+                                >
+                                  {isFree ? "—" : cell}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════
+           SUBSTITUTION TAB
+      ══════════════════════════════════════════════ */}
+      {activeTab === "substitution" && <>
 
       {/* ── Allocation Rules ── */}
       <div className="bg-white rounded-lg border border-gray-200 mb-6">
@@ -597,6 +717,8 @@ export default function SubstitutionPage() {
           )}
         </>
       )}
+
+      </> /* end substitution tab */ }
     </div>
   );
 }
