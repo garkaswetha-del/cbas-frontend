@@ -86,9 +86,11 @@ export default function SubstitutionPage() {
   const [permanentExceptions, setPermanentExceptions] = useState<{ id: string; teacher_id: string; teacher: Teacher }[]>([]);
 
   // Timetable viewer state
-  const [timetableTeacherId, setTimetableTeacherId] = useState("");
-  const [timetableData, setTimetableData] = useState<TeacherSchedule | null>(null);
+  const [timetableSelectedIds, setTimetableSelectedIds] = useState<string[]>([]);
+  const [timetableDataMap, setTimetableDataMap] = useState<Record<string, TeacherSchedule>>({});
   const [timetableLoading, setTimetableLoading] = useState(false);
+  const [timetableDropdownOpen, setTimetableDropdownOpen] = useState(false);
+  const [timetableSearch, setTimetableSearch] = useState("");
 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -275,12 +277,27 @@ export default function SubstitutionPage() {
     }
   };
 
-  const loadTimetable = async (teacherId: string) => {
-    if (!teacherId) { setTimetableData(null); return; }
+  const toggleTimetableTeacher = async (id: string) => {
+    const next = timetableSelectedIds.includes(id)
+      ? timetableSelectedIds.filter((x) => x !== id)
+      : [...timetableSelectedIds, id];
+    setTimetableSelectedIds(next);
+
+    // Fetch only newly added teachers; already-loaded ones stay in map
+    const missing = next.filter((tid) => !timetableDataMap[tid]);
+    if (missing.length === 0) return;
     setTimetableLoading(true);
     try {
-      const res = await axios.get(`${API}/substitution/timetable/teacher`, { params: { teacher_id: teacherId } });
-      setTimetableData(res.data);
+      const results = await Promise.all(
+        missing.map((tid) =>
+          axios.get(`${API}/substitution/timetable/teacher`, { params: { teacher_id: tid } }).then((r) => r.data as TeacherSchedule)
+        )
+      );
+      setTimetableDataMap((prev) => {
+        const updated = { ...prev };
+        results.forEach((d) => { updated[d.teacher.id] = d; });
+        return updated;
+      });
     } finally {
       setTimetableLoading(false);
     }
@@ -350,65 +367,136 @@ export default function SubstitutionPage() {
             <p className="text-sm text-gray-500">No timetable uploaded yet. Upload a PDF first from the Substitution tab.</p>
           ) : (
             <>
-              <div className="flex items-center gap-3 mb-6">
-                <select
-                  value={timetableTeacherId}
-                  onChange={(e) => {
-                    setTimetableTeacherId(e.target.value);
-                    loadTimetable(e.target.value);
-                  }}
-                  className="border border-gray-300 rounded-md px-3 py-2 text-sm w-64"
+              {/* Multi-select dropdown */}
+              <div className="relative mb-6 w-80">
+                <button
+                  onClick={() => setTimetableDropdownOpen((o) => !o)}
+                  className="w-full flex items-center justify-between border border-gray-300 rounded-md px-3 py-2 text-sm bg-white hover:border-indigo-400"
                 >
-                  <option value="">Select a teacher…</option>
-                  {sortedTeachers.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-                {timetableLoading && <span className="text-xs text-gray-400">Loading…</span>}
+                  <span className="text-gray-700">
+                    {timetableSelectedIds.length === 0
+                      ? "Select teachers…"
+                      : `${timetableSelectedIds.length} teacher${timetableSelectedIds.length > 1 ? "s" : ""} selected`}
+                  </span>
+                  <span className="text-gray-400 text-xs ml-2">{timetableDropdownOpen ? "▲" : "▼"}</span>
+                </button>
+
+                {timetableDropdownOpen && (
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg">
+                    <div className="p-2 border-b border-gray-100">
+                      <input
+                        autoFocus
+                        value={timetableSearch}
+                        onChange={(e) => setTimetableSearch(e.target.value)}
+                        placeholder="Search…"
+                        className="w-full text-sm border border-gray-200 rounded px-2 py-1 outline-none focus:border-indigo-400"
+                      />
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                      {sortedTeachers
+                        .filter((t) => t.name.toLowerCase().includes(timetableSearch.toLowerCase()))
+                        .map((t) => (
+                          <label key={t.id} className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={timetableSelectedIds.includes(t.id)}
+                              onChange={() => toggleTimetableTeacher(t.id)}
+                              className="accent-indigo-600"
+                            />
+                            {t.name}
+                          </label>
+                        ))}
+                    </div>
+                    {timetableSelectedIds.length > 0 && (
+                      <div className="border-t border-gray-100 px-3 py-2">
+                        <button
+                          onClick={() => setTimetableSelectedIds([])}
+                          className="text-xs text-gray-500 hover:text-red-500"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {timetableData && (
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-800 mb-4">
-                    {timetableData.teacher.name} — Weekly Timetable
-                  </h2>
-                  <div className="overflow-x-auto">
-                    <table className="border-collapse text-sm w-full">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold text-gray-600 w-20">Day</th>
-                          {PERIODS.map((p) => (
-                            <th key={p} className="border border-gray-300 px-3 py-2 text-center text-xs font-semibold text-gray-600 w-24">
-                              P{p}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {DAYS.map(({ value: d, label }) => (
-                          <tr key={d} className="even:bg-gray-50">
-                            <td className="border border-gray-300 px-3 py-2 font-medium text-gray-700 text-xs">{label}</td>
-                            {PERIODS.map((p) => {
-                              const cell = timetableData.schedule[d]?.[p];
-                              const isFree = !cell || cell === "FREE";
-                              return (
-                                <td
-                                  key={p}
-                                  className={`border border-gray-300 px-2 py-2 text-center text-xs ${
-                                    isFree ? "text-gray-300 bg-gray-50" : "text-gray-800"
-                                  }`}
-                                >
-                                  {isFree ? "—" : cell}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+              {timetableLoading && <p className="text-xs text-gray-400 mb-4">Loading…</p>}
+
+              {/* Selected chips */}
+              {timetableSelectedIds.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {timetableSelectedIds.map((id) => {
+                    const t = teachers.find((x) => x.id === id);
+                    return (
+                      <span key={id} className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium">
+                        {t?.name ?? id}
+                        <button onClick={() => toggleTimetableTeacher(id)} className="hover:text-red-500 ml-0.5">×</button>
+                      </span>
+                    );
+                  })}
                 </div>
               )}
+
+              {/* Timetable grids — adaptive columns */}
+              {(() => {
+                const count = timetableSelectedIds.length;
+                const colClass = count === 1 ? "grid-cols-1" : count === 2 ? "grid-cols-2" : "grid-cols-3";
+                const compact = count >= 3;
+                return (
+                  <div className={`grid ${colClass} gap-6`}>
+                    {timetableSelectedIds.map((id) => {
+                      const data = timetableDataMap[id];
+                      if (!data) return null;
+                      return (
+                        <div key={id} className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="bg-indigo-50 px-3 py-2">
+                            <span className="font-semibold text-indigo-800 text-sm">{data.teacher.name}</span>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="border-collapse w-full">
+                              <thead>
+                                <tr className="bg-gray-100">
+                                  <th className={`border border-gray-200 px-1 py-1 text-left font-semibold text-gray-500 ${compact ? "text-[10px]" : "text-xs"}`}>Day</th>
+                                  {PERIODS.map((p) => (
+                                    <th key={p} className={`border border-gray-200 px-1 py-1 text-center font-semibold text-gray-500 ${compact ? "text-[10px]" : "text-xs"}`}>
+                                      P{p}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {DAYS.map(({ value: d, label }) => (
+                                  <tr key={d} className="even:bg-gray-50">
+                                    <td className={`border border-gray-200 px-1 py-1 font-medium text-gray-600 ${compact ? "text-[10px]" : "text-xs"}`}>
+                                      {compact ? d : label.slice(0, 3)}
+                                    </td>
+                                    {PERIODS.map((p) => {
+                                      const cell = data.schedule[d]?.[p];
+                                      const isFree = !cell || cell === "FREE";
+                                      return (
+                                        <td
+                                          key={p}
+                                          title={isFree ? "" : cell}
+                                          className={`border border-gray-200 px-1 py-1 text-center ${compact ? "text-[10px]" : "text-xs"} ${
+                                            isFree ? "text-gray-300 bg-gray-50" : "text-gray-800"
+                                          }`}
+                                        >
+                                          {isFree ? "—" : compact ? cell?.slice(0, 10) : cell}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>
