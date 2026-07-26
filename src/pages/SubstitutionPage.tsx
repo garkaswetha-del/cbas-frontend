@@ -101,7 +101,10 @@ export default function SubstitutionPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [permanentExceptions, setPermanentExceptions] = useState<{ id: string; teacher_id: string; teacher: Teacher }[]>([]);
 
+  const [savedIndicator, setSavedIndicator] = useState(false);
+
   // History tab state
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyFrom, setHistoryFrom] = useState(() => {
     const d = new Date(); d.setDate(1);
     return d.toISOString().slice(0, 10);
@@ -298,6 +301,8 @@ export default function SubstitutionPage() {
         temp_unavailable_teacher_ids: tempUnavailableIds,
       });
       setAssignments(res.data.assignments);
+      setSavedIndicator(true);
+      setTimeout(() => setSavedIndicator(false), 4000);
     } catch (err: any) {
       alert(err?.response?.data?.message || "Allocation failed. Please try again.");
     } finally {
@@ -307,6 +312,7 @@ export default function SubstitutionPage() {
 
   const loadHistory = useCallback(async (from: string, to: string, teacherId?: string, date?: string) => {
     setHistoryLoading(true);
+    setHistoryError(null);
     try {
       const params: Record<string, string> = { from, to };
       if (teacherId) params.substitute_teacher_id = teacherId;
@@ -317,6 +323,8 @@ export default function SubstitutionPage() {
       ]);
       setHistorySummary(summaryRes.data);
       setHistoryLog(logRes.data);
+    } catch (err: any) {
+      setHistoryError(err?.response?.data?.message || "Failed to load history. Please try again.");
     } finally {
       setHistoryLoading(false);
     }
@@ -453,6 +461,12 @@ export default function SubstitutionPage() {
                 className="text-xs text-gray-400 hover:text-gray-600">Clear filters</button>
             )}
           </div>
+
+          {historyError && (
+            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {historyError}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* ── Summary panel ── */}
@@ -839,20 +853,25 @@ export default function SubstitutionPage() {
                 </div>
               ))}
             </div>
-            <button
-              onClick={runAllocation}
-              disabled={hasBlockingErrors || allocating || absentIds.length === 0}
-              title={
-                absentIds.length === 0
-                  ? "Mark at least one teacher as absent first."
-                  : hasBlockingErrors
-                  ? "Resolve all errors above before proceeding."
-                  : ""
-              }
-              className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {allocating ? "Allocating…" : "Generate Substitution Plan"}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={runAllocation}
+                disabled={hasBlockingErrors || allocating || absentIds.length === 0}
+                title={
+                  absentIds.length === 0
+                    ? "Mark at least one teacher as absent first."
+                    : hasBlockingErrors
+                    ? "Resolve all errors above before proceeding."
+                    : ""
+                }
+                className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {allocating ? "Allocating…" : "Generate Substitution Plan"}
+              </button>
+              {savedIndicator && (
+                <span className="text-sm text-green-600 font-medium">✓ Saved to database</span>
+              )}
+            </div>
           </div>
 
           {/* ── Allocation results (teacher-wise) ── */}
