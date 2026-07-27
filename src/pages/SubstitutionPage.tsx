@@ -972,8 +972,7 @@ export default function SubstitutionPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {group.periods.map((a, i) => (
-                                {(() => {
+                              {group.periods.map((a, i) => {
                                   const isCCA = a.reason === 'CCA — assign manually if needed';
                                   const isUnresolved = !a.substitute_id && !isCCA;
                                   const key = `${a.absent_teacher_id}:${a.period}`;
@@ -1040,8 +1039,7 @@ export default function SubstitutionPage() {
                                       </td>
                                     </tr>
                                   );
-                                })()}
-                              ))}
+                              })}
                             </tbody>
                           </table>
                         </div>
