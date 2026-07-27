@@ -379,7 +379,7 @@ export default function SubstitutionPage() {
   const permanentExceptionIds = permanentExceptions.map((e) => e.teacher_id);
   const availableForException = sortedTeachers.filter((t) => !permanentExceptionIds.includes(t.id));
   const dayLabel = DAYS.find((d) => d.value === day)?.label ?? day;
-  const unresolvedCount = assignments?.filter((a) => !a.substitute_id).length ?? 0;
+  const unresolvedCount = assignments?.filter((a) => !a.substitute_id && !a.reason.startsWith('CCA co-teacher')).length ?? 0;
 
   // Group assignments by absent teacher
   const grouped: { teacherId: string; teacherName: string; periods: Assignment[] }[] = [];
@@ -904,7 +904,7 @@ export default function SubstitutionPage() {
               ) : (
                 <div className="space-y-6">
                   {grouped.map((group) => {
-                    const unresolved = group.periods.filter((p) => !p.substitute_id).length;
+                    const unresolved = group.periods.filter((p) => !p.substitute_id && !p.reason.startsWith('CCA co-teacher')).length;
                     return (
                       <div key={group.teacherId} className="border border-gray-200 rounded-lg overflow-hidden">
                         {/* Teacher header */}
@@ -941,45 +941,57 @@ export default function SubstitutionPage() {
                             </thead>
                             <tbody>
                               {group.periods.map((a, i) => (
-                                <tr
-                                  key={i}
-                                  className={`border-b border-gray-100 last:border-0 ${
-                                    a.substitute_id ? "hover:bg-gray-50" : "bg-red-50"
-                                  }`}
-                                >
-                                  <td className="px-3 py-2 text-center font-medium text-gray-700">
-                                    {a.period}
-                                  </td>
-                                  <td className="px-3 py-2 text-gray-600 text-xs">
-                                    {classLabel(a)}
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    {a.substitute_id ? (
-                                      <span className="text-green-700 font-medium">{a.substitute_name}</span>
-                                    ) : (
-                                      <span className="text-red-600 font-medium">⚠ No substitute available</span>
-                                    )}
-                                  </td>
-                                  <td className="px-3 py-2 text-center text-gray-700 tabular-nums">
-                                    {a.substitute_id ? a.substitute_regular_periods : "—"}
-                                  </td>
-                                  <td className="px-3 py-2 text-center text-gray-700 tabular-nums">
-                                    {a.substitute_id ? a.substitute_subs_today : "—"}
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    {a.substitute_id ? (
-                                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                        a.cross_stage
-                                          ? "text-amber-700 bg-amber-50"
-                                          : "text-indigo-600 bg-indigo-50"
-                                      }`}>
-                                        {a.reason}
-                                      </span>
-                                    ) : (
-                                      <span className="text-xs text-gray-400">—</span>
-                                    )}
-                                  </td>
-                                </tr>
+                                {(() => {
+                                  const isCoTeacher = a.reason.startsWith('CCA co-teacher');
+                                  const isUnresolved = !a.substitute_id && !isCoTeacher;
+                                  return (
+                                    <tr
+                                      key={i}
+                                      className={`border-b border-gray-100 last:border-0 ${
+                                        isUnresolved ? "bg-red-50" : isCoTeacher ? "bg-gray-50" : "hover:bg-gray-50"
+                                      }`}
+                                    >
+                                      <td className="px-3 py-2 text-center font-medium text-gray-700">
+                                        {a.period}
+                                      </td>
+                                      <td className="px-3 py-2 text-gray-600 text-xs">
+                                        {classLabel(a)}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {a.substitute_id ? (
+                                          <span className="text-green-700 font-medium">{a.substitute_name}</span>
+                                        ) : isCoTeacher ? (
+                                          <span className="text-gray-400 text-xs">Co-teacher covers</span>
+                                        ) : (
+                                          <span className="text-red-600 font-medium">⚠ No substitute available</span>
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2 text-center text-gray-700 tabular-nums">
+                                        {a.substitute_id ? a.substitute_regular_periods : "—"}
+                                      </td>
+                                      <td className="px-3 py-2 text-center text-gray-700 tabular-nums">
+                                        {a.substitute_id ? a.substitute_subs_today : "—"}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {a.substitute_id ? (
+                                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                            a.cross_stage
+                                              ? "text-amber-700 bg-amber-50"
+                                              : "text-indigo-600 bg-indigo-50"
+                                          }`}>
+                                            {a.reason}
+                                          </span>
+                                        ) : isCoTeacher ? (
+                                          <span className="text-xs px-2 py-0.5 rounded-full text-gray-500 bg-gray-100">
+                                            CCA — co-teacher present
+                                          </span>
+                                        ) : (
+                                          <span className="text-xs text-gray-400">—</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })()}
                               ))}
                             </tbody>
                           </table>
