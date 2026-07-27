@@ -102,6 +102,9 @@ export default function SubstitutionPage() {
   const [permanentExceptions, setPermanentExceptions] = useState<{ id: string; teacher_id: string; teacher: Teacher }[]>([]);
 
   const [savedIndicator, setSavedIndicator] = useState(false);
+  const [allocationDate, setAllocationDate] = useState("");
+  const [ccaSelections, setCcaSelections] = useState<Record<string, string>>({});
+  const [ccaSaving, setCcaSaving] = useState<Record<string, boolean>>({});
 
   // History tab state
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -291,15 +294,44 @@ export default function SubstitutionPage() {
     setTimeout(() => { win.print(); win.close(); }, 400);
   };
 
+  const assignCCA = async (a: Assignment, substituteId: string) => {
+    const key = `${a.absent_teacher_id}:${a.period}`;
+    setCcaSaving((prev) => ({ ...prev, [key]: true }));
+    try {
+      await axios.post(`${API}/substitution/manual-assign`, {
+        date: allocationDate,
+        day,
+        period: a.period,
+        absent_teacher_id: a.absent_teacher_id,
+        substitute_teacher_id: substituteId,
+      });
+      const subName = sortedTeachers.find((t) => t.id === substituteId)?.name ?? substituteId;
+      setAssignments((prev) =>
+        prev!.map((x) =>
+          x.absent_teacher_id === a.absent_teacher_id && x.period === a.period
+            ? { ...x, substitute_id: substituteId, substitute_name: subName, reason: 'Manual CCA assignment' }
+            : x,
+        ),
+      );
+    } catch (err: any) {
+      alert(err?.response?.data?.message || 'Failed to save assignment');
+    } finally {
+      setCcaSaving((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
   const runAllocation = async () => {
     setAllocating(true);
     try {
+      const today = new Date().toISOString().slice(0, 10);
       const res = await axios.post(`${API}/substitution/allocate`, {
         day,
-        date: new Date().toISOString().slice(0, 10),
+        date: today,
         absent_teacher_ids: absentIds,
         temp_unavailable_teacher_ids: tempUnavailableIds,
       });
+      setAllocationDate(today);
+      setCcaSelections({});
       setAssignments(res.data.assignments);
       setSavedIndicator(true);
       setTimeout(() => setSavedIndicator(false), 4000);
@@ -379,7 +411,7 @@ export default function SubstitutionPage() {
   const permanentExceptionIds = permanentExceptions.map((e) => e.teacher_id);
   const availableForException = sortedTeachers.filter((t) => !permanentExceptionIds.includes(t.id));
   const dayLabel = DAYS.find((d) => d.value === day)?.label ?? day;
-  const unresolvedCount = assignments?.filter((a) => !a.substitute_id && !a.reason.startsWith('CCA co-teacher')).length ?? 0;
+  const unresolvedCount = assignments?.filter((a) => !a.substitute_id && !a.reason.startsWith('CCA')).length ?? 0;
 
   // Group assignments by absent teacher
   const grouped: { teacherId: string; teacherName: string; periods: Assignment[] }[] = [];
@@ -904,7 +936,7 @@ export default function SubstitutionPage() {
               ) : (
                 <div className="space-y-6">
                   {grouped.map((group) => {
-                    const unresolved = group.periods.filter((p) => !p.substitute_id && !p.reason.startsWith('CCA co-teacher')).length;
+                    const unresolved = group.periods.filter((p) => !p.substitute_id && !p.reason.startsWith('CCA')).length;
                     return (
                       <div key={group.teacherId} className="border border-gray-200 rounded-lg overflow-hidden">
                         {/* Teacher header */}
@@ -942,26 +974,41 @@ export default function SubstitutionPage() {
                             <tbody>
                               {group.periods.map((a, i) => (
                                 {(() => {
-                                  const isCoTeacher = a.reason.startsWith('CCA co-teacher');
-                                  const isUnresolved = !a.substitute_id && !isCoTeacher;
+                                  const isCCA = a.reason === 'CCA — assign manually if needed';
+                                  const isUnresolved = !a.substitute_id && !isCCA;
+                                  const key = `${a.absent_teacher_id}:${a.period}`;
                                   return (
                                     <tr
                                       key={i}
                                       className={`border-b border-gray-100 last:border-0 ${
-                                        isUnresolved ? "bg-red-50" : isCoTeacher ? "bg-gray-50" : "hover:bg-gray-50"
+                                        isUnresolved ? "bg-red-50" : isCCA ? "bg-gray-50" : "hover:bg-gray-50"
                                       }`}
                                     >
-                                      <td className="px-3 py-2 text-center font-medium text-gray-700">
-                                        {a.period}
-                                      </td>
-                                      <td className="px-3 py-2 text-gray-600 text-xs">
-                                        {classLabel(a)}
-                                      </td>
+                                      <td className="px-3 py-2 text-center font-medium text-gray-700">{a.period}</td>
+                                      <td className="px-3 py-2 text-gray-600 text-xs">{classLabel(a)}</td>
                                       <td className="px-3 py-2">
                                         {a.substitute_id ? (
                                           <span className="text-green-700 font-medium">{a.substitute_name}</span>
-                                        ) : isCoTeacher ? (
-                                          <span className="text-gray-400 text-xs">Co-teacher covers</span>
+                                        ) : isCCA ? (
+                                          <div className="flex items-center gap-2">
+                                            <select
+                                              value={ccaSelections[key] ?? ""}
+                                              onChange={(e) => setCcaSelections((prev) => ({ ...prev, [key]: e.target.value }))}
+                                              className="border border-gray-300 rounded px-2 py-1 text-xs w-36"
+                                            >
+                                              <option value="">Select teacher…</option>
+                                              {sortedTeachers.map((t) => (
+                                                <option key={t.id} value={t.id}>{t.name}</option>
+                                              ))}
+                                            </select>
+                                            <button
+                                              onClick={() => assignCCA(a, ccaSelections[key])}
+                                              disabled={!ccaSelections[key] || ccaSaving[key]}
+                                              className="px-2 py-1 text-xs bg-indigo-600 text-white rounded disabled:opacity-40"
+                                            >
+                                              {ccaSaving[key] ? "…" : "Assign"}
+                                            </button>
+                                          </div>
                                         ) : (
                                           <span className="text-red-600 font-medium">⚠ No substitute available</span>
                                         )}
@@ -975,15 +1022,17 @@ export default function SubstitutionPage() {
                                       <td className="px-3 py-2">
                                         {a.substitute_id ? (
                                           <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                            a.cross_stage
+                                            a.reason === 'Manual CCA assignment'
+                                              ? "text-gray-600 bg-gray-100"
+                                              : a.cross_stage
                                               ? "text-amber-700 bg-amber-50"
                                               : "text-indigo-600 bg-indigo-50"
                                           }`}>
                                             {a.reason}
                                           </span>
-                                        ) : isCoTeacher ? (
+                                        ) : isCCA ? (
                                           <span className="text-xs px-2 py-0.5 rounded-full text-gray-500 bg-gray-100">
-                                            CCA — co-teacher present
+                                            CCA — manual
                                           </span>
                                         ) : (
                                           <span className="text-xs text-gray-400">—</span>
