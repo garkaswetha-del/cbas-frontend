@@ -46,6 +46,7 @@ interface Assignment {
   period: number;
   absent_teacher_id: string;
   absent_teacher_name: string;
+  absence_type: 'ABSENT' | 'ON_DUTY';
   substitute_id: string | null;
   substitute_name: string | null;
   substitute_regular_periods: number;
@@ -102,9 +103,13 @@ export default function SubstitutionPage() {
   const [permanentExceptions, setPermanentExceptions] = useState<{ id: string; teacher_id: string; teacher: Teacher }[]>([]);
 
   const [savedIndicator, setSavedIndicator] = useState(false);
+  const [onDutyIds, setOnDutyIds] = useState<string[]>([]);
   const [allocationDate, setAllocationDate] = useState("");
   const [ccaSelections, setCcaSelections] = useState<Record<string, string>>({});
   const [ccaSaving, setCcaSaving] = useState<Record<string, boolean>>({});
+  const [editingRow, setEditingRow] = useState<Record<string, boolean>>({});
+  const [editSelections, setEditSelections] = useState<Record<string, string>>({});
+  const [editSaving, setEditSaving] = useState<Record<string, boolean>>({});
 
   // History tab state
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -294,6 +299,33 @@ export default function SubstitutionPage() {
     setTimeout(() => { win.print(); win.close(); }, 400);
   };
 
+  const saveEdit = async (a: Assignment, substituteId: string) => {
+    const key = `${a.absent_teacher_id}:${a.period}`;
+    setEditSaving((prev) => ({ ...prev, [key]: true }));
+    try {
+      await axios.post(`${API}/substitution/manual-assign`, {
+        date: allocationDate,
+        day,
+        period: a.period,
+        absent_teacher_id: a.absent_teacher_id,
+        substitute_teacher_id: substituteId,
+      });
+      const subName = sortedTeachers.find((t) => t.id === substituteId)?.name ?? substituteId;
+      setAssignments((prev) =>
+        prev!.map((x) =>
+          x.absent_teacher_id === a.absent_teacher_id && x.period === a.period
+            ? { ...x, substitute_id: substituteId, substitute_name: subName, reason: 'Manual assignment' }
+            : x,
+        ),
+      );
+      setEditingRow((prev) => ({ ...prev, [key]: false }));
+    } catch (err: any) {
+      alert(err?.response?.data?.message || 'Failed to save assignment');
+    } finally {
+      setEditSaving((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
   const assignCCA = async (a: Assignment, substituteId: string) => {
     const key = `${a.absent_teacher_id}:${a.period}`;
     setCcaSaving((prev) => ({ ...prev, [key]: true }));
@@ -329,9 +361,12 @@ export default function SubstitutionPage() {
         date: today,
         absent_teacher_ids: absentIds,
         temp_unavailable_teacher_ids: tempUnavailableIds,
+        on_duty_teacher_ids: onDutyIds,
       });
       setAllocationDate(today);
       setCcaSelections({});
+      setEditingRow({});
+      setEditSelections({});
       setAssignments(res.data.assignments);
       setSavedIndicator(true);
       setTimeout(() => setSavedIndicator(false), 4000);
@@ -822,9 +857,9 @@ export default function SubstitutionPage() {
                 ))}
               </select>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-2">
+                <p className="text-sm font-medium text-red-700 mb-2">
                   Absent Teachers <span className="font-normal text-gray-400">({absentIds.length} selected)</span>
                 </p>
                 <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-md p-2">
@@ -851,6 +886,23 @@ export default function SubstitutionPage() {
                         type="checkbox"
                         checked={tempUnavailableIds.includes(t.id)}
                         onChange={() => toggleId(tempUnavailableIds, setTempUnavailableIds, t.id)}
+                      />
+                      {t.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-amber-700 mb-2">
+                  Present but cannot take class <span className="font-normal text-gray-400">({onDutyIds.length} selected)</span>
+                </p>
+                <div className="max-h-56 overflow-y-auto border border-amber-200 rounded-md p-2 bg-amber-50/40">
+                  {sortedTeachers.map((t) => (
+                    <label key={t.id} className="flex items-center gap-2 text-sm py-1 cursor-pointer hover:bg-amber-50 px-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={onDutyIds.includes(t.id)}
+                        onChange={() => toggleId(onDutyIds, setOnDutyIds, t.id)}
                       />
                       {t.name}
                     </label>
@@ -888,10 +940,10 @@ export default function SubstitutionPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={runAllocation}
-                disabled={hasBlockingErrors || allocating || absentIds.length === 0}
+                disabled={hasBlockingErrors || allocating || (absentIds.length === 0 && onDutyIds.length === 0)}
                 title={
-                  absentIds.length === 0
-                    ? "Mark at least one teacher as absent first."
+                  absentIds.length === 0 && onDutyIds.length === 0
+                    ? "Mark at least one teacher as absent or on duty first."
                     : hasBlockingErrors
                     ? "Resolve all errors above before proceeding."
                     : ""
@@ -937,12 +989,17 @@ export default function SubstitutionPage() {
                 <div className="space-y-6">
                   {grouped.map((group) => {
                     const unresolved = group.periods.filter((p) => !p.substitute_id && !p.reason.startsWith('CCA')).length;
+                    const isOnDuty = group.periods[0]?.absence_type === 'ON_DUTY';
+                    const headerBg = unresolved > 0 ? "bg-red-50" : isOnDuty ? "bg-amber-50" : "bg-indigo-50";
                     return (
                       <div key={group.teacherId} className="border border-gray-200 rounded-lg overflow-hidden">
                         {/* Teacher header */}
-                        <div className={`px-4 py-2.5 flex items-center justify-between ${unresolved > 0 ? "bg-red-50" : "bg-indigo-50"}`}>
+                        <div className={`px-4 py-2.5 flex items-center justify-between ${headerBg}`}>
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-gray-800 text-sm">{group.teacherName}</span>
+                            {isOnDuty && (
+                              <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">On Duty</span>
+                            )}
                             <span className="text-xs text-gray-500">
                               — {group.periods.length} period{group.periods.length !== 1 ? "s" : ""} to cover
                             </span>
@@ -986,8 +1043,42 @@ export default function SubstitutionPage() {
                                       <td className="px-3 py-2 text-center font-medium text-gray-700">{a.period}</td>
                                       <td className="px-3 py-2 text-gray-600 text-xs">{classLabel(a)}</td>
                                       <td className="px-3 py-2">
-                                        {a.substitute_id ? (
-                                          <span className="text-green-700 font-medium">{a.substitute_name}</span>
+                                        {editingRow[key] ? (
+                                          <div className="flex items-center gap-2">
+                                            <select
+                                              value={editSelections[key] ?? ""}
+                                              onChange={(e) => setEditSelections((prev) => ({ ...prev, [key]: e.target.value }))}
+                                              className="border border-gray-300 rounded px-2 py-1 text-xs w-36"
+                                            >
+                                              <option value="">Select teacher…</option>
+                                              {sortedTeachers.map((t) => (
+                                                <option key={t.id} value={t.id}>{t.name}</option>
+                                              ))}
+                                            </select>
+                                            <button
+                                              onClick={() => saveEdit(a, editSelections[key])}
+                                              disabled={!editSelections[key] || editSaving[key]}
+                                              className="px-2 py-1 text-xs bg-indigo-600 text-white rounded disabled:opacity-40"
+                                            >
+                                              {editSaving[key] ? "…" : "Save"}
+                                            </button>
+                                            <button
+                                              onClick={() => setEditingRow((prev) => ({ ...prev, [key]: false }))}
+                                              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 text-gray-500"
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        ) : a.substitute_id ? (
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-green-700 font-medium">{a.substitute_name}</span>
+                                            <button
+                                              onClick={() => setEditingRow((prev) => ({ ...prev, [key]: true }))}
+                                              className="text-xs px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-100 text-gray-500"
+                                            >
+                                              Change
+                                            </button>
+                                          </div>
                                         ) : isCCA ? (
                                           <div className="flex items-center gap-2">
                                             <select
@@ -1009,7 +1100,15 @@ export default function SubstitutionPage() {
                                             </button>
                                           </div>
                                         ) : (
-                                          <span className="text-red-600 font-medium">⚠ No substitute available</span>
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-red-600 font-medium">⚠ No substitute available</span>
+                                            <button
+                                              onClick={() => setEditingRow((prev) => ({ ...prev, [key]: true }))}
+                                              className="text-xs px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-100 text-gray-500"
+                                            >
+                                              Assign
+                                            </button>
+                                          </div>
                                         )}
                                       </td>
                                       <td className="px-3 py-2 text-center text-gray-700 tabular-nums">
@@ -1021,7 +1120,7 @@ export default function SubstitutionPage() {
                                       <td className="px-3 py-2">
                                         {a.substitute_id ? (
                                           <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                            a.reason === 'Manual CCA assignment'
+                                            a.reason === 'Manual CCA assignment' || a.reason === 'Manual assignment'
                                               ? "text-gray-600 bg-gray-100"
                                               : a.cross_stage
                                               ? "text-amber-700 bg-amber-50"
