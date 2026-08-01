@@ -94,7 +94,7 @@ export default function StudentManagementPage() {
 
   const fetchStats = async () => {
     try {
-      const res = await axios.get(`${API}/students/stats`);
+      const res = await axios.get(`${API}/students/stats`, { params: { academic_year: selectedYear } });
       setStats(res.data);
     } catch { }
   };
