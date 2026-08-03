@@ -881,7 +881,7 @@ export default function BaselinePage() {
 
   const fetchSections = async () => {
     try {
-      const r = await axios.get(`${API}/students?limit=2000`);
+      const r = await axios.get(`${API}/students?limit=2000&academic_year=${academicYear}`);
       const students = r.data?.data || r.data || [];
       const secs = [...new Set(students.filter((s:any) => s.current_class === grade).map((s:any) => s.section).filter(Boolean))] as string[];
       setSections(secs.sort());
@@ -1255,7 +1255,7 @@ export default function BaselinePage() {
     try {
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer);
-      const studRes = await axios.get(`${API}/students?limit=5000`);
+      const studRes = await axios.get(`${API}/students?limit=5000&academic_year=${academicYear}`);
       const allDb: any[] = studRes.data?.data || studRes.data || [];
 
       const parsed: typeof xlSheets = [];
