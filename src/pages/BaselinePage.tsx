@@ -1255,7 +1255,7 @@ export default function BaselinePage() {
     try {
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer);
-      const studRes = await axios.get(`${API}/students?limit=5000&academic_year=${academicYear}`);
+      const studRes = await axios.get(`${API}/students?limit=5000&academic_year=${academicYear}&include_inactive=true`);
       const allDb: any[] = studRes.data?.data || studRes.data || [];
 
       const parsed: typeof xlSheets = [];
@@ -1268,8 +1268,7 @@ export default function BaselinePage() {
 
         const dbStudents = allDb.filter((s:any) =>
           s.current_class?.toLowerCase() === meta.grade.toLowerCase() &&
-          s.section?.toUpperCase() === meta.section.toUpperCase() &&
-          s.is_active !== false
+          s.section?.toUpperCase() === meta.section.toUpperCase()
         );
 
         const matched: typeof parsed[0]["matched"] = [];
