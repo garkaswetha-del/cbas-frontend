@@ -8,7 +8,6 @@ import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/LoginPage';
 import UserManagementPage from './pages/UserManagementPage';
 import StudentManagementPage from './pages/StudentManagementPage';
-import SectionManagementPage from './pages/SectionManagementPage';
 import AppraisalPage from './pages/AppraisalPage';
 import BaselinePage from './pages/BaselinePage';
 import CompetencyManagementPage from './pages/CompetencyManagementPage';
@@ -286,7 +285,6 @@ function App() {
           <Route path="super-dashboard" element={<SuperDashboardPage />} />
           <Route path="users" element={<UserManagementPage />} />
           <Route path="students" element={<StudentManagementPage />} />
-          <Route path="sections" element={<SectionManagementPage />} />
           <Route path="appraisal" element={<AppraisalPage />} />
           <Route path="baseline" element={<BaselinePage />} />
           <Route path="competencies" element={<CompetencyManagementPage />} />

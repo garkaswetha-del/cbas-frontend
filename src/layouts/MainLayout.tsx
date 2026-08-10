@@ -7,7 +7,6 @@ const ADMINISTRATIVE_NAV = [
   { path: '/super-dashboard', label: 'Super Dashboard',   icon: '📊' },
   { path: '/users',           label: 'User Management',   icon: '👥' },
   { path: '/students',        label: 'Student Management', icon: '🎓' },
-  { path: '/sections',        label: 'Section Management', icon: '🏫' },
   { path: '/appraisal',       label: 'Teachers Appraisal', icon: '📋' },
   { path: '/memos',           label: 'Memos',              icon: '📩' },
   { path: '/audit-log',       label: 'Audit Log',          icon: '🔍' },
