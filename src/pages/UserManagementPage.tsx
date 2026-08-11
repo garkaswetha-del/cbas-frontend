@@ -569,7 +569,7 @@ export default function UserManagementPage() {
   // Year-specific stats derived from filtered teacher list
   const yearStats = hasAssignments ? {
     total: teachers.length,
-    inactive: inactiveUsers.filter((u: any) => TEACHING_ROLES.has(u.role)).length,
+    inactive: inactiveUsers.filter((u: any) => u.role === "teacher").length,
     byQualification: Object.entries(
       teachers.reduce((acc: Record<string, number>, u: any) => {
         const q = (u.appraisal_qualification || u.qualification || "Unknown").toUpperCase().replace(/B\.ED/g, 'BED').replace(/D\.ED/g, 'DED');
