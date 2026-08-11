@@ -5,12 +5,13 @@ import { getSchoolName } from '../utils/api';
 const SUBSTITUTION_NAV_ITEM = { path: '/substitution', label: 'Substitution', icon: '🔄' };
 
 const ADMINISTRATIVE_NAV = [
-  { path: '/super-dashboard', label: 'Super Dashboard',   icon: '📊' },
-  { path: '/users',           label: 'User Management',   icon: '👥' },
-  { path: '/students',        label: 'Student Management', icon: '🎓' },
-  { path: '/appraisal',       label: 'Teachers Appraisal', icon: '📋' },
-  { path: '/memos',           label: 'Memos',              icon: '📩' },
-  { path: '/audit-log',       label: 'Audit Log',          icon: '🔍' },
+  { path: '/super-dashboard',   label: 'Super Dashboard',    icon: '📊' },
+  { path: '/users',             label: 'User Management',    icon: '👥' },
+  { path: '/teacher-mappings',  label: 'Teacher Mappings',   icon: '🗂️' },
+  { path: '/students',          label: 'Student Management', icon: '🎓' },
+  { path: '/appraisal',         label: 'Teachers Appraisal', icon: '📋' },
+  { path: '/memos',             label: 'Memos',              icon: '📩' },
+  { path: '/audit-log',         label: 'Audit Log',          icon: '🔍' },
   SUBSTITUTION_NAV_ITEM,
 ];
 

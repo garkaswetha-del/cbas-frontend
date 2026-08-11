@@ -22,6 +22,7 @@ import AuditLogPage from "./pages/AuditLogPage";
 import SubstitutionPage from "./pages/SubstitutionPage";
 import AcademicCalendarPage from "./pages/AcademicCalendarPage";
 import SOWPage from "./pages/SOWPage";
+import TeacherMappingsPage from "./pages/TeacherMappingsPage";
 
 const CLASS_TABS = (isClassTeacher: boolean) => [
   { id: 'students',       label: 'My Students',        show: true },
@@ -47,6 +48,7 @@ const SELF_TABS = [
 const SELF_TAB_IDS = new Set(SELF_TABS.map(t => t.id));
 
 const AHM_TOOL_TABS = [
+  { id: 'ahm_mappings',     label: 'Teacher Mappings' },
   { id: 'ahm_baseline',     label: 'Baseline Entry' },
   { id: 'ahm_competencies', label: 'Competency Registry' },
   { id: 'ahm_activities',   label: 'Activities & Marks' },
@@ -221,6 +223,7 @@ function AHMLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
   const classTabs = CLASS_TABS(isClassTeacher);
 
   const renderContent = () => {
+    if (activeTab === 'ahm_mappings')     return <TeacherMappingsPage />;
     if (activeTab === 'ahm_baseline')     return <BaselinePage />;
     if (activeTab === 'ahm_competencies') return <CompetencyManagementPage />;
     if (activeTab === 'ahm_activities')   return <ActivitiesPage />;
@@ -465,6 +468,7 @@ function App() {
           <Route index element={<Navigate to="/super-dashboard" replace />} />
           <Route path="super-dashboard" element={<SuperDashboardPage />} />
           <Route path="users" element={<UserManagementPage />} />
+          <Route path="teacher-mappings" element={<TeacherMappingsPage />} />
           <Route path="students" element={<StudentManagementPage />} />
           <Route path="appraisal" element={<AppraisalPage />} />
           <Route path="baseline" element={<BaselinePage />} />
