@@ -17,7 +17,12 @@ export default function LoginPage({ onLogin }: { onLogin: (user: any) => void })
   const [showPassword, setShowPassword] = useState(false);
 
   const selectSchool = (school: School) => {
+    const prev = localStorage.getItem('cbas_school_id');
     localStorage.setItem('cbas_school_id', school.id);
+    if (prev !== school.id) {
+      window.location.reload();
+      return;
+    }
     setSelectedSchool(school);
     setError("");
   };
