@@ -1721,8 +1721,6 @@ function BaselineTab({ user, academicYear }: any) {
 // PA/SA TAB — Marks Entry + Full Analysis (teacher's subjects only)
 // ─────────────────────────────────────────────────────────────────
 function PASATab({ user, mappings, academicYear }: any) {
-  import { getAPI } from '../utils/api';
-const API = getAPI();
   const EXAM_TYPES = ["FA1","FA2","SA1","FA3","FA4","SA2","Custom"];
 
   const allMappingsPasa: any[] = mappings?.mappings || [];
@@ -2159,8 +2157,6 @@ const API = getAPI();
 // ACTIVITIES TAB — Create + Marks Entry + Coverage + Analysis
 // ─────────────────────────────────────────────────────────────────
 function ActivitiesTab({ user, mappings, academicYear }: any) {
-  import { getAPI } from '../utils/api';
-const API = getAPI();
   const ACTIVITY_TYPES = ["Individual","Group","Project","Assessment","Workshop","Other"];
   const LEVELS = ["Beginning","Developing","Approaching","Meeting","Exceeding","Proficient","Advanced","Mastery"];
   const LEVEL_COLOR: Record<string,string> = {
@@ -5075,8 +5071,6 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
 //   Baseline → sort rounds, take slice(-1)[0], check literacy_pct/numeracy_pct < 60%
 // ─────────────────────────────────────────────────────────────────────────────
 function AIToolsTab({ user, mappings, academicYear }: any) {
-  import { getAPI } from '../utils/api';
-const API = getAPI();
   const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
 
   const allMappings: any[] = mappings?.mappings || [];
@@ -5757,8 +5751,6 @@ Keep tone warm, professional and supportive — never alarming or critical.`;
 
 
 function AlertsTab({ user, mappings, academicYear }: any) {
-  import { getAPI } from '../utils/api';
-const API = getAPI();
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -5962,8 +5954,6 @@ function HomeworkPortfolioSection({ student, grade, section, subject, isClassTea
 }
 
 function PortfolioTab({ user, mappings, academicYear }: any) {
-  import { getAPI } from '../utils/api';
-const API = getAPI();
 
   // Determine teacher's subjects and type
   const isClassTeacher = !!(mappings?.is_class_teacher);
@@ -6306,8 +6296,6 @@ const API = getAPI();
 // ─────────────────────────────────────────────────────────────────
 function LearningResourcesTab({ user, academicYear }: any) {
   const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
-  import { getAPI } from '../utils/api';
-const API = getAPI();
 
   const RESOURCE_GRADE: Record<string,string> = {
     foundation:"Grade 2", preparatory:"Grade 5", middle:"Grade 8", secondary:"Grade 10",
@@ -6815,8 +6803,6 @@ function getLevel(score: number) {
 
 
 function BaselineDashTab({ user, mappings, academicYear }: any) {
-  import { getAPI } from '../utils/api';
-const API = getAPI();
   const ROUNDS = [
     { value: "baseline_1", label: "Round 1" },
     { value: "baseline_2", label: "Round 2" },

@@ -663,8 +663,6 @@ function PASADashboardTab({ academicYear }: any) {
 }
 
 function StudentDashTab({ grade, section, academicYear }: any) {
-  import { getAPI } from '../utils/api';
-const API = getAPI();
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [analysis, setAnalysis] = useState<any>(null);
