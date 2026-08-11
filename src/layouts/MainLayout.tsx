@@ -28,6 +28,12 @@ const ACADEMIC_NAV = [
 // is appended here to stay reachable for that role too.
 const ACADEMIC_NAV_WITH_SUBSTITUTION = [...ACADEMIC_NAV, SUBSTITUTION_NAV_ITEM];
 
+const OFFICE_NAV = [
+  { path: '/users',    label: 'User Management',   icon: '👥' },
+  { path: '/students', label: 'Student Management', icon: '🎓' },
+  { path: '/calendar', label: 'Academic Calendar',  icon: '📅' },
+];
+
 const ADMIN_PATHS = ADMINISTRATIVE_NAV.map(n => n.path);
 const ACADEMIC_PATHS = ACADEMIC_NAV.map(n => n.path);
 
@@ -35,9 +41,10 @@ interface MainLayoutProps {
   user: any;
   onLogout: () => void;
   academicOnly?: boolean;
+  officeOnly?: boolean;
 }
 
-export default function MainLayout({ user, onLogout, academicOnly = false }: MainLayoutProps) {
+export default function MainLayout({ user, onLogout, academicOnly = false, officeOnly = false }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
@@ -50,11 +57,15 @@ export default function MainLayout({ user, onLogout, academicOnly = false }: Mai
     setNavTab(detectTab(location.pathname));
   }, [location.pathname]);
 
-  const currentNav = navTab === 'administrative'
-    ? ADMINISTRATIVE_NAV
-    : (academicOnly ? ACADEMIC_NAV_WITH_SUBSTITUTION : ACADEMIC_NAV);
+  const currentNav = officeOnly
+    ? OFFICE_NAV
+    : navTab === 'administrative'
+      ? ADMINISTRATIVE_NAV
+      : (academicOnly ? ACADEMIC_NAV_WITH_SUBSTITUTION : ACADEMIC_NAV);
 
-  const TabSwitcher = () => academicOnly ? null : (
+  const portalLabel = officeOnly ? 'Office Portal' : academicOnly ? 'Academic Portal' : 'Competence Based Assessment System';
+
+  const TabSwitcher = () => (academicOnly || officeOnly) ? null : (
     <div className="flex mx-3 mb-2 rounded-lg overflow-hidden border border-indigo-700">
       <button
         onClick={() => setNavTab('administrative')}
@@ -128,7 +139,7 @@ export default function MainLayout({ user, onLogout, academicOnly = false }: Mai
       <div className="hidden md:flex w-64 bg-indigo-900 flex-col flex-shrink-0">
         <div className="px-4 py-4 border-b border-indigo-700">
           <h1 className="text-white text-sm font-bold leading-tight">{getSchoolName()}</h1>
-          <p className="text-indigo-300 text-xs mt-0.5">{academicOnly ? 'Academic Portal' : 'Competence Based Assessment System'}</p>
+          <p className="text-indigo-300 text-xs mt-0.5">{portalLabel}</p>
         </div>
         <div className="pt-3 pb-1">
           <TabSwitcher />
@@ -152,7 +163,7 @@ export default function MainLayout({ user, onLogout, academicOnly = false }: Mai
         <div className="px-4 py-4 border-b border-indigo-700 flex items-center justify-between">
           <div>
             <h1 className="text-white text-sm font-bold leading-tight">{getSchoolName()}</h1>
-            <p className="text-indigo-300 text-xs mt-0.5">{academicOnly ? 'Academic Portal' : 'Competence Based Assessment System'}</p>
+            <p className="text-indigo-300 text-xs mt-0.5">{portalLabel}</p>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="text-indigo-300 hover:text-white text-xl p-1">✕</button>
         </div>
@@ -177,7 +188,7 @@ export default function MainLayout({ user, onLogout, academicOnly = false }: Mai
           </button>
           <div className="text-center">
             <p className="text-white text-xs font-bold">{getSchoolName()}</p>
-            <p className="text-indigo-300 text-xs">{academicOnly ? 'Academic Portal' : 'Competence Based Assessment System'}</p>
+            <p className="text-indigo-300 text-xs">{portalLabel}</p>
           </div>
           <button onClick={onLogout} className="text-indigo-300 hover:text-red-400 text-xs p-1">
             🚪

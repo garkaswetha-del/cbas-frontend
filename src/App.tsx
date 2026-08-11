@@ -46,6 +46,18 @@ const SELF_TABS = [
 
 const SELF_TAB_IDS = new Set(SELF_TABS.map(t => t.id));
 
+const AHM_TOOL_TABS = [
+  { id: 'ahm_baseline',     label: 'Baseline Entry' },
+  { id: 'ahm_competencies', label: 'Competency Registry' },
+  { id: 'ahm_activities',   label: 'Activities & Marks' },
+  { id: 'ahm_pasa',         label: 'PA/SA' },
+  { id: 'ahm_observation',  label: 'Class Observation' },
+  { id: 'ahm_substitution', label: 'Substitution' },
+  { id: 'ahm_calendar',     label: 'Academic Calendar' },
+  { id: 'ahm_sow',          label: 'Scheme of Work' },
+];
+const AHM_TOOL_TAB_IDS = new Set(AHM_TOOL_TABS.map(t => t.id));
+
 function TeacherLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<string>('students');
   const [academicYear, setAcademicYear] = useState(currentAcademicYear);
@@ -189,6 +201,168 @@ function TeacherLayout({ user, onLogout }: { user: any; onLogout: () => void }) 
   );
 }
 
+function AHMLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
+  const [activeTab, setActiveTab] = useState<string>('students');
+  const [academicYear, setAcademicYear] = useState(currentAcademicYear);
+  const [mappings, setMappings] = useState<any>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    axios.get(`${API}/mappings/teacher/${user.id}/dashboard?academic_year=${academicYear}`)
+      .then(r => setMappings(r.data))
+      .catch(() => {});
+  }, [academicYear, user?.id]);
+
+  const isClassTeacher = !!(mappings?.is_class_teacher);
+  const AHM_SELF_TABS = SELF_TABS.filter(t => t.id !== 'appraisal');
+  const AHM_SELF_TAB_IDS = new Set(AHM_SELF_TABS.map(t => t.id));
+  const activeGroup: 'class' | 'self' = AHM_SELF_TAB_IDS.has(activeTab) ? 'self' : 'class';
+  const classTabs = CLASS_TABS(isClassTeacher);
+
+  const renderContent = () => {
+    if (activeTab === 'ahm_baseline')     return <BaselinePage />;
+    if (activeTab === 'ahm_competencies') return <CompetencyManagementPage />;
+    if (activeTab === 'ahm_activities')   return <ActivitiesPage />;
+    if (activeTab === 'ahm_pasa')         return <PASAPage />;
+    if (activeTab === 'ahm_observation')  return <ClassObservationPage />;
+    if (activeTab === 'ahm_substitution') return <SubstitutionPage />;
+    if (activeTab === 'ahm_calendar')     return <AcademicCalendarPage />;
+    if (activeTab === 'ahm_sow')          return <SOWPage user={user} />;
+    return (
+      <TeacherDashboardPage
+        user={user}
+        mappings={mappings}
+        activeTab={activeTab}
+        activeGroup={activeGroup}
+        academicYear={academicYear}
+        setAcademicYear={setAcademicYear}
+      />
+    );
+  };
+
+  const SidebarContent = () => (
+    <>
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
+        <p className="text-indigo-400 text-xs font-semibold uppercase tracking-wider px-2 pt-1 pb-1.5">
+          Class Management
+        </p>
+        {classTabs.filter(t => t.show).map(t => (
+          <button
+            key={t.id}
+            onClick={() => { setActiveTab(t.id); setSidebarOpen(false); }}
+            className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === t.id
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+        <p className="text-indigo-400 text-xs font-semibold uppercase tracking-wider px-2 pt-4 pb-1.5">
+          Self Management
+        </p>
+        {AHM_SELF_TABS.filter(t => t.show).map(t => (
+          <button
+            key={t.id}
+            onClick={() => { setActiveTab(t.id); setSidebarOpen(false); }}
+            className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === t.id
+                ? 'bg-purple-600 text-white shadow'
+                : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+        <p className="text-indigo-400 text-xs font-semibold uppercase tracking-wider px-2 pt-4 pb-1.5">
+          AHM Tools
+        </p>
+        {AHM_TOOL_TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => { setActiveTab(t.id); setSidebarOpen(false); }}
+            className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              AHM_TOOL_TAB_IDS.has(activeTab) && activeTab === t.id
+                ? 'bg-teal-600 text-white shadow'
+                : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+      <div className="border-t border-indigo-700 p-4">
+        <div className="flex items-center gap-3 mb-3">
+          {user?.photo ? (
+            <img src={user.photo} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-indigo-400" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+              {user?.name?.[0]?.toUpperCase()}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-white text-xs font-semibold truncate">{user?.name}</p>
+            <p className="text-indigo-300 text-xs capitalize">{user?.role}</p>
+          </div>
+        </div>
+        <button
+          onClick={onLogout}
+          className="w-full flex items-center justify-center gap-2 bg-indigo-700 hover:bg-red-600 text-white text-xs py-2 rounded-lg transition-all font-medium"
+        >
+          <span>🚪</span> Sign Out
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex h-screen bg-gray-100">
+      <div className="hidden md:flex w-64 bg-indigo-900 flex-col flex-shrink-0">
+        <div className="px-4 py-5 border-b border-indigo-700">
+          <h1 className="text-white text-sm font-bold leading-tight">{getSchoolName()}</h1>
+          <p className="text-indigo-300 text-xs mt-0.5">AHM Portal</p>
+        </div>
+        <SidebarContent />
+      </div>
+
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <div className={`fixed top-0 left-0 h-full w-72 bg-indigo-900 z-50 flex flex-col transform transition-transform duration-300 md:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="px-4 py-4 border-b border-indigo-700 flex items-center justify-between">
+          <div>
+            <h1 className="text-white text-sm font-bold leading-tight">{getSchoolName()}</h1>
+            <p className="text-indigo-300 text-xs mt-0.5">AHM Portal</p>
+          </div>
+          <button onClick={() => setSidebarOpen(false)} className="text-indigo-300 hover:text-white text-xl p-1">✕</button>
+        </div>
+        <SidebarContent />
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="md:hidden flex items-center justify-between bg-indigo-900 px-4 py-3 flex-shrink-0">
+          <button onClick={() => setSidebarOpen(true)} className="text-white p-1">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <div className="text-center">
+            <p className="text-white text-xs font-bold">{getSchoolName()}</p>
+            <p className="text-indigo-300 text-xs">AHM Portal</p>
+          </div>
+          <button onClick={onLogout} className="text-indigo-300 hover:text-red-400 text-xs p-1">🚪</button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {renderContent()}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [user, setUser] = useState<any>(null);
   const [checking, setChecking] = useState(true);
@@ -255,22 +429,28 @@ function App() {
     );
   }
 
-  // AHM gets academic tabs only — no admin routes registered
+  // AHM: dual role — teacher tabs + AHM admin tools; no appraisal
   if (user.role === "ahm") {
     return (
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<MainLayout user={user} onLogout={handleLogout} academicOnly />}>
-            <Route index element={<Navigate to="/baseline" replace />} />
-            <Route path="baseline" element={<BaselinePage />} />
-            <Route path="competencies" element={<CompetencyManagementPage />} />
-            <Route path="activities" element={<ActivitiesPage />} />
-            <Route path="pasa" element={<PASAPage />} />
-            <Route path="observation" element={<ClassObservationPage />} />
-            <Route path="substitution" element={<SubstitutionPage />} />
+          <Route path="/*" element={<AHMLayout user={user} onLogout={handleLogout} />} />
+        </Routes>
+      </BrowserRouter>
+    );
+  }
+
+  // Office: user management, student management, calendar with full create/edit access
+  if (user.role === "office") {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<MainLayout user={user} onLogout={handleLogout} officeOnly />}>
+            <Route index element={<Navigate to="/users" replace />} />
+            <Route path="users" element={<UserManagementPage />} />
+            <Route path="students" element={<StudentManagementPage />} />
             <Route path="calendar" element={<AcademicCalendarPage />} />
-            <Route path="sow" element={<SOWPage user={user} />} />
-            <Route path="*" element={<Navigate to="/baseline" replace />} />
+            <Route path="*" element={<Navigate to="/users" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>
