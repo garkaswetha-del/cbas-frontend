@@ -557,9 +557,10 @@ export default function UserManagementPage() {
   // If the tag doesn't match the current year, the fetch is still in flight — show nothing.
   const assignmentsReady = assignmentsYear === academicYear;
   const hasAssignments = assignmentsReady && Object.keys(assignments).length > 0;
+  const TEACHING_ROLES = new Set(["teacher", "ahm", "principal"]);
   const teachers = !assignmentsReady
     ? []
-    : users.filter(u => u.role === "teacher" && !!assignments[u.id]);
+    : users.filter(u => TEACHING_ROLES.has(u.role) && !!assignments[u.id]);
   const admins = users.filter(u => u.role === "admin");
   const ahms = users.filter(u => u.role === "ahm");
   const principals = users.filter(u => u.role === "principal");
@@ -568,7 +569,7 @@ export default function UserManagementPage() {
   // Year-specific stats derived from filtered teacher list
   const yearStats = hasAssignments ? {
     total: teachers.length,
-    inactive: inactiveUsers.filter((u: any) => u.role === "teacher").length,
+    inactive: inactiveUsers.filter((u: any) => TEACHING_ROLES.has(u.role)).length,
     byQualification: Object.entries(
       teachers.reduce((acc: Record<string, number>, u: any) => {
         const q = (u.appraisal_qualification || u.qualification || "Unknown").toUpperCase().replace(/B\.ED/g, 'BED').replace(/D\.ED/g, 'DED');
@@ -1047,9 +1048,17 @@ export default function UserManagementPage() {
                               </div>
                             )}
                             <div>
-                              <button onClick={() => viewHistory(u)} className="font-medium text-gray-800 hover:text-indigo-600 text-left">
-                                {u.name}
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button onClick={() => viewHistory(u)} className="font-medium text-gray-800 hover:text-indigo-600 text-left">
+                                  {u.name}
+                                </button>
+                                {u.role === "ahm" && (
+                                  <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700">AHM</span>
+                                )}
+                                {u.role === "principal" && (
+                                  <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">Principal</span>
+                                )}
+                              </div>
                               <p className="text-gray-400">{u.appraisal_qualification||"—"}</p>
                             </div>
                           </div>
