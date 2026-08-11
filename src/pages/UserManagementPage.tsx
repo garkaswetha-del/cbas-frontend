@@ -561,6 +561,9 @@ export default function UserManagementPage() {
     ? []
     : users.filter(u => u.role === "teacher" && !!assignments[u.id]);
   const admins = users.filter(u => u.role === "admin");
+  const ahms = users.filter(u => u.role === "ahm");
+  const principals = users.filter(u => u.role === "principal");
+  const staffAccounts = [...principals, ...ahms, ...admins];
 
   // Year-specific stats derived from filtered teacher list
   const yearStats = hasAssignments ? {
@@ -1373,11 +1376,12 @@ export default function UserManagementPage() {
         </div>
       )}
 
-      {/* ── ADMINS TABLE ── */}
-      {activeTab === "active" && admins.length > 0 && (
+      {/* ── STAFF ACCOUNTS TABLE (Principal / AHM / Admin) ── */}
+      {activeTab === "active" && staffAccounts.length > 0 && (
         <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <h2 className="text-sm font-bold text-gray-700">Admins ({admins.length})</h2>
+            <h2 className="text-sm font-bold text-gray-700">Staff Accounts ({staffAccounts.length})</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Principal · AHM · Admin</p>
           </div>
           <table className="w-full text-xs border-collapse">
             <thead>
@@ -1385,23 +1389,35 @@ export default function UserManagementPage() {
                 <th className="px-3 py-2 text-center w-8">#</th>
                 <th className="px-3 py-2 text-left">Name</th>
                 <th className="px-3 py-2 text-left">Email</th>
+                <th className="px-3 py-2 text-center">Role</th>
                 <th className="px-3 py-2 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {admins.map((u, i) => (
-                <tr key={u.id} className={`border-b border-gray-100 ${i%2===0?"bg-white":"bg-gray-50"}`}>
-                  <td className="px-3 py-2.5 text-center text-gray-400">{i+1}</td>
-                  <td className="px-3 py-2.5 font-medium text-gray-800">{u.name}</td>
-                  <td className="px-3 py-2.5 text-gray-500">{u.email}</td>
-                  <td className="px-3 py-2.5 text-center">
-                    <div className="flex gap-1 justify-center">
-                      <button onClick={() => openEdit(u)} className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 text-xs">✏️</button>
-                      <button onClick={() => deactivateUser(u.id, u.name)} className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs">🔴</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {staffAccounts.map((u, i) => {
+                const roleColors: Record<string, string> = {
+                  principal: "bg-purple-100 text-purple-700",
+                  ahm:       "bg-teal-100 text-teal-700",
+                  admin:     "bg-indigo-100 text-indigo-700",
+                };
+                const roleColor = roleColors[u.role] || "bg-gray-100 text-gray-600";
+                return (
+                  <tr key={u.id} className={`border-b border-gray-100 ${i%2===0?"bg-white":"bg-gray-50"}`}>
+                    <td className="px-3 py-2.5 text-center text-gray-400">{i+1}</td>
+                    <td className="px-3 py-2.5 font-medium text-gray-800">{u.name}</td>
+                    <td className="px-3 py-2.5 text-gray-500">{u.email}</td>
+                    <td className="px-3 py-2.5 text-center">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${roleColor}`}>{u.role}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <div className="flex gap-1 justify-center">
+                        <button onClick={() => openEdit(u)} className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 text-xs">✏️</button>
+                        <button onClick={() => deactivateUser(u.id, u.name)} className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs">🔴</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
