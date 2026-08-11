@@ -3,7 +3,8 @@ import axios from "axios";
 import { currentAcademicYear } from "../utils/academicYear";
 import AcademicYearSelect from "../components/AcademicYearSelect";
 
-const API = "https://cbas-backend-production.up.railway.app";
+import { getAPI } from '../utils/api';
+const API = getAPI();
 const STAGES = ["Foundation", "Preparatory", "Middle", "Secondary"];
 
 interface Memo {

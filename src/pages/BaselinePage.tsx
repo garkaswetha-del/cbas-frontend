@@ -8,7 +8,8 @@ import {
   ResponsiveContainer, LineChart, Line, Cell,
 } from "recharts";
 
-const API = "https://cbas-backend-production.up.railway.app";
+import { getAPI } from '../utils/api';
+const API = getAPI();
 
 // ── Section name corrections (Excel typos → DB names) ────────────
 const SECTION_CORRECTIONS: Record<string, string> = {

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { currentAcademicYear } from "../utils/academicYear";
 import AcademicYearSelect from "../components/AcademicYearSelect";
 
-const API = "https://cbas-backend-production.up.railway.app";
+import { getAPI } from '../utils/api';
+const API = getAPI();
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const COMMON_SUBJECTS = ["Mathematics", "English", "Kannada", "Science", "Social Studies", "Hindi", "Telugu", "EVS", "Computer Science", "Physical Education"];

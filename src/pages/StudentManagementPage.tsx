@@ -8,7 +8,8 @@ import AcademicYearSelect from "../components/AcademicYearSelect";
 
 const STANDARD_YEARS = generateAcademicYears();
 
-const API = "https://cbas-backend-production.up.railway.app";
+import { getAPI } from '../utils/api';
+const API = getAPI();
 const CLASSES = [
   "Pre-KG", "LKG", "UKG",
   "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5",

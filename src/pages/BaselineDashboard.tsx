@@ -4,7 +4,8 @@ import { currentAcademicYear } from "../utils/academicYear";
 import AcademicYearSelect from "../components/AcademicYearSelect";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
-const API = "https://cbas-backend-production.up.railway.app";
+import { getAPI } from '../utils/api';
+const API = getAPI();
 const ROUNDS = [
   { value: "baseline_1", label: "Baseline 1" }, { value: "baseline_2", label: "Baseline 2" },
   { value: "baseline_3", label: "Baseline 3" }, { value: "baseline_4", label: "Baseline 4" },

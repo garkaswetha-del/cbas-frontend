@@ -3,8 +3,9 @@ import axios from 'axios';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { currentAcademicYear } from './utils/academicYear';
 
-const API = 'https://cbas-backend-production.up.railway.app';
 import MainLayout from './layouts/MainLayout';
+import { getAPI, getSchoolName } from './utils/api';
+const API = getAPI();
 import LoginPage from './pages/LoginPage';
 import UserManagementPage from './pages/UserManagementPage';
 import StudentManagementPage from './pages/StudentManagementPage';
@@ -128,7 +129,7 @@ function TeacherLayout({ user, onLogout }: { user: any; onLogout: () => void }) 
       {/* ── DESKTOP SIDEBAR ── */}
       <div className="hidden md:flex w-64 bg-indigo-900 flex-col flex-shrink-0">
         <div className="px-4 py-5 border-b border-indigo-700">
-          <h1 className="text-white text-sm font-bold leading-tight">Wisdom Techno School</h1>
+          <h1 className="text-white text-sm font-bold leading-tight">{getSchoolName()}</h1>
           <p className="text-indigo-300 text-xs mt-0.5">Teacher Portal</p>
         </div>
         <SidebarContent />
@@ -146,7 +147,7 @@ function TeacherLayout({ user, onLogout }: { user: any; onLogout: () => void }) 
       <div className={`fixed top-0 left-0 h-full w-72 bg-indigo-900 z-50 flex flex-col transform transition-transform duration-300 md:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="px-4 py-4 border-b border-indigo-700 flex items-center justify-between">
           <div>
-            <h1 className="text-white text-sm font-bold leading-tight">Wisdom Techno School</h1>
+            <h1 className="text-white text-sm font-bold leading-tight">{getSchoolName()}</h1>
             <p className="text-indigo-300 text-xs mt-0.5">Teacher Portal</p>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="text-indigo-300 hover:text-white text-xl p-1">✕</button>
@@ -165,7 +166,7 @@ function TeacherLayout({ user, onLogout }: { user: any; onLogout: () => void }) 
             </svg>
           </button>
           <div className="text-center">
-            <p className="text-white text-xs font-bold">Wisdom Techno School</p>
+            <p className="text-white text-xs font-bold">{getSchoolName()}</p>
             <p className="text-indigo-300 text-xs">Teacher Portal</p>
           </div>
           <button onClick={onLogout} className="text-indigo-300 hover:text-red-400 text-xs p-1">

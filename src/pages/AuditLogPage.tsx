@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-const API = 'https://cbas-backend-production.up.railway.app';
+import { getAPI } from '../utils/api';
+const API = getAPI();
 const PAGE_SIZE = 50;
 
 const ALL_ACTIONS = [

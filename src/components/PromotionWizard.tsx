@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 
-const API = "https://cbas-backend-production.up.railway.app";
+import { getAPI } from '../utils/api';
+const API = getAPI();
 const GRADE_ORDER = [
   "Pre-KG", "LKG", "UKG",
   "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5",

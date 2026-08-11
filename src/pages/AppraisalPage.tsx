@@ -4,7 +4,8 @@ import * as XLSX from "xlsx";
 import { currentAcademicYear } from "../utils/academicYear";
 import AcademicYearSelect from "../components/AcademicYearSelect";
 
-const API = "https://cbas-backend-production.up.railway.app";
+import { getAPI } from '../utils/api';
+const API = getAPI();
 
 const GRADE_ORDER = ["Nursery","LKG","UKG","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10"];
 

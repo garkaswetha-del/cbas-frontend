@@ -1,7 +1,8 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
-const API = "https://cbas-backend-production.up.railway.app";
+import { getAPI } from '../utils/api';
+const API = getAPI();
 
 const STAGES = [
   { value: "foundation", label: "Foundation (Pre-KG to Grade 2)" },

@@ -8,7 +8,8 @@ import {
   LineChart, Line, Legend,
 } from "recharts";
 
-const API = "https://cbas-backend-production.up.railway.app";
+import { getAPI } from '../utils/api';
+const API = getAPI();
 
 
 const CLASSES = [

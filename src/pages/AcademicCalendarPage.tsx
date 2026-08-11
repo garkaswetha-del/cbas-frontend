@@ -3,7 +3,8 @@ import axios from 'axios';
 import { currentAcademicYear } from '../utils/academicYear';
 import AcademicYearSelect from '../components/AcademicYearSelect';
 
-const API = 'https://cbas-backend-production.up.railway.app';
+import { getAPI } from '../utils/api';
+const API = getAPI();
 
 const EVENT_TYPES = [
   { value: 'holiday',  label: 'Holiday',    color: 'bg-red-100 text-red-800 border-red-200',          dot: 'bg-red-500',    ring: 'ring-red-400' },

@@ -5,7 +5,8 @@ import {
   ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie,
 } from "recharts";
 
-const API = "https://cbas-backend-production.up.railway.app";
+import { getAPI } from '../utils/api';
+const API = getAPI();
 
 const YEARS = ["2025-26", "2026-27"];
 

@@ -2,7 +2,8 @@
 import axios from "axios";
 import { currentAcademicYear } from "../utils/academicYear";
 
-const API = "https://cbas-backend-production.up.railway.app";
+import { getAPI } from '../utils/api';
+const API = getAPI();
 const ACADEMIC_YEAR = currentAcademicYear();
 
 const GRADES = [

@@ -3,7 +3,8 @@ import axios from "axios";
 import { currentAcademicYear } from "../utils/academicYear";
 import AcademicYearSelect from "../components/AcademicYearSelect";
 
-const API = "https://cbas-backend-production.up.railway.app";
+import { getAPI } from '../utils/api';
+const API = getAPI();
 const EXAM_TYPES = ["FA1", "FA2", "SA1", "FA3", "FA4", "SA2", "Custom"];
 
 function getBand(pct: number) {
@@ -662,7 +663,8 @@ function PASADashboardTab({ academicYear }: any) {
 }
 
 function StudentDashTab({ grade, section, academicYear }: any) {
-  const API = "https://cbas-backend-production.up.railway.app";
+  import { getAPI } from '../utils/api';
+const API = getAPI();
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [analysis, setAnalysis] = useState<any>(null);
