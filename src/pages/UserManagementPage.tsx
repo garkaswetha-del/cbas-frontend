@@ -317,7 +317,27 @@ export default function UserManagementPage() {
     try {
       await axios.post(`${API}/mappings/save`, { teacher_id: expandedTeacherId, academic_year: academicYear, mappings });
       showMsg(`✅ Assignments saved for ${academicYear}`);
-      fetchAssignments();
+      // Re-fetch from DB and refresh both the summary table and the open edit panel
+      const r = await axios.get(`${API}/mappings/all?academic_year=${academicYear}`);
+      const map: Record<string, any> = {};
+      const flat: Record<string, any[]> = {};
+      (r.data || []).forEach((m: any) => {
+        if (!map[m.teacher_id]) map[m.teacher_id] = { subjects: [], assigned_classes: [], class_teacher_of: "" };
+        if (m.subject && !map[m.teacher_id].subjects.includes(m.subject)) map[m.teacher_id].subjects.push(m.subject);
+        if (m.grade && !map[m.teacher_id].assigned_classes.includes(m.grade)) map[m.teacher_id].assigned_classes.push(m.grade);
+        if (m.is_class_teacher && m.grade && m.section) map[m.teacher_id].class_teacher_of = `${m.grade} ${m.section}`;
+        if (!flat[m.teacher_id]) flat[m.teacher_id] = [];
+        flat[m.teacher_id].push(m);
+      });
+      setAssignments(map);
+      setAllMappingsFlat(flat);
+      setAssignmentsYear(academicYear);
+      // Refresh the open edit panel so it reflects exactly what is now in the DB
+      const freshMappings = flat[expandedTeacherId!] || [];
+      setEditRows(buildEditRows(freshMappings));
+      const ct = extractClassTeacher(freshMappings);
+      setClassTeacherGrade(ct.grade);
+      setClassTeacherSection(ct.section);
     } catch (e: any) { showMsg("❌ " + (e?.response?.data?.message || "Error saving assignments")); }
     setSavingAssignments(false);
   };
