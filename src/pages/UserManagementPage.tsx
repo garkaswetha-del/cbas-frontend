@@ -227,7 +227,7 @@ export default function UserManagementPage() {
 
   // ── Computed lists ──
   const assignmentsReady = assignmentsYear === academicYear;
-  const teachers = !assignmentsReady ? [] : users.filter(u => TEACHING_ROLES.has(u.role) && !!assignments[u.id]);
+  const teachers = users.filter(u => TEACHING_ROLES.has(u.role) && u.is_active !== false);
   const allActiveTeachers = users.filter(u => TEACHING_ROLES.has(u.role) && u.is_active !== false);
   const admins = users.filter(u => u.role === "admin");
   const ahms = users.filter(u => u.role === "ahm");
@@ -276,10 +276,31 @@ export default function UserManagementPage() {
       experience: u.experience || "", photo: u.photo || "",
     });
     const flatMappings = allMappingsFlat[u.id] || [];
-    setEditRows(buildEditRows(flatMappings));
-    const ct = extractClassTeacher(flatMappings);
-    setClassTeacherGrade(ct.grade);
-    setClassTeacherSection(ct.section);
+    if (flatMappings.length > 0) {
+      setEditRows(buildEditRows(flatMappings));
+      const ct = extractClassTeacher(flatMappings);
+      setClassTeacherGrade(ct.grade);
+      setClassTeacherSection(ct.section);
+    } else {
+      // No teacher_mappings yet — seed the form from the users table data
+      const grades: string[] = u.assigned_classes || [];
+      const subs: string[]   = (u.subjects || []).filter(Boolean);
+      const secs: string[]   = u.assigned_sections || [];
+      setEditRows(grades.length > 0
+        ? grades.map((grade: string) => ({ grade, subjects: subs, sections: secs }))
+        : [{ grade: "", subjects: [], sections: [] }]);
+      // Parse class_teacher_of e.g. "Grade 9 Himalaya" → grade="Grade 9", section="Himalaya"
+      const ctRaw: string = u.class_teacher_of || "";
+      const ctParts = ctRaw.trim().split(/\s+/);
+      let ctGrade = "", ctSection = "";
+      if (ctParts.length >= 3 && ctParts[0].toLowerCase() === "grade") {
+        ctGrade = `Grade ${ctParts[1]}`; ctSection = ctParts.slice(2).join(" ");
+      } else if (ctParts.length === 2) {
+        ctGrade = ctParts[0]; ctSection = ctParts[1];
+      }
+      setClassTeacherGrade(ctGrade);
+      setClassTeacherSection(ctSection);
+    }
   };
 
   const saveProfile = async () => {
@@ -332,6 +353,8 @@ export default function UserManagementPage() {
       setAssignments(map);
       setAllMappingsFlat(flat);
       setAssignmentsYear(academicYear);
+      // Refresh users so u.subjects / u.assigned_classes reflect the new save
+      fetchUsers();
       // Refresh the open edit panel so it reflects exactly what is now in the DB
       const freshMappings = flat[expandedTeacherId!] || [];
       setEditRows(buildEditRows(freshMappings));
@@ -724,7 +747,7 @@ export default function UserManagementPage() {
               { label:"Middle",      sub:"Grade 6–8",         active:"bg-purple-600 text-white", inactive:"bg-white text-purple-700 border border-purple-300 hover:bg-purple-50" },
               { label:"Secondary",   sub:"Grade 9–10",        active:"bg-orange-500 text-white", inactive:"bg-white text-orange-700 border border-orange-300 hover:bg-orange-50" },
             ].map(tab => {
-              const count = filtered.filter(u => STAGE_ORDER[primaryStageOrder(assignments[u.id]?.assigned_classes || [])] === tab.label).length;
+              const count = filtered.filter(u => STAGE_ORDER[primaryStageOrder(assignments[u.id]?.assigned_classes || u.assigned_classes || [])] === tab.label).length;
               return (
                 <button key={tab.label} onClick={() => setStageFilter(tab.label)}
                   className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${stageFilter===tab.label ? tab.active : tab.inactive}`}>
@@ -798,10 +821,9 @@ export default function UserManagementPage() {
                   <tbody>
                     {stageFiltered.map((u, i) => {
                       const asgn = assignments[u.id];
-                      const isPast = academicYear < currentAcademicYear;
-                      const subs   = asgn?.subjects?.length      > 0 ? asgn.subjects      : (isPast ? (u.subjects||[])        : []);
-                      const cls    = asgn?.assigned_classes?.length > 0 ? asgn.assigned_classes : (isPast ? (u.assigned_classes||[]) : []);
-                      const ct     = asgn?.class_teacher_of || (isPast ? (u.class_teacher_of||"") : "");
+                      const subs   = asgn?.subjects?.length      > 0 ? asgn.subjects      : (u.subjects||[]);
+                      const cls    = asgn?.assigned_classes?.length > 0 ? asgn.assigned_classes : (u.assigned_classes||[]);
+                      const ct     = asgn?.class_teacher_of || (u.class_teacher_of||"");
                       const isOpen = expandedTeacherId === u.id;
                       return (
                         <Fragment key={u.id}>
