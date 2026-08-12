@@ -76,14 +76,16 @@ type MainTab = "teachers" | "staff" | "inactive" | "grade-subjects";
 type EditSubTab = "profile" | "assignments";
 
 function buildEditRows(mappings: any[]) {
+  // Group by grade: each row = one grade with multiple subjects + multiple sections
   const rowMap: Record<string, any> = {};
   for (const m of mappings) {
-    const key = `${m.grade}|||${m.subject || ""}`;
-    if (!rowMap[key]) rowMap[key] = { grade: m.grade || "", subject: m.subject || "", sections: [] };
-    if (m.section && !rowMap[key].sections.includes(m.section)) rowMap[key].sections.push(m.section);
+    if (!m.grade) continue;
+    if (!rowMap[m.grade]) rowMap[m.grade] = { grade: m.grade, subjects: [], sections: [] };
+    if (m.subject && !rowMap[m.grade].subjects.includes(m.subject)) rowMap[m.grade].subjects.push(m.subject);
+    if (m.section && !rowMap[m.grade].sections.includes(m.section)) rowMap[m.grade].sections.push(m.section);
   }
   const result = Object.values(rowMap);
-  return result.length > 0 ? result : [{ grade: "", subject: "", sections: [] }];
+  return result.length > 0 ? result : [{ grade: "", subjects: [], sections: [] }];
 }
 function extractClassTeacher(mappings: any[]) {
   const ct = mappings.find(m => m.is_class_teacher);
@@ -123,7 +125,7 @@ export default function UserManagementPage() {
   const [expandedTeacherId, setExpandedTeacherId] = useState<string | null>(null);
   const [editSubTab, setEditSubTab] = useState<EditSubTab>("profile");
   const [editProfileForm, setEditProfileForm] = useState<any>({});
-  const [editRows, setEditRows] = useState<any[]>([{ grade: "", subject: "", sections: [] }]);
+  const [editRows, setEditRows] = useState<any[]>([{ grade: "", subjects: [], sections: [] }]);
   const [classTeacherGrade, setClassTeacherGrade] = useState("");
   const [classTeacherSection, setClassTeacherSection] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
@@ -300,13 +302,16 @@ export default function UserManagementPage() {
     for (const row of editRows) {
       if (!row.grade) continue;
       const secs = row.sections.length > 0 ? row.sections : [""];
+      const subs: (string | null)[] = row.subjects.length > 0 ? row.subjects : [null];
       for (const sec of secs) {
-        mappings.push({
-          grade: row.grade,
-          section: sec,
-          subject: row.subject || null,
-          is_class_teacher: row.grade === classTeacherGrade && sec === classTeacherSection,
-        });
+        for (const sub of subs) {
+          mappings.push({
+            grade: row.grade,
+            section: sec,
+            subject: sub,
+            is_class_teacher: row.grade === classTeacherGrade && sec === classTeacherSection,
+          });
+        }
       }
     }
     try {
@@ -479,15 +484,20 @@ export default function UserManagementPage() {
   };
 
   // ── Assignment row helpers ──
-  const updateEditRow = (i: number, field: string, value: any) => {
-    setEditRows(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: value, ...(field === "grade" ? { subject: "", sections: [] } : {}) } : r));
+  const updateEditRowGrade = (i: number, grade: string) => {
+    setEditRows(rows => rows.map((r, idx) => idx === i ? { ...r, grade, subjects: [], sections: [] } : r));
+  };
+  const toggleSubjectInRow = (rowIdx: number, sub: string) => {
+    setEditRows(rows => rows.map((r, i) => i !== rowIdx ? r : {
+      ...r, subjects: r.subjects.includes(sub) ? r.subjects.filter((s: string) => s !== sub) : [...r.subjects, sub]
+    }));
   };
   const toggleSection = (rowIdx: number, sec: string) => {
     setEditRows(rows => rows.map((r, i) => i !== rowIdx ? r : {
       ...r, sections: r.sections.includes(sec) ? r.sections.filter((s: string) => s !== sec) : [...r.sections, sec]
     }));
   };
-  const addEditRow = () => setEditRows(r => [...r, { grade: "", subject: "", sections: [] }]);
+  const addEditRow = () => setEditRows(r => [...r, { grade: "", subjects: [], sections: [] }]);
   const removeEditRow = (i: number) => setEditRows(r => r.filter((_,idx) => idx !== i));
 
   // ── Photo helpers ──
@@ -901,64 +911,90 @@ export default function UserManagementPage() {
                                   {editSubTab === "assignments" && (
                                     <div className="p-4">
                                       <div className="bg-white border border-indigo-100 rounded-lg px-3 py-2 mb-4 text-xs text-indigo-700">
-                                        Editing <strong>{academicYear}</strong> assignments. Previous years are not affected.
-                                        {" "}Each row = <strong>one grade + one subject</strong>. Teaching the same subject in multiple grades? Add one row per grade.
-                                        {Object.keys(gradeSubjects).length === 0 && <span className="text-orange-600 ml-1">⚠ No subjects configured — go to "Grade &amp; Subject Mapping" tab first.</span>}
+                                        Editing <strong>{academicYear}</strong>. Each card = one grade.
+                                        Select <strong>all subjects</strong> and <strong>all sections</strong> for that grade.
+                                        Teaching in multiple grades? Add one card per grade.
+                                        {Object.keys(gradeSubjects).length === 0 && <span className="text-orange-600 ml-2">⚠ No subjects configured — go to "Grade &amp; Subject Mapping" tab first.</span>}
                                       </div>
 
-                                      {/* Subject-Grade rows */}
-                                      <div className="space-y-2 mb-3">
+                                      {/* Grade cards */}
+                                      <div className="space-y-3 mb-3">
                                         {editRows.map((row, ri) => {
                                           const availableSubjects = gradeSubjects[row.grade] || [];
-                                          const availableSections = allSectionsFull.filter(s => !row.grade || s.grade === row.grade);
+                                          const availableSections = allSectionsFull.filter(s => s.grade === row.grade);
                                           return (
-                                            <div key={ri} className="bg-white border border-gray-200 rounded-lg p-3">
-                                              {/* Row label */}
-                                              <div className="flex items-center gap-2 mb-2">
-                                                <span className="text-xs font-semibold text-gray-400 bg-gray-100 rounded px-2 py-0.5">Row {ri + 1}</span>
-                                                {row.grade && row.subject && (
-                                                  <span className="text-xs text-indigo-600 font-medium">{row.subject} → {row.grade}</span>
+                                            <div key={ri} className="bg-white border-2 border-gray-200 rounded-xl p-4">
+                                              {/* Card header */}
+                                              <div className="flex items-center gap-2 mb-3">
+                                                <span className="text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-2.5 py-0.5">
+                                                  {row.grade || `Grade ${ri + 1}`}
+                                                </span>
+                                                {row.subjects.length > 0 && (
+                                                  <span className="text-xs text-gray-500">{row.subjects.length} subject{row.subjects.length > 1 ? "s" : ""}</span>
+                                                )}
+                                                {row.sections.length > 0 && (
+                                                  <span className="text-xs text-gray-500">{row.sections.length} section{row.sections.length > 1 ? "s" : ""}</span>
                                                 )}
                                                 {editRows.length > 1 && (
-                                                  <button onClick={() => removeEditRow(ri)} className="ml-auto text-xs text-red-400 hover:text-red-600 font-medium">✕ Remove row</button>
+                                                  <button onClick={() => removeEditRow(ri)} className="ml-auto text-xs text-red-400 hover:text-red-600 font-medium">✕ Remove</button>
                                                 )}
                                               </div>
-                                              {/* Grade + Subject dropdowns */}
-                                              <div className="flex gap-3 flex-wrap mb-2">
-                                                <div>
-                                                  <label className="text-xs text-gray-400 block mb-1">Grade</label>
-                                                  <select value={row.grade} onChange={e => updateEditRow(ri, "grade", e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs bg-white min-w-[130px]">
-                                                    <option value="">— Select Grade —</option>
-                                                    {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-                                                  </select>
-                                                </div>
-                                                <div>
-                                                  <label className="text-xs text-gray-400 block mb-1">Subject taught in this grade</label>
-                                                  <select value={row.subject} onChange={e => updateEditRow(ri, "subject", e.target.value)} disabled={!row.grade || availableSubjects.length === 0} className="border border-gray-300 rounded px-2 py-1.5 text-xs bg-white min-w-[160px] disabled:bg-gray-50 disabled:text-gray-400">
-                                                    <option value="">{!row.grade ? "Pick grade first" : availableSubjects.length === 0 ? "No subjects for this grade" : "— Select Subject —"}</option>
-                                                    {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
-                                                  </select>
-                                                </div>
+
+                                              {/* Grade dropdown */}
+                                              <div className="mb-3">
+                                                <label className="text-xs text-gray-500 font-semibold block mb-1">Grade</label>
+                                                <select value={row.grade} onChange={e => updateEditRowGrade(ri, e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs bg-white w-40">
+                                                  <option value="">— Select Grade —</option>
+                                                  {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                                                </select>
                                               </div>
-                                              {/* Sections */}
+
                                               {row.grade && (
-                                                <div>
-                                                  <label className="text-xs text-gray-400 block mb-1">
-                                                    Sections in {row.grade} <span className="text-indigo-500 font-medium">({row.sections.length} selected)</span>
-                                                  </label>
-                                                  {availableSections.length === 0 ? (
-                                                    <p className="text-xs text-gray-400 italic">No sections found for {row.grade}</p>
-                                                  ) : (
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                      {availableSections.map(s => (
-                                                        <button key={s.name} onClick={() => toggleSection(ri, s.name)}
-                                                          className={`px-2 py-0.5 text-xs rounded border transition-all ${row.sections.includes(s.name) ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:border-indigo-400"}`}>
-                                                          {s.name}
-                                                        </button>
-                                                      ))}
-                                                    </div>
-                                                  )}
-                                                </div>
+                                                <>
+                                                  {/* Subjects — multi-select chips */}
+                                                  <div className="mb-3">
+                                                    <label className="text-xs text-gray-500 font-semibold block mb-1.5">
+                                                      Subjects taught in {row.grade}
+                                                      <span className="ml-1.5 text-indigo-500 font-normal">
+                                                        {row.subjects.length === 0 ? "(click to select)" : `(${row.subjects.length} selected)`}
+                                                      </span>
+                                                    </label>
+                                                    {availableSubjects.length === 0 ? (
+                                                      <p className="text-xs text-orange-500 italic">No subjects configured for {row.grade} — add them in the "Grade &amp; Subject Mapping" tab.</p>
+                                                    ) : (
+                                                      <div className="flex flex-wrap gap-1.5">
+                                                        {availableSubjects.map(sub => (
+                                                          <button key={sub} onClick={() => toggleSubjectInRow(ri, sub)}
+                                                            className={`px-2.5 py-1 text-xs rounded-full border font-medium transition-all ${row.subjects.includes(sub) ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:border-indigo-400 hover:text-indigo-600"}`}>
+                                                            {sub}
+                                                          </button>
+                                                        ))}
+                                                      </div>
+                                                    )}
+                                                  </div>
+
+                                                  {/* Sections — multi-select chips */}
+                                                  <div>
+                                                    <label className="text-xs text-gray-500 font-semibold block mb-1.5">
+                                                      Sections in {row.grade}
+                                                      <span className="ml-1.5 text-indigo-500 font-normal">
+                                                        {row.sections.length === 0 ? "(click to select)" : `(${row.sections.length} selected)`}
+                                                      </span>
+                                                    </label>
+                                                    {availableSections.length === 0 ? (
+                                                      <p className="text-xs text-gray-400 italic">No sections found for {row.grade}.</p>
+                                                    ) : (
+                                                      <div className="flex flex-wrap gap-1.5">
+                                                        {availableSections.map(s => (
+                                                          <button key={s.name} onClick={() => toggleSection(ri, s.name)}
+                                                            className={`px-2.5 py-1 text-xs rounded-full border font-medium transition-all ${row.sections.includes(s.name) ? "bg-green-600 text-white border-green-600" : "bg-white text-gray-600 border-gray-300 hover:border-green-400 hover:text-green-600"}`}>
+                                                            {s.name}
+                                                          </button>
+                                                        ))}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                </>
                                               )}
                                             </div>
                                           );
@@ -966,13 +1002,13 @@ export default function UserManagementPage() {
                                       </div>
 
                                       <button onClick={addEditRow} className="px-3 py-1.5 border border-dashed border-indigo-400 text-indigo-600 text-xs rounded-lg hover:bg-indigo-50 font-medium mb-5">
-                                        + Add another grade / subject
+                                        + Add another grade
                                       </button>
 
                                       {/* Class Teacher — dedicated section */}
-                                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                                        <h4 className="text-xs font-bold text-yellow-800 mb-1">👑 Class Teacher Role (optional)</h4>
-                                        <p className="text-xs text-yellow-700 mb-3">Select the ONE section this teacher is class teacher for. Leave blank if not applicable.</p>
+                                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
+                                        <h4 className="text-xs font-bold text-yellow-800 mb-1">👑 Class Teacher Role <span className="font-normal text-yellow-600">(optional)</span></h4>
+                                        <p className="text-xs text-yellow-700 mb-3">Pick the ONE section this teacher is class teacher for.</p>
                                         <div className="flex gap-3 flex-wrap items-end">
                                           <div>
                                             <label className="text-xs text-gray-500 block mb-1">Grade</label>
@@ -1008,14 +1044,14 @@ export default function UserManagementPage() {
                                             </span>
                                           )}
                                           {classTeacherGrade && (
-                                            <button onClick={() => { setClassTeacherGrade(""); setClassTeacherSection(""); }} className="text-xs text-gray-400 hover:text-red-500 pb-0.5">
+                                            <button onClick={() => { setClassTeacherGrade(""); setClassTeacherSection(""); }} className="text-xs text-gray-400 hover:text-red-500">
                                               Clear
                                             </button>
                                           )}
                                         </div>
                                       </div>
 
-                                      <button onClick={saveAssignments} disabled={savingAssignments} className="px-5 py-2 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 font-semibold disabled:opacity-50">
+                                      <button onClick={saveAssignments} disabled={savingAssignments} className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-semibold disabled:opacity-50">
                                         {savingAssignments ? "Saving..." : `💾 Save Assignments for ${academicYear}`}
                                       </button>
                                     </div>
