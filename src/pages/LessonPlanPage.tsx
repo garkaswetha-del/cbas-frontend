@@ -82,6 +82,16 @@ export default function LessonPlanPage({ user, mappings, academicYear, readOnly 
   const [paramOverrides, setParamOverrides] = useState<any>({});
   const [showOverrides, setShowOverrides] = useState(false);
 
+  // Chapter plan (multi-LP generation)
+  const [chapterMode, setChapterMode] = useState(false);
+  const [lpCount, setLpCount] = useState(3);
+  const [startDate, setStartDate] = useState('');
+  const [lpDuration, setLpDuration] = useState(45);
+  const [chapterForMulti, setChapterForMulti] = useState('');
+  const [lpSuggestion, setLpSuggestion] = useState<{ suggested_lps: number; reason: string } | null>(null);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [chapterGenLoading, setChapterGenLoading] = useState(false);
+
   // For admin/AHM view: all plans
   const [allPlans, setAllPlans] = useState<any[]>([]);
   const [gradeFilter, setGradeFilter] = useState('');
@@ -217,6 +227,39 @@ export default function LessonPlanPage({ user, mappings, academicYear, readOnly 
     } finally { setWsLoading(false); }
   }
 
+  async function suggestLpCount() {
+    if (!chapterForMulti) { alert('Select a chapter first.'); return; }
+    setSuggestLoading(true);
+    try {
+      const r = await axios.post(`${API}/lesson-plans/ai/suggest-lp-count`, {
+        grade, subject: activeSubject, chapter_name: chapterForMulti,
+      });
+      setLpSuggestion(r.data);
+      setLpCount(r.data.suggested_lps || 3);
+    } catch { alert('Could not get suggestion. Check that the chapter PDF is uploaded.'); }
+    finally { setSuggestLoading(false); }
+  }
+
+  async function generateChapterPlans() {
+    if (!chapterForMulti || !lpCount) { alert('Select a chapter and LP count first.'); return; }
+    setChapterGenLoading(true);
+    try {
+      await axios.post(`${API}/lesson-plans/ai/generate-chapter`, {
+        teacher_id: user.id, academic_year: academicYear,
+        grade, section, subject: activeSubject,
+        chapter_name: chapterForMulti, total_lps: lpCount,
+        duration: lpDuration, start_date: startDate || undefined,
+        parameter_overrides: showOverrides ? paramOverrides : {},
+      });
+      setChapterMode(false);
+      setChapterForMulti('');
+      setLpSuggestion(null);
+      await fetchPlans();
+    } catch (e: any) {
+      alert('Generation failed: ' + (e.response?.data?.message || e.message));
+    } finally { setChapterGenLoading(false); }
+  }
+
   async function generateHomework() {
     if (!selectedPlan?.id) return;
     setHwLoading(true);
@@ -333,9 +376,13 @@ export default function LessonPlanPage({ user, mappings, academicYear, readOnly 
 
         {/* New plan button */}
         {ncertMappings.length > 0 && (
-          <div className="p-2 border-b">
+          <div className="p-2 border-b space-y-1">
             <button onClick={openNew} className="w-full bg-indigo-600 text-white text-xs py-1.5 rounded hover:bg-indigo-700 font-medium">
-              + New Lesson Plan
+              + New Single Lesson Plan
+            </button>
+            <button onClick={() => { setChapterMode(true); setIsEditing(false); setSelectedPlan(null); }}
+              className="w-full bg-purple-600 text-white text-xs py-1.5 rounded hover:bg-purple-700 font-medium">
+              ✨ Generate Full Chapter Plans
             </button>
           </div>
         )}
@@ -345,7 +392,10 @@ export default function LessonPlanPage({ user, mappings, academicYear, readOnly 
           {filtered.map(p => (
             <button key={p.id} onClick={() => openView(p)}
               className={`w-full text-left p-3 hover:bg-gray-50 ${selectedPlan?.id === p.id ? 'bg-indigo-50' : ''}`}>
-              <div className="font-medium text-gray-800 truncate">{p.chapter_name || 'Untitled'}</div>
+              <div className="flex items-center gap-1">
+                {p.total_lps && <span className="text-purple-600 font-bold text-xs shrink-0">LP {p.lp_number}/{p.total_lps}</span>}
+                <span className="font-medium text-gray-800 truncate">{p.chapter_name || 'Untitled'}</span>
+              </div>
               <div className="text-gray-500 truncate">{p.lesson_name}</div>
               <div className="text-gray-400">{p.date || ''}</div>
               <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs ${STATUS_COLOR[p.status]}`}>{STATUS_LABEL[p.status]}</span>
@@ -357,7 +407,21 @@ export default function LessonPlanPage({ user, mappings, academicYear, readOnly 
 
       {/* Right: form or detail */}
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-        {isEditing ? (
+        {chapterMode ? (
+          <ChapterPlanPanel
+            chapters={chapters} grade={grade} subject={activeSubject}
+            chapterForMulti={chapterForMulti} setChapterForMulti={setChapterForMulti}
+            lpCount={lpCount} setLpCount={setLpCount}
+            lpDuration={lpDuration} setLpDuration={setLpDuration}
+            startDate={startDate} setStartDate={setStartDate}
+            lpSuggestion={lpSuggestion} suggestLoading={suggestLoading}
+            chapterGenLoading={chapterGenLoading}
+            paramOverrides={paramOverrides} setParamOverrides={setParamOverrides}
+            showOverrides={showOverrides} setShowOverrides={setShowOverrides}
+            onSuggest={suggestLpCount} onGenerate={generateChapterPlans}
+            onCancel={() => setChapterMode(false)}
+          />
+        ) : isEditing ? (
           <PlanForm
             form={form} setForm={setForm} chapters={chapters}
             loading={loading} aiLoading={aiLoading}
@@ -382,6 +446,109 @@ export default function LessonPlanPage({ user, mappings, academicYear, readOnly 
             {ncertMappings.length > 0 ? 'Select a plan or create a new one' : 'No NCERT grade subjects assigned'}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Chapter Plan Panel ────────────────────────────────────────────────────
+
+function ChapterPlanPanel({ chapters, grade, subject, chapterForMulti, setChapterForMulti, lpCount, setLpCount, lpDuration, setLpDuration, startDate, setStartDate, lpSuggestion, suggestLoading, chapterGenLoading, paramOverrides, setParamOverrides, showOverrides, setShowOverrides, onSuggest, onGenerate, onCancel }: any) {
+  return (
+    <div className="max-w-2xl mx-auto space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-bold text-gray-800">Generate Full Chapter Lesson Plans</h2>
+          <p className="text-xs text-gray-500 mt-0.5">{grade} · {subject}</p>
+        </div>
+        <button onClick={onCancel} className="text-xs border rounded px-3 py-1.5 text-gray-600 hover:bg-gray-50">Cancel</button>
+      </div>
+
+      <div className="bg-white rounded-lg border p-4 space-y-4">
+        {/* Chapter selection */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Select Chapter</label>
+          <select className="w-full border rounded px-2 py-1.5 text-xs" value={chapterForMulti} onChange={e => setChapterForMulti(e.target.value)}>
+            <option value="">Choose chapter…</option>
+            {chapters.map((c: any) => (
+              <option key={c.id} value={c.chapter_name}>{c.chapter_number}. {c.chapter_name}</option>
+            ))}
+          </select>
+          {chapters.length === 0 && (
+            <p className="text-xs text-amber-600 mt-1">No chapters uploaded yet. Upload NCERT PDFs in the NCERT Library first.</p>
+          )}
+        </div>
+
+        {/* LP count */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            How many Lesson Plans to complete this chapter?
+          </label>
+          <div className="flex items-center gap-3">
+            <input type="number" min={1} max={10} className="border rounded px-2 py-1.5 text-xs w-20"
+              value={lpCount} onChange={e => setLpCount(+e.target.value)} />
+            <button onClick={onSuggest} disabled={suggestLoading || !chapterForMulti}
+              className="px-3 py-1.5 text-xs bg-purple-100 text-purple-700 border border-purple-300 rounded hover:bg-purple-200 disabled:opacity-50">
+              {suggestLoading ? '⟳ Asking AI…' : '🤖 Ask AI to suggest'}
+            </button>
+          </div>
+
+          {/* AI suggestion badge */}
+          {lpSuggestion && (
+            <div className="mt-2 bg-purple-50 border border-purple-200 rounded p-2 text-xs">
+              <span className="font-semibold text-purple-700">AI suggests: {lpSuggestion.suggested_lps} lesson plans</span>
+              <p className="text-gray-600 mt-0.5">{lpSuggestion.reason}</p>
+              <button onClick={() => setLpCount(lpSuggestion.suggested_lps)}
+                className="mt-1 text-purple-600 hover:underline">Use this suggestion</button>
+            </div>
+          )}
+        </div>
+
+        {/* Duration + Start date */}
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <label className="block text-gray-600 mb-1">Duration per class (minutes)</label>
+            <input type="number" className="w-full border rounded px-2 py-1" min={20} max={120}
+              value={lpDuration} onChange={e => setLpDuration(+e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-gray-600 mb-1">Date of first class (optional)</label>
+            <input type="date" className="w-full border rounded px-2 py-1"
+              value={startDate} onChange={e => setStartDate(e.target.value)} />
+            <p className="text-gray-400 mt-0.5">AI spaces plans 1 week apart</p>
+          </div>
+        </div>
+
+        {/* Teaching style override */}
+        <div>
+          <button onClick={() => setShowOverrides(!showOverrides)} className="text-xs text-indigo-600 hover:underline">
+            {showOverrides ? 'Hide' : 'Override teaching style for this chapter'}
+          </button>
+          {showOverrides && (
+            <div className="mt-2 border border-purple-200 rounded-lg p-3 bg-purple-50 grid grid-cols-2 gap-2 text-xs">
+              <ParamSelect label="Talk Ratio" val={paramOverrides.talk_ratio} keys={['30:70','40:60','50:50']} labels={['T30%/S70%','T40%/S60%','T50%/S50%']} onChange={(v: string) => setParamOverrides((p: any) => ({ ...p, talk_ratio: v }))} />
+              <ParamSelect label="Approach" val={paramOverrides.learning_approach} keys={['student-centric','teacher-led','inquiry-based','problem-based']} labels={['Student-Centric','Teacher-Led','Inquiry-Based','Problem-Based']} onChange={(v: string) => setParamOverrides((p: any) => ({ ...p, learning_approach: v }))} />
+              <ParamSelect label="Collaboration" val={paramOverrides.collaboration_mode} keys={['individual','pairs','small-groups','whole-class']} labels={['Individual','Pairs','Small Groups','Whole Class']} onChange={(v: string) => setParamOverrides((p: any) => ({ ...p, collaboration_mode: v }))} />
+              <ParamSelect label="Bloom's Level" val={paramOverrides.blooms_level} keys={['remember','understand','apply','analyze','evaluate','create']} labels={['Remember','Understand','Apply','Analyze','Evaluate','Create']} onChange={(v: string) => setParamOverrides((p: any) => ({ ...p, blooms_level: v }))} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Summary + Generate button */}
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <p className="text-xs text-purple-800 font-medium mb-3">
+          AI will generate <strong>{lpCount} lesson plans</strong> for "{chapterForMulti || '(no chapter selected)'}", each covering a different sequential portion of the chapter. They will appear in your Lesson Plans list as LP 1 of {lpCount}, LP 2 of {lpCount}, etc.
+        </p>
+        <button onClick={onGenerate} disabled={chapterGenLoading || !chapterForMulti || !lpCount}
+          className="w-full py-2.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:opacity-50 font-semibold">
+          {chapterGenLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="animate-spin inline-block">⟳</span>
+              Generating {lpCount} lesson plans… this may take 20–40 seconds
+            </span>
+          ) : `✨ Generate All ${lpCount} Lesson Plans`}
+        </button>
       </div>
     </div>
   );
