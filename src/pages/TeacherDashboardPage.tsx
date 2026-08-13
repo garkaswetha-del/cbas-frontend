@@ -5,9 +5,7 @@ import axios from "axios";
 import PromotionWizard from "../components/PromotionWizard";
 import AcademicCalendarPage from "./AcademicCalendarPage";
 import { TeacherSOW } from "./SOWPage";
-import LessonPlanPage from "./LessonPlanPage";
-import TeachingStylePage from "./TeachingStylePage";
-import ReflectionPage from "./ReflectionPage";
+import LPTabsPage from "./LPTabsPage";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Cell,
@@ -119,9 +117,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
     self_ai:        "My AI",
     memos:          "Memos",
     calendar:        "Academic Calendar",
-    lesson_plans:    "Lesson Plans",
-    teaching_style:  "My Teaching Style",
-    reflections:     "Daily Reflection",
+    lp:              "LP",
   };
 
   return (
@@ -175,9 +171,7 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
         {activeTab === "memos"          && <MemosTab user={user} academicYear={academicYear} />}
         {activeTab === "calendar"       && <AcademicCalendarPage readOnly />}
         {activeTab === "sow"            && <TeacherSOW user={user} mappings={mappings} academicYear={academicYear} />}
-        {activeTab === "lesson_plans"   && <LessonPlanPage user={user} mappings={mappings} academicYear={academicYear} />}
-        {activeTab === "teaching_style" && <TeachingStylePage user={user} />}
-        {activeTab === "reflections"    && <ReflectionPage user={user} />}
+        {activeTab === "lp"             && <LPTabsPage user={user} mappings={mappings} academicYear={academicYear} role="teacher" />}
       </div>
     </div>
   );

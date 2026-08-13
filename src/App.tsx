@@ -22,10 +22,7 @@ import AuditLogPage from "./pages/AuditLogPage";
 import SubstitutionPage from "./pages/SubstitutionPage";
 import AcademicCalendarPage from "./pages/AcademicCalendarPage";
 import SOWPage from "./pages/SOWPage";
-import LessonPlanPage from "./pages/LessonPlanPage";
-import TeachingStylePage from "./pages/TeachingStylePage";
-import NcertLibraryPage from "./pages/NcertLibraryPage";
-import ReflectionPage from "./pages/ReflectionPage";
+import LPTabsPage from "./pages/LPTabsPage";
 
 const CLASS_TABS = (isClassTeacher: boolean) => [
   { id: 'students',       label: 'My Students',        show: true },
@@ -46,9 +43,7 @@ const SELF_TABS = [
   { id: 'memos',         label: 'Memos',              show: true },
   { id: 'calendar',     label: 'Academic Calendar',  show: true },
   { id: 'sow',            label: 'Scheme of Work',     show: true },
-  { id: 'lesson_plans',   label: 'Lesson Plans',       show: true },
-  { id: 'teaching_style', label: 'Teaching Style',     show: true },
-  { id: 'reflections',    label: 'Daily Reflection',   show: true },
+  { id: 'lp',             label: 'LP',                 show: true },
 ];
 
 const SELF_TAB_IDS = new Set(SELF_TABS.map(t => t.id));
@@ -62,9 +57,7 @@ const AHM_TOOL_TABS = [
   { id: 'ahm_substitution', label: 'Substitution' },
   { id: 'ahm_calendar',     label: 'Academic Calendar' },
   { id: 'ahm_sow',          label: 'Scheme of Work' },
-  { id: 'ahm_lesson_plans', label: 'Lesson Plans' },
-  { id: 'ahm_ncert_library',label: 'NCERT Library' },
-  { id: 'ahm_reflections',  label: 'Staff Reflections' },
+  { id: 'ahm_lp',           label: 'LP' },
 ];
 const AHM_TOOL_TAB_IDS = new Set(AHM_TOOL_TABS.map(t => t.id));
 
@@ -239,9 +232,7 @@ function AHMLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
     if (activeTab === 'ahm_substitution') return <SubstitutionPage />;
     if (activeTab === 'ahm_calendar')     return <AcademicCalendarPage />;
     if (activeTab === 'ahm_sow')           return <SOWPage user={user} />;
-    if (activeTab === 'ahm_lesson_plans')  return <LessonPlanPage user={user} mappings={mappings} academicYear={academicYear} readOnly />;
-    if (activeTab === 'ahm_ncert_library') return <NcertLibraryPage user={user} />;
-    if (activeTab === 'ahm_reflections')   return <ReflectionPage user={user} readOnly />;
+    if (activeTab === 'ahm_lp') return <LPTabsPage user={user} mappings={mappings} academicYear={academicYear} role="ahm" />;
     return (
       <TeacherDashboardPage
         user={user}
@@ -490,9 +481,7 @@ function App() {
           <Route path="substitution" element={<SubstitutionPage />} />
           <Route path="calendar" element={<AcademicCalendarPage />} />
           <Route path="sow" element={<SOWPage user={user} />} />
-          <Route path="lesson-plans" element={<LessonPlanPage user={user} mappings={null} academicYear={currentAcademicYear()} readOnly />} />
-          <Route path="ncert-library" element={<NcertLibraryPage user={user} />} />
-          <Route path="staff-reflections" element={<ReflectionPage user={user} readOnly />} />
+          <Route path="lp" element={<LPTabsPage user={user} mappings={null} academicYear={currentAcademicYear()} role="admin" />} />
           <Route path="*" element={<Navigate to="/super-dashboard" replace />} />
         </Route>
       </Routes>
