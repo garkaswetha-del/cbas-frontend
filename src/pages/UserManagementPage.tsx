@@ -277,17 +277,22 @@ export default function UserManagementPage() {
     });
     const flatMappings = allMappingsFlat[u.id] || [];
     if (flatMappings.length > 0) {
-      setEditRows(buildEditRows(flatMappings));
+      // Filter subjects to only those present in grade_subjects (removes legacy labels like "Mother teacher")
+      const rawRows = buildEditRows(flatMappings);
+      setEditRows(rawRows.map((row: any) => ({
+        ...row,
+        subjects: row.subjects.filter((s: string) => (gradeSubjects[row.grade] || []).includes(s)),
+      })));
       const ct = extractClassTeacher(flatMappings);
       setClassTeacherGrade(ct.grade);
       setClassTeacherSection(ct.section);
     } else {
-      // No teacher_mappings yet — seed the form from the users table data
+      // No teacher_mappings yet — seed grades/sections from users table; leave subjects empty
+      // so the user selects fresh from the grade chips (avoids legacy labels bleeding in)
       const grades: string[] = u.assigned_classes || [];
-      const subs: string[]   = (u.subjects || []).filter(Boolean);
       const secs: string[]   = u.assigned_sections || [];
       setEditRows(grades.length > 0
-        ? grades.map((grade: string) => ({ grade, subjects: subs, sections: secs }))
+        ? grades.map((grade: string) => ({ grade, subjects: [], sections: secs }))
         : [{ grade: "", subjects: [], sections: [] }]);
       // Parse class_teacher_of e.g. "Grade 9 Himalaya" → grade="Grade 9", section="Himalaya"
       const ctRaw: string = u.class_teacher_of || "";
@@ -357,7 +362,11 @@ export default function UserManagementPage() {
       fetchUsers();
       // Refresh the open edit panel so it reflects exactly what is now in the DB
       const freshMappings = flat[expandedTeacherId!] || [];
-      setEditRows(buildEditRows(freshMappings));
+      const freshRows = buildEditRows(freshMappings);
+      setEditRows(freshRows.map((row: any) => ({
+        ...row,
+        subjects: row.subjects.filter((s: string) => (gradeSubjects[row.grade] || []).includes(s)),
+      })));
       const ct = extractClassTeacher(freshMappings);
       setClassTeacherGrade(ct.grade);
       setClassTeacherSection(ct.section);
