@@ -158,7 +158,7 @@ export default function NcertLibraryPage({ user }: Props) {
         <ul className="list-disc list-inside space-y-0.5 text-amber-600">
           <li>Upload one PDF per chapter (not the full textbook)</li>
           <li>NCERT digital PDFs from ncert.nic.in work best — avoid scanned images</li>
-          <li>The AI uses the first 8,000 characters of the chapter text</li>
+          <li>The AI reads up to 30,000 characters — enough for a full NCERT chapter</li>
           <li>Chapter names must match what teachers select in the lesson plan form</li>
         </ul>
       </div>
