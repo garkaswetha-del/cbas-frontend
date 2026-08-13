@@ -5,6 +5,9 @@ import axios from "axios";
 import PromotionWizard from "../components/PromotionWizard";
 import AcademicCalendarPage from "./AcademicCalendarPage";
 import { TeacherSOW } from "./SOWPage";
+import LessonPlanPage from "./LessonPlanPage";
+import TeachingStylePage from "./TeachingStylePage";
+import ReflectionPage from "./ReflectionPage";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Cell,
@@ -115,7 +118,10 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
     observations:   "My Observations",
     self_ai:        "My AI",
     memos:          "Memos",
-    calendar:       "Academic Calendar",
+    calendar:        "Academic Calendar",
+    lesson_plans:    "Lesson Plans",
+    teaching_style:  "My Teaching Style",
+    reflections:     "Daily Reflection",
   };
 
   return (
@@ -169,6 +175,9 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
         {activeTab === "memos"          && <MemosTab user={user} academicYear={academicYear} />}
         {activeTab === "calendar"       && <AcademicCalendarPage readOnly />}
         {activeTab === "sow"            && <TeacherSOW user={user} mappings={mappings} academicYear={academicYear} />}
+        {activeTab === "lesson_plans"   && <LessonPlanPage user={user} mappings={mappings} academicYear={academicYear} />}
+        {activeTab === "teaching_style" && <TeachingStylePage user={user} />}
+        {activeTab === "reflections"    && <ReflectionPage user={user} />}
       </div>
     </div>
   );
