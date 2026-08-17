@@ -44,7 +44,8 @@ const DOMAIN_COLORS = [
   "#06b6d4", "#f97316", "#ec4899", "#84cc16", "#14b8a6",
 ];
 
-export default function ActivitiesPage() {
+export default function ActivitiesPage({ allowedGrades }: { allowedGrades?: string[] } = {}) {
+  const visibleClasses = allowedGrades?.length ? CLASSES.filter(g => allowedGrades.includes(g)) : CLASSES;
   const [activeTab, setActiveTab] = useState<"activities" | "marks" | "report" | "dashboard">("activities");
   const [reportGrade, setReportGrade] = useState("");
   const [reportSection, setReportSection] = useState("");
@@ -445,7 +446,7 @@ export default function ActivitiesPage() {
                 <select value={filterGrade} onChange={e => { setFilterGrade(e.target.value); setFilterSection(""); }}
                   className="border border-gray-300 rounded px-2 py-1.5 text-sm">
                   <option value="">All Grades</option>
-                  {CLASSES.map(g => <option key={g} value={g}>{g}</option>)}
+                  {visibleClasses.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
               {filterGrade && (
@@ -495,11 +496,11 @@ export default function ActivitiesPage() {
               <div>
                 <label className="text-xs text-gray-500 font-semibold block mb-1">
                   Grade(s) * ({formGrades.length} selected)
-                  <button onClick={()=>setFormGrades([...CLASSES])} className="ml-2 text-indigo-600 hover:underline text-xs font-normal">All</button>
+                  <button onClick={()=>setFormGrades([...visibleClasses])} className="ml-2 text-indigo-600 hover:underline text-xs font-normal">All</button>
                   <button onClick={()=>setFormGrades([])} className="ml-2 text-gray-400 hover:underline text-xs font-normal">Clear</button>
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {CLASSES.map(g=>(
+                  {visibleClasses.map(g=>(
                     <button key={g} onClick={()=>setFormGrades(p=>p.includes(g)?p.filter(x=>x!==g):[...p,g])}
                       className={`px-3 py-1.5 rounded-lg border text-xs font-medium ${formGrades.includes(g)?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300 hover:bg-indigo-50"}`}>{g}</button>
                   ))}

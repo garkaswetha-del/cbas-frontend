@@ -23,6 +23,8 @@ import SubstitutionPage from "./pages/SubstitutionPage";
 import AcademicCalendarPage from "./pages/AcademicCalendarPage";
 import SOWPage from "./pages/SOWPage";
 import LPTabsPage from "./pages/LPTabsPage";
+import AHMStageOverviewPage from "./pages/AHMStageOverviewPage";
+import { deriveAHMStage } from "./utils/stage";
 
 const CLASS_TABS = (isClassTeacher: boolean) => [
   { id: 'students',       label: 'My Students',        show: true },
@@ -49,6 +51,7 @@ const SELF_TABS = [
 const SELF_TAB_IDS = new Set(SELF_TABS.map(t => t.id));
 
 const AHM_TOOL_TABS = [
+  { id: 'ahm_stage',        label: 'Stage Overview' },
   { id: 'ahm_baseline',     label: 'Baseline Entry' },
   { id: 'ahm_competencies', label: 'Competency Registry' },
   { id: 'ahm_activities',   label: 'Activities & Marks' },
@@ -205,7 +208,7 @@ function TeacherLayout({ user, onLogout }: { user: any; onLogout: () => void }) 
 }
 
 function AHMLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
-  const [activeTab, setActiveTab] = useState<string>('students');
+  const [activeTab, setActiveTab] = useState<string>('ahm_stage');
   const [academicYear, setAcademicYear] = useState(currentAcademicYear);
   const [mappings, setMappings] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -222,12 +225,15 @@ function AHMLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
   const AHM_SELF_TAB_IDS = new Set(AHM_SELF_TABS.map(t => t.id));
   const activeGroup: 'class' | 'self' = AHM_SELF_TAB_IDS.has(activeTab) ? 'self' : 'class';
   const classTabs = CLASS_TABS(isClassTeacher);
+  const stageInfo = mappings ? deriveAHMStage(mappings) : null;
+  const allowedGrades = stageInfo?.grades;
 
   const renderContent = () => {
-    if (activeTab === 'ahm_baseline')     return <BaselinePage />;
+    if (activeTab === 'ahm_stage')        return <AHMStageOverviewPage user={user} mappings={mappings} academicYear={academicYear} />;
+    if (activeTab === 'ahm_baseline')     return <BaselinePage allowedGrades={allowedGrades} />;
     if (activeTab === 'ahm_competencies') return <CompetencyManagementPage />;
-    if (activeTab === 'ahm_activities')   return <ActivitiesPage />;
-    if (activeTab === 'ahm_pasa')         return <PASAPage />;
+    if (activeTab === 'ahm_activities')   return <ActivitiesPage allowedGrades={allowedGrades} />;
+    if (activeTab === 'ahm_pasa')         return <PASAPage allowedGrades={allowedGrades} />;
     if (activeTab === 'ahm_observation')  return <ClassObservationPage />;
     if (activeTab === 'ahm_substitution') return <SubstitutionPage />;
     if (activeTab === 'ahm_calendar')     return <AcademicCalendarPage />;

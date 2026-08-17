@@ -24,7 +24,7 @@ function KPICard({ label, value, color }: any) {
   );
 }
 
-export default function PASAPage() {
+export default function PASAPage({ allowedGrades }: { allowedGrades?: string[] } = {}) {
   const [activeTab, setActiveTab] = useState<"config" | "entry" | "dashboard" | "clear">("config");
   const [academicYear, setAcademicYear] = useState(currentAcademicYear);
   return (
@@ -47,15 +47,15 @@ export default function PASAPage() {
           </button>
         ))}
       </div>
-      {activeTab === "config" && <ExamConfigTab academicYear={academicYear} />}
-      {activeTab === "entry" && <MarksEntryTab academicYear={academicYear} />}
-      {activeTab === "dashboard" && <PASADashboardTab academicYear={academicYear} />}
+      {activeTab === "config" && <ExamConfigTab academicYear={academicYear} allowedGrades={allowedGrades} />}
+      {activeTab === "entry" && <MarksEntryTab academicYear={academicYear} allowedGrades={allowedGrades} />}
+      {activeTab === "dashboard" && <PASADashboardTab academicYear={academicYear} allowedGrades={allowedGrades} />}
       {activeTab === "clear" && <ClearDataTab />}
     </div>
   );
 }
 
-function ExamConfigTab({ academicYear }: any) {
+function ExamConfigTab({ academicYear, allowedGrades }: any) {
   const [configs, setConfigs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -75,7 +75,8 @@ function ExamConfigTab({ academicYear }: any) {
   const fetchGrades = async () => {
     try {
       const r = await axios.get(`${API}/students/stats`);
-      setGrades((r.data?.byGrade||[]).map((g:any)=>g.grade).sort());
+      const all: string[] = (r.data?.byGrade||[]).map((g:any)=>g.grade).sort();
+      setGrades(allowedGrades?.length ? all.filter(g => allowedGrades.includes(g)) : all);
     } catch {}
   };
 
@@ -250,7 +251,7 @@ function ExamConfigTab({ academicYear }: any) {
   );
 }
 
-function MarksEntryTab({ academicYear }: any) {
+function MarksEntryTab({ academicYear, allowedGrades }: any) {
   const [grade,setGrade]=useState("");
   const [section,setSection]=useState("");
   const [grades,setGrades]=useState<string[]>([]);
@@ -269,7 +270,7 @@ function MarksEntryTab({ academicYear }: any) {
   useEffect(()=>{if(grade){fetchSections();setSection("");setConfigs([]);setSelectedConfig(null);setStudents([]);}},[grade]);
   useEffect(()=>{if(grade&&section)fetchConfigs();},[grade,section,academicYear]);
 
-  const fetchGrades=async()=>{try{const r=await axios.get(`${API}/students/stats`);setGrades((r.data?.byGrade||[]).map((g:any)=>g.grade).sort());}catch{}};
+  const fetchGrades=async()=>{try{const r=await axios.get(`${API}/students/stats`);const all:string[]=(r.data?.byGrade||[]).map((g:any)=>g.grade).sort();setGrades(allowedGrades?.length?all.filter((g:string)=>allowedGrades.includes(g)):all);}catch{}};
   const fetchSections=async()=>{try{const r=await axios.get(`${API}/students/sections/${encodeURIComponent(grade)}`);setSections(r.data?.sections||[]);}catch{}};
 
   const fetchConfigs=async()=>{
@@ -462,7 +463,7 @@ function MarksEntryTab({ academicYear }: any) {
   );
 }
 
-function PASADashboardTab({ academicYear }: any) {
+function PASADashboardTab({ academicYear, allowedGrades }: any) {
   const [dashTab,setDashTab]=useState<"school"|"grade"|"section"|"student"|"alerts">("school");
   const [grade,setGrade]=useState("");
   const [section,setSection]=useState("");
@@ -476,7 +477,7 @@ function PASADashboardTab({ academicYear }: any) {
   useEffect(()=>{if(grade)fetchSections();},[grade]);
   useEffect(()=>{fetchData();},[dashTab,academicYear,grade,section,examType]);
 
-  const fetchGrades=async()=>{try{const r=await axios.get(`${API}/students/stats`);setGrades((r.data?.byGrade||[]).map((g:any)=>g.grade).sort());}catch{}};
+  const fetchGrades=async()=>{try{const r=await axios.get(`${API}/students/stats`);const all:string[]=(r.data?.byGrade||[]).map((g:any)=>g.grade).sort();setGrades(allowedGrades?.length?all.filter((g:string)=>allowedGrades.includes(g)):all);}catch{}};
   const fetchSections=async()=>{try{const r=await axios.get(`${API}/students/sections/${encodeURIComponent(grade)}`);setSections(r.data?.sections||[]);}catch{}};
 
   const fetchData=async()=>{

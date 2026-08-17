@@ -717,10 +717,11 @@ function TeacherBaselineEntry({ teachers, academicYear, assessmentDate, setAsses
 
 
 // ── Main BaselinePage export ──────────────────────────────────────
-export default function BaselinePage() {
+export default function BaselinePage({ allowedGrades }: { allowedGrades?: string[] } = {}) {
   const [activeTab, setActiveTab] = useState<"entry"|"teacher"|"dashboard"|"ai_paper"|"report_card">("entry");
   const [academicYear, setAcademicYear] = useState(currentAcademicYear);
   const [round, setRound] = useState("baseline_1");
+  const visibleGrades = allowedGrades?.length ? GRADES.filter(g => allowedGrades.includes(g)) : GRADES;
   const [grade, setGrade] = useState("Grade 1");
   const [sections, setSections] = useState<string[]>([]);
   const [section, setSection] = useState("");
@@ -1470,7 +1471,7 @@ export default function BaselinePage() {
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Grade</label>
                 <select value={grade} onChange={e => setGrade(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                  {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                  {visibleGrades.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
               <div>
@@ -1935,7 +1936,7 @@ export default function BaselinePage() {
               <h3 className="text-sm font-semibold text-indigo-800 mb-1">Grades participating in baseline exam — {academicYear}</h3>
               <p className="text-xs text-gray-500 mb-3">Only selected grades count toward Total Students and Pending.</p>
               <div className="flex flex-wrap gap-3 mb-3">
-                {GRADES.map((g:string) => (
+                {visibleGrades.map((g:string) => (
                   <label key={g} className="flex items-center gap-1.5 text-sm cursor-pointer">
                     <input type="checkbox" checked={participatingGrades.includes(g)}
                       onChange={e => setParticipatingGrades(prev => e.target.checked ? [...prev, g] : prev.filter(x => x !== g))}
@@ -2128,7 +2129,7 @@ export default function BaselinePage() {
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Grade</label>
                   <select value={dashGrade} onChange={e => setDashGrade(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
-                    {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                    {visibleGrades.map(g => <option key={g} value={g}>{g}</option>)}
                   </select>
                 </div>
               </div>
