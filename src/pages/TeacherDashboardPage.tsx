@@ -4493,6 +4493,592 @@ function SelfAITab({ user, academicYear }: any) {
   const GROQ_KEY2 = import.meta.env.VITE_GROQ_API_KEY || "";
 
   const STAGE_GRADE: Record<string,string> = { foundation:"Grade 2", preparatory:"Grade 5", middle:"Grade 8", secondary:"Grade 10" };
+  const STAGE_LABELS: Record<string,string> = { foundation:"Foundation", preparatory:"Preparatory", middle:"Middle", secondary:"Secondary" };
+  const STAGE_ORDER = ["foundation","preparatory","middle","secondary"];
+  const LIT_DOMAINS = ["Listening","Speaking","Reading","Writing"];
+  const NUM_DOMAINS = ["Operations","Base 10","Measurement","Geometry"];
+  const ALL_DOMAINS = [...LIT_DOMAINS, ...NUM_DOMAINS];
+
+  // ── Module hub state ──
+  const [modules, setModules] = useState<any>(null);
+  const [modLoading, setModLoading] = useState(true);
+  const [activeModule, setActiveModule] = useState<{subject:string;stage:string;domain:string} | null>(null);
+  const [activePracticeSubTab, setActivePracticeSubTab] = useState<"gap"|"custom">("gap");
+
+  // ── Step interaction state ──
+  const [reflectionText, setReflectionText] = useState("");
+  const [savingStep, setSavingStep] = useState(false);
+  const [stepMsg, setStepMsg] = useState("");
+
+  // ── AI paper generation state (reused from original) ──
+  const [ppMode, setPpMode] = useState<"practice"|"assessment">("practice");
+  const [numQ, setNumQ] = useState(10);
+  const [difficulty, setDifficulty] = useState("Mixed");
+  const [qTypes, setQTypes] = useState(["MCQ","Short Answer","Case-Based"]);
+  const [extraInstructions, setExtraInstructions] = useState("");
+  const [totalMarks, setTotalMarks] = useState(50);
+  const [generating, setGenerating] = useState(false);
+  const [output, setOutput] = useState("");
+  const [genMsg, setGenMsg] = useState("");
+  const [custComps, setCustComps] = useState<any[]>([]);
+  const [loadingComps, setLoadingComps] = useState(false);
+  const [baselineData, setBaselineData] = useState<any>(null);
+  const [baselineError, setBaselineError] = useState("");
+
+  useEffect(() => { fetchBaseline(); }, [academicYear]);
+  useEffect(() => { loadModules(); }, [academicYear]);
+  // When opening a module, reset paper output and load reflection
+  useEffect(() => {
+    if (!activeModule) return;
+    setOutput(""); setGenMsg(""); setReflectionText("");
+    if (activeModule.subject === "numeracy" && !["literacy"].includes(activeModule.subject)) {
+      // no-op — keep custDomain in sync with module domain when possible
+    }
+    const domData = getActiveDomainData();
+    if (domData?.reflection_text) setReflectionText(domData.reflection_text);
+  }, [activeModule]);
+
+  const loadModules = async () => {
+    setModLoading(true);
+    try {
+      const r = await axios.get(`${API}/learning-modules/teacher/${user.id}?academic_year=${academicYear}`);
+      setModules(r.data);
+    } catch { setModules(null); }
+    setModLoading(false);
+  };
+
+  const fetchBaseline = async () => {
+    setBaselineError("");
+    try {
+      const r = await axios.get(`${API}/baseline/teacher/${user.id}?academic_year=${academicYear}`);
+      setBaselineData(r.data);
+    } catch { setBaselineError("Could not load baseline data."); }
+  };
+
+  const getActiveDomainData = () => {
+    if (!activeModule || !modules) return null;
+    const sub = modules[activeModule.subject];
+    const inCurrent = sub?.domains?.find((d: any) => d.domain === activeModule.domain);
+    if (inCurrent) return inCurrent;
+    return sub?.next_stage_domains?.find((d: any) => d.domain === activeModule.domain) ?? null;
+  };
+
+  const saveStep = async (fields: Record<string, any>) => {
+    if (!activeModule) return;
+    setSavingStep(true); setStepMsg("");
+    try {
+      await axios.post(`${API}/learning-modules/teacher/${user.id}/step`, {
+        subject: activeModule.subject,
+        stage: activeModule.stage,
+        domain: activeModule.domain,
+        academic_year: academicYear,
+        ...fields,
+      });
+      await loadModules();
+      setStepMsg("Saved!");
+      setTimeout(() => setStepMsg(""), 2000);
+    } catch { setStepMsg("Save failed."); }
+    setSavingStep(false);
+  };
+
+  // Fetch competencies for the active module domain (for AI paper generation)
+  const fetchDomainComps = async (subject: string, stage: string, domain: string) => {
+    const grade = STAGE_GRADE[stage] || "Grade 2";
+    setLoadingComps(true);
+    try {
+      const apiSubj = subject === "literacy" ? "language" : subject;
+      const r = await axios.get(`${API}/activities/competencies?subject=${apiSubj}&stage=${stage}&grade=${encodeURIComponent(grade)}`);
+      const all = r.data?.competencies || [];
+      const filtered = all.filter((c: any) => (c.domain || "").toLowerCase().includes(domain.toLowerCase()));
+      setCustComps(filtered.length ? filtered : all.slice(0, 10));
+    } catch { setCustComps([]); }
+    setLoadingComps(false);
+  };
+
+  // Generate AI paper for the current module's domain
+  const generateForModule = async () => {
+    if (!activeModule) return;
+    const { subject, stage, domain } = activeModule;
+    if (!GROQ_KEY2) { setGenMsg("VITE_GROQ_API_KEY not set."); return; }
+    setGenerating(true); setOutput(""); setGenMsg("");
+
+    const grade = STAGE_GRADE[stage] || "Grade 2";
+    const diffNote: Record<string,string> = {
+      "Easy":"Recall and basic application only.",
+      "Moderate":"Mix of recall, application and simple analysis.",
+      "Challenging":"Prioritise analysis, evaluation and synthesis.",
+      "Mixed":"40% easy, 40% moderate, 20% challenging.",
+    };
+    const marksNote = ppMode === "assessment" ? `\n- Total marks: ${totalMarks}. Distribute marks proportionally.` : "";
+    const extraNote = extraInstructions ? `\n\nEXTRA INSTRUCTIONS:\n${extraInstructions}` : "";
+    const compLines = custComps.length
+      ? custComps.map((c: any) => `  - [${c.competency_code}]: ${c.description || c.desc || ""}`).join("\n")
+      : "  - General competencies";
+    const domData = getActiveDomainData();
+    const scoreNote = domData?.latest_score !== null ? `Current baseline score: ${domData?.latest_score?.toFixed(1)}% — needs to reach 85% to complete this module.` : "No baseline score yet — use this paper to prepare for the upcoming assessment.";
+
+    const prompt = `You are an expert educational assessor for teacher professional development in India (CBSE/NEP 2020).
+
+Create a ${ppMode === "practice" ? "PRACTICE PAPER" : "ASSESSMENT PAPER"} for teacher ${user?.name} targeting the domain: ${domain.toUpperCase()} (${subject === "literacy" ? "Literacy" : "Numeracy"}).
+
+TEACHER: ${user?.name}
+Domain: ${domain} | Subject: ${subject === "literacy" ? "Literacy" : "Numeracy"} | Stage: ${STAGE_LABELS[stage] || stage} | Grade Level: ${grade}
+${scoreNote}
+
+COMPETENCIES TO ASSESS:
+${compLines}
+
+PAPER REQUIREMENTS:
+- Exactly ${numQ} questions
+- Question types: ${qTypes.join(", ")}
+- Difficulty: ${difficulty} — ${diffNote[difficulty] || "Mixed difficulty"}
+- Tag every question with its competency code [CODE]
+- Test both THEORETICAL KNOWLEDGE and CLASSROOM APPLICATION
+- Include complete Answer Key with explanations${marksNote}${extraNote}
+
+QUESTION FORMAT:
+[MCQ] 4 options A/B/C/D, mark correct with ✓, 1-line reason
+[SA] Short Answer: model answer 2-3 sentences
+[LA] Long Answer: model answer 5-8 sentences
+[Case-Based] 4-5 line classroom scenario + question + model answer
+
+Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} (${subject === "literacy" ? "Literacy" : "Numeracy"}) — ${user?.name} — ${new Date().toLocaleDateString()}`;
+
+    try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY2}` },
+        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }], max_tokens: 3000 }),
+      });
+      const d = await res.json();
+      if (!res.ok) setGenMsg(`AI Error: ${d.error?.message || res.status}`);
+      else setOutput(d.choices?.[0]?.message?.content || "No response");
+    } catch (e: any) { setGenMsg(`AI failed: ${(e as Error).message}`); }
+    setGenerating(false);
+  };
+
+  // Per-competency resource links
+  const getCompLinks = (comp: any, subject: string, stage: string) => {
+    const desc = (comp.description || "").slice(0, 80);
+    const grade = STAGE_GRADE[stage] || "";
+    return {
+      google: `https://www.google.com/search?q=${encodeURIComponent(`${desc} ${grade} teaching activity India`)}`,
+      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${desc} teaching strategy classroom`)}`,
+      diksha: `https://diksha.gov.in/search?key=${encodeURIComponent(`${subject === "literacy" ? "literacy" : "numeracy"} ${grade}`)}`,
+    };
+  };
+
+  // ── Status helpers ──
+  const statusColor = (status: string) => ({
+    completed:   "bg-green-100 text-green-800 border-green-300",
+    in_progress: "bg-blue-100 text-blue-800 border-blue-300",
+    not_started: "bg-gray-100 text-gray-500 border-gray-200",
+  }[status] || "bg-gray-100 text-gray-500 border-gray-200");
+
+  const statusLabel = (status: string) => ({
+    completed:   "Completed",
+    in_progress: "In Progress",
+    not_started: "Not Started",
+  }[status] || status);
+
+  const statusIcon = (status: string) => ({
+    completed:   "✅",
+    in_progress: "🔵",
+    not_started: "⬜",
+  }[status] || "⬜");
+
+  // ── Render: Module Hub (no active module) ──
+  const renderHub = () => {
+    if (modLoading) return <div className="py-16 text-center text-gray-400 text-sm">Loading your learning modules...</div>;
+    if (!modules) return (
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
+        <p className="text-sm font-medium text-amber-700">No baseline data yet.</p>
+        <p className="text-xs text-amber-600 mt-1">Your learning modules will appear once your AHM enters your first baseline assessment.</p>
+      </div>
+    );
+
+    const renderSubjectSection = (subject: "literacy" | "numeracy") => {
+      const data = modules[subject];
+      if (!data) return null;
+      const isLit = subject === "literacy";
+      const stageIdx = STAGE_ORDER.indexOf(data.current_stage);
+      const domains: any[] = data.domains || [];
+      const nextDomains: any[] = data.next_stage_domains || [];
+      const completedCount = domains.filter((d: any) => d.status === "completed").length;
+
+      return (
+        <div className={`bg-white rounded-xl shadow border-l-4 ${isLit ? "border-blue-500" : "border-purple-500"} overflow-hidden`}>
+          {/* Subject header */}
+          <div className={`px-4 py-3 ${isLit ? "bg-blue-50" : "bg-purple-50"} flex items-center justify-between`}>
+            <div>
+              <span className="text-sm font-bold text-gray-800">{isLit ? "📖 Literacy" : "🔢 Numeracy"}</span>
+              <span className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-full ${isLit ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
+                {STAGE_LABELS[data.current_stage]} Stage
+              </span>
+            </div>
+            <span className="text-xs text-gray-500">{completedCount}/{domains.length} domains done</span>
+          </div>
+
+          {/* Stage progress bar */}
+          <div className="px-4 pt-3 pb-1">
+            <div className="flex items-center gap-1">
+              {STAGE_ORDER.map((s, i) => (
+                <div key={s} className="flex items-center gap-1">
+                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                    i < stageIdx ? "bg-green-100 text-green-700" :
+                    i === stageIdx ? (isLit ? "bg-blue-600 text-white" : "bg-purple-600 text-white") :
+                    data.next_stage_unlocked && i === stageIdx + 1 ? "bg-yellow-100 text-yellow-700" :
+                    "bg-gray-100 text-gray-400"
+                  }`}>
+                    {i < stageIdx ? "✓" : i === stageIdx ? "→" : data.next_stage_unlocked && i === stageIdx + 1 ? "🔓" : "🔒"}
+                    {" "}{STAGE_LABELS[s]}
+                  </div>
+                  {i < 3 && <span className="text-gray-300 text-xs">›</span>}
+                </div>
+              ))}
+              {data.teaching_methodology_unlocked && <><span className="text-gray-300 text-xs">›</span><div className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">🏆 Methodology</div></>}
+            </div>
+          </div>
+
+          {/* Stage cleared banner */}
+          {data.stage_cleared && (
+            <div className="mx-4 mt-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700 font-medium">
+              🎉 {STAGE_LABELS[data.current_stage]} stage cleared! {data.next_stage ? `${STAGE_LABELS[data.next_stage]} modules unlocked.` : ""}
+            </div>
+          )}
+
+          {/* Domain cards — current stage */}
+          <div className="px-4 pb-4 pt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {domains.map((dom: any, idx: number) => (
+              <button
+                key={dom.domain}
+                onClick={() => {
+                  setActiveModule({ subject, stage: data.current_stage, domain: dom.domain });
+                  setOutput(""); setCustComps([]);
+                  const ref = dom.reflection_text || "";
+                  setReflectionText(ref);
+                  fetchDomainComps(subject, data.current_stage, dom.domain);
+                }}
+                className={`text-left p-3 rounded-lg border transition-all hover:shadow-md ${
+                  dom.status === "completed" ? "border-green-300 bg-green-50" :
+                  dom.status === "in_progress" ? "border-blue-300 bg-blue-50" :
+                  "border-gray-200 bg-gray-50 hover:bg-white"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-gray-700">Module {idx + 1}: {dom.domain}</span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${statusColor(dom.status)}`}>
+                    {statusIcon(dom.status)} {statusLabel(dom.status)}
+                  </span>
+                </div>
+                {dom.priority && <span className="text-xs text-orange-600 font-medium">⚠️ Priority gap</span>}
+                {dom.latest_score !== null ? (
+                  <div className="mt-1.5">
+                    <div className="flex justify-between text-xs text-gray-500 mb-0.5">
+                      <span>Latest score</span><span className={dom.latest_score >= 85 ? "text-green-600 font-bold" : dom.latest_score >= 70 ? "text-blue-600" : "text-orange-600"}>{dom.latest_score.toFixed(0)}%</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${dom.latest_score >= 85 ? "bg-green-500" : dom.latest_score >= 70 ? "bg-blue-500" : "bg-orange-500"}`} style={{ width: `${dom.latest_score}%` }} />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">Target: 85% to complete</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-1">Awaiting baseline assessment</p>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Next stage section — if unlocked */}
+          {data.next_stage_unlocked && nextDomains.length > 0 && (
+            <div className="border-t border-dashed border-gray-200 px-4 pb-4 pt-3">
+              <p className="text-xs font-semibold text-yellow-700 mb-2">🔓 {STAGE_LABELS[data.next_stage]} Modules (Unlocked)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {nextDomains.map((dom: any, idx: number) => (
+                  <button
+                    key={dom.domain}
+                    onClick={() => {
+                      setActiveModule({ subject, stage: data.next_stage, domain: dom.domain });
+                      setOutput(""); setCustComps([]);
+                      setReflectionText(dom.reflection_text || "");
+                      fetchDomainComps(subject, data.next_stage, dom.domain);
+                    }}
+                    className="text-left p-3 rounded-lg border border-yellow-200 bg-yellow-50 hover:bg-yellow-100 transition-all"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-gray-700">Module {idx + 1}: {dom.domain}</span>
+                      <span className="text-xs text-yellow-700 font-medium">New Level</span>
+                    </div>
+                    <p className="text-xs text-gray-400">Awaiting {STAGE_LABELS[data.next_stage]} baseline</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Teaching Methodology — if unlocked */}
+          {data.teaching_methodology_unlocked && data.teaching_methodology && (
+            <div className="border-t border-amber-200 px-4 pb-4 pt-3 bg-amber-50">
+              <p className="text-xs font-bold text-amber-800 mb-1">🏆 Teaching Methodology Module</p>
+              <p className="text-xs text-amber-700">{data.teaching_methodology.summary}</p>
+              <ul className="mt-2 space-y-0.5">
+                {data.teaching_methodology.keySkills.map((s: string, i: number) => (
+                  <li key={i} className="text-xs text-amber-600">• {s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <div className="space-y-5">
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
+          <h3 className="text-sm font-bold text-indigo-800 mb-1">My Learning Modules</h3>
+          <p className="text-xs text-indigo-600">Your progress is based on AHM-entered baseline assessments. Complete all 4 domains in a subject to advance to the next stage.</p>
+        </div>
+        {renderSubjectSection("literacy")}
+        {renderSubjectSection("numeracy")}
+      </div>
+    );
+  };
+
+  // ── Render: Module Detail ──
+  const renderModuleDetail = () => {
+    const domData = getActiveDomainData();
+    if (!activeModule) return null;
+    const { subject, stage, domain } = activeModule;
+    const isLit = subject === "literacy";
+    const score = domData?.latest_score;
+    const completed = domData?.status === "completed";
+
+    return (
+      <div className="space-y-4">
+        {/* Header + back */}
+        <div className="flex items-center gap-3">
+          <button onClick={() => setActiveModule(null)} className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm">← Back</button>
+          <div className="flex-1">
+            <h3 className="text-sm font-bold text-gray-800">{isLit ? "📖" : "🔢"} {domain} <span className="font-normal text-gray-400">· {subject === "literacy" ? "Literacy" : "Numeracy"} · {STAGE_LABELS[stage]}</span></h3>
+          </div>
+          <span className={`text-xs px-2 py-1 rounded-full border font-medium ${statusColor(domData?.status || "not_started")}`}>
+            {statusIcon(domData?.status || "not_started")} {statusLabel(domData?.status || "not_started")}
+          </span>
+        </div>
+
+        {/* Baseline score card */}
+        <div className={`rounded-xl p-4 ${completed ? "bg-green-50 border border-green-200" : score !== null && score !== undefined ? "bg-orange-50 border border-orange-200" : "bg-gray-50 border border-gray-200"}`}>
+          {score !== null && score !== undefined ? (
+            <div>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="font-semibold text-gray-700">Latest Baseline Score</span>
+                <span className={`font-bold ${score >= 85 ? "text-green-600" : "text-orange-600"}`}>{score.toFixed(1)}%</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full ${score >= 85 ? "bg-green-500" : "bg-orange-500"}`} style={{ width: `${Math.min(100, score)}%` }} />
+              </div>
+              {completed
+                ? <p className="text-xs text-green-700 mt-1.5 font-medium">Module complete — score ≥ 85%</p>
+                : <p className="text-xs text-orange-600 mt-1.5">Needs {(85 - score).toFixed(1)}% more to complete · prepare with the practice paper below</p>
+              }
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500">No baseline score yet. Your AHM will enter this during the next assessment round.</p>
+          )}
+        </div>
+
+        {/* Step 1: Learn */}
+        <div className={`bg-white rounded-xl shadow border overflow-hidden ${domData?.step_learn_done ? "border-green-300" : "border-gray-200"}`}>
+          <div className={`px-4 py-3 flex items-center justify-between ${domData?.step_learn_done ? "bg-green-50" : "bg-gray-50"}`}>
+            <span className="text-xs font-bold text-gray-700">{domData?.step_learn_done ? "✅" : "1️⃣"} Learn — What to Know</span>
+            {!domData?.step_learn_done && (
+              <button onClick={() => saveStep({ step_learn_done: true })} disabled={savingStep}
+                className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                Mark Read ✓
+              </button>
+            )}
+          </div>
+          <div className="px-4 py-3 space-y-2">
+            {domData?.content ? (
+              <>
+                <p className="text-xs text-gray-600 leading-relaxed">{domData.content.summary}</p>
+                <div className="mt-2">
+                  <p className="text-xs font-semibold text-gray-700 mb-1">Key Skills:</p>
+                  <ul className="space-y-0.5">
+                    {domData.content.keySkills.map((s: string, i: number) => (
+                      <li key={i} className="text-xs text-gray-600">• {s}</li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-gray-400">Content not available for this domain.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Step 2: Resources */}
+        <div className={`bg-white rounded-xl shadow border overflow-hidden ${domData?.step_resources_done ? "border-green-300" : "border-gray-200"}`}>
+          <div className={`px-4 py-3 flex items-center justify-between ${domData?.step_resources_done ? "bg-green-50" : "bg-gray-50"}`}>
+            <span className="text-xs font-bold text-gray-700">{domData?.step_resources_done ? "✅" : "2️⃣"} Resources</span>
+            {!domData?.step_resources_done && (
+              <button onClick={() => saveStep({ step_resources_done: true })} disabled={savingStep}
+                className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                Viewed ✓
+              </button>
+            )}
+          </div>
+          <div className="px-4 py-3 space-y-2">
+            {domData?.resources?.length > 0 ? (
+              <>
+                {domData.resources.map((r: any, i: number) => (
+                  <a key={i} href={r.url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-200 hover:bg-indigo-50 hover:border-indigo-200 transition-all">
+                    <span className="text-xs text-gray-700 font-medium">{r.title}</span>
+                    <span className="text-xs text-indigo-600 font-medium ml-2">{r.type} ↗</span>
+                  </a>
+                ))}
+                {custComps.length > 0 && (
+                  <div className="mt-2 bg-indigo-50 rounded-lg p-3">
+                    <p className="text-xs font-semibold text-indigo-700 mb-2">Competency-level search links:</p>
+                    {custComps.slice(0, 5).map((comp: any) => {
+                      const links = getCompLinks(comp, subject, stage);
+                      return (
+                        <div key={comp.competency_code} className="mb-2">
+                          <p className="text-xs text-gray-600 mb-1"><span className="font-bold text-indigo-600">[{comp.competency_code}]</span> {(comp.description || "").slice(0, 80)}</p>
+                          <div className="flex gap-1.5">
+                            <a href={links.google} target="_blank" rel="noopener noreferrer" className="px-2 py-0.5 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">🔍 Google</a>
+                            <a href={links.youtube} target="_blank" rel="noopener noreferrer" className="px-2 py-0.5 bg-red-50 border border-red-200 rounded text-xs text-red-700">▶️ YouTube</a>
+                            <a href={links.diksha} target="_blank" rel="noopener noreferrer" className="px-2 py-0.5 bg-green-50 border border-green-200 rounded text-xs text-green-700">🎓 DIKSHA</a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            ) : <p className="text-xs text-gray-400">No resources listed for this domain.</p>}
+          </div>
+        </div>
+
+        {/* Step 3: Practice */}
+        <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
+            <span className="text-xs font-bold text-gray-700">3️⃣ Practice Paper <span className="font-normal text-gray-400">(study tool — not assessed)</span></span>
+          </div>
+          <div className="px-4 py-3 space-y-3">
+            {/* Paper type toggle */}
+            <div className="flex gap-2">
+              {[{id:"practice",label:"✍️ Practice"},{id:"assessment",label:"📋 Assessment"}].map(p=>(
+                <button key={p.id} onClick={()=>setPpMode(p.id as any)}
+                  className={`px-3 py-1.5 text-xs rounded-lg border font-medium ${ppMode===p.id?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Questions</label>
+                <select value={numQ} onChange={e=>setNumQ(+e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                  {[5,10,15,20].map(n=><option key={n}>{n}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Difficulty</label>
+                <select value={difficulty} onChange={e=>setDifficulty(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                  {["Easy","Moderate","Challenging","Mixed"].map(d=><option key={d}>{d}</option>)}
+                </select>
+              </div>
+              {ppMode==="assessment" && (
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Total Marks</label>
+                  <input type="number" min={10} max={200} value={totalMarks} onChange={e=>setTotalMarks(+e.target.value)}
+                    className="border border-gray-300 rounded px-2 py-1.5 text-xs w-20" />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Question Types</label>
+              <div className="flex flex-wrap gap-1">
+                {["MCQ","Short Answer","Long Answer","True/False","Case-Based"].map(qt=>(
+                  <button key={qt} onClick={()=>setQTypes(prev=>prev.includes(qt)?prev.filter(x=>x!==qt):[...prev,qt])}
+                    className={`px-2 py-0.5 rounded text-xs border ${qTypes.includes(qt)?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-600 border-gray-300"}`}>
+                    {qt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Extra instructions (optional)</label>
+              <textarea value={extraInstructions} onChange={e=>setExtraInstructions(e.target.value)} rows={2}
+                placeholder="e.g. include classroom scenarios, focus on foundation level..."
+                className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full resize-none" />
+            </div>
+
+            {genMsg && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{genMsg}</p>}
+            {loadingComps && <p className="text-xs text-gray-400">Loading competencies for this domain...</p>}
+
+            <button onClick={generateForModule} disabled={generating || !GROQ_KEY2}
+              className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50">
+              {generating ? "⏳ Generating..." : `Generate ${ppMode==="practice"?"Practice":"Assessment"} Paper (${numQ} Qs)`}
+            </button>
+            {!GROQ_KEY2 && <p className="text-xs text-amber-600 text-center">⚠️ VITE_GROQ_API_KEY not set</p>}
+
+            {output && (
+              <div className="mt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-bold text-gray-700">Generated Paper</h4>
+                  <button onClick={()=>{const b=new Blob([output],{type:"text/plain"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=`Paper_${domain}_${user?.name?.replace(/\s+/g,"_")}.txt`;a.click();URL.revokeObjectURL(u);}}
+                    className="px-2.5 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">📥 Download</button>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-800 whitespace-pre-wrap break-words font-mono leading-relaxed max-h-[500px] overflow-y-auto border border-gray-200">
+                  {output}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Step 4: Reflection */}
+        <div className={`bg-white rounded-xl shadow border overflow-hidden ${domData?.reflection_text ? "border-green-300" : "border-gray-200"}`}>
+          <div className={`px-4 py-3 ${domData?.reflection_text ? "bg-green-50" : "bg-gray-50"}`}>
+            <span className="text-xs font-bold text-gray-700">{domData?.reflection_text ? "✅" : "4️⃣"} Reflection</span>
+            <p className="text-xs text-gray-400 mt-0.5">What will you do differently in your teaching after studying this domain?</p>
+          </div>
+          <div className="px-4 py-3 space-y-2">
+            <textarea
+              value={reflectionText}
+              onChange={e => setReflectionText(e.target.value)}
+              rows={4}
+              placeholder="Write your reflection here — it will be saved to your portfolio..."
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            />
+            {stepMsg && <p className="text-xs text-green-600">{stepMsg}</p>}
+            <button onClick={() => saveStep({ reflection_text: reflectionText })} disabled={savingStep || !reflectionText.trim()}
+              className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
+              {savingStep ? "Saving..." : "Save Reflection"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4 w-full max-w-3xl">
+      {baselineError && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{baselineError}</p>}
+      {activeModule ? renderModuleDetail() : renderHub()}
+    </div>
+  );
+}
+
+// ── LEGACY SelfAITab helpers (unused stub — kept for tree-shaking) ──
+function _legacySelfAITab({ user, academicYear }: any) {
+  const GROQ_KEY2 = import.meta.env.VITE_GROQ_API_KEY || "";
+  const STAGE_GRADE: Record<string,string> = { foundation:"Grade 2", preparatory:"Grade 5", middle:"Grade 8", secondary:"Grade 10" };
   const LIT_DOMAINS = ["Listening","Speaking","Reading","Writing"];
   const NUM_DOMAINS = ["Operations","Base 10","Measurement","Geometry"];
 
