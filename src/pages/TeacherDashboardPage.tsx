@@ -4524,7 +4524,7 @@ function SelfAITab({ user, academicYear }: any) {
   const [loadingComps, setLoadingComps] = useState(false);
   const [baselineData, setBaselineData] = useState<any>(null);
   const [baselineError, setBaselineError] = useState("");
-  const [cgSearchQueries, setCgSearchQueries] = useState<Record<string, {youtube:string;google:string;diksha:string}>>({});
+  const [cgSubConcepts, setCgSubConcepts] = useState<Record<string, Array<{concept:string;youtube:string;google:string;diksha:string}>>>({});
   const [cgQueriesLoading, setCgQueriesLoading] = useState(false);
 
   useEffect(() => { fetchBaseline(); }, [academicYear]);
@@ -4533,7 +4533,7 @@ function SelfAITab({ user, academicYear }: any) {
   useEffect(() => {
     if (!activeModule) return;
     setOutput(""); setGenMsg(""); setReflectionText("");
-    setCgSearchQueries({});
+    setCgSubConcepts({});
     if (activeModule.subject === "numeracy" && !["literacy"].includes(activeModule.subject)) {
       // no-op — keep custDomain in sync with module domain when possible
     }
@@ -4588,7 +4588,7 @@ function SelfAITab({ user, academicYear }: any) {
   const fetchDomainComps = async (subject: string, stage: string, domain: string) => {
     const grade = STAGE_GRADE[stage] || "Grade 2";
     setLoadingComps(true);
-    setCgSearchQueries({});
+    setCgSubConcepts({});
     try {
       const apiSubj = subject === "literacy" ? "language" : subject;
       const r = await axios.get(`${API}/activities/competencies?subject=${apiSubj}&stage=${stage}&grade=${encodeURIComponent(grade)}`);
@@ -4601,7 +4601,8 @@ function SelfAITab({ user, academicYear }: any) {
     setLoadingComps(false);
   };
 
-  // Use Groq to translate formal CG descriptions → natural teacher-training search queries
+  // Groq: for each CG, identify ALL distinct teachable sub-concepts and generate search queries per sub-concept.
+  // Simple CGs get 1 entry; complex multi-topic CGs get as many as they actually contain.
   const translateCGsForTeachers = async (comps: any[], subject: string, stage: string, domain: string) => {
     if (!comps.length || !GROQ_KEY2) return;
     setCgQueriesLoading(true);
@@ -4609,32 +4610,35 @@ function SelfAITab({ user, academicYear }: any) {
     const subjectLabel = subject === "literacy" ? "English Language / Literacy" : "Mathematics / Numeracy";
     const cgLines = comps.slice(0, 8).map((c: any) =>
       `[${c.competency_code || "CG"}] ${(c.description || c.desc || "").trim()}`
-    ).join("\n");
+    ).join("\n\n");
 
-    const prompt = `You are helping a teacher professional development platform in India.
+    const prompt = `You are analyzing school curriculum competency goals to help teachers learn HOW TO TEACH each one.
 
-A teacher must LEARN HOW TO TEACH these competency goals to their students. The TEACHER is the learner here, not the student. Generate search queries that will find TEACHER TRAINING resources — videos and materials that train teachers how to deliver this skill in the classroom.
+The TEACHER is the learner. Resources must train the teacher to deliver the skill in the classroom, not teach the concept to students.
 
 Subject: ${subjectLabel}
 Domain: ${domain}
 Grade: ${grade}
 Curriculum: CBSE India
 
-For each competency goal below, generate 3 natural search queries a teacher would use to find training materials. Use simple natural language like "how to teach [topic]", "[topic] teacher training activity", "[topic] teaching strategy classroom" — NOT the formal CG text. The goal: a teacher watches these and learns how to TEACH the concept to students.
+For each CG:
+1. Identify ALL distinct teachable sub-concepts it contains. Be exact — simple CGs have 1; complex CGs targeting higher grades may have 5, 6, 7 or more. Do not group unrelated ideas together and do not create artificial splits.
+2. For each sub-concept generate 3 natural teacher-training search queries (NOT formal CG language — use language like "how to teach [topic]" or "[topic] teacher training").
 
 Competency Goals:
 ${cgLines}
 
-Output ONLY in this exact format (no extra text, no commentary):
-
-Example:
-[L01] Identifying main ideas from spoken text
-YOUTUBE: how to teach listening comprehension main idea Grade 2 India classroom strategy teacher training
-GOOGLE: teaching main idea listening comprehension lesson plan CBSE India teacher professional development
-DIKSHA: listening main idea teacher resource Grade 2 English CBSE
-
-Now generate for ALL competency goals listed above, one block each:
-${comps.slice(0, 8).map((c: any) => `[${c.competency_code || "CG"}]`).join("\n")}`;
+Respond with ONLY a valid JSON object, no other text:
+{
+  "<cg_code>": [
+    {
+      "concept": "<3-7 word sub-concept name a teacher would recognise>",
+      "youtube": "<natural YouTube search for a teacher training video on this sub-concept>",
+      "google": "<natural Google search for teacher lesson plan or training resource>",
+      "diksha": "<short DIKSHA India search for teacher resource on this sub-concept>"
+    }
+  ]
+}`;
 
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -4642,29 +4646,27 @@ ${comps.slice(0, 8).map((c: any) => `[${c.competency_code || "CG"}]`).join("\n")
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY2}` },
         body: JSON.stringify({
           model: "llama-3.3-70b-versatile",
-          max_tokens: 1800,
-          temperature: 0.3,
+          max_tokens: 4000,
+          temperature: 0.2,
+          response_format: { type: "json_object" },
           messages: [{ role: "user", content: prompt }],
         }),
       });
       const data = await res.json();
-      const text: string = data.choices?.[0]?.message?.content || "";
+      const raw: string = data.choices?.[0]?.message?.content || "{}";
+      let parsed: any = {};
+      try { parsed = JSON.parse(raw); } catch { /* malformed JSON — stay empty */ }
 
-      const result: Record<string, {youtube:string;google:string;diksha:string}> = {};
+      const result: Record<string, Array<{concept:string;youtube:string;google:string;diksha:string}>> = {};
       for (const comp of comps.slice(0, 8)) {
         const code = comp.competency_code || "CG";
-        const escaped = code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const blockMatch = text.match(new RegExp(`\\[${escaped}\\][^\\n]*\\n([\\s\\S]*?)(?=\\[|$)`));
-        if (blockMatch) {
-          const block = blockMatch[1];
-          const yt = block.match(/YOUTUBE:\s*(.+)/)?.[1]?.trim() || "";
-          const gl = block.match(/GOOGLE:\s*(.+)/)?.[1]?.trim() || "";
-          const dk = block.match(/DIKSHA:\s*(.+)/)?.[1]?.trim() || "";
-          if (yt || gl || dk) result[code] = { youtube: yt, google: gl, diksha: dk };
+        const arr = parsed[code];
+        if (Array.isArray(arr) && arr.length) {
+          result[code] = arr.filter((s: any) => s.concept && (s.youtube || s.google || s.diksha));
         }
       }
-      setCgSearchQueries(result);
-    } catch { /* silent — fallback queries still work */ }
+      setCgSubConcepts(result);
+    } catch { /* silent — UI shows fallback links */ }
     setCgQueriesLoading(false);
   };
 
@@ -4730,23 +4732,15 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
     setGenerating(false);
   };
 
-  // Per-competency resource links — uses Groq-translated queries when available
-  const getCompLinks = (comp: any, subject: string, stage: string) => {
-    const code = comp.competency_code || "";
-    const desc = (comp.description || comp.desc || "").slice(0, 80);
+  // Fallback links for a CG when Groq sub-concepts are not yet loaded
+  const cgFallbackLinks = (comp: any, subject: string, stage: string) => {
+    const desc = (comp.description || comp.desc || "").slice(0, 60);
     const grade = STAGE_GRADE[stage] || "";
-    const domainLabel = activeModule?.domain || "";
-    const groqQ = cgSearchQueries[code];
-
-    const ytQuery  = groqQ?.youtube || `how to teach ${domainLabel} ${desc} CBSE India teacher training`;
-    const glQuery  = groqQ?.google  || `teaching ${domainLabel} ${desc} ${grade} CBSE India teacher professional development`;
-    const dkQuery  = groqQ?.diksha  || `${domainLabel} ${desc} ${grade} teacher resource CBSE`;
-
+    const dom = activeModule?.domain || "";
     return {
-      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(ytQuery)}`,
-      google:  `https://www.google.com/search?q=${encodeURIComponent(glQuery)}`,
-      diksha:  `https://diksha.gov.in/search?key=${encodeURIComponent(dkQuery)}`,
-      isAI: !!groqQ,
+      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`how to teach ${dom} ${desc} CBSE India teacher training`)}`,
+      google:  `https://www.google.com/search?q=${encodeURIComponent(`teaching ${dom} ${desc} ${grade} CBSE India teacher professional development`)}`,
+      diksha:  `https://diksha.gov.in/search?key=${encodeURIComponent(`${dom} ${desc} ${grade} teacher resource CBSE`)}`,
     };
   };
 
@@ -5038,44 +5032,62 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
               </div>
             </div>
 
-            {/* Per-CG links */}
+            {/* Per-CG sub-concept resources */}
             {custComps.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-gray-600">Per competency goal (CG) resources:</p>
+                  <p className="text-xs font-semibold text-gray-600">Resources by competency goal:</p>
                   {cgQueriesLoading && (
-                    <span className="text-xs text-indigo-500 animate-pulse">✨ Generating smart queries...</span>
+                    <span className="text-xs text-indigo-500 animate-pulse">✨ Analysing sub-concepts...</span>
                   )}
-                  {!cgQueriesLoading && Object.keys(cgSearchQueries).length > 0 && (
-                    <span className="text-xs text-green-600 font-medium">✨ AI-optimized for teacher training</span>
+                  {!cgQueriesLoading && Object.keys(cgSubConcepts).length > 0 && (
+                    <span className="text-xs text-green-600 font-medium">✨ Sub-concepts identified</span>
                   )}
                 </div>
                 {custComps.slice(0, 8).map((comp: any) => {
-                  const links = getCompLinks(comp, subject, stage);
-                  const desc = (comp.description || comp.desc || "").slice(0, 100);
+                  const code = comp.competency_code || "";
+                  const desc = (comp.description || comp.desc || "").slice(0, 130);
+                  const subConcepts = cgSubConcepts[code];
+                  const fallback = cgFallbackLinks(comp, subject, stage);
+                  const ResourceBtns = ({ yt, gl, dk }: {yt:string;gl:string;dk:string}) => (
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      <a href={`https://diksha.gov.in/search?key=${encodeURIComponent(dk)}`} target="_blank" rel="noopener noreferrer"
+                        className="px-2 py-1 bg-green-50 border border-green-200 rounded text-xs text-green-700 font-medium hover:bg-green-100">🎓 DIKSHA</a>
+                      <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(yt)}`} target="_blank" rel="noopener noreferrer"
+                        className="px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-medium hover:bg-red-100">▶️ YouTube</a>
+                      <a href={`https://www.google.com/search?q=${encodeURIComponent(gl)}`} target="_blank" rel="noopener noreferrer"
+                        className="px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 font-medium hover:bg-blue-100">🔍 Google</a>
+                    </div>
+                  );
                   return (
-                    <div key={comp.competency_code} className="border border-gray-200 rounded-lg p-3 bg-white">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <p className="text-xs font-medium text-gray-700 leading-snug">
-                          <span className="font-bold text-indigo-600 mr-1">[{comp.competency_code}]</span>{desc}
+                    <div key={code} className="border border-gray-200 rounded-lg bg-white overflow-hidden">
+                      {/* CG header */}
+                      <div className="px-3 py-2 bg-indigo-50 border-b border-indigo-100 flex items-start justify-between gap-2">
+                        <p className="text-xs font-medium text-gray-800 leading-snug">
+                          <span className="font-bold text-indigo-700 mr-1">[{code}]</span>{desc}
                         </p>
-                        {links.isAI && (
-                          <span className="shrink-0 text-xs px-1.5 py-0.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 font-medium">✨ AI</span>
+                        {subConcepts && (
+                          <span className="shrink-0 text-xs px-1.5 py-0.5 bg-indigo-100 border border-indigo-300 rounded text-indigo-700 font-semibold whitespace-nowrap">
+                            {subConcepts.length} concept{subConcepts.length !== 1 ? "s" : ""}
+                          </span>
                         )}
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        <a href={links.diksha} target="_blank" rel="noopener noreferrer"
-                          className="px-2 py-1 bg-green-50 border border-green-200 rounded text-xs text-green-700 font-medium hover:bg-green-100">
-                          🎓 DIKSHA
-                        </a>
-                        <a href={links.youtube} target="_blank" rel="noopener noreferrer"
-                          className="px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-medium hover:bg-red-100">
-                          ▶️ YouTube
-                        </a>
-                        <a href={links.google} target="_blank" rel="noopener noreferrer"
-                          className="px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 font-medium hover:bg-blue-100">
-                          🔍 Google
-                        </a>
+                      {/* Sub-concept list */}
+                      <div className="px-3 py-2 space-y-2">
+                        {cgQueriesLoading && !subConcepts ? (
+                          <div className="h-7 bg-gray-100 rounded animate-pulse" />
+                        ) : subConcepts?.length ? (
+                          subConcepts.map((sc, i) => (
+                            <div key={i} className={`${subConcepts.length > 1 ? "border-l-2 border-indigo-200 pl-2 py-0.5" : ""}`}>
+                              {subConcepts.length > 1 && (
+                                <p className="text-xs font-semibold text-gray-700">📌 {sc.concept}</p>
+                              )}
+                              <ResourceBtns yt={sc.youtube} gl={sc.google} dk={sc.diksha} />
+                            </div>
+                          ))
+                        ) : (
+                          <ResourceBtns yt={fallback.youtube} gl={fallback.google} dk={fallback.diksha} />
+                        )}
                       </div>
                     </div>
                   );
