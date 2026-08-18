@@ -4659,12 +4659,16 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
 
   // Per-competency resource links
   const getCompLinks = (comp: any, subject: string, stage: string) => {
-    const desc = (comp.description || "").slice(0, 80);
+    const desc = (comp.description || comp.desc || "").slice(0, 100);
+    const code = comp.competency_code || "";
     const grade = STAGE_GRADE[stage] || "";
+    const subjectLabel = subject === "literacy" ? "English literacy" : "numeracy mathematics";
+    const domainLabel = activeModule?.domain || "";
     return {
-      google: `https://www.google.com/search?q=${encodeURIComponent(`${desc} ${grade} teaching activity India`)}`,
-      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${desc} teaching strategy classroom`)}`,
-      diksha: `https://diksha.gov.in/search?key=${encodeURIComponent(`${subject === "literacy" ? "literacy" : "numeracy"} ${grade}`)}`,
+      google: `https://www.google.com/search?q=${encodeURIComponent(`"${desc}" CBSE ${grade} worksheet lesson plan India`)}`,
+      google2: `https://www.google.com/search?q=${encodeURIComponent(`${domainLabel} ${subjectLabel} ${grade} CBSE teaching activity worksheet India`)}`,
+      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${domainLabel} ${desc} ${grade} CBSE India teaching classroom activity`)}`,
+      diksha: `https://diksha.gov.in/search?key=${encodeURIComponent(`${domainLabel} ${desc} ${grade}`)}`,
     };
   };
 
@@ -4928,36 +4932,72 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
               </button>
             )}
           </div>
-          <div className="px-4 py-3 space-y-2">
-            {domData?.resources?.length > 0 ? (
-              <>
-                {domData.resources.map((r: any, i: number) => (
-                  <a key={i} href={r.url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-200 hover:bg-indigo-50 hover:border-indigo-200 transition-all">
-                    <span className="text-xs text-gray-700 font-medium">{r.title}</span>
-                    <span className="text-xs text-indigo-600 font-medium ml-2">{r.type} ↗</span>
-                  </a>
-                ))}
-                {custComps.length > 0 && (
-                  <div className="mt-2 bg-indigo-50 rounded-lg p-3">
-                    <p className="text-xs font-semibold text-indigo-700 mb-2">Competency-level search links:</p>
-                    {custComps.slice(0, 5).map((comp: any) => {
-                      const links = getCompLinks(comp, subject, stage);
-                      return (
-                        <div key={comp.competency_code} className="mb-2">
-                          <p className="text-xs text-gray-600 mb-1"><span className="font-bold text-indigo-600">[{comp.competency_code}]</span> {(comp.description || "").slice(0, 80)}</p>
-                          <div className="flex gap-1.5">
-                            <a href={links.google} target="_blank" rel="noopener noreferrer" className="px-2 py-0.5 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">🔍 Google</a>
-                            <a href={links.youtube} target="_blank" rel="noopener noreferrer" className="px-2 py-0.5 bg-red-50 border border-red-200 rounded text-xs text-red-700">▶️ YouTube</a>
-                            <a href={links.diksha} target="_blank" rel="noopener noreferrer" className="px-2 py-0.5 bg-green-50 border border-green-200 rounded text-xs text-green-700">🎓 DIKSHA</a>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            ) : <p className="text-xs text-gray-400">No resources listed for this domain.</p>}
+          <div className="px-4 py-3 space-y-3">
+            {/* Domain-level quick links */}
+            <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+              <p className="text-xs font-semibold text-gray-600 mb-2">Search by domain — {domain} ({subject === "literacy" ? "Literacy" : "Numeracy"}) · {STAGE_LABELS[stage]} · {STAGE_GRADE[stage]}</p>
+              <div className="flex flex-wrap gap-2">
+                <a href={`https://diksha.gov.in/search?key=${encodeURIComponent(`${domain} ${subject === "literacy" ? "English" : "Mathematics"} ${STAGE_GRADE[stage]} CBSE`)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700">
+                  🎓 DIKSHA — {domain}
+                </a>
+                <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${domain} ${subject === "literacy" ? "literacy English" : "numeracy maths"} ${STAGE_GRADE[stage]} CBSE India teaching`)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700">
+                  ▶️ YouTube — {domain}
+                </a>
+                <a href={`https://www.google.com/search?q=${encodeURIComponent(`${domain} ${subject === "literacy" ? "English literacy" : "numeracy"} ${STAGE_GRADE[stage]} CBSE worksheet lesson plan India`)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
+                  🔍 Google — {domain} worksheets
+                </a>
+                <a href={`https://www.google.com/search?q=${encodeURIComponent(`site:ncert.nic.in OR site:cbseacademic.nic.in ${domain} ${STAGE_GRADE[stage]}`)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-medium hover:bg-orange-700">
+                  📚 NCERT/CBSE — {domain}
+                </a>
+              </div>
+            </div>
+
+            {/* Per-CG links */}
+            {custComps.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-600">Per competency goal (CG) resources:</p>
+                {custComps.slice(0, 8).map((comp: any) => {
+                  const links = getCompLinks(comp, subject, stage);
+                  const desc = (comp.description || comp.desc || "").slice(0, 100);
+                  return (
+                    <div key={comp.competency_code} className="border border-gray-200 rounded-lg p-3 bg-white">
+                      <p className="text-xs font-medium text-gray-700 mb-2 leading-snug">
+                        <span className="font-bold text-indigo-600 mr-1">[{comp.competency_code}]</span>{desc}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        <a href={links.diksha} target="_blank" rel="noopener noreferrer"
+                          className="px-2 py-1 bg-green-50 border border-green-200 rounded text-xs text-green-700 font-medium hover:bg-green-100">
+                          🎓 DIKSHA
+                        </a>
+                        <a href={links.youtube} target="_blank" rel="noopener noreferrer"
+                          className="px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-medium hover:bg-red-100">
+                          ▶️ YouTube
+                        </a>
+                        <a href={links.google} target="_blank" rel="noopener noreferrer"
+                          className="px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 font-medium hover:bg-blue-100">
+                          🔍 Google (exact CG)
+                        </a>
+                        <a href={links.google2} target="_blank" rel="noopener noreferrer"
+                          className="px-2 py-1 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 font-medium hover:bg-indigo-100">
+                          🔍 Google (domain)
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {custComps.length === 0 && !loadingComps && (
+              <p className="text-xs text-gray-400">No competencies loaded yet for this domain.</p>
+            )}
           </div>
         </div>
 
@@ -5330,12 +5370,15 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
 
   // Per-competency search links — Google, YouTube, DIKSHA
   const getCompLinks = (comp: any, gap: any) => {
-    const desc = (comp.description || "").slice(0, 80);
+    const desc = (comp.description || comp.desc || "").slice(0, 100);
     const grade = gap.grade || "";
+    const domainLabel = gap.domain || "";
+    const subjectLabel = gap.subject === "literacy" ? "English literacy" : "numeracy mathematics";
     return {
-      google: `https://www.google.com/search?q=${encodeURIComponent(`${desc} ${grade} teaching activity India`)}`,
-      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${desc} teaching strategy classroom`)}`,
-      diksha: `https://diksha.gov.in/search?key=${encodeURIComponent(`${gap.subject === "literacy" ? "literacy" : "numeracy"} ${gap.domain} ${grade}`)}`,
+      google: `https://www.google.com/search?q=${encodeURIComponent(`"${desc}" CBSE ${grade} worksheet lesson plan India`)}`,
+      google2: `https://www.google.com/search?q=${encodeURIComponent(`${domainLabel} ${subjectLabel} ${grade} CBSE teaching activity worksheet India`)}`,
+      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${domainLabel} ${desc} ${grade} CBSE India teaching classroom activity`)}`,
+      diksha: `https://diksha.gov.in/search?key=${encodeURIComponent(`${domainLabel} ${desc} ${grade}`)}`,
     };
   };
 
@@ -5592,30 +5635,50 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">{comps.length} competenc{comps.length===1?"y":"ies"}</p>
                     </div>
+                    {/* Domain-level quick links */}
+                    <div className="px-4 pt-3 pb-1 flex flex-wrap gap-2">
+                      <a href={`https://diksha.gov.in/search?key=${encodeURIComponent(`${gap.domain} ${gap.subject === "literacy" ? "English" : "Mathematics"} ${gap.grade} CBSE`)}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="px-2.5 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700">🎓 DIKSHA — {gap.domain}</a>
+                      <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${gap.domain} ${gap.subject === "literacy" ? "literacy English" : "numeracy maths"} ${gap.grade} CBSE India teaching`)}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="px-2.5 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700">▶️ YouTube — {gap.domain}</a>
+                      <a href={`https://www.google.com/search?q=${encodeURIComponent(`${gap.domain} ${gap.subject === "literacy" ? "English literacy" : "numeracy"} ${gap.grade} CBSE worksheet lesson plan India`)}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="px-2.5 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700">🔍 Google — {gap.domain}</a>
+                      <a href={`https://www.google.com/search?q=${encodeURIComponent(`site:ncert.nic.in OR site:cbseacademic.nic.in ${gap.domain} ${gap.grade}`)}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="px-2.5 py-1 bg-orange-600 text-white rounded text-xs font-medium hover:bg-orange-700">📚 NCERT/CBSE</a>
+                    </div>
                     {/* Per-competency resource rows */}
                     <div className="px-4 py-3 space-y-3">
                       {comps.length === 0 ? (
                         <p className="text-xs text-gray-400 italic">No competencies found for this domain.</p>
                       ) : comps.map((comp:any) => {
                         const links = getCompLinks(comp, gap);
+                        const desc = (comp.description || comp.desc || "").slice(0, 100);
                         return (
                           <div key={comp.competency_code} className="border border-gray-100 rounded-lg p-3 bg-gray-50">
                             <p className="text-xs font-medium text-gray-700 mb-2 leading-snug">
                               <span className={`font-bold mr-1 ${isLit?"text-blue-600":"text-purple-600"}`}>[{comp.competency_code}]</span>
-                              {comp.description}
+                              {desc}
                             </p>
-                            <div className="flex gap-2 flex-wrap">
-                              <a href={links.google} target="_blank" rel="noopener noreferrer"
-                                className="flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded text-xs text-blue-700 font-medium transition-all">
-                                🔍 Google
+                            <div className="flex gap-1.5 flex-wrap">
+                              <a href={links.diksha} target="_blank" rel="noopener noreferrer"
+                                className="px-2 py-0.5 bg-green-50 hover:bg-green-100 border border-green-200 rounded text-xs text-green-700 font-medium">
+                                🎓 DIKSHA
                               </a>
                               <a href={links.youtube} target="_blank" rel="noopener noreferrer"
-                                className="flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 border border-red-200 rounded text-xs text-red-700 font-medium transition-all">
+                                className="px-2 py-0.5 bg-red-50 hover:bg-red-100 border border-red-200 rounded text-xs text-red-700 font-medium">
                                 ▶️ YouTube
                               </a>
-                              <a href={links.diksha} target="_blank" rel="noopener noreferrer"
-                                className="flex items-center gap-1 px-2 py-1 bg-green-50 hover:bg-green-100 border border-green-200 rounded text-xs text-green-700 font-medium transition-all">
-                                🎓 DIKSHA
+                              <a href={links.google} target="_blank" rel="noopener noreferrer"
+                                className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded text-xs text-blue-700 font-medium">
+                                🔍 Google (exact CG)
+                              </a>
+                              <a href={links.google2} target="_blank" rel="noopener noreferrer"
+                                className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded text-xs text-indigo-700 font-medium">
+                                🔍 Google (domain)
                               </a>
                             </div>
                           </div>
