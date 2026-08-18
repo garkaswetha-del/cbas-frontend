@@ -4524,6 +4524,8 @@ function SelfAITab({ user, academicYear }: any) {
   const [loadingComps, setLoadingComps] = useState(false);
   const [baselineData, setBaselineData] = useState<any>(null);
   const [baselineError, setBaselineError] = useState("");
+  const [cgSearchQueries, setCgSearchQueries] = useState<Record<string, {youtube:string;google:string;diksha:string}>>({});
+  const [cgQueriesLoading, setCgQueriesLoading] = useState(false);
 
   useEffect(() => { fetchBaseline(); }, [academicYear]);
   useEffect(() => { loadModules(); }, [academicYear]);
@@ -4531,6 +4533,7 @@ function SelfAITab({ user, academicYear }: any) {
   useEffect(() => {
     if (!activeModule) return;
     setOutput(""); setGenMsg(""); setReflectionText("");
+    setCgSearchQueries({});
     if (activeModule.subject === "numeracy" && !["literacy"].includes(activeModule.subject)) {
       // no-op — keep custDomain in sync with module domain when possible
     }
@@ -4585,14 +4588,84 @@ function SelfAITab({ user, academicYear }: any) {
   const fetchDomainComps = async (subject: string, stage: string, domain: string) => {
     const grade = STAGE_GRADE[stage] || "Grade 2";
     setLoadingComps(true);
+    setCgSearchQueries({});
     try {
       const apiSubj = subject === "literacy" ? "language" : subject;
       const r = await axios.get(`${API}/activities/competencies?subject=${apiSubj}&stage=${stage}&grade=${encodeURIComponent(grade)}`);
       const all = r.data?.competencies || [];
       const filtered = all.filter((c: any) => (c.domain || "").toLowerCase().includes(domain.toLowerCase()));
-      setCustComps(filtered.length ? filtered : all.slice(0, 10));
+      const finalComps = filtered.length ? filtered : all.slice(0, 10);
+      setCustComps(finalComps);
+      translateCGsForTeachers(finalComps, subject, stage, domain);
     } catch { setCustComps([]); }
     setLoadingComps(false);
+  };
+
+  // Use Groq to translate formal CG descriptions → natural teacher-training search queries
+  const translateCGsForTeachers = async (comps: any[], subject: string, stage: string, domain: string) => {
+    if (!comps.length || !GROQ_KEY2) return;
+    setCgQueriesLoading(true);
+    const grade = STAGE_GRADE[stage] || "Grade 2";
+    const subjectLabel = subject === "literacy" ? "English Language / Literacy" : "Mathematics / Numeracy";
+    const cgLines = comps.slice(0, 8).map((c: any) =>
+      `[${c.competency_code || "CG"}] ${(c.description || c.desc || "").trim()}`
+    ).join("\n");
+
+    const prompt = `You are helping a teacher professional development platform in India.
+
+A teacher must LEARN HOW TO TEACH these competency goals to their students. The TEACHER is the learner here, not the student. Generate search queries that will find TEACHER TRAINING resources — videos and materials that train teachers how to deliver this skill in the classroom.
+
+Subject: ${subjectLabel}
+Domain: ${domain}
+Grade: ${grade}
+Curriculum: CBSE India
+
+For each competency goal below, generate 3 natural search queries a teacher would use to find training materials. Use simple natural language like "how to teach [topic]", "[topic] teacher training activity", "[topic] teaching strategy classroom" — NOT the formal CG text. The goal: a teacher watches these and learns how to TEACH the concept to students.
+
+Competency Goals:
+${cgLines}
+
+Output ONLY in this exact format (no extra text, no commentary):
+
+Example:
+[L01] Identifying main ideas from spoken text
+YOUTUBE: how to teach listening comprehension main idea Grade 2 India classroom strategy teacher training
+GOOGLE: teaching main idea listening comprehension lesson plan CBSE India teacher professional development
+DIKSHA: listening main idea teacher resource Grade 2 English CBSE
+
+Now generate for ALL competency goals listed above, one block each:
+${comps.slice(0, 8).map((c: any) => `[${c.competency_code || "CG"}]`).join("\n")}`;
+
+    try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY2}` },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          max_tokens: 1800,
+          temperature: 0.3,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      const data = await res.json();
+      const text: string = data.choices?.[0]?.message?.content || "";
+
+      const result: Record<string, {youtube:string;google:string;diksha:string}> = {};
+      for (const comp of comps.slice(0, 8)) {
+        const code = comp.competency_code || "CG";
+        const escaped = code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const blockMatch = text.match(new RegExp(`\\[${escaped}\\][^\\n]*\\n([\\s\\S]*?)(?=\\[|$)`));
+        if (blockMatch) {
+          const block = blockMatch[1];
+          const yt = block.match(/YOUTUBE:\s*(.+)/)?.[1]?.trim() || "";
+          const gl = block.match(/GOOGLE:\s*(.+)/)?.[1]?.trim() || "";
+          const dk = block.match(/DIKSHA:\s*(.+)/)?.[1]?.trim() || "";
+          if (yt || gl || dk) result[code] = { youtube: yt, google: gl, diksha: dk };
+        }
+      }
+      setCgSearchQueries(result);
+    } catch { /* silent — fallback queries still work */ }
+    setCgQueriesLoading(false);
   };
 
   // Generate AI paper for the current module's domain
@@ -4657,18 +4730,23 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
     setGenerating(false);
   };
 
-  // Per-competency resource links
+  // Per-competency resource links — uses Groq-translated queries when available
   const getCompLinks = (comp: any, subject: string, stage: string) => {
-    const desc = (comp.description || comp.desc || "").slice(0, 100);
     const code = comp.competency_code || "";
+    const desc = (comp.description || comp.desc || "").slice(0, 80);
     const grade = STAGE_GRADE[stage] || "";
-    const subjectLabel = subject === "literacy" ? "English literacy" : "numeracy mathematics";
     const domainLabel = activeModule?.domain || "";
+    const groqQ = cgSearchQueries[code];
+
+    const ytQuery  = groqQ?.youtube || `how to teach ${domainLabel} ${desc} CBSE India teacher training`;
+    const glQuery  = groqQ?.google  || `teaching ${domainLabel} ${desc} ${grade} CBSE India teacher professional development`;
+    const dkQuery  = groqQ?.diksha  || `${domainLabel} ${desc} ${grade} teacher resource CBSE`;
+
     return {
-      google: `https://www.google.com/search?q=${encodeURIComponent(`"${desc}" CBSE ${grade} worksheet lesson plan India`)}`,
-      google2: `https://www.google.com/search?q=${encodeURIComponent(`${domainLabel} ${subjectLabel} ${grade} CBSE teaching activity worksheet India`)}`,
-      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${domainLabel} ${desc} ${grade} CBSE India teaching classroom activity`)}`,
-      diksha: `https://diksha.gov.in/search?key=${encodeURIComponent(`${domainLabel} ${desc} ${grade}`)}`,
+      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(ytQuery)}`,
+      google:  `https://www.google.com/search?q=${encodeURIComponent(glQuery)}`,
+      diksha:  `https://diksha.gov.in/search?key=${encodeURIComponent(dkQuery)}`,
+      isAI: !!groqQ,
     };
   };
 
@@ -4963,15 +5041,28 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
             {/* Per-CG links */}
             {custComps.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-gray-600">Per competency goal (CG) resources:</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-gray-600">Per competency goal (CG) resources:</p>
+                  {cgQueriesLoading && (
+                    <span className="text-xs text-indigo-500 animate-pulse">✨ Generating smart queries...</span>
+                  )}
+                  {!cgQueriesLoading && Object.keys(cgSearchQueries).length > 0 && (
+                    <span className="text-xs text-green-600 font-medium">✨ AI-optimized for teacher training</span>
+                  )}
+                </div>
                 {custComps.slice(0, 8).map((comp: any) => {
                   const links = getCompLinks(comp, subject, stage);
                   const desc = (comp.description || comp.desc || "").slice(0, 100);
                   return (
                     <div key={comp.competency_code} className="border border-gray-200 rounded-lg p-3 bg-white">
-                      <p className="text-xs font-medium text-gray-700 mb-2 leading-snug">
-                        <span className="font-bold text-indigo-600 mr-1">[{comp.competency_code}]</span>{desc}
-                      </p>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <p className="text-xs font-medium text-gray-700 leading-snug">
+                          <span className="font-bold text-indigo-600 mr-1">[{comp.competency_code}]</span>{desc}
+                        </p>
+                        {links.isAI && (
+                          <span className="shrink-0 text-xs px-1.5 py-0.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 font-medium">✨ AI</span>
+                        )}
+                      </div>
                       <div className="flex flex-wrap gap-1.5">
                         <a href={links.diksha} target="_blank" rel="noopener noreferrer"
                           className="px-2 py-1 bg-green-50 border border-green-200 rounded text-xs text-green-700 font-medium hover:bg-green-100">
@@ -4983,11 +5074,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
                         </a>
                         <a href={links.google} target="_blank" rel="noopener noreferrer"
                           className="px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 font-medium hover:bg-blue-100">
-                          🔍 Google (exact CG)
-                        </a>
-                        <a href={links.google2} target="_blank" rel="noopener noreferrer"
-                          className="px-2 py-1 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 font-medium hover:bg-indigo-100">
-                          🔍 Google (domain)
+                          🔍 Google
                         </a>
                       </div>
                     </div>
