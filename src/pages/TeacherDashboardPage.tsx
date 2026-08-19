@@ -4737,10 +4737,10 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
     const desc = (comp.description || comp.desc || "").slice(0, 60);
     const grade = STAGE_GRADE[stageArg] || "";
     const dom = activeModule?.domain || "";
-    const subj = subjectArg === "literacy" ? "English literacy" : "Mathematics";
+    const langTag = subjectArg === "literacy" ? " English" : "";
     return {
-      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`how to teach ${dom} ${desc} ${grade} CBSE India teacher training`)}`,
-      google:  `https://www.google.com/search?q=${encodeURIComponent(`${dom} ${desc} teacher training lesson plan ${grade} CBSE NCERT India ${subj}`)}`,
+      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`how to teach ${dom} ${desc}${langTag} ${grade} CBSE India teacher training`)}`,
+      google:  `https://www.google.com/search?q=${encodeURIComponent(`${dom} ${desc}${langTag} teacher training lesson plan ${grade} CBSE NCERT India`)}`,
       diksha:  `https://diksha.gov.in/search?key=${encodeURIComponent(`${dom} ${desc} ${grade} CBSE teacher training`)}`,
     };
   };
@@ -5051,14 +5051,14 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
                   const subConcepts = cgSubConcepts[code];
                   const fallback = cgFallbackLinks(comp, subject, stage);
                   const gr = STAGE_GRADE[stage] || "";
-                  const subj = subject === "literacy" ? "English literacy" : "Mathematics";
+                  const langTag = subject === "literacy" ? " English" : "";
                   const ResourceBtns = ({ yt, gl, dk }: {yt:string;gl:string;dk:string}) => (
                     <div className="flex flex-wrap gap-1.5 mt-1">
                       <a href={`https://diksha.gov.in/search?key=${encodeURIComponent(`${dk} ${gr} CBSE teacher training`)}`} target="_blank" rel="noopener noreferrer"
                         className="px-2 py-1 bg-green-50 border border-green-200 rounded text-xs text-green-700 font-medium hover:bg-green-100">🎓 DIKSHA</a>
-                      <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`how to teach ${yt} ${gr} CBSE India teacher training`)}`} target="_blank" rel="noopener noreferrer"
+                      <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`how to teach ${yt}${langTag} ${gr} CBSE India teacher training`)}`} target="_blank" rel="noopener noreferrer"
                         className="px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-medium hover:bg-red-100">▶️ YouTube</a>
-                      <a href={`https://www.google.com/search?q=${encodeURIComponent(`${gl} teacher training lesson plan ${gr} CBSE NCERT India ${subj}`)}`} target="_blank" rel="noopener noreferrer"
+                      <a href={`https://www.google.com/search?q=${encodeURIComponent(`${gl}${langTag} teacher training lesson plan ${gr} CBSE NCERT India`)}`} target="_blank" rel="noopener noreferrer"
                         className="px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 font-medium hover:bg-blue-100">🔍 Google</a>
                     </div>
                   );
