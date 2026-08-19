@@ -4614,7 +4614,7 @@ function SelfAITab({ user, academicYear }: any) {
 
     const prompt = `You are analyzing school curriculum competency goals to help teachers learn HOW TO TEACH each one.
 
-Context: A teacher is the learner. The app will automatically append "teacher training CBSE India ${grade} NCERT" to every search query — so DO NOT include those words in your output. Return ONLY the natural-language topic phrase that makes each search unique.
+Context: A teacher is the learner. The app will automatically append "teacher training CBSE ${grade} NCERT" to every search query — so DO NOT include those words in your output. Return ONLY the natural-language topic phrase that makes each search unique.
 
 Subject: ${subjectLabel}
 Domain: ${domain}
@@ -4739,8 +4739,8 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
     const dom = activeModule?.domain || "";
     const langTag = subjectArg === "literacy" ? " English" : "";
     return {
-      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`how to teach ${dom} ${desc}${langTag} ${grade} CBSE India teacher training`)}`,
-      google:  `https://www.google.com/search?q=${encodeURIComponent(`${dom} ${desc}${langTag} teacher training lesson plan ${grade} CBSE NCERT India`)}`,
+      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`how to teach ${dom} ${desc}${langTag} ${grade} CBSE teacher training`)}`,
+      google:  `https://www.google.com/search?q=${encodeURIComponent(`${dom} ${desc}${langTag} teacher training lesson plan ${grade} CBSE NCERT`)}`,
       diksha:  `https://diksha.gov.in/search?key=${encodeURIComponent(`${dom} ${desc} ${grade} CBSE teacher training`)}`,
     };
   };
@@ -5056,9 +5056,9 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
                     <div className="flex flex-wrap gap-1.5 mt-1">
                       <a href={`https://diksha.gov.in/search?key=${encodeURIComponent(`${dk} ${gr} CBSE teacher training`)}`} target="_blank" rel="noopener noreferrer"
                         className="px-2 py-1 bg-green-50 border border-green-200 rounded text-xs text-green-700 font-medium hover:bg-green-100">🎓 DIKSHA</a>
-                      <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`how to teach ${yt}${langTag} ${gr} CBSE India teacher training`)}`} target="_blank" rel="noopener noreferrer"
+                      <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`how to teach ${yt}${langTag} ${gr} CBSE teacher training`)}`} target="_blank" rel="noopener noreferrer"
                         className="px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-medium hover:bg-red-100">▶️ YouTube</a>
-                      <a href={`https://www.google.com/search?q=${encodeURIComponent(`${gl}${langTag} teacher training lesson plan ${gr} CBSE NCERT India`)}`} target="_blank" rel="noopener noreferrer"
+                      <a href={`https://www.google.com/search?q=${encodeURIComponent(`${gl}${langTag} teacher training lesson plan ${gr} CBSE NCERT`)}`} target="_blank" rel="noopener noreferrer"
                         className="px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 font-medium hover:bg-blue-100">🔍 Google</a>
                     </div>
                   );
