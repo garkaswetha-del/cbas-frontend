@@ -4614,7 +4614,7 @@ function SelfAITab({ user, academicYear }: any) {
 
     const prompt = `You are analyzing school curriculum competency goals to help teachers learn HOW TO TEACH each one.
 
-The TEACHER is the learner. Resources must train the teacher to deliver the skill in the classroom, not teach the concept to students.
+Context: A teacher is the learner. The app will automatically append "teacher training CBSE India ${grade} NCERT" to every search query — so DO NOT include those words in your output. Return ONLY the natural-language topic phrase that makes each search unique.
 
 Subject: ${subjectLabel}
 Domain: ${domain}
@@ -4622,8 +4622,8 @@ Grade: ${grade}
 Curriculum: CBSE India
 
 For each CG:
-1. Identify ALL distinct teachable sub-concepts it contains. Be exact — simple CGs have 1; complex CGs targeting higher grades may have 5, 6, 7 or more. Do not group unrelated ideas together and do not create artificial splits.
-2. For each sub-concept generate 3 natural teacher-training search queries (NOT formal CG language — use language like "how to teach [topic]" or "[topic] teacher training").
+1. Identify ALL distinct teachable sub-concepts it contains. Be exact — simple CGs have 1; complex CGs at higher grades may have 5, 6, 7 or more. Do not group unrelated ideas; do not create artificial splits.
+2. For each sub-concept return a short natural-language phrase (4-8 words) for youtube, google, and diksha. Phrase it as a teacher/trainer would search — like "drawing nets cylinders cones", "total surface area formula derivation cylinder", "open box exposed surface identification". Do NOT include "teacher training", "CBSE", "NCERT", "India", or grade level — those are added automatically.
 
 Competency Goals:
 ${cgLines}
@@ -4632,10 +4632,10 @@ Respond with ONLY a valid JSON object, no other text:
 {
   "<cg_code>": [
     {
-      "concept": "<3-7 word sub-concept name a teacher would recognise>",
-      "youtube": "<natural YouTube search for a teacher training video on this sub-concept>",
-      "google": "<natural Google search for teacher lesson plan or training resource>",
-      "diksha": "<short DIKSHA India search for teacher resource on this sub-concept>"
+      "concept": "<3-7 word sub-concept label a teacher would recognise>",
+      "youtube": "<4-8 word core topic phrase for YouTube — no CBSE/NCERT/grade/teacher training>",
+      "google": "<4-8 word core topic phrase for Google — no CBSE/NCERT/grade/teacher training>",
+      "diksha": "<3-6 word core topic phrase for DIKSHA — no CBSE/NCERT/grade/teacher training>"
     }
   ]
 }`;
@@ -4733,14 +4733,15 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
   };
 
   // Fallback links for a CG when Groq sub-concepts are not yet loaded
-  const cgFallbackLinks = (comp: any, subject: string, stage: string) => {
+  const cgFallbackLinks = (comp: any, subjectArg: string, stageArg: string) => {
     const desc = (comp.description || comp.desc || "").slice(0, 60);
-    const grade = STAGE_GRADE[stage] || "";
+    const grade = STAGE_GRADE[stageArg] || "";
     const dom = activeModule?.domain || "";
+    const subj = subjectArg === "literacy" ? "English literacy" : "Mathematics";
     return {
-      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`how to teach ${dom} ${desc} CBSE India teacher training`)}`,
-      google:  `https://www.google.com/search?q=${encodeURIComponent(`teaching ${dom} ${desc} ${grade} CBSE India teacher professional development`)}`,
-      diksha:  `https://diksha.gov.in/search?key=${encodeURIComponent(`${dom} ${desc} ${grade} teacher resource CBSE`)}`,
+      youtube: `https://www.youtube.com/results?search_query=${encodeURIComponent(`how to teach ${dom} ${desc} ${grade} CBSE India teacher training`)}`,
+      google:  `https://www.google.com/search?q=${encodeURIComponent(`${dom} ${desc} teacher training lesson plan ${grade} CBSE NCERT India ${subj}`)}`,
+      diksha:  `https://diksha.gov.in/search?key=${encodeURIComponent(`${dom} ${desc} ${grade} CBSE teacher training`)}`,
     };
   };
 
@@ -5049,13 +5050,15 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
                   const desc = (comp.description || comp.desc || "").slice(0, 130);
                   const subConcepts = cgSubConcepts[code];
                   const fallback = cgFallbackLinks(comp, subject, stage);
+                  const gr = STAGE_GRADE[stage] || "";
+                  const subj = subject === "literacy" ? "English literacy" : "Mathematics";
                   const ResourceBtns = ({ yt, gl, dk }: {yt:string;gl:string;dk:string}) => (
                     <div className="flex flex-wrap gap-1.5 mt-1">
-                      <a href={`https://diksha.gov.in/search?key=${encodeURIComponent(dk)}`} target="_blank" rel="noopener noreferrer"
+                      <a href={`https://diksha.gov.in/search?key=${encodeURIComponent(`${dk} ${gr} CBSE teacher training`)}`} target="_blank" rel="noopener noreferrer"
                         className="px-2 py-1 bg-green-50 border border-green-200 rounded text-xs text-green-700 font-medium hover:bg-green-100">🎓 DIKSHA</a>
-                      <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(yt)}`} target="_blank" rel="noopener noreferrer"
+                      <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`how to teach ${yt} ${gr} CBSE India teacher training`)}`} target="_blank" rel="noopener noreferrer"
                         className="px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-medium hover:bg-red-100">▶️ YouTube</a>
-                      <a href={`https://www.google.com/search?q=${encodeURIComponent(gl)}`} target="_blank" rel="noopener noreferrer"
+                      <a href={`https://www.google.com/search?q=${encodeURIComponent(`${gl} teacher training lesson plan ${gr} CBSE NCERT India ${subj}`)}`} target="_blank" rel="noopener noreferrer"
                         className="px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 font-medium hover:bg-blue-100">🔍 Google</a>
                     </div>
                   );
