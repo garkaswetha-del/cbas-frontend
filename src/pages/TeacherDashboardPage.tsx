@@ -98,9 +98,11 @@ interface TeacherDashboardProps {
   activeGroup: "class" | "self";
   academicYear: string;
   setAcademicYear: (y: string) => void;
+  lockYearSelector?: boolean;
+  onMappingsSaved?: () => void;
 }
 
-export default function TeacherDashboardPage({ user, mappings, activeTab, activeGroup, academicYear, setAcademicYear }: TeacherDashboardProps) {
+export default function TeacherDashboardPage({ user, mappings, activeTab, activeGroup, academicYear, setAcademicYear, lockYearSelector, onMappingsSaved }: TeacherDashboardProps) {
 
   const TAB_LABELS: Record<string, string> = {
     students:       "My Students",
@@ -110,6 +112,8 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
     alerts:         "Alerts",
     promotion:      "Promotion",
     portfolio:      "Student Portfolio",
+    my_mappings:    "My Teaching Assignments",
+    insights:       "Class Insights",
     profile:        "My Profile",
     self_baseline:  "My Baseline",
     appraisal:      "My Appraisal",
@@ -136,13 +140,21 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
           )}
           <div>
             <label className="text-xs text-gray-400 block mb-0.5">Academic Year</label>
-            <AcademicYearSelect value={academicYear} onChange={setAcademicYear} className="text-xs" />
+            {lockYearSelector ? (
+              <div className="border border-gray-200 bg-gray-50 rounded px-2 py-1.5 text-xs text-gray-500" title="Set up your current-year classes first to switch years">
+                {academicYear}
+              </div>
+            ) : (
+              <AcademicYearSelect value={academicYear} onChange={setAcademicYear} className="text-xs" />
+            )}
           </div>
         </div>
       </div>
 
       {/* Tab content */}
       <div className="p-4 sm:p-6">
+        {activeTab === "my_mappings"    && <MyAssignmentsTab user={user} academicYear={academicYear} isCurrentYear={academicYear === currentAcademicYear()} onSaved={onMappingsSaved} />}
+        {activeTab === "insights"       && <ClassInsightsTab user={user} academicYear={academicYear} />}
         {activeTab === "students"       && <StudentsTab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "pasa"           && <PASATab user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "activities"     && <ActivitiesTab user={user} mappings={mappings} academicYear={academicYear} />}
@@ -173,6 +185,387 @@ export default function TeacherDashboardPage({ user, mappings, activeTab, active
         {activeTab === "sow"            && <TeacherSOW user={user} mappings={mappings} academicYear={academicYear} />}
         {activeTab === "lp"             && <LPTabsPage user={user} mappings={mappings} academicYear={academicYear} role="teacher" />}
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TAB 0: MY TEACHING ASSIGNMENTS — self-service grade/section/subject mapping.
+// Same shape of data admin's User Management → Assignments tab writes (same
+// /mappings/save endpoint, same teacher_mappings table) — this just lets the
+// teacher fill in her own record instead of waiting on the admin to do it.
+// ─────────────────────────────────────────────────────────────────
+const SELF_MAP_GRADES = [
+  "Pre-KG", "LKG", "UKG",
+  "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5",
+  "Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10",
+];
+
+function buildSelfMapRows(mappings: any[]) {
+  const rowMap: Record<string, any> = {};
+  for (const m of mappings) {
+    if (!m.grade) continue;
+    if (!rowMap[m.grade]) rowMap[m.grade] = { grade: m.grade, subjects: [], sections: [] };
+    if (m.subject && !rowMap[m.grade].subjects.includes(m.subject)) rowMap[m.grade].subjects.push(m.subject);
+    if (m.section && !rowMap[m.grade].sections.includes(m.section)) rowMap[m.grade].sections.push(m.section);
+  }
+  const result = Object.values(rowMap);
+  return result.length > 0 ? result : [{ grade: "", subjects: [], sections: [] }];
+}
+function extractSelfMapClassTeacher(mappings: any[]) {
+  const ct = mappings.find((m: any) => m.is_class_teacher);
+  return { grade: ct?.grade || "", section: ct?.section || "" };
+}
+
+function MyAssignmentsTab({ user, academicYear, isCurrentYear, onSaved }: { user: any; academicYear: string; isCurrentYear: boolean; onSaved?: () => void }) {
+  const [rows, setRows] = useState<any[]>([{ grade: "", subjects: [], sections: [] }]);
+  const [gradeSubjects, setGradeSubjects] = useState<Record<string, string[]>>({});
+  const [allSectionsFull, setAllSectionsFull] = useState<{ grade: string; name: string }[]>([]);
+  const [classTeacherGrade, setClassTeacherGrade] = useState("");
+  const [classTeacherSection, setClassTeacherSection] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([
+      axios.get(`${API}/grade-subjects`),
+      axios.get(`${API}/sections/counts?academic_year=${academicYear}`),
+      axios.get(`${API}/mappings/teacher/${user.id}?academic_year=${academicYear}`),
+    ]).then(([gs, secs, own]) => {
+      if (cancelled) return;
+      setGradeSubjects(gs.data || {});
+      const active = (secs.data || []).filter((s: any) => s.is_active !== false);
+      setAllSectionsFull(active.map((s: any) => ({ grade: s.grade, name: s.name })));
+      const mine = own.data || [];
+      setRows(buildSelfMapRows(mine));
+      const ct = extractSelfMapClassTeacher(mine);
+      setClassTeacherGrade(ct.grade);
+      setClassTeacherSection(ct.section);
+    }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [user.id, academicYear]);
+
+  const sectionsForGrade = (grade: string) => allSectionsFull.filter(s => s.grade === grade).map(s => s.name);
+
+  const addRow = () => setRows(prev => [...prev, { grade: "", subjects: [], sections: [] }]);
+  const removeRow = (i: number) => setRows(prev => prev.filter((_, idx) => idx !== i));
+  const updateRow = (i: number, patch: any) => setRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
+  const toggleInRow = (i: number, key: "subjects" | "sections", val: string) => {
+    setRows(prev => prev.map((r, idx) => {
+      if (idx !== i) return r;
+      const list = r[key].includes(val) ? r[key].filter((x: string) => x !== val) : [...r[key], val];
+      return { ...r, [key]: list };
+    }));
+  };
+
+  // Every grade+section the teacher has actually picked below — the Class Teacher
+  // dropdown can only point at one of these, never an arbitrary section.
+  const allSelectedSections = rows
+    .filter((r: any) => r.grade)
+    .flatMap((r: any) => (r.sections.length ? r.sections : []).map((s: string) => ({ grade: r.grade, section: s })));
+
+  const save = async () => {
+    const mappings: any[] = [];
+    for (const row of rows) {
+      if (!row.grade) continue;
+      const secs = row.sections.length > 0 ? row.sections : [""];
+      const subs: (string | null)[] = row.subjects.length > 0 ? row.subjects : [null];
+      for (const sec of secs) {
+        for (const sub of subs) {
+          mappings.push({
+            grade: row.grade,
+            section: sec,
+            subject: sub,
+            is_class_teacher: row.grade === classTeacherGrade && sec === classTeacherSection,
+          });
+        }
+      }
+    }
+    if (mappings.length === 0) {
+      setMessage("❌ Pick at least one grade before saving");
+      setTimeout(() => setMessage(""), 3000);
+      return;
+    }
+    setSaving(true);
+    try {
+      await axios.post(`${API}/mappings/save`, { teacher_id: user.id, academic_year: academicYear, mappings });
+      setMessage(`✅ Saved your ${academicYear} assignments`);
+      onSaved?.();
+    } catch {
+      setMessage("❌ Error saving — please try again");
+    }
+    setSaving(false);
+    setTimeout(() => setMessage(""), 3500);
+  };
+
+  if (loading) return <div className="p-8 text-center text-gray-400 text-sm">Loading your assignments…</div>;
+
+  return (
+    <div className="max-w-3xl">
+      {!isCurrentYear && (
+        <div className="mb-4 px-4 py-2.5 bg-yellow-50 border border-yellow-300 rounded-lg text-xs text-yellow-700">
+          You're editing <strong>{academicYear}</strong>, not the current year. This is saved as its own separate record — it never touches any other year's data.
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl shadow border border-gray-200 p-4 mb-4">
+        <h3 className="text-sm font-bold text-gray-700 mb-1">Your classes for {academicYear}</h3>
+        <p className="text-xs text-gray-500 mb-3">Add every grade you teach, then pick the sections and subjects within each one.</p>
+
+        {rows.map((row: any, i: number) => (
+          <div key={i} className="border border-gray-200 rounded-lg p-3 mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <select
+                value={row.grade}
+                onChange={e => updateRow(i, { grade: e.target.value, subjects: [], sections: [] })}
+                className="border border-gray-300 rounded px-2 py-1.5 text-xs font-medium"
+              >
+                <option value="">-- Select grade --</option>
+                {SELF_MAP_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+              {rows.length > 1 && (
+                <button onClick={() => removeRow(i)} className="text-xs text-red-500 hover:text-red-700">Remove grade</button>
+              )}
+            </div>
+
+            {row.grade && (
+              <>
+                <p className="text-xs text-gray-500 mb-1">Sections</p>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {sectionsForGrade(row.grade).length === 0 && <span className="text-xs text-gray-400">No sections found for this grade</span>}
+                  {sectionsForGrade(row.grade).map(sec => (
+                    <button
+                      key={sec}
+                      onClick={() => toggleInRow(i, "sections", sec)}
+                      className={`px-2 py-1 rounded-full text-xs border ${row.sections.includes(sec) ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300 hover:border-indigo-400"}`}
+                    >
+                      {sec}
+                    </button>
+                  ))}
+                </div>
+
+                <p className="text-xs text-gray-500 mb-1">Subjects</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(gradeSubjects[row.grade] || []).length === 0 && <span className="text-xs text-gray-400">No subjects configured for this grade — ask admin to add them under Grade &amp; Subject Mapping</span>}
+                  {(gradeSubjects[row.grade] || []).map(sub => (
+                    <button
+                      key={sub}
+                      onClick={() => toggleInRow(i, "subjects", sub)}
+                      className={`px-2 py-1 rounded-full text-xs border ${row.subjects.includes(sub) ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-600 border-gray-300 hover:border-purple-400"}`}
+                    >
+                      {sub}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+
+        <button onClick={addRow} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Add another grade</button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow border border-gray-200 p-4 mb-4">
+        <h3 className="text-sm font-bold text-gray-700 mb-1">👑 Class Teacher</h3>
+        <p className="text-xs text-gray-500 mb-3">If you're the class teacher for one of your sections above, mark it here. Leave unset otherwise.</p>
+        <select
+          value={allSelectedSections.some((x: any) => x.grade === classTeacherGrade && x.section === classTeacherSection) ? `${classTeacherGrade}__${classTeacherSection}` : ""}
+          onChange={e => {
+            const [g, s] = e.target.value ? e.target.value.split("__") : ["", ""];
+            setClassTeacherGrade(g); setClassTeacherSection(s);
+          }}
+          className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full sm:w-64"
+        >
+          <option value="">-- Not a class teacher --</option>
+          {allSelectedSections.map((x: any, i: number) => (
+            <option key={i} value={`${x.grade}__${x.section}`}>{x.grade} — {x.section}</option>
+          ))}
+        </select>
+      </div>
+
+      {message && (
+        <div className={`mb-4 px-4 py-2 rounded text-xs border ${message.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>
+          {message}
+        </div>
+      )}
+
+      <button
+        onClick={save}
+        disabled={saving}
+        className="px-5 py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold"
+      >
+        {saving ? "Saving..." : `💾 Save my ${academicYear} assignments`}
+      </button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TAB 0.5: CLASS INSIGHTS — a home for teacher-facing insight widgets.
+// First section is previous-year grade performance; more sections can be
+// added here later without needing a new sidebar entry each time.
+// ─────────────────────────────────────────────────────────────────
+interface GoalRow {
+  current_grade: string; subject: string;
+  previous_grade: string | null; previous_academic_year: string;
+  achieved_percentage: number | null; this_year_goal: number | null;
+  next_grade: string | null; next_academic_year: string; next_year_goal: number | null;
+}
+
+function ClassInsightsTab({ user, academicYear }: { user: any; academicYear: string }) {
+  const [rows, setRows] = useState<GoalRow[]>([]);
+  const [edits, setEdits] = useState<Record<number, { thisYear: string; nextYear: string }>>({});
+  const [saving, setSaving] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = () => {
+    setLoading(true);
+    axios.get(`${API}/grade-subject-goals/for-teacher/${user.id}?academic_year=${academicYear}`)
+      .then(r => {
+        const data: GoalRow[] = r.data || [];
+        setRows(data);
+        const initial: Record<number, { thisYear: string; nextYear: string }> = {};
+        data.forEach((row, i) => {
+          initial[i] = {
+            thisYear: row.this_year_goal !== null ? String(row.this_year_goal) : "",
+            nextYear: row.next_year_goal !== null ? String(row.next_year_goal) : "",
+          };
+        });
+        setEdits(initial);
+      })
+      .catch(() => { setRows([]); setEdits({}); })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, [user.id, academicYear]);
+
+  const saveRow = async (i: number) => {
+    const row = rows[i];
+    const edit = edits[i];
+    const thisYearNum = edit.thisYear === "" ? null : Number(edit.thisYear);
+    const nextYearNum = edit.nextYear === "" ? null : Number(edit.nextYear);
+    if ((edit.thisYear !== "" && isNaN(thisYearNum as number)) || (edit.nextYear !== "" && isNaN(nextYearNum as number))) {
+      setMessage("❌ Goals must be numbers"); setTimeout(() => setMessage(""), 3000); return;
+    }
+    setSaving(i);
+    try {
+      const calls: Promise<any>[] = [];
+      if (thisYearNum !== null) {
+        calls.push(axios.post(`${API}/grade-subject-goals`, {
+          academic_year: academicYear, grade: row.current_grade, subject: row.subject,
+          goal_percentage: thisYearNum, set_by: user?.name,
+        }));
+      }
+      if (nextYearNum !== null && row.next_grade) {
+        calls.push(axios.post(`${API}/grade-subject-goals`, {
+          academic_year: row.next_academic_year, grade: row.next_grade, subject: row.subject,
+          goal_percentage: nextYearNum, set_by: user?.name,
+        }));
+      }
+      await Promise.all(calls);
+      setMessage("✅ Goals saved");
+      load();
+    } catch {
+      setMessage("❌ Error saving — please try again");
+    }
+    setSaving(null);
+    setTimeout(() => setMessage(""), 3000);
+  };
+
+  return (
+    <div className="max-w-4xl space-y-6">
+      <div>
+        <h3 className="text-sm font-bold text-gray-700 mb-1">🎯 Goal Tracking</h3>
+        <p className="text-xs text-gray-500 mb-3">
+          For each grade and subject you teach this year: last year's average as a reference, plus your goal for this year and for next year (when these students move up).
+        </p>
+
+        {message && (
+          <div className={`mb-3 px-4 py-2 rounded text-xs border ${message.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>
+            {message}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="p-6 text-center text-gray-400 text-sm bg-white rounded-xl border border-gray-200">Loading…</div>
+        ) : rows.length === 0 ? (
+          <div className="p-6 text-center text-gray-400 text-sm bg-white rounded-xl border border-gray-200">
+            No grade/subject assignments found for {academicYear} yet.
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
+                    <th className="px-3 py-2 text-left">Grade · Subject</th>
+                    <th className="px-3 py-2 text-right">Last year</th>
+                    <th className="px-3 py-2 text-right">This year's goal</th>
+                    <th className="px-3 py-2 text-right">Next year's goal</th>
+                    <th className="px-3 py-2 text-center">Save</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, i) => (
+                    <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                      <td className="px-3 py-2.5">
+                        <p className="font-medium text-gray-800">{row.current_grade} · {row.subject}</p>
+                        {row.previous_grade && (
+                          <p className="text-gray-400">vs {row.previous_grade}, {row.previous_academic_year}</p>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        {row.achieved_percentage !== null
+                          ? <span className={`font-semibold ${scoreColor(row.achieved_percentage)}`}>{row.achieved_percentage}%</span>
+                          : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        <input
+                          type="number" min={0} max={100} step="0.1"
+                          value={edits[i]?.thisYear ?? ""}
+                          onChange={e => setEdits(prev => ({ ...prev, [i]: { ...prev[i], thisYear: e.target.value } }))}
+                          placeholder="—"
+                          className="border border-gray-300 rounded px-2 py-1 text-xs w-20 text-right"
+                        />
+                        <span className="text-gray-400 ml-1">% ({row.current_grade})</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        {row.next_grade ? (
+                          <>
+                            <input
+                              type="number" min={0} max={100} step="0.1"
+                              value={edits[i]?.nextYear ?? ""}
+                              onChange={e => setEdits(prev => ({ ...prev, [i]: { ...prev[i], nextYear: e.target.value } }))}
+                              placeholder="—"
+                              className="border border-gray-300 rounded px-2 py-1 text-xs w-20 text-right"
+                            />
+                            <span className="text-gray-400 ml-1">% ({row.next_grade})</span>
+                          </>
+                        ) : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        <button
+                          onClick={() => saveRow(i)}
+                          disabled={saving === i}
+                          className="px-2.5 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 font-medium"
+                        >
+                          {saving === i ? "..." : "💾"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Future Class Insights sections go here */}
     </div>
   );
 }

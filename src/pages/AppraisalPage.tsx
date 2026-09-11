@@ -613,10 +613,14 @@ export default function AppraisalPage() {
             {a.updated_at && <div className="text-xs text-gray-400 mt-0.5">{timeAgo(a.updated_at)}</div>}
             {t.appraisal_qualification && <div className="text-xs text-indigo-400 italic truncate">{t.appraisal_qualification}</div>}
           </div>
-          <button onClick={()=>save(t.teacher_id,t.teacher_name)} disabled={saving===t.teacher_id}
-            className="px-2 py-0.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap shrink-0">
-            {saving===t.teacher_id?"...":"Save"}
-          </button>
+          {t.appraisal?.is_shared ? (
+            <span className="px-2 py-0.5 bg-gray-100 text-gray-400 text-xs rounded border border-gray-200 whitespace-nowrap shrink-0 cursor-not-allowed" title="Recall the appraisal first to edit">🔒 Locked</span>
+          ) : (
+            <button onClick={()=>save(t.teacher_id,t.teacher_name)} disabled={saving===t.teacher_id}
+              className="px-2 py-0.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap shrink-0">
+              {saving===t.teacher_id?"...":"Save"}
+            </button>
+          )}
         </div>
       </td>
     );

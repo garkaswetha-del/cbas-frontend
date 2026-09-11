@@ -23,6 +23,8 @@ const ACADEMIC_NAV = [
   { path: '/activities',   label: 'Activities & Marks',   icon: '🎯' },
   { path: '/pasa',         label: 'PA/SA Marks',          icon: '📝' },
   { path: '/observation',  label: 'Class Observation',    icon: '👁' },
+  { path: '/prior-marks',  label: 'Prior Year Marks',     icon: '📜' },
+  { path: '/goal-tracker', label: 'Goal Tracker',         icon: '🎯' },
 ];
 
 // AHM (academicOnly mode) doesn't get the Administrative tab, so Substitution

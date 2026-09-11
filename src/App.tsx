@@ -24,6 +24,8 @@ import AcademicCalendarPage from "./pages/AcademicCalendarPage";
 import SOWPage from "./pages/SOWPage";
 import LPTabsPage from "./pages/LPTabsPage";
 import AHMStageOverviewPage from "./pages/AHMStageOverviewPage";
+import PriorMarksUploadPage from "./pages/PriorMarksUploadPage";
+import GoalTrackerPage from "./pages/GoalTrackerPage";
 import { deriveAHMStage } from "./utils/stage";
 
 const CLASS_TABS = (isClassTeacher: boolean) => [
@@ -37,6 +39,8 @@ const CLASS_TABS = (isClassTeacher: boolean) => [
 ];
 
 const SELF_TABS = [
+  { id: 'my_mappings',   label: 'My Teaching Assignments', show: true },
+  { id: 'insights',      label: 'Class Insights',      show: true },
   { id: 'profile',       label: 'My Profile',         show: true },
   { id: 'self_baseline', label: 'My Baseline',        show: true },
   { id: 'appraisal',     label: 'My Appraisal',       show: true },
@@ -61,14 +65,33 @@ const AHM_TOOL_TABS = [
   { id: 'ahm_calendar',     label: 'Academic Calendar' },
   { id: 'ahm_sow',          label: 'Scheme of Work' },
   { id: 'ahm_lp',           label: 'LP' },
+  { id: 'ahm_prior_marks',  label: 'Prior Year Marks' },
+  { id: 'ahm_goal_tracker', label: 'Goal Tracker' },
 ];
 const AHM_TOOL_TAB_IDS = new Set(AHM_TOOL_TABS.map(t => t.id));
 
 function TeacherLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<string>('students');
-  const [academicYear, setAcademicYear] = useState(currentAcademicYear);
+  const [academicYear, setAcademicYearRaw] = useState(currentAcademicYear);
   const [mappings, setMappings] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Dedicated check, always against the CURRENT academic year regardless of whichever
+  // year the dashboard's own year selector is showing — so a teacher can't dodge the
+  // "map yourself first" requirement by switching the dashboard to a past year.
+  const [currentYearMappings, setCurrentYearMappings] = useState<any>(null);
+  const [currentYearChecked, setCurrentYearChecked] = useState(false);
+  const fetchCurrentYearMappings = () => {
+    if (!user?.id) return;
+    axios.get(`${API}/mappings/teacher/${user.id}/dashboard?academic_year=${currentAcademicYear()}`)
+      .then(r => { setCurrentYearMappings(r.data); setCurrentYearChecked(true); })
+      .catch(() => setCurrentYearChecked(true));
+  };
+  useEffect(fetchCurrentYearMappings, [user?.id]);
+  const mustSelfMap = currentYearChecked && !(currentYearMappings?.mappings?.length > 0);
+  useEffect(() => { if (mustSelfMap) setActiveTab('my_mappings'); }, [mustSelfMap]);
+  // While locked, the dashboard's year selector is frozen on the current year too.
+  const setAcademicYear = (y: string) => { if (!mustSelfMap) setAcademicYearRaw(y); };
 
   useEffect(() => {
     if (!user?.id) return;
@@ -77,26 +100,47 @@ function TeacherLayout({ user, onLogout }: { user: any; onLogout: () => void }) 
       .catch(() => {});
   }, [academicYear, user?.id]);
 
+  // Called by the self-mapping screen right after a successful save, so the lock
+  // (and the rest of the dashboard, if it's showing the same year) lifts immediately.
+  const handleMappingsSaved = () => {
+    fetchCurrentYearMappings();
+    axios.get(`${API}/mappings/teacher/${user.id}/dashboard?academic_year=${academicYear}`)
+      .then(r => setMappings(r.data)).catch(() => {});
+  };
+
   const isClassTeacher = !!(mappings?.is_class_teacher);
   const activeGroup: 'class' | 'self' = SELF_TAB_IDS.has(activeTab) ? 'self' : 'class';
   const classTabs = CLASS_TABS(isClassTeacher);
 
+  const navButtonClass = (id: string, activeColor: string) => {
+    const locked = mustSelfMap && id !== 'my_mappings';
+    return `w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+      activeTab === id
+        ? `${activeColor} text-white shadow`
+        : locked
+          ? 'text-indigo-500 opacity-40 cursor-not-allowed'
+          : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
+    }`;
+  };
+  const goToTab = (id: string) => {
+    if (mustSelfMap && id !== 'my_mappings') return;
+    setActiveTab(id); setSidebarOpen(false);
+  };
+
   const SidebarContent = () => (
     <>
+      {mustSelfMap && (
+        <div className="mx-2 mt-2 mb-1 px-2.5 py-2 bg-amber-500/20 border border-amber-400/40 rounded-lg">
+          <p className="text-amber-200 text-xs font-semibold">Set up your classes first</p>
+          <p className="text-amber-200/80 text-[11px] mt-0.5">Save at least one grade/section below to unlock the rest of the portal.</p>
+        </div>
+      )}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
         <p className="text-indigo-400 text-xs font-semibold uppercase tracking-wider px-2 pt-1 pb-1.5">
           Class Management
         </p>
         {classTabs.filter(t => t.show).map(t => (
-          <button
-            key={t.id}
-            onClick={() => { setActiveTab(t.id); setSidebarOpen(false); }}
-            className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === t.id
-                ? 'bg-indigo-600 text-white shadow'
-                : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
-            }`}
-          >
+          <button key={t.id} onClick={() => goToTab(t.id)} className={navButtonClass(t.id, 'bg-indigo-600')}>
             {t.label}
           </button>
         ))}
@@ -104,15 +148,7 @@ function TeacherLayout({ user, onLogout }: { user: any; onLogout: () => void }) 
           Self Management
         </p>
         {SELF_TABS.filter(t => t.show).map(t => (
-          <button
-            key={t.id}
-            onClick={() => { setActiveTab(t.id); setSidebarOpen(false); }}
-            className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === t.id
-                ? 'bg-purple-600 text-white shadow'
-                : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
-            }`}
-          >
+          <button key={t.id} onClick={() => goToTab(t.id)} className={navButtonClass(t.id, 'bg-purple-600')}>
             {t.label}
           </button>
         ))}
@@ -200,6 +236,8 @@ function TeacherLayout({ user, onLogout }: { user: any; onLogout: () => void }) 
             activeGroup={activeGroup}
             academicYear={academicYear}
             setAcademicYear={setAcademicYear}
+            lockYearSelector={mustSelfMap}
+            onMappingsSaved={handleMappingsSaved}
           />
         </div>
       </div>
@@ -209,9 +247,23 @@ function TeacherLayout({ user, onLogout }: { user: any; onLogout: () => void }) 
 
 function AHMLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<string>('ahm_stage');
-  const [academicYear, setAcademicYear] = useState(currentAcademicYear);
+  const [academicYear, setAcademicYearRaw] = useState(currentAcademicYear);
   const [mappings, setMappings] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Same dedicated, always-current-year check as TeacherLayout — see comment there.
+  const [currentYearMappings, setCurrentYearMappings] = useState<any>(null);
+  const [currentYearChecked, setCurrentYearChecked] = useState(false);
+  const fetchCurrentYearMappings = () => {
+    if (!user?.id) return;
+    axios.get(`${API}/mappings/teacher/${user.id}/dashboard?academic_year=${currentAcademicYear()}`)
+      .then(r => { setCurrentYearMappings(r.data); setCurrentYearChecked(true); })
+      .catch(() => setCurrentYearChecked(true));
+  };
+  useEffect(fetchCurrentYearMappings, [user?.id]);
+  const mustSelfMap = currentYearChecked && !(currentYearMappings?.mappings?.length > 0);
+  useEffect(() => { if (mustSelfMap) setActiveTab('my_mappings'); }, [mustSelfMap]);
+  const setAcademicYear = (y: string) => { if (!mustSelfMap) setAcademicYearRaw(y); };
 
   useEffect(() => {
     if (!user?.id) return;
@@ -219,6 +271,12 @@ function AHMLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
       .then(r => setMappings(r.data))
       .catch(() => {});
   }, [academicYear, user?.id]);
+
+  const handleMappingsSaved = () => {
+    fetchCurrentYearMappings();
+    axios.get(`${API}/mappings/teacher/${user.id}/dashboard?academic_year=${academicYear}`)
+      .then(r => setMappings(r.data)).catch(() => {});
+  };
 
   const isClassTeacher = !!(mappings?.is_class_teacher);
   const AHM_SELF_TABS = SELF_TABS.filter(t => t.id !== 'appraisal');
@@ -229,6 +287,20 @@ function AHMLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
   const allowedGrades = stageInfo?.grades;
 
   const renderContent = () => {
+    if (mustSelfMap) {
+      return (
+        <TeacherDashboardPage
+          user={user}
+          mappings={mappings}
+          activeTab="my_mappings"
+          activeGroup="self"
+          academicYear={academicYear}
+          setAcademicYear={setAcademicYear}
+          lockYearSelector={mustSelfMap}
+          onMappingsSaved={handleMappingsSaved}
+        />
+      );
+    }
     if (activeTab === 'ahm_stage')        return <AHMStageOverviewPage user={user} mappings={mappings} academicYear={academicYear} />;
     if (activeTab === 'ahm_baseline')     return <BaselinePage allowedGrades={allowedGrades} />;
     if (activeTab === 'ahm_competencies') return <CompetencyManagementPage />;
@@ -239,6 +311,14 @@ function AHMLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
     if (activeTab === 'ahm_calendar')     return <AcademicCalendarPage />;
     if (activeTab === 'ahm_sow')           return <SOWPage user={user} />;
     if (activeTab === 'ahm_lp') return <LPTabsPage user={user} mappings={mappings} academicYear={academicYear} role="ahm" />;
+    if (activeTab === 'ahm_prior_marks') return <PriorMarksUploadPage />;
+    if (activeTab === 'ahm_goal_tracker') return (
+      <GoalTrackerPage
+        restrictToGrades={stageInfo?.grades}
+        title={stageInfo ? `Goal Tracker — ${stageInfo.stage} Stage` : "Goal Tracker"}
+        subtitle={stageInfo ? undefined : "Map your own classes first (My Teaching Assignments) so your stage can be identified"}
+      />
+    );
     return (
       <TeacherDashboardPage
         user={user}
@@ -247,26 +327,41 @@ function AHMLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
         activeGroup={activeGroup}
         academicYear={academicYear}
         setAcademicYear={setAcademicYear}
+        lockYearSelector={mustSelfMap}
+        onMappingsSaved={handleMappingsSaved}
       />
     );
   };
 
+  const navButtonClass = (id: string, activeColor: string) => {
+    const locked = mustSelfMap && id !== 'my_mappings';
+    return `w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+      activeTab === id
+        ? `${activeColor} text-white shadow`
+        : locked
+          ? 'text-indigo-500 opacity-40 cursor-not-allowed'
+          : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
+    }`;
+  };
+  const goToTab = (id: string) => {
+    if (mustSelfMap && id !== 'my_mappings') return;
+    setActiveTab(id); setSidebarOpen(false);
+  };
+
   const SidebarContent = () => (
     <>
+      {mustSelfMap && (
+        <div className="mx-2 mt-2 mb-1 px-2.5 py-2 bg-amber-500/20 border border-amber-400/40 rounded-lg">
+          <p className="text-amber-200 text-xs font-semibold">Set up your classes first</p>
+          <p className="text-amber-200/80 text-[11px] mt-0.5">Save at least one grade/section below to unlock the rest of the portal.</p>
+        </div>
+      )}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
         <p className="text-indigo-400 text-xs font-semibold uppercase tracking-wider px-2 pt-1 pb-1.5">
           Class Management
         </p>
         {classTabs.filter(t => t.show).map(t => (
-          <button
-            key={t.id}
-            onClick={() => { setActiveTab(t.id); setSidebarOpen(false); }}
-            className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === t.id
-                ? 'bg-indigo-600 text-white shadow'
-                : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
-            }`}
-          >
+          <button key={t.id} onClick={() => goToTab(t.id)} className={navButtonClass(t.id, 'bg-indigo-600')}>
             {t.label}
           </button>
         ))}
@@ -274,34 +369,31 @@ function AHMLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
           Self Management
         </p>
         {AHM_SELF_TABS.filter(t => t.show).map(t => (
-          <button
-            key={t.id}
-            onClick={() => { setActiveTab(t.id); setSidebarOpen(false); }}
-            className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === t.id
-                ? 'bg-purple-600 text-white shadow'
-                : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
-            }`}
-          >
+          <button key={t.id} onClick={() => goToTab(t.id)} className={navButtonClass(t.id, 'bg-purple-600')}>
             {t.label}
           </button>
         ))}
         <p className="text-indigo-400 text-xs font-semibold uppercase tracking-wider px-2 pt-4 pb-1.5">
           AHM Tools
         </p>
-        {AHM_TOOL_TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => { setActiveTab(t.id); setSidebarOpen(false); }}
-            className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              AHM_TOOL_TAB_IDS.has(activeTab) && activeTab === t.id
-                ? 'bg-teal-600 text-white shadow'
-                : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+        {AHM_TOOL_TABS.map(t => {
+          const locked = mustSelfMap;
+          return (
+            <button
+              key={t.id}
+              onClick={() => { if (!locked) { setActiveTab(t.id); setSidebarOpen(false); } }}
+              className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                AHM_TOOL_TAB_IDS.has(activeTab) && activeTab === t.id
+                  ? 'bg-teal-600 text-white shadow'
+                  : locked
+                    ? 'text-indigo-500 opacity-40 cursor-not-allowed'
+                    : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
       </nav>
       <div className="border-t border-indigo-700 p-4">
         <div className="flex items-center gap-3 mb-3">
@@ -488,6 +580,8 @@ function App() {
           <Route path="calendar" element={<AcademicCalendarPage />} />
           <Route path="sow" element={<SOWPage user={user} />} />
           <Route path="lp" element={<LPTabsPage user={user} mappings={null} academicYear={currentAcademicYear()} role="admin" />} />
+          <Route path="prior-marks" element={<PriorMarksUploadPage />} />
+          <Route path="goal-tracker" element={<GoalTrackerPage />} />
           <Route path="*" element={<Navigate to="/super-dashboard" replace />} />
         </Route>
       </Routes>
