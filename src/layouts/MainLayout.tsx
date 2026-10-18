@@ -11,6 +11,7 @@ const ADMINISTRATIVE_NAV = [
   { path: '/appraisal',         label: 'Teachers Appraisal', icon: '📋' },
   { path: '/memos',             label: 'Memos',              icon: '📩' },
   { path: '/audit-log',         label: 'Audit Log',          icon: '🔍' },
+  { path: '/hr',                 label: 'HR',                  icon: '👔' },
   SUBSTITUTION_NAV_ITEM,
 ];
 
@@ -20,8 +21,6 @@ const ACADEMIC_NAV = [
   { path: '/lp',                 label: 'LP',                  icon: '📖' },
   { path: '/baseline',     label: 'Baseline Entry',      icon: '📈' },
   { path: '/competencies', label: 'Competency Registry',  icon: '🗂️' },
-  { path: '/activities',   label: 'Activities & Marks',   icon: '🎯' },
-  { path: '/pasa',         label: 'PA/SA Marks',          icon: '📝' },
   { path: '/observation',  label: 'Class Observation',    icon: '👁' },
   { path: '/prior-marks',  label: 'Prior Year Marks',     icon: '📜' },
   { path: '/goal-tracker', label: 'Goal Tracker',         icon: '🎯' },

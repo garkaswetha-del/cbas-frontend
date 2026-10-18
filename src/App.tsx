@@ -12,9 +12,7 @@ import StudentManagementPage from './pages/StudentManagementPage';
 import AppraisalPage from './pages/AppraisalPage';
 import BaselinePage from './pages/BaselinePage';
 import CompetencyManagementPage from './pages/CompetencyManagementPage';
-import ActivitiesPage from './pages/ActivitiesPage';
 import ClassObservationPage from "./pages/ClassObservationPage";
-import PASAPage from "./pages/PASAPage";
 import TeacherDashboardPage from "./pages/TeacherDashboardPage";
 import MemosPage from "./pages/MemosPage";
 import SuperDashboardPage from "./pages/SuperDashboardPage";
@@ -26,12 +24,12 @@ import LPTabsPage from "./pages/LPTabsPage";
 import AHMStageOverviewPage from "./pages/AHMStageOverviewPage";
 import PriorMarksUploadPage from "./pages/PriorMarksUploadPage";
 import GoalTrackerPage from "./pages/GoalTrackerPage";
+import HRPage from "./pages/HRPage";
+import InductionPage from "./pages/InductionPage";
 import { deriveAHMStage } from "./utils/stage";
 
 const CLASS_TABS = (isClassTeacher: boolean) => [
   { id: 'students',       label: 'My Students',        show: true },
-  { id: 'pasa',           label: 'PA/SA Marks',        show: true },
-  { id: 'activities',     label: 'Activities',         show: true },
   { id: 'ai_tools',       label: 'AI Tools',           show: true },
   { id: 'alerts',         label: 'Alerts',             show: true },
   { id: 'promotion',      label: 'Promotion',          show: isClassTeacher },
@@ -58,8 +56,6 @@ const AHM_TOOL_TABS = [
   { id: 'ahm_stage',        label: 'Stage Overview' },
   { id: 'ahm_baseline',     label: 'Baseline Entry' },
   { id: 'ahm_competencies', label: 'Competency Registry' },
-  { id: 'ahm_activities',   label: 'Activities & Marks' },
-  { id: 'ahm_pasa',         label: 'PA/SA' },
   { id: 'ahm_observation',  label: 'Class Observation' },
   { id: 'ahm_substitution', label: 'Substitution' },
   { id: 'ahm_calendar',     label: 'Academic Calendar' },
@@ -304,8 +300,6 @@ function AHMLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
     if (activeTab === 'ahm_stage')        return <AHMStageOverviewPage user={user} mappings={mappings} academicYear={academicYear} />;
     if (activeTab === 'ahm_baseline')     return <BaselinePage allowedGrades={allowedGrades} />;
     if (activeTab === 'ahm_competencies') return <CompetencyManagementPage />;
-    if (activeTab === 'ahm_activities')   return <ActivitiesPage allowedGrades={allowedGrades} />;
-    if (activeTab === 'ahm_pasa')         return <PASAPage allowedGrades={allowedGrades} />;
     if (activeTab === 'ahm_observation')  return <ClassObservationPage />;
     if (activeTab === 'ahm_substitution') return <SubstitutionPage />;
     if (activeTab === 'ahm_calendar')     return <AcademicCalendarPage />;
@@ -520,6 +514,12 @@ function App() {
     return <LoginPage onLogin={handleLogin} />;
   }
 
+  // A newly-selected candidate: locked to induction videos only until HR marks
+  // them hired (is_inducting flips false), regardless of their eventual role.
+  if (user.is_inducting) {
+    return <InductionPage user={user} onLogout={handleLogout} />;
+  }
+
   // Teachers get their own dedicated dashboard with sidebar navigation
   if (user.role === "teacher") {
     return (
@@ -571,9 +571,7 @@ function App() {
           <Route path="appraisal" element={<AppraisalPage />} />
           <Route path="baseline" element={<BaselinePage />} />
           <Route path="competencies" element={<CompetencyManagementPage />} />
-          <Route path="activities" element={<ActivitiesPage />} />
           <Route path="observation" element={<ClassObservationPage />} />
-          <Route path="pasa" element={<PASAPage />} />
           <Route path="memos" element={<MemosPage />} />
           <Route path="audit-log" element={<AuditLogPage />} />
           <Route path="substitution" element={<SubstitutionPage />} />
@@ -582,6 +580,7 @@ function App() {
           <Route path="lp" element={<LPTabsPage user={user} mappings={null} academicYear={currentAcademicYear()} role="admin" />} />
           <Route path="prior-marks" element={<PriorMarksUploadPage />} />
           <Route path="goal-tracker" element={<GoalTrackerPage />} />
+          <Route path="hr" element={<HRPage />} />
           <Route path="*" element={<Navigate to="/super-dashboard" replace />} />
         </Route>
       </Routes>
