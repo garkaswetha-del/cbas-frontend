@@ -2132,25 +2132,20 @@ function PASATab({ user, mappings, academicYear }: any) {
   ].map((s) => [`${s.grade}__${s.section}`, s])).values()];
   const defaultSection = allSections[0] || { grade: "", section: "" };
 
-  const [subTab, setSubTab] = useState<"config"|"entry"|"dashboard">("config");
-  const [configSection, setConfigSection] = useState<{ grade: string; section: string }>(defaultSection);
+  const [subTab, setSubTab] = useState<"sheet"|"dashboard">("sheet");
+  const [sheetSection, setSheetSection] = useState<{ grade: string; section: string }>(defaultSection);
   const [dashSection, setDashSection] = useState<{ grade: string; section: string }>(defaultSection);
+  const [examType, setExamType] = useState("FA1");
 
-  // Config state
-  const [configs, setConfigs] = useState<any[]>([]);
-  const [showConfigForm, setShowConfigForm] = useState(false);
-  const [configForm, setConfigForm] = useState({ subject: "", exam_type:"FA1", exam_date:"", description:"" });
+  // Sheet state
   const [gradeSubjects, setGradeSubjects] = useState<Record<string,string[]>>({});
-  const [maxMarks, setMaxMarks] = useState<number | "">("");
-  const [savingConfig, setSavingConfig] = useState(false);
-
-  // Entry state
-  const [selectedConfig, setSelectedConfig] = useState<any>(null);
-  const [entryStudents, setEntryStudents] = useState<any[]>([]);
-  const [marks, setMarks] = useState<Record<string,Record<string,number|null>>>({});
-  const [absent, setAbsent] = useState<Record<string,boolean>>({});
-  const [loadingEntry, setLoadingEntry] = useState(false);
-  const [savingMarks, setSavingMarks] = useState(false);
+  const [students, setStudents] = useState<any[]>([]);
+  const [configs, setConfigs] = useState<any[]>([]);
+  const [maxMarks, setMaxMarks] = useState<Record<string,string>>({});
+  const [marks, setMarks] = useState<Record<string,Record<string,string>>>({});
+  const [loadingSheet, setLoadingSheet] = useState(false);
+  const [savingSheet, setSavingSheet] = useState(false);
+  const [importingMarks,setImportingMarks]=useState(false);
 
   // Dashboard state
   const [dashData, setDashData] = useState<any>(null);
@@ -2159,102 +2154,120 @@ function PASATab({ user, mappings, academicYear }: any) {
 
   const [msg, setMsg] = useState("");
 
-  useEffect(() => { fetchConfigs(); }, [academicYear, mappings]);
   useEffect(() => { if (subTab==="dashboard") fetchDashboard(); }, [subTab, dashExam, academicYear, dashSection.grade, dashSection.section]);
   useEffect(() => {
     axios.get(`${API}/grade-subjects`).then(r => setGradeSubjects(r.data || {})).catch(() => {});
   }, []);
+  useEffect(() => { if (sheetSection.grade && sheetSection.section) loadSheet(); }, [sheetSection.grade, sheetSection.section, examType, academicYear]);
 
-  const subjectOptions = teacherSubjects.filter(s => (gradeSubjects[configSection.grade] || []).includes(s));
-  useEffect(() => { setConfigForm(p => ({ ...p, subject: subjectOptions[0] || "" })); }, [configSection.grade, JSON.stringify(subjectOptions)]);
+  const subjects = teacherSubjects.filter(s => (gradeSubjects[sheetSection.grade] || []).includes(s));
 
-  const fetchConfigs = async () => {
+  const loadSheet = async () => {
+    setLoadingSheet(true);setMsg("");
     try {
-      // Fetch configs for this teacher across all their assigned sections
-      const allMappingsLocal: any[] = mappings?.mappings || [];
-      const sections = classGrade && classSection
-        ? [{ grade: classGrade, section: classSection }]
-        : [...new Map(allMappingsLocal.map((m:any) => [`${m.grade}__${m.section}`, { grade: m.grade, section: m.section }])).values()];
+      const [studentsRes, configsRes] = await Promise.all([
+        axios.get(`${API}/students?grade=${encodeURIComponent(sheetSection.grade)}&section=${encodeURIComponent(sheetSection.section)}&academic_year=${academicYear}`),
+        axios.get(`${API}/pasa/config/section?grade=${encodeURIComponent(sheetSection.grade)}&section=${encodeURIComponent(sheetSection.section)}&academic_year=${academicYear}`),
+      ]);
+      const sl = studentsRes.data || [];
+      setStudents(sl);
+      const relevantConfigs = (configsRes.data?.configs || []).filter((c:any)=>c.exam_type===examType);
+      setConfigs(relevantConfigs);
 
-      let allConfigs: any[] = [];
-      for (const sec of sections) {
-        if (!sec.grade || !sec.section) continue;
-        const r = await axios.get(`${API}/pasa/config/section?grade=${encodeURIComponent(sec.grade)}&section=${encodeURIComponent(sec.section)}&academic_year=${academicYear}`);
-        allConfigs.push(...(r.data?.configs || []));
-      }
-      setConfigs(allConfigs);
-    } catch {}
+      const mm: Record<string,string> = {};
+      relevantConfigs.forEach((c:any)=>{ mm[c.subject] = String(c.total_marks); });
+      setMaxMarks(mm);
+
+      const im: Record<string,Record<string,string>> = {};
+      sl.forEach((s:any)=>{ im[s.id] = {}; });
+      await Promise.all(relevantConfigs.map(async (c:any) => {
+        try {
+          const r = await axios.get(`${API}/pasa/marks/entry?exam_config_id=${c.id}&grade=${encodeURIComponent(sheetSection.grade)}&section=${encodeURIComponent(sheetSection.section)}`);
+          (r.data?.students||[]).forEach((rs:any)=>{
+            if (!im[rs.student_id]) im[rs.student_id] = {};
+            const existing = rs.existing_marks;
+            if (!existing) return;
+            if (existing.is_absent) { im[rs.student_id][c.subject] = "AB"; return; }
+            const cs = (existing.competency_scores||[])[0];
+            im[rs.student_id][c.subject] = cs?.marks_obtained!=null ? String(cs.marks_obtained) : "";
+          });
+        } catch {}
+      }));
+      setMarks(im);
+    } catch { setMsg("❌ Failed to load sheet."); }
+    setLoadingSheet(false);
   };
 
-  const saveConfig = async () => {
-    if (!configForm.subject||!configForm.exam_type){setMsg("❌ Fill all fields");return;}
-    if (!maxMarks || +maxMarks <= 0){setMsg("❌ Enter max marks for this subject");return;}
-    setSavingConfig(true);
-    try {
-      const competencies = [{ competency_id: "TOTAL", competency_code: configForm.subject, competency_name: configForm.subject, max_marks: +maxMarks }];
-      const r = await axios.post(`${API}/pasa/config`,{
-        teacher_id:user.id, teacher_name:user.name,
-        subject:configForm.subject, grade:configSection.grade, section:configSection.section,
-        exam_type:configForm.exam_type, exam_date:configForm.exam_date,
-        description:configForm.description, academic_year:academicYear,
-        competencies,
-      });
-      if(r.data?.success){
-        setMsg(r.data.message==="Config updated"?"✅ Updated (overwrote existing config)":"✅ Config saved!");
-        setShowConfigForm(false);setMaxMarks("");fetchConfigs();
-      }
-    } catch (e:any) {setMsg(`❌ ${e?.response?.data?.message || "Save failed"}`);}
-    setSavingConfig(false);setTimeout(()=>setMsg(""),3000);
+  const rowTotal = (sid:string) => {
+    let obtained=0,maxSum=0,any=false;
+    subjects.forEach(sub=>{
+      const mm=+(maxMarks[sub]||0);
+      if(!mm)return;
+      const cell=marks[sid]?.[sub];
+      if(cell===undefined||cell==="")return;
+      if(cell.trim().toLowerCase().startsWith("ab"))return;
+      const n=Number(cell);
+      if(isNaN(n))return;
+      obtained+=Math.min(n,mm);maxSum+=mm;any=true;
+    });
+    return{obtained,maxSum,pct:maxSum>0?+((obtained/maxSum)*100).toFixed(1):0,any};
   };
 
-  const loadEntryStudents = async (config:any) => {
-    setSelectedConfig(config);setMarks({});setAbsent({});setLoadingEntry(true);setEntryStudents([]);
+  const saveSheet = async () => {
+    const activeSubjects = subjects.filter(sub=>+(maxMarks[sub]||0)>0);
+    if (!activeSubjects.length) { setMsg("❌ Enter Max Marks for at least one subject column"); return; }
+    setSavingSheet(true);
     try {
-      // Always use grade/section from config — it is always set and may differ from classGrade for subject teachers
-      const r = await axios.get(`${API}/pasa/marks/entry?exam_config_id=${config.id}&grade=${encodeURIComponent(config.grade)}&section=${encodeURIComponent(config.section)}`);
-      const sl = r.data?.students||[];
-      setEntryStudents(sl);
-      const im:Record<string,Record<string,number|null>>={};
-      const ia:Record<string,boolean>={};
-      sl.forEach((s:any)=>{
-        im[s.student_id]={};
-        ia[s.student_id]=s.existing_marks?.is_absent||false;
-        const cs=s.existing_marks?.competency_scores||[];
-        (config.competencies as any[]).forEach((c:any)=>{
-          const ex=cs.find((x:any)=>x.competency_id===c.competency_id);
-          im[s.student_id][c.competency_id]=ex?.marks_obtained??null;
+      for (const subject of activeSubjects) {
+        const mmVal = +maxMarks[subject];
+        const existing = configs.find((c:any)=>c.subject===subject);
+        let configId = existing?.id;
+        if (!existing || +existing.total_marks !== mmVal) {
+          const competencies = [{ competency_id: "TOTAL", competency_code: subject, competency_name: subject, max_marks: mmVal }];
+          const r = await axios.post(`${API}/pasa/config`,{
+            teacher_id:user.id, teacher_name:user.name,
+            subject, grade:sheetSection.grade, section:sheetSection.section,
+            exam_type:examType, academic_year:academicYear, competencies,
+          });
+          configId = r.data?.config_id || configId;
+        }
+        if (!configId) continue;
+        const entries = students.map((s:any)=>{
+          const cell = marks[s.id]?.[subject] ?? "";
+          const isAbsent = cell.trim().toLowerCase().startsWith("ab");
+          const n = cell===""||isAbsent ? null : Math.min(Number(cell), mmVal);
+          return {
+            student_id:s.id, student_name:s.name, is_absent:isAbsent,
+            competency_scores:[{ competency_id:"TOTAL", competency_code:subject, competency_name:subject,
+              marks_obtained: isAbsent?null:(n!==null&&!isNaN(n)?n:null), max_marks:mmVal }],
+          };
         });
-      });
-      setMarks(im);setAbsent(ia);
-      setSubTab("entry");
-    } catch {setMsg("❌ Failed to load students.");}
-    setLoadingEntry(false);
+        await axios.post(`${API}/pasa/marks`,{
+          exam_config_id:configId, grade:sheetSection.grade, section:sheetSection.section,
+          subject, exam_type:examType, academic_year:academicYear, teacher_id:user.id, entries,
+        });
+      }
+      setMsg("✅ Sheet saved!");
+      loadSheet();
+    } catch { setMsg("❌ Save failed."); }
+    setSavingSheet(false);setTimeout(()=>setMsg(""),3000);
   };
-
-  const calcTotal = (sid:string) => {
-    if(absent[sid]||!selectedConfig)return{total:0,pct:0};
-    let total=0;
-    (selectedConfig.competencies as any[]).forEach((c:any)=>{total+=+(marks[sid]?.[c.competency_id]||0);});
-    return{total,pct:selectedConfig.total_marks>0?+((total/selectedConfig.total_marks)*100).toFixed(1):0};
-  };
-
-  const [importingMarks,setImportingMarks]=useState(false);
 
   const downloadMarksTemplate=async()=>{
-    if(!selectedConfig||!entryStudents.length)return;
+    if(!students.length||!subjects.length)return;
     const XLSX=await import("xlsx");
-    const header=["Student Name",`Marks (out of ${selectedConfig.total_marks}) — type AB if absent`];
-    const rows=entryStudents.map((s:any)=>[s.student_name,""]);
+    const header=["Student Name",...subjects.map(s=>`${s} (out of ${maxMarks[s]||"?"}) — AB if absent`)];
+    const rows=students.map((s:any)=>[s.name,...subjects.map(()=>"")]);
     const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,"Marks");
-    const fname=`${selectedConfig.grade}_${selectedConfig.section}_${selectedConfig.subject}_${selectedConfig.exam_type}_template.xlsx`.replace(/\s+/g,"_");
+    const fname=`${sheetSection.grade}_${sheetSection.section}_${examType}_template.xlsx`.replace(/\s+/g,"_");
     XLSX.writeFile(wb,fname);
   };
 
   const importMarksFromExcel=async(e:React.ChangeEvent<HTMLInputElement>)=>{
     const file=e.target.files?.[0];
-    if(!file||!selectedConfig)return;
+    if(!file)return;
     setImportingMarks(true);
     try{
       const XLSX=await import("xlsx");
@@ -2263,60 +2276,37 @@ function PASATab({ user, mappings, academicYear }: any) {
       const ws=wb.Sheets[wb.SheetNames[0]];
       const rows:any[][]=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
       if(rows.length<2){setMsg("❌ No data rows found in file");setImportingMarks(false);e.target.value="";return;}
+      const headerRow=rows[0];
+      const colSubject:Record<number,string>={};
+      for(let c=1;c<headerRow.length;c++){
+        const text=(headerRow[c]??"").toString().trim().toLowerCase();
+        const match=subjects.find(sub=>text.startsWith(sub.toLowerCase()));
+        if(match)colSubject[c]=match;
+      }
+      if(!Object.keys(colSubject).length){setMsg("❌ Couldn't match any columns to your subjects");setImportingMarks(false);e.target.value="";return;}
       const norm=(v:any)=>(v??"").toString().trim().toLowerCase();
       const byName:Record<string,any>={};
-      entryStudents.forEach((s:any)=>{byName[norm(s.student_name)]=s;});
-      const competencyId=(selectedConfig.competencies as any[])[0]?.competency_id;
-      const newMarks={...marks};const newAbsent={...absent};
-      let matched=0;
+      students.forEach((s:any)=>{byName[norm(s.name)]=s;});
+      const newMarks={...marks};
+      let matchedRows=0;
       for(let i=1;i<rows.length;i++){
         const row=rows[i];
         const name=row[0];
         if(!name)continue;
         const stu=byName[norm(name)];
         if(!stu)continue;
-        const cell=row[1];
-        if(cell===""||cell===null||cell===undefined)continue;
-        matched++;
-        if(norm(cell).startsWith("ab")){
-          newAbsent[stu.student_id]=true;
-        }else{
-          const n=Number(cell);
-          newAbsent[stu.student_id]=false;
-          if(!newMarks[stu.student_id])newMarks[stu.student_id]={};
-          newMarks[stu.student_id][competencyId]=isNaN(n)?null:Math.min(n,selectedConfig.total_marks);
-        }
+        matchedRows++;
+        if(!newMarks[stu.id])newMarks[stu.id]={};
+        Object.entries(colSubject).forEach(([idx,sub])=>{
+          const cell=row[+idx];
+          if(cell===""||cell===null||cell===undefined)return;
+          newMarks[stu.id][sub]=cell.toString().trim();
+        });
       }
-      setMarks(newMarks);setAbsent(newAbsent);
-      setMsg(`✅ Imported ${matched} of ${rows.length-1} rows — review below, then Save`);
+      setMarks(newMarks);
+      setMsg(`✅ Imported ${matchedRows} of ${rows.length-1} rows — review below, then Save`);
     }catch{setMsg("❌ Couldn't read that file — is it a valid .xlsx/.xls?");}
     setImportingMarks(false);e.target.value="";setTimeout(()=>setMsg(""),6000);
-  };
-
-  const saveMarks = async () => {
-    if(!selectedConfig||!entryStudents.length)return;
-    setSavingMarks(true);
-    try {
-      const entries = entryStudents.map((s:any)=>({
-        student_id:s.student_id, student_name:s.student_name,
-        is_absent:absent[s.student_id]||false,
-        competency_scores:(selectedConfig.competencies as any[]).map((c:any)=>({
-          competency_id:c.competency_id, competency_code:c.competency_code,
-          competency_name:c.competency_name,
-          marks_obtained:absent[s.student_id]?null:(marks[s.student_id]?.[c.competency_id]??null),
-          max_marks:c.max_marks,
-        })),
-      }));
-      await axios.post(`${API}/pasa/marks`,{
-        exam_config_id:selectedConfig.id,
-        grade:selectedConfig.grade,
-        section:selectedConfig.section,
-        subject:selectedConfig.subject, exam_type:selectedConfig.exam_type,
-        academic_year:academicYear, teacher_id:user.id, entries,
-      });
-      setMsg("✅ Marks saved!");
-    } catch {setMsg("❌ Save failed.");}
-    setSavingMarks(false);setTimeout(()=>setMsg(""),3000);
   };
 
   const fetchDashboard = async () => {
@@ -2354,7 +2344,7 @@ function PASATab({ user, mappings, academicYear }: any) {
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        {[{id:"config",label:"⚙️ Exam Config"},{id:"entry",label:"✏️ Marks Entry"},{id:"dashboard",label:"📊 Dashboard"}].map(t=>(
+        {[{id:"sheet",label:"✏️ Marks Entry"},{id:"dashboard",label:"📊 Dashboard"}].map(t=>(
           <button key={t.id} onClick={()=>setSubTab(t.id as any)}
             className={`px-4 py-2 text-sm rounded-lg font-medium ${subTab===t.id?"bg-indigo-600 text-white":"bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
             {t.label}
@@ -2364,156 +2354,105 @@ function PASATab({ user, mappings, academicYear }: any) {
 
       {msg&&<div className={`px-4 py-2 rounded text-sm border ${msg.startsWith("✅")?"bg-green-50 border-green-300 text-green-800":"bg-red-50 border-red-300 text-red-800"}`}>{msg}</div>}
 
-      {/* CONFIG TAB */}
-      {subTab==="config"&&(
+      {/* SHEET TAB */}
+      {subTab==="sheet"&&(
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <p className="text-xs text-gray-500">{configs.length} exam configurations (all your sections)</p>
-            <button onClick={()=>setShowConfigForm(!showConfigForm)} className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium">
-              {showConfigForm?"✕ Cancel":"+ New Config"}
-            </button>
+          <div className="bg-white rounded-xl shadow p-4 flex gap-3 flex-wrap items-end">
+            <div><label className="text-xs text-gray-500 block mb-1">Section</label>
+              <SectionPicker value={sheetSection} onChange={setSheetSection} /></div>
+            <div><label className="text-xs text-gray-500 block mb-1">Exam Type</label>
+              <select value={examType} onChange={e=>setExamType(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+                {EXAM_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
           </div>
 
-          {showConfigForm&&(
-            <div className="bg-white rounded-xl shadow border p-4 space-y-4">
-              <div className="flex items-center gap-3 mb-1"><h3 className="text-sm font-bold text-gray-700">New Config for</h3><SectionPicker value={configSection} onChange={setConfigSection} /></div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Subject *</label>
-                  {subjectOptions.length>0?(
-                    <select value={configForm.subject} onChange={e=>setConfigForm(p=>({...p,subject:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                      {subjectOptions.map((s:string)=><option key={s} value={s}>{s}</option>)}
-                    </select>
-                  ):(
-                    <p className="text-xs text-red-500 py-1.5">No subject match between your assigned subjects and {configSection.grade || "this grade"}'s Subjects list.</p>
-                  )}
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Exam Type *</label>
-                  <select value={configForm.exam_type} onChange={e=>setConfigForm(p=>({...p,exam_type:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full">
-                    {EXAM_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Exam Date</label>
-                  <input type="date" value={configForm.exam_date} onChange={e=>setConfigForm(p=>({...p,exam_date:e.target.value}))} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Max Marks *</label>
-                  <input type="number" min={1} max={500} value={maxMarks} placeholder="e.g. 25"
-                    onChange={e=>setMaxMarks(e.target.value===""?"":+e.target.value)}
-                    className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
-                </div>
-              </div>
-              <button onClick={saveConfig} disabled={savingConfig} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
-                {savingConfig?"Saving...":"💾 Save Config"}
-              </button>
+          {loadingSheet&&<div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">Loading sheet...</div>}
+
+          {!loadingSheet&&subjects.length===0&&(
+            <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">
+              No subject match between your assigned subjects and {sheetSection.grade || "this grade"}'s Subjects list.
             </div>
           )}
 
-          {configs.length===0?(
-            <div className="bg-white rounded-xl shadow p-6 text-center text-gray-400 text-sm">No configs yet. Create one above.</div>
-          ):(
-            <div className="bg-white rounded-xl shadow overflow-hidden">
-              <div className="divide-y divide-gray-100">
-                {configs.map((c:any)=>(
-                  <div key={c.id} className="px-4 py-3 flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">{c.exam_type}</span>
-                        <span className="text-sm font-medium text-gray-800">{c.subject}</span>
-                        <span className="text-xs text-gray-500">· Max marks: {c.total_marks}</span>
-                      </div>
-                    </div>
-                    <button onClick={()=>loadEntryStudents(c)} disabled={loadingEntry}
-                      className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50">
-                      {loadingEntry?"Loading...":"✏️ Enter Marks"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {!loadingSheet&&subjects.length>0&&students.length===0&&(
+            <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">No students enrolled in this section for {academicYear}.</div>
           )}
-        </div>
-      )}
 
-      {/* ENTRY TAB */}
-      {subTab==="entry"&&selectedConfig&&entryStudents.length>0&&(
-        <div className="space-y-3">
-          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <p className="text-sm font-bold text-indigo-800">{selectedConfig.exam_type} — {selectedConfig.subject}</p>
-              <p className="text-xs text-indigo-600">Max marks: {selectedConfig.total_marks}</p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={downloadMarksTemplate} className="px-3 py-2 bg-white border border-gray-300 text-gray-600 text-xs rounded-lg hover:bg-gray-50 font-medium">
-                ⬇ Download Template</button>
-              <label className="px-3 py-2 bg-white border border-gray-300 text-gray-600 text-xs rounded-lg hover:bg-gray-50 font-medium cursor-pointer">
-                {importingMarks?"Importing...":"📤 Import from Excel"}
-                <input type="file" accept=".xlsx,.xls" onChange={importMarksFromExcel} disabled={importingMarks} className="hidden" />
-              </label>
-              <button onClick={saveMarks} disabled={savingMarks} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
-                {savingMarks?"Saving...":"💾 Save Marks"}
-              </button>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-indigo-700 text-white">
-                    <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[150px]">Student</th>
-                    <th className="px-2 py-2 text-center w-14">Absent</th>
-                    {(selectedConfig.competencies as any[]).map((c:any)=>(
-                      <th key={c.competency_id} className="px-2 py-2 text-center min-w-[70px]">
-                        <div>{c.competency_code}</div>
-                        <div className="text-indigo-200">/{c.max_marks}</div>
-                      </th>
-                    ))}
-                    <th className="px-2 py-2 text-center min-w-[55px]">Total</th>
-                    <th className="px-2 py-2 text-center min-w-[45px]">%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entryStudents.map((s:any,i:number)=>{
-                    const {total,pct}=calcTotal(s.student_id);
-                    const isAbs=absent[s.student_id];
-                    return(
-                      <tr key={s.student_id} className={i%2===0?"bg-white":"bg-gray-50"}>
-                        <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.student_name}</td>
-                        <td className="px-2 py-2 text-center">
-                          <input type="checkbox" checked={isAbs} onChange={e=>setAbsent(p=>({...p,[s.student_id]:e.target.checked}))} className="accent-red-500" /></td>
-                        {(selectedConfig.competencies as any[]).map((c:any)=>(
-                          <td key={c.competency_id} className="px-2 py-1 text-center">
-                            <input type="number" min={0} max={c.max_marks}
-                              value={marks[s.student_id]?.[c.competency_id]??""}
-                              disabled={isAbs}
-                              onChange={e=>{
-                                const v=e.target.value===""?null:Math.min(+e.target.value,c.max_marks);
-                                setMarks(p=>({...p,[s.student_id]:{...p[s.student_id],[c.competency_id]:v}}));
-                              }}
-                              className="border border-gray-300 rounded px-1 py-0.5 w-12 text-center disabled:bg-gray-100" />
-                          </td>
+          {!loadingSheet&&subjects.length>0&&students.length>0&&(
+            <div className="space-y-3">
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <p className="text-sm font-bold text-indigo-800">{examType} — {sheetSection.grade} {sheetSection.section}</p>
+                  <p className="text-xs text-indigo-600">{students.length} students · set Max Marks per subject below, then enter marks</p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button onClick={downloadMarksTemplate} className="px-3 py-2 bg-white border border-gray-300 text-gray-600 text-xs rounded-lg hover:bg-gray-50 font-medium">
+                    ⬇ Download Template</button>
+                  <label className="px-3 py-2 bg-white border border-gray-300 text-gray-600 text-xs rounded-lg hover:bg-gray-50 font-medium cursor-pointer">
+                    {importingMarks?"Importing...":"📤 Import from Excel"}
+                    <input type="file" accept=".xlsx,.xls" onChange={importMarksFromExcel} disabled={importingMarks} className="hidden" />
+                  </label>
+                  <button onClick={saveSheet} disabled={savingSheet} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+                    {savingSheet?"Saving...":"💾 Save Sheet"}
+                  </button>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl shadow overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-indigo-700 text-white">
+                        <th className="px-3 py-2 text-left sticky left-0 bg-indigo-700 min-w-[150px]">Student</th>
+                        {subjects.map(sub=>(
+                          <th key={sub} className="px-2 py-2 text-center min-w-[90px]">
+                            <div className="text-xs font-medium">{sub}</div>
+                            <input type="number" min={1} max={500} value={maxMarks[sub]||""} placeholder="Max"
+                              onChange={e=>setMaxMarks(p=>({...p,[sub]:e.target.value}))}
+                              className="mt-1 border border-indigo-300 rounded px-1 py-0.5 w-16 text-center text-xs text-gray-800" />
+                          </th>
                         ))}
-                        <td className="px-2 py-2 text-center font-bold">
-                          {isAbs?<span className="text-red-500">Absent</span>:total}</td>
-                        <td className="px-2 py-2 text-center">
-                          {!isAbs&&pct>0&&<span className={`px-1 py-0.5 rounded text-xs font-bold ${pct>=80?"bg-green-100 text-green-700":pct>=60?"bg-blue-100 text-blue-700":pct>=40?"bg-yellow-100 text-yellow-700":"bg-red-100 text-red-700"}`}>{pct}%</span>}
-                        </td>
+                        <th className="px-2 py-2 text-center min-w-[60px]">Total</th>
+                        <th className="px-2 py-2 text-center min-w-[45px]">%</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                      {students.map((s:any,i:number)=>{
+                        const {obtained,maxSum,pct,any}=rowTotal(s.id);
+                        return(
+                          <tr key={s.id} className={i%2===0?"bg-white":"bg-gray-50"}>
+                            <td className="px-3 py-2 font-medium text-gray-800 sticky left-0 bg-inherit">{s.name}</td>
+                            {subjects.map(sub=>{
+                              const hasMax=!!maxMarks[sub];
+                              return(
+                                <td key={sub} className="px-2 py-1 text-center">
+                                  <input type="text" value={marks[s.id]?.[sub]??""}
+                                    disabled={!hasMax}
+                                    placeholder={hasMax?"":"set max"}
+                                    onChange={e=>{
+                                      const v=e.target.value;
+                                      setMarks(p=>({...p,[s.id]:{...p[s.id],[sub]:v}}));
+                                    }}
+                                    className="border border-gray-300 rounded px-1 py-0.5 w-14 text-center disabled:bg-gray-100" />
+                                </td>
+                              );
+                            })}
+                            <td className="px-2 py-2 text-center font-bold">
+                              {any?`${obtained}/${maxSum}`:<span className="text-gray-300 font-normal">—</span>}</td>
+                            <td className="px-2 py-2 text-center">
+                              {any&&<span className={`px-1 py-0.5 rounded text-xs font-bold ${pct>=80?"bg-green-100 text-green-700":pct>=60?"bg-blue-100 text-blue-700":pct>=40?"bg-yellow-100 text-yellow-700":"bg-red-100 text-red-700"}`}>{pct}%</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <button onClick={saveSheet} disabled={savingSheet} className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+                {savingSheet?"Saving...":"💾 Save Sheet"}
+              </button>
             </div>
-          </div>
-          <button onClick={saveMarks} disabled={savingMarks} className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
-            {savingMarks?"Saving...":"💾 Save Marks"}
-          </button>
+          )}
         </div>
-      )}
-      {subTab==="entry"&&!selectedConfig&&(
-        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Select an exam config from the Config tab and click "Enter Marks".</div>
       )}
 
       {/* DASHBOARD TAB */}
