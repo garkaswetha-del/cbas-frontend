@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect } from "react";
 import axios from "axios";
 import { currentAcademicYear } from "../utils/academicYear";
 import AcademicYearSelect from "../components/AcademicYearSelect";
@@ -32,7 +32,7 @@ export default function PASAPage({ allowedGrades }: { allowedGrades?: string[] }
       <div className="mb-4 flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-800">📝 PA/SA Marks</h1>
-          <p className="text-xs text-gray-500">Competency-mapped exam system</p>
+          <p className="text-xs text-gray-500">Subject-wise marks, per grade</p>
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Academic Year</label>
@@ -62,14 +62,12 @@ function ExamConfigTab({ academicYear, allowedGrades }: any) {
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ teacher_name:"", teacher_id:"", subject:"", grade:"", section:"", exam_type:"FA1", exam_date:"", description:"" });
-  const [competencies, setCompetencies] = useState<any[]>([]);
-  const [loadingComps, setLoadingComps] = useState(false);
-  const [selectedComps, setSelectedComps] = useState<any[]>([]);
+  const [gradeSubjects, setGradeSubjects] = useState<Record<string,string[]>>({});
+  const [maxMarks, setMaxMarks] = useState<number | "">("");
   const [grades, setGrades] = useState<string[]>([]);
   const [filterGrade, setFilterGrade] = useState("");
-  const maxMarksHistoryRef = useRef<Record<string,number>>({});
 
-  useEffect(() => { fetchGrades(); }, []);
+  useEffect(() => { fetchGrades(); fetchGradeSubjects(); }, []);
   useEffect(() => { fetchConfigs(); }, [academicYear, filterGrade]);
 
   const fetchGrades = async () => {
@@ -77,6 +75,13 @@ function ExamConfigTab({ academicYear, allowedGrades }: any) {
       const r = await axios.get(`${API}/students/stats`);
       const all: string[] = (r.data?.byGrade||[]).map((g:any)=>g.grade).sort();
       setGrades(allowedGrades?.length ? all.filter(g => allowedGrades.includes(g)) : all);
+    } catch {}
+  };
+
+  const fetchGradeSubjects = async () => {
+    try {
+      const r = await axios.get(`${API}/grade-subjects`);
+      setGradeSubjects(r.data || {});
     } catch {}
   };
 
@@ -89,47 +94,20 @@ function ExamConfigTab({ academicYear, allowedGrades }: any) {
     setLoading(false);
   };
 
-  const fetchCompetencies = async () => {
-    if (!form.subject) return;
-    setLoadingComps(true);
-    try {
-      const params = new URLSearchParams({ subject: form.subject });
-      if (form.grade) params.append('grade', form.grade);
-      const r = await axios.get(`${API}/activities/competencies?${params}`);
-      const data = r.data?.competencies||r.data||[];
-      setCompetencies(Array.isArray(data)?data:[]);
-    } catch {}
-    setLoadingComps(false);
-  };
-
-  useEffect(() => { if (form.subject) fetchCompetencies(); }, [form.subject, form.grade]);
-
-  const toggleComp = (comp: any) => {
-    setSelectedComps(prev => {
-      const exists = prev.find((c:any)=>c.competency_id===comp.id);
-      if (exists) {
-        maxMarksHistoryRef.current[comp.id] = exists.max_marks;
-        return prev.filter((c:any)=>c.competency_id!==comp.id);
-      }
-      const savedMax = maxMarksHistoryRef.current[comp.id] || 10;
-      return [...prev,{competency_id:comp.id,competency_code:comp.code,competency_name:comp.name,max_marks:savedMax}];
-    });
-  };
-
-  const updateMaxMarks = (cid: string, mm: number) => setSelectedComps(p=>p.map((c:any)=>c.competency_id===cid?{...c,max_marks:mm}:c));
-  const totalMarks = selectedComps.reduce((s:number,c:any)=>s+(+c.max_marks||0),0);
+  const subjectOptions = form.grade ? (gradeSubjects[form.grade] || []) : [];
 
   const saveConfig = async () => {
     if (!form.teacher_name||!form.subject||!form.grade||!form.section||!form.exam_type){setMsg("❌ Fill all required fields");return;}
-    if (!selectedComps.length){setMsg("❌ Select at least one competency");return;}
+    if (!maxMarks || +maxMarks <= 0){setMsg("❌ Enter max marks for this subject");return;}
     setSaving(true);
     try {
-      const r = await axios.post(`${API}/pasa/config`,{...form,academic_year:academicYear,competencies:selectedComps});
+      const competencies = [{ competency_id: "TOTAL", competency_code: form.subject, competency_name: form.subject, max_marks: +maxMarks }];
+      const r = await axios.post(`${API}/pasa/config`,{...form,academic_year:academicYear,competencies});
       if (r.data?.success){
         setMsg(r.data.message==="Config updated"?"✅ Updated (overwrote existing config)":"✅ Config saved!");
-        setShowForm(false);setSelectedComps([]);maxMarksHistoryRef.current={};fetchConfigs();
+        setShowForm(false);setMaxMarks("");fetchConfigs();
       }
-    } catch {setMsg("❌ Save failed");}
+    } catch (e:any) {setMsg(`❌ ${e?.response?.data?.message || "Save failed"}`);}
     setSaving(false); setTimeout(()=>setMsg(""),3000);
   };
 
@@ -155,7 +133,7 @@ function ExamConfigTab({ academicYear, allowedGrades }: any) {
         <div className="bg-white rounded-xl shadow border border-gray-200 p-5 space-y-4">
           <h3 className="text-sm font-bold text-gray-700">New Exam Configuration</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[{k:"teacher_name",l:"Teacher Name *",p:"Teacher name"},{k:"teacher_id",l:"Teacher ID *",p:"Teacher ID"},{k:"subject",l:"Subject *",p:"e.g. Science"},{k:"section",l:"Section *",p:"e.g. Himalaya"},{k:"exam_date",l:"Exam Date",t:"date"},{k:"description",l:"Description",p:"Optional"}].map(f=>(
+            {[{k:"teacher_name",l:"Teacher Name *",p:"Teacher name"},{k:"teacher_id",l:"Teacher ID *",p:"Teacher ID"},{k:"section",l:"Section *",p:"e.g. Himalaya"},{k:"exam_date",l:"Exam Date",t:"date"},{k:"description",l:"Description",p:"Optional"}].map(f=>(
               <div key={f.k}>
                 <label className="text-xs text-gray-500 block mb-1">{f.l}</label>
                 <input type={f.t||"text"} value={(form as any)[f.k]} placeholder={f.p}
@@ -165,10 +143,18 @@ function ExamConfigTab({ academicYear, allowedGrades }: any) {
             ))}
             <div>
               <label className="text-xs text-gray-500 block mb-1">Grade *</label>
-              <select value={form.grade} onChange={e=>setForm((p:any)=>({...p,grade:e.target.value}))} className="border border-gray-300 rounded px-3 py-1.5 text-sm w-full">
+              <select value={form.grade} onChange={e=>setForm((p:any)=>({...p,grade:e.target.value,subject:""}))} className="border border-gray-300 rounded px-3 py-1.5 text-sm w-full">
                 <option value="">Select</option>
                 {grades.map(g=><option key={g} value={g}>{g}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Subject *</label>
+              <select value={form.subject} disabled={!form.grade} onChange={e=>setForm((p:any)=>({...p,subject:e.target.value}))} className="border border-gray-300 rounded px-3 py-1.5 text-sm w-full disabled:bg-gray-100">
+                <option value="">{form.grade ? "Select subject" : "Select grade first"}</option>
+                {subjectOptions.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+              {form.grade && subjectOptions.length===0 && <p className="text-xs text-red-500 mt-1">No subjects configured for {form.grade} in the Subjects module yet.</p>}
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Exam Type *</label>
@@ -176,47 +162,12 @@ function ExamConfigTab({ academicYear, allowedGrades }: any) {
                 {EXAM_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-          </div>
-          <div className="border-t border-gray-200 pt-4">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-semibold text-gray-700">Select Competencies</h4>
-{loadingComps && <span className="text-xs text-indigo-500 animate-pulse">Loading competencies...</span>}
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Max Marks *</label>
+              <input type="number" min={1} max={500} value={maxMarks} placeholder="e.g. 25"
+                onChange={e=>setMaxMarks(e.target.value===""?"":+e.target.value)}
+                className="border border-gray-300 rounded px-3 py-1.5 text-sm w-full" />
             </div>
-            {competencies.length>0&&(
-              <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-                {competencies.map((comp:any)=>{
-                  const sel=selectedComps.find((c:any)=>c.competency_id===comp.id);
-                  return (
-                    <div key={comp.id} className={`px-3 py-2 flex items-center gap-3 ${sel?"bg-indigo-50":""}`}>
-                      <input type="checkbox" checked={!!sel} onChange={()=>toggleComp(comp)} className="accent-indigo-600" />
-                      <div className="flex-1">
-                        <span className="text-xs font-medium text-indigo-700">[{comp.code}]</span>
-                        <span className="text-xs text-gray-700 ml-2">{comp.name?.slice(0,80)}</span>
-                      </div>
-                      {sel&&(
-                        <div className="flex items-center gap-1">
-                          <label className="text-xs text-gray-500">Marks:</label>
-                          <input type="number" value={sel.max_marks} min={1} max={100}
-                            onChange={e=>updateMaxMarks(comp.id,+e.target.value)}
-                            className="border border-gray-300 rounded px-2 py-0.5 text-xs w-16 text-center" />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {selectedComps.length>0&&(
-              <div className="mt-3 bg-indigo-50 rounded-lg p-3">
-                <p className="text-xs font-bold text-indigo-800 mb-2">{selectedComps.length} competencies · Total: {totalMarks} marks</p>
-                {selectedComps.map((c:any)=>(
-                  <div key={c.competency_id} className="flex items-center justify-between text-xs py-0.5">
-                    <span className="text-indigo-700">[{c.competency_code}] {c.competency_name?.slice(0,50)}</span>
-                    <span className="font-bold text-indigo-800">{c.max_marks} marks</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
           <button onClick={saveConfig} disabled={saving} className="px-5 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
             {saving?"Saving...":"💾 Save Exam Config"}
@@ -239,7 +190,7 @@ function ExamConfigTab({ academicYear, allowedGrades }: any) {
                     <span className="text-sm font-medium text-gray-800">{c.subject}</span>
                     <span className="text-xs text-gray-500">· {c.grade} {c.section} · {c.teacher_name}</span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">{(c.competencies as any[])?.length||0} competencies · Total: {c.total_marks} marks{c.exam_date?` · ${c.exam_date}`:""}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Max marks: {c.total_marks}{c.exam_date?` · ${c.exam_date}`:""}</p>
                 </div>
                 <button onClick={()=>deleteConfig(c.id)} className="text-xs text-red-500 hover:text-red-700 ml-3">Delete</button>
               </div>
@@ -314,6 +265,61 @@ function MarksEntryTab({ academicYear, allowedGrades }: any) {
     return{total,pct:selectedConfig.total_marks>0?+((total/selectedConfig.total_marks)*100).toFixed(1):0,hasAnyMark};
   };
 
+  const [importing,setImporting]=useState(false);
+
+  const downloadTemplate=async()=>{
+    if(!selectedConfig||!students.length)return;
+    const XLSX=await import("xlsx");
+    const header=["Student Name",`Marks (out of ${selectedConfig.total_marks}) — type AB if absent`];
+    const rows=students.map((s:any)=>[s.student_name,""]);
+    const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"Marks");
+    const fname=`${grade}_${section}_${selectedConfig.subject}_${selectedConfig.exam_type}_template.xlsx`.replace(/\s+/g,"_");
+    XLSX.writeFile(wb,fname);
+  };
+
+  const importFromExcel=async(e:React.ChangeEvent<HTMLInputElement>)=>{
+    const file=e.target.files?.[0];
+    if(!file||!selectedConfig)return;
+    setImporting(true);
+    try{
+      const XLSX=await import("xlsx");
+      const buffer=await file.arrayBuffer();
+      const wb=XLSX.read(buffer);
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows:any[][]=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+      if(rows.length<2){setMsg("❌ No data rows found in file");setImporting(false);e.target.value="";return;}
+      const norm=(v:any)=>(v??"").toString().trim().toLowerCase();
+      const byName:Record<string,any>={};
+      students.forEach((s:any)=>{byName[norm(s.student_name)]=s;});
+      const competencyId=(selectedConfig.competencies as any[])[0]?.competency_id;
+      const newMarks={...marks};const newAbsent={...absent};
+      let matched=0;
+      for(let i=1;i<rows.length;i++){
+        const row=rows[i];
+        const name=row[0];
+        if(!name)continue;
+        const stu=byName[norm(name)];
+        if(!stu)continue;
+        const cell=row[1];
+        if(cell===""||cell===null||cell===undefined)continue;
+        matched++;
+        if(norm(cell).startsWith("ab")){
+          newAbsent[stu.student_id]=true;
+        }else{
+          const n=Number(cell);
+          newAbsent[stu.student_id]=false;
+          if(!newMarks[stu.student_id])newMarks[stu.student_id]={};
+          newMarks[stu.student_id][competencyId]=isNaN(n)?null:Math.min(n,selectedConfig.total_marks);
+        }
+      }
+      setMarks(newMarks);setAbsent(newAbsent);
+      setMsg(`✅ Imported ${matched} of ${rows.length-1} rows — review below, then Save`);
+    }catch{setMsg("❌ Couldn't read that file — is it a valid .xlsx/.xls?");}
+    setImporting(false);e.target.value="";setTimeout(()=>setMsg(""),6000);
+  };
+
   const saveMarks=async()=>{
     if(!selectedConfig||!students.length)return;
     setSaving(true);
@@ -380,7 +386,7 @@ function MarksEntryTab({ academicYear, allowedGrades }: any) {
                       className={`w-full px-4 py-3 flex items-center justify-between hover:bg-blue-50 text-left transition-colors ${selectedConfig?.id===c.id?"bg-blue-50 border-l-4 border-blue-500":""}`}>
                       <div>
                         <span className="text-sm font-medium text-gray-800">{c.subject}</span>
-                        <span className="text-xs text-gray-500 ml-2">· {(c.competencies as any[])?.length||0} competencies · {c.total_marks} marks · by {c.teacher_name}</span>
+                        <span className="text-xs text-gray-500 ml-2">· Max marks: {c.total_marks} · by {c.teacher_name}</span>
                       </div>
                       {loadingStudents&&selectedConfig?.id===c.id
                         ?<span className="text-xs text-indigo-400 animate-pulse">Loading students...</span>
@@ -400,10 +406,18 @@ function MarksEntryTab({ academicYear, allowedGrades }: any) {
           <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2">
             <div>
               <p className="text-sm font-bold text-indigo-800">{selectedConfig.exam_type} — {selectedConfig.subject} · {grade} {section}</p>
-              <p className="text-xs text-indigo-600">{(selectedConfig.competencies as any[]).length} competencies · Total: {selectedConfig.total_marks} marks · {students.length} students</p>
+              <p className="text-xs text-indigo-600">Max marks: {selectedConfig.total_marks} · {students.length} students</p>
             </div>
-            <button onClick={saveMarks} disabled={saving} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
-              {saving?"Saving...":"💾 Save All Marks"}</button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={downloadTemplate} className="px-3 py-2 bg-white border border-gray-300 text-gray-600 text-xs rounded-lg hover:bg-gray-50 font-medium">
+                ⬇ Download Template</button>
+              <label className="px-3 py-2 bg-white border border-gray-300 text-gray-600 text-xs rounded-lg hover:bg-gray-50 font-medium cursor-pointer">
+                {importing?"Importing...":"📤 Import from Excel"}
+                <input type="file" accept=".xlsx,.xls" onChange={importFromExcel} disabled={importing} className="hidden" />
+              </label>
+              <button onClick={saveMarks} disabled={saving} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+                {saving?"Saving...":"💾 Save All Marks"}</button>
+            </div>
           </div>
           <div className="bg-white rounded-xl shadow overflow-hidden">
             <div className="overflow-x-auto">

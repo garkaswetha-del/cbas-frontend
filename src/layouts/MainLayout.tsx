@@ -20,6 +20,7 @@ const ACADEMIC_NAV = [
   { path: '/sow',               label: 'Scheme of Work',      icon: '📋' },
   { path: '/lp',                 label: 'LP',                  icon: '📖' },
   { path: '/baseline',     label: 'Baseline Entry',      icon: '📈' },
+  { path: '/pasa',         label: 'PA/SA Marks',          icon: '📝' },
   { path: '/competencies', label: 'Competency Registry',  icon: '🗂️' },
   { path: '/observation',  label: 'Class Observation',    icon: '👁' },
   { path: '/prior-marks',  label: 'Prior Year Marks',     icon: '📜' },
