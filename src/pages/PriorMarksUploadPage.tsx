@@ -37,6 +37,7 @@ export default function PriorMarksUploadPage() {
   const [message, setMessage] = useState("");
   const [existing, setExisting] = useState<any[]>([]);
   const [loadingExisting, setLoadingExisting] = useState(false);
+  const [gradeSubjects, setGradeSubjects] = useState<Record<string,string[]>>({});
 
   const fetchExisting = async (year: string) => {
     setLoadingExisting(true);
@@ -48,6 +49,21 @@ export default function PriorMarksUploadPage() {
   };
 
   useEffect(() => { fetchExisting(academicYear); }, [academicYear]);
+  useEffect(() => {
+    axios.get(`${API}/grade-subjects`).then(r => setGradeSubjects(r.data || {})).catch(() => {});
+  }, []);
+
+  const downloadTemplate = () => {
+    const grades = Object.keys(gradeSubjects);
+    const allSubjects = [...new Set(Object.values(gradeSubjects).flat())].sort();
+    if (!grades.length || !allSubjects.length) return;
+    const header = ["Grade", ...allSubjects];
+    const rows = grades.map(g => [g, ...allSubjects.map(() => "")]);
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Prior Marks");
+    XLSX.writeFile(wb, "prior_year_marks_template.xlsx");
+  };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -140,9 +156,17 @@ export default function PriorMarksUploadPage() {
           Defaults to last year ({previousAcademicYear(currentAcademicYear())}). Change this if you're uploading a different year's file.
         </p>
 
-        <label className="text-xs text-gray-500 block mb-1">Excel file (one stage at a time)</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-gray-500">Excel file (one stage at a time)</label>
+          <button onClick={downloadTemplate} className="px-3 py-1.5 bg-white border border-gray-300 text-gray-600 text-xs rounded-lg hover:bg-gray-50 font-medium">
+            ⬇ Download Template
+          </button>
+        </div>
         <input type="file" accept=".xlsx,.xls" onChange={handleFile} className="text-sm" />
         {fileName && <p className="text-xs text-gray-500 mt-1">Selected: {fileName}</p>}
+        <p className="text-xs text-gray-400 mt-2">
+          The template lists every grade as a row and every subject configured in the Subjects module as a column — fill in only the cells that apply, leave the rest blank.
+        </p>
       </div>
 
       {parsedRows.length > 0 && (
