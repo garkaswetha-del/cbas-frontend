@@ -78,7 +78,7 @@ const EMPTY_FORM = {
   name: "", email: "", contact_no: "", address: "", locality: "",
   qualification: "", experience_years: "", experience_detail: "", skills: "",
   guardian_name: "", religion: "", caste: "",
-  previous_salary: "", expected_salary: "", subject_applied_for: "", source_portal: "",
+  previous_salary: "", expected_salary: "", subject_applied_for: "", school_stage: "", source_portal: "",
 };
 
 function ApplicationsTab() {
@@ -244,6 +244,14 @@ function ApplicationsTab() {
                   className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full" />
               </div>
             ))}
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Stage Applying For</label>
+              <select value={form.school_stage || ""} onChange={e => setForm((f: any) => ({ ...f, school_stage: e.target.value }))}
+                className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                <option value="">— Select —</option>
+                {["Foundation", "Preparatory", "Middle", "Secondary"].map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
             <div className="col-span-2">
               <label className="text-xs text-gray-500 block mb-1">Address</label>
               <input value={form.address} onChange={e => setForm((f: any) => ({ ...f, address: e.target.value }))}
@@ -459,6 +467,17 @@ function InterviewsTab() {
   const notify = async (id: string) => { await axios.patch(`${API}/hr/interviews/${id}/notified`); load(); };
   const attendance = async (id: string, attended: boolean) => { await axios.patch(`${API}/hr/interviews/${id}/attendance`, { attended }); load(); };
 
+  const [questionsMap, setQuestionsMap] = useState<Record<string, string[]>>({});
+  const [loadingQuestions, setLoadingQuestions] = useState<string | null>(null);
+  const genQuestions = async (applicantId: string) => {
+    setLoadingQuestions(applicantId);
+    try {
+      const r = await axios.get(`${API}/hr/applicants/${applicantId}/interview-questions`);
+      setQuestionsMap(p => ({ ...p, [applicantId]: r.data?.questions || [] }));
+    } catch { setQuestionsMap(p => ({ ...p, [applicantId]: [] })); }
+    setLoadingQuestions(null);
+  };
+
   return (
     <div>
       {message && (
@@ -525,10 +544,12 @@ function InterviewsTab() {
                 <th className="px-3 py-2 text-left">Interviewer</th>
                 <th className="px-3 py-2 text-center">Notified</th>
                 <th className="px-3 py-2 text-center">Attendance</th>
+                <th className="px-3 py-2 text-center">NCF Questions</th>
               </tr>
             </thead>
             <tbody>
               {interviews.map((iv: any) => (
+                <>
                 <tr key={iv.id} className="border-b border-gray-100">
                   <td className="px-3 py-2 font-medium text-gray-800">{iv.applicant?.name || "—"}</td>
                   <td className="px-3 py-2">{fmtDate(iv.interview_date)} {iv.slot_time}</td>
@@ -548,7 +569,27 @@ function InterviewsTab() {
                       </span>
                     )}
                   </td>
+                  <td className="px-3 py-2 text-center">
+                    <button onClick={() => genQuestions(iv.applicant_id)} disabled={loadingQuestions === iv.applicant_id}
+                      className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50">
+                      {loadingQuestions === iv.applicant_id ? "Generating..." : questionsMap[iv.applicant_id] ? "🔄 Regenerate" : "🤖 Generate"}
+                    </button>
+                  </td>
                 </tr>
+                {questionsMap[iv.applicant_id] && (
+                  <tr className="border-b border-gray-100 bg-purple-50">
+                    <td colSpan={6} className="px-4 py-3">
+                      {questionsMap[iv.applicant_id].length === 0 ? (
+                        <p className="text-gray-400">No questions generated — check the Groq API key is configured.</p>
+                      ) : (
+                        <ol className="list-decimal list-inside space-y-1 text-gray-700">
+                          {questionsMap[iv.applicant_id].map((q, i) => <li key={i}>{q}</li>)}
+                        </ol>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </>
               ))}
             </tbody>
           </table>
@@ -682,6 +723,7 @@ function SelectionTab() {
   const [message, setMessage] = useState("");
   const [emailPrompt, setEmailPrompt] = useState<{ id: string; email: string } | null>(null);
   const [deciding, setDeciding] = useState<string | null>(null);
+  const [letter, setLetter] = useState<{ name: string; dataUri: string } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -707,6 +749,12 @@ function SelectionTab() {
       } else {
         setMessage(`✅ Marked ${result}`);
       }
+      if (result === "selected" && r.data?.applicant_id) {
+        try {
+          const a = await axios.get(`${API}/hr/applicants/${r.data.applicant_id}`);
+          if (a.data?.appointment_letter) setLetter({ name: a.data.name || "Candidate", dataUri: a.data.appointment_letter });
+        } catch {}
+      }
       setEmailPrompt(null);
       load();
     } catch (e: any) {
@@ -723,7 +771,15 @@ function SelectionTab() {
   return (
     <div>
       {message && (
-        <div className="mb-4 px-4 py-2 rounded text-sm border bg-green-50 border-green-300 text-green-800">{message}</div>
+        <div className="mb-4 px-4 py-2 rounded text-sm border bg-green-50 border-green-300 text-green-800 flex items-center justify-between flex-wrap gap-2">
+          <span>{message}</span>
+          {letter && (
+            <a href={letter.dataUri} download={`${letter.name.replace(/\s+/g, "_")}_Appointment_Letter.pdf`}
+              className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 font-semibold whitespace-nowrap">
+              ⬇ Download Appointment Letter
+            </a>
+          )}
+        </div>
       )}
 
       {emailPrompt && (
