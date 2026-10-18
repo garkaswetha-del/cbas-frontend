@@ -227,9 +227,20 @@ function StudentsTab({ academicYear, stageInfo }: { academicYear: string; stageI
   const [examType, setExamType] = useState('');
   const [pasaData, setPasaData] = useState<any[]>([]);
   const [blData, setBlData]   = useState<any[]>([]);
+  const [goalRows, setGoalRows] = useState<any[]>([]);
 
   useEffect(() => { loadPASA(); }, [academicYear, examType]);
   useEffect(() => { loadBaseline(); }, [academicYear, round]);
+  useEffect(() => { loadGoals(); }, [academicYear, stageInfo.grades.join(',')]);
+
+  const loadGoals = async () => {
+    try {
+      const r = await axios.get(`${API}/grade-subject-goals/summary`, {
+        params: { academic_year: academicYear, grades: stageInfo.grades.join(',') },
+      });
+      setGoalRows(r.data || []);
+    } catch { setGoalRows([]); }
+  };
 
   const loadPASA = async () => {
     try {
@@ -379,6 +390,56 @@ function StudentsTab({ academicYear, stageInfo }: { academicYear: string; stageI
           <div className="bg-white rounded-xl shadow p-6 text-center text-gray-400 text-sm">
             No baseline data for {stageInfo.stage} stage in {academicYear} — {round.replace('_', ' ')}.
           </div>
+        )}
+      </div>
+
+      {/* Prior Year Marks + Goals section */}
+      <div>
+        <h2 className="text-sm font-bold text-gray-700 mb-4">🎯 Goals &amp; Prior Year Benchmark</h2>
+        {goalRows.length === 0 ? (
+          <div className="bg-white rounded-xl shadow p-6 text-center text-gray-400 text-sm">
+            No subjects configured for {stageInfo.stage} stage yet — add them under Grade &amp; Subject Mapping.
+          </div>
+        ) : (
+          Object.entries(
+            goalRows.reduce((acc: Record<string, any[]>, r: any) => {
+              if (!acc[r.grade]) acc[r.grade] = [];
+              acc[r.grade].push(r);
+              return acc;
+            }, {})
+          ).map(([grade, rows]: [string, any[]]) => (
+            <div key={grade} className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden mb-3">
+              <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                <h3 className="text-sm font-bold text-gray-700">{grade}</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-gray-600 border-b border-gray-100">
+                      <th className="px-4 py-2 text-left">Subject</th>
+                      <th className="px-4 py-2 text-right">Last year ({rows[0]?.previous_grade || '—'})</th>
+                      <th className="px-4 py-2 text-right">This year's goal</th>
+                      <th className="px-4 py-2 text-left">Set by</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r, i) => (
+                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-4 py-2 font-medium text-gray-800">{r.subject}</td>
+                        <td className="px-4 py-2 text-right">
+                          {r.achieved_percentage !== null ? `${r.achieved_percentage}%` : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          {r.this_year_goal !== null ? <span className="font-semibold text-indigo-700">{r.this_year_goal}%</span> : <span className="text-gray-300">Not set</span>}
+                        </td>
+                        <td className="px-4 py-2 text-gray-500">{r.set_by || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))
         )}
       </div>
     </div>

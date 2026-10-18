@@ -21,7 +21,6 @@ import AuditLogPage from "./pages/AuditLogPage";
 import SubstitutionPage from "./pages/SubstitutionPage";
 import AcademicCalendarPage from "./pages/AcademicCalendarPage";
 import SOWPage from "./pages/SOWPage";
-import LPTabsPage from "./pages/LPTabsPage";
 import AHMStageOverviewPage from "./pages/AHMStageOverviewPage";
 import PriorMarksUploadPage from "./pages/PriorMarksUploadPage";
 import GoalTrackerPage from "./pages/GoalTrackerPage";
@@ -49,7 +48,6 @@ const SELF_TABS = [
   { id: 'memos',         label: 'Memos',              show: true },
   { id: 'calendar',     label: 'Academic Calendar',  show: true },
   { id: 'sow',            label: 'Scheme of Work',     show: true },
-  { id: 'lp',             label: 'LP',                 show: true },
 ];
 
 const SELF_TAB_IDS = new Set(SELF_TABS.map(t => t.id));
@@ -63,7 +61,6 @@ const AHM_TOOL_TABS = [
   { id: 'ahm_substitution', label: 'Substitution' },
   { id: 'ahm_calendar',     label: 'Academic Calendar' },
   { id: 'ahm_sow',          label: 'Scheme of Work' },
-  { id: 'ahm_lp',           label: 'LP' },
   { id: 'ahm_prior_marks',  label: 'Prior Year Marks' },
   { id: 'ahm_goal_tracker', label: 'Goal Tracker' },
 ];
@@ -304,12 +301,11 @@ function AHMLayout({ user, onLogout }: { user: any; onLogout: () => void }) {
     if (activeTab === 'ahm_baseline')     return <BaselinePage allowedGrades={allowedGrades} />;
     if (activeTab === 'ahm_pasa')         return <PASAPage allowedGrades={allowedGrades} />;
     if (activeTab === 'ahm_competencies') return <CompetencyManagementPage />;
-    if (activeTab === 'ahm_observation')  return <ClassObservationPage />;
+    if (activeTab === 'ahm_observation')  return <ClassObservationPage allowedGrades={allowedGrades} />;
     if (activeTab === 'ahm_substitution') return <SubstitutionPage />;
     if (activeTab === 'ahm_calendar')     return <AcademicCalendarPage />;
-    if (activeTab === 'ahm_sow')           return <SOWPage user={user} />;
-    if (activeTab === 'ahm_lp') return <LPTabsPage user={user} mappings={mappings} academicYear={academicYear} role="ahm" />;
-    if (activeTab === 'ahm_prior_marks') return <PriorMarksUploadPage />;
+    if (activeTab === 'ahm_sow')           return <SOWPage user={user} allowedGrades={allowedGrades} />;
+    if (activeTab === 'ahm_prior_marks') return <PriorMarksUploadPage allowedGrades={allowedGrades} />;
     if (activeTab === 'ahm_goal_tracker') return (
       <GoalTrackerPage
         restrictToGrades={stageInfo?.grades}
@@ -582,7 +578,6 @@ function App() {
           <Route path="substitution" element={<SubstitutionPage />} />
           <Route path="calendar" element={<AcademicCalendarPage />} />
           <Route path="sow" element={<SOWPage user={user} />} />
-          <Route path="lp" element={<LPTabsPage user={user} mappings={null} academicYear={currentAcademicYear()} role="admin" />} />
           <Route path="prior-marks" element={<PriorMarksUploadPage />} />
           <Route path="goal-tracker" element={<GoalTrackerPage />} />
           <Route path="hr" element={<HRPage />} />

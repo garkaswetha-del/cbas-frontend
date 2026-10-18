@@ -93,7 +93,7 @@ const emptyRow = (name: string) => ({
 });
 
 
-export default function ClassObservationPage() {
+export default function ClassObservationPage({ allowedGrades }: { allowedGrades?: string[] } = {}) {
   const [activeTab, setActiveTab] = useState<"table" | "dashboard">("table");
   const [academicYear, setAcademicYear] = useState(currentAcademicYear);
   const [showCriteriaRef, setShowCriteriaRef] = useState(true);
@@ -158,9 +158,10 @@ export default function ClassObservationPage() {
       });
       const observedNames: string[] = (dRes.data?.teachers || []).map((t: any) => t.teacher_name);
       const extra = observedNames.filter((n: string) => !names.includes(n));
+      const inScope = (n: string) => !allowedGrades?.length || (gradesMap[n] || []).some(g => allowedGrades.includes(g));
       setTeacherEmails(emailMap);
       setTeacherIds(idMap);
-      setAllTeachers([...names, ...extra]);
+      setAllTeachers([...names, ...extra].filter(inScope));
       setDashboard(dRes.data);
       setTeacherStageMap(stageMap);
       setTeacherSubjects(subjectMap);
@@ -613,7 +614,7 @@ export default function ClassObservationPage() {
                           <select value={row.grade_observed}
                             onChange={e => updateRow(name, "grade_observed", e.target.value)}
                             className="border border-gray-300 rounded px-1 py-1 text-xs w-full">
-                            {(teacherGrades[name]?.length > 0 ? teacherGrades[name] : CLASSES).map(c => <option key={c} value={c}>{c}</option>)}
+                            {(teacherGrades[name]?.length > 0 ? teacherGrades[name] : CLASSES).filter(c => !allowedGrades?.length || allowedGrades.includes(c)).map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                         </td>
                         <td className={`px-1 py-1.5 ${bg}`}>

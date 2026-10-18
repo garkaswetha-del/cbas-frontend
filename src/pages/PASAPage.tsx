@@ -25,7 +25,7 @@ function KPICard({ label, value, color }: any) {
 }
 
 export default function PASAPage({ allowedGrades }: { allowedGrades?: string[] } = {}) {
-  const [activeTab, setActiveTab] = useState<"entry" | "dashboard" | "clear">("entry");
+  const [activeTab, setActiveTab] = useState<"entry" | "bulk" | "dashboard" | "clear">("entry");
   const [academicYear, setAcademicYear] = useState(currentAcademicYear);
   return (
     <div className="p-3 sm:p-6">
@@ -40,7 +40,8 @@ export default function PASAPage({ allowedGrades }: { allowedGrades?: string[] }
         </div>
       </div>
       <div className="flex gap-2 mb-5 overflow-x-auto pb-1 flex-nowrap">
-        {[{id:"entry",label:"✏️ Marks Entry"},{id:"dashboard",label:"📊 Dashboard"},{id:"clear",label:"🗑️ Clear Data"}].map(t => (
+        {[{id:"entry",label:"✏️ Marks Entry"},{id:"bulk",label:"📥 Bulk Import"},{id:"dashboard",label:"📊 Dashboard"},
+          ...(allowedGrades?.length ? [] : [{id:"clear",label:"🗑️ Clear Data"}])].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id as any)}
             className={`px-4 py-2 text-sm rounded-lg font-medium whitespace-nowrap ${activeTab === t.id ? "bg-indigo-600 text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50"}`}>
             {t.label}
@@ -48,8 +49,9 @@ export default function PASAPage({ allowedGrades }: { allowedGrades?: string[] }
         ))}
       </div>
       {activeTab === "entry" && <MarksSheetTab academicYear={academicYear} allowedGrades={allowedGrades} />}
+      {activeTab === "bulk" && <BulkImportTab academicYear={academicYear} allowedGrades={allowedGrades} />}
       {activeTab === "dashboard" && <PASADashboardTab academicYear={academicYear} allowedGrades={allowedGrades} />}
-      {activeTab === "clear" && <ClearDataTab />}
+      {activeTab === "clear" && !allowedGrades?.length && <ClearDataTab />}
     </div>
   );
 }
@@ -335,6 +337,255 @@ function MarksSheetTab({ academicYear, allowedGrades }: any) {
           </div>
           <button onClick={saveSheet} disabled={saving} className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
             {saving?"Saving...":"💾 Save Sheet"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const SUBJECT_SYNONYMS: Record<string,string> = { mathematics: "math", maths: "math" };
+function subjectHeaderMatches(header: string, subject: string): boolean {
+  const h = header.trim().toLowerCase();
+  const s = subject.trim().toLowerCase();
+  if (h === s) return true;
+  if (SUBJECT_SYNONYMS[h] === s) return true;
+  return false;
+}
+const normName = (v: any) => (v ?? "").toString().trim().toLowerCase();
+
+interface BulkSheetPreview {
+  sheetName: string;
+  grade: string;
+  section: string;
+  subjects: string[];
+  unmatchedSubjectHeaders: string[];
+  matchedRows: { student: any; cellsBySubject: Record<string, any> }[];
+  unmatchedNames: string[];
+}
+
+function BulkImportTab({ academicYear, allowedGrades }: any) {
+  const [examType, setExamType] = useState("FA1");
+  const [parsing, setParsing] = useState(false);
+  const [preview, setPreview] = useState<{ sheets: BulkSheetPreview[]; unrecognized: string[] } | null>(null);
+  const [maxMarksGrid, setMaxMarksGrid] = useState<Record<string,string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveLog, setSaveLog] = useState<string[]>([]);
+  const [msg, setMsg] = useState("");
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setParsing(true); setMsg(""); setPreview(null); setSaveLog([]); setMaxMarksGrid({});
+    try {
+      const XLSX = await import("xlsx");
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer);
+      const gradeSubjectsRes = await axios.get(`${API}/grade-subjects`);
+      const gradeSubjects: Record<string,string[]> = gradeSubjectsRes.data || {};
+
+      const sheets: BulkSheetPreview[] = [];
+      const unrecognized: string[] = [];
+      const sectionsCache: Record<string,string[]> = {};
+
+      for (const sheetName of wb.SheetNames) {
+        const gm = sheetName.match(/^g(?:rade)?\s*(\d+)/i);
+        if (!gm) { unrecognized.push(sheetName); continue; }
+        const grade = `Grade ${gm[1]}`;
+        if (allowedGrades?.length && !allowedGrades.includes(grade)) { unrecognized.push(`${sheetName} (${grade} is outside your stage)`); continue; }
+
+        if (!sectionsCache[grade]) {
+          try { const r = await axios.get(`${API}/students/sections/${encodeURIComponent(grade)}`); sectionsCache[grade] = r.data?.sections || []; }
+          catch { sectionsCache[grade] = []; }
+        }
+        const upperSheet = sheetName.toUpperCase();
+        const section = sectionsCache[grade].find(s => upperSheet.includes(s.toUpperCase()));
+        if (!section) { unrecognized.push(`${sheetName} (grade detected, no matching section name)`); continue; }
+
+        const ws = wb.Sheets[sheetName];
+        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
+        let headerRowIdx = -1;
+        for (let i = 0; i < Math.min(3, rows.length); i++) {
+          if (rows[i]?.some((c:any) => typeof c === "string" && /name/i.test(c))) { headerRowIdx = i; break; }
+        }
+        if (headerRowIdx === -1) { unrecognized.push(`${sheetName} (no header row with a Name column found)`); continue; }
+        const header = rows[headerRowIdx].map((h:any) => (h ?? "").toString().trim());
+        const nameColIdx = header.findIndex(h => /name/i.test(h));
+        const gradeSubs = gradeSubjects[grade] || [];
+        const subjectCols: { idx: number; subject: string }[] = [];
+        const unmatchedSubjectHeaders: string[] = [];
+        header.forEach((h, idx) => {
+          if (idx === nameColIdx || !h) return;
+          if (/grand percentage/i.test(h) || /roll/i.test(h)) return;
+          const match = gradeSubs.find(s => subjectHeaderMatches(h, s));
+          if (match) subjectCols.push({ idx, subject: match });
+          else unmatchedSubjectHeaders.push(h);
+        });
+
+        let students: any[] = [];
+        try {
+          const r = await axios.get(`${API}/students?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}&academic_year=${academicYear}`);
+          students = r.data || [];
+        } catch {}
+        const byName: Record<string, any> = {};
+        students.forEach(s => { byName[normName(s.name)] = s; });
+
+        const matchedRows: { student: any; cellsBySubject: Record<string, any> }[] = [];
+        const unmatchedNames: string[] = [];
+        for (let r = headerRowIdx + 1; r < rows.length; r++) {
+          const row = rows[r];
+          if (typeof row?.[0] !== "number") break; // Roll No stops being numeric -> end of real roster
+          const name = row[nameColIdx];
+          if (!name) continue;
+          const stu = byName[normName(name)];
+          const cellsBySubject: Record<string, any> = {};
+          subjectCols.forEach(({ idx, subject }) => { cellsBySubject[subject] = row[idx]; });
+          if (stu) matchedRows.push({ student: stu, cellsBySubject });
+          else unmatchedNames.push(name.toString());
+        }
+
+        sheets.push({ sheetName, grade, section, subjects: subjectCols.map(s => s.subject), unmatchedSubjectHeaders, matchedRows, unmatchedNames });
+      }
+
+      setPreview({ sheets, unrecognized });
+    } catch { setMsg("❌ Couldn't parse that file — is it a valid .xlsx/.xls?"); }
+    setParsing(false); e.target.value = "";
+  };
+
+  const allPairs = (): string[] => {
+    const set = new Set<string>();
+    preview?.sheets.forEach(s => s.subjects.forEach(sub => set.add(`${s.grade}__${sub}`)));
+    return [...set].sort();
+  };
+  const canConfirm = !!preview && preview.sheets.length > 0 && allPairs().every(k => +(maxMarksGrid[k] || 0) > 0);
+
+  const confirmSave = async () => {
+    if (!preview) return;
+    setSaving(true);
+    const log: string[] = [];
+    const { teacher_id, teacher_name } = currentStaffIdentity();
+    for (const sheet of preview.sheets) {
+      for (const subject of sheet.subjects) {
+        const key = `${sheet.grade}__${subject}`;
+        const mm = +(maxMarksGrid[key] || 0);
+        if (!mm) continue;
+        try {
+          const competencies = [{ competency_id: "TOTAL", competency_code: subject, competency_name: subject, max_marks: mm }];
+          const cfgRes = await axios.post(`${API}/pasa/config`, {
+            teacher_id, teacher_name, subject, grade: sheet.grade, section: sheet.section,
+            exam_type: examType, academic_year: academicYear, competencies,
+          });
+          const configId = cfgRes.data?.config_id;
+          if (!configId) { log.push(`❌ ${sheet.sheetName} / ${subject}: no config id returned`); continue; }
+          const entries = sheet.matchedRows.map(({ student, cellsBySubject }) => {
+            const cell = cellsBySubject[subject];
+            const isAbsent = typeof cell === "string" && cell.trim().toLowerCase().startsWith("ab");
+            const n = (cell === "" || cell === null || cell === undefined || isAbsent) ? null : Math.min(Number(cell), mm);
+            return {
+              student_id: student.id, student_name: student.name, is_absent: isAbsent,
+              competency_scores: [{ competency_id: "TOTAL", competency_code: subject, competency_name: subject,
+                marks_obtained: isAbsent ? null : (n !== null && !isNaN(n) ? n : null), max_marks: mm }],
+            };
+          });
+          await axios.post(`${API}/pasa/marks`, {
+            exam_config_id: configId, grade: sheet.grade, section: sheet.section,
+            subject, exam_type: examType, academic_year: academicYear, teacher_id, entries,
+          });
+          log.push(`✅ ${sheet.sheetName} / ${subject}: ${entries.length} students saved`);
+        } catch (e:any) {
+          log.push(`❌ ${sheet.sheetName} / ${subject}: ${e?.response?.data?.message || "save failed"}`);
+        }
+      }
+    }
+    setSaveLog(log);
+    setSaving(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl shadow p-4 space-y-3">
+        <p className="text-sm text-gray-600">
+          Upload one workbook covering as many grades as you like — one sheet per section, named like your real
+          marks-analysis file (e.g. "G9 MERU"). The section name in the sheet must match a section currently
+          registered for that grade, and each subject column header must match a name in that grade's Subjects
+          module (e.g. "Mathematics" auto-matches "Math", but a renamed subject like "IT" → "CT & AI" won't —
+          you'll see it flagged below if a column gets skipped). Sheets or columns that don't match are skipped, not guessed.
+          {allowedGrades?.length ? ` Only sheets for your stage (${allowedGrades.join(", ")}) will be processed — others are skipped.` : ""}
+        </p>
+        <div className="flex gap-3 flex-wrap items-end">
+          <div><label className="text-xs text-gray-500 block mb-1">Exam Type</label>
+            <select value={examType} onChange={e=>setExamType(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+              {EXAM_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+          <div><label className="text-xs text-gray-500 block mb-1">Workbook (.xlsx/.xls)</label>
+            <input type="file" accept=".xlsx,.xls" onChange={handleFile} disabled={parsing} className="text-sm" /></div>
+          {parsing && <span className="text-xs text-indigo-500 animate-pulse">Parsing and matching rosters...</span>}
+        </div>
+      </div>
+
+      {msg && <div className="px-4 py-2 rounded text-sm border bg-red-50 border-red-300 text-red-800">{msg}</div>}
+
+      {preview && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl shadow p-4">
+            <h3 className="text-sm font-bold text-gray-700 mb-3">Detected Sheets ({preview.sheets.length})</h3>
+            <div className="space-y-2">
+              {preview.sheets.map(s => (
+                <div key={s.sheetName} className="text-xs border border-gray-200 rounded-lg p-2">
+                  <span className="font-medium text-gray-800">{s.sheetName}</span>
+                  <span className="text-gray-500"> → {s.grade} · {s.section} · {s.subjects.join(", ") || "no matching subjects"}</span>
+                  <span className={`ml-2 ${s.unmatchedNames.length ? "text-amber-600" : "text-green-600"}`}>
+                    {s.matchedRows.length} matched{s.unmatchedNames.length ? `, ${s.unmatchedNames.length} unmatched` : ""}
+                  </span>
+                  {s.unmatchedNames.length > 0 && (
+                    <p className="text-gray-400 mt-1">Unmatched students: {s.unmatchedNames.join(", ")}</p>
+                  )}
+                  {s.unmatchedSubjectHeaders.length > 0 && (
+                    <p className="text-amber-600 mt-1">⚠ Column(s) not found in {s.grade}'s Subjects list, skipped: {s.unmatchedSubjectHeaders.join(", ")}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+            {preview.unrecognized.length > 0 && (
+              <div className="mt-3 text-xs text-amber-600">
+                <p className="font-medium">Skipped sheets:</p>
+                <p>{preview.unrecognized.join(" · ")}</p>
+              </div>
+            )}
+          </div>
+
+          {allPairs().length > 0 && (
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="text-sm font-bold text-gray-700 mb-1">Set Max Marks</h3>
+              <p className="text-xs text-gray-500 mb-3">Required for every grade/subject before saving — these raw marks will be scaled against whatever you set here.</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {allPairs().map(key => {
+                  const [grade, subject] = key.split("__");
+                  return (
+                    <div key={key}>
+                      <label className="text-xs text-gray-500 block mb-1">{grade} · {subject}</label>
+                      <input type="number" min={1} max={500} value={maxMarksGrid[key] || ""} placeholder="Max"
+                        onChange={e=>setMaxMarksGrid(p=>({...p,[key]:e.target.value}))}
+                        className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <button onClick={confirmSave} disabled={!canConfirm || saving}
+            className="px-6 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium">
+            {saving ? "Saving..." : "💾 Confirm & Save All"}
+          </button>
+          {!canConfirm && allPairs().length > 0 && <p className="text-xs text-red-500">Fill in Max Marks for every grade/subject above first.</p>}
+
+          {saveLog.length > 0 && (
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="text-sm font-bold text-gray-700 mb-2">Result</h3>
+              <div className="space-y-1 text-xs max-h-80 overflow-y-auto">
+                {saveLog.map((l, i) => <p key={i} className={l.startsWith("✅") ? "text-green-700" : "text-red-600"}>{l}</p>)}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

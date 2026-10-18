@@ -554,8 +554,8 @@ export function TeacherSOW({ user, mappings, academicYear }: { user: any; mappin
 
 // ── Admin Curriculum Setup tab ────────────────────────────────────────────────
 
-function CurriculumSetupTab({ academicYear }: { academicYear: string }) {
-  const [grade, setGrade] = useState("Grade 1");
+function CurriculumSetupTab({ academicYear, allowedGrades }: { academicYear: string; allowedGrades?: string[] }) {
+  const [grade, setGrade] = useState(allowedGrades?.length ? allowedGrades[0] : "Grade 1");
   const [subject, setSubject] = useState("Mathematics");
   const [curriculum, setCurriculum] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -644,7 +644,7 @@ function CurriculumSetupTab({ academicYear }: { academicYear: string }) {
           <label className="block text-xs text-gray-500 mb-1">Grade</label>
           <select value={grade} onChange={e => setGrade(e.target.value)}
             className="border border-gray-300 rounded px-3 py-1.5 text-sm">
-            {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+            {GRADES.filter(g => !allowedGrades?.length || allowedGrades.includes(g)).map(g => <option key={g} value={g}>{g}</option>)}
           </select>
         </div>
         <div>
@@ -1039,7 +1039,7 @@ function TeacherPlansTab({ academicYear, user }: { academicYear: string; user: a
 
 // ── Default export: Admin / AHM page ─────────────────────────────────────────
 
-export default function SOWPage({ user }: { user?: any }) {
+export default function SOWPage({ user, allowedGrades }: { user?: any; allowedGrades?: string[] }) {
   const [academicYear, setAcademicYear] = useState(currentAcademicYear());
   const [tab, setTab] = useState<"curriculum" | "plans">("curriculum");
 
@@ -1059,7 +1059,7 @@ export default function SOWPage({ user }: { user?: any }) {
         ))}
       </div>
 
-      {tab === "curriculum" && <CurriculumSetupTab academicYear={academicYear} />}
+      {tab === "curriculum" && <CurriculumSetupTab academicYear={academicYear} allowedGrades={allowedGrades} />}
       {tab === "plans"      && <TeacherPlansTab academicYear={academicYear} user={user} />}
     </div>
   );

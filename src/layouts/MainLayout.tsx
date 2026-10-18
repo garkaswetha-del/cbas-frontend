@@ -18,7 +18,6 @@ const ADMINISTRATIVE_NAV = [
 const ACADEMIC_NAV = [
   { path: '/calendar',          label: 'Academic Calendar',   icon: '📅' },
   { path: '/sow',               label: 'Scheme of Work',      icon: '📋' },
-  { path: '/lp',                 label: 'LP',                  icon: '📖' },
   { path: '/baseline',     label: 'Baseline Entry',      icon: '📈' },
   { path: '/pasa',         label: 'PA/SA Marks',          icon: '📝' },
   { path: '/competencies', label: 'Competency Registry',  icon: '🗂️' },

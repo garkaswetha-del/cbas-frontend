@@ -29,7 +29,23 @@ function normalizeGradeLabel(raw: string): string {
 
 interface ParsedRow { grade: string; subject: string; average_percentage: number }
 
-export default function PriorMarksUploadPage() {
+const GRADE_ORDER = ['Nursery','Pre-KG','LKG','UKG','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10'];
+// Prior-year rows are stored under the grade BEFORE the one they benchmark (e.g. a "Grade 9" row
+// feeds this year's Grade 10 teachers) — so scoping to an AHM's stage must also include the one
+// grade just below their stage's lowest grade, or they could never upload the feeder data their
+// own stage's lowest grade needs.
+function expandWithFeederGrades(grades?: string[]): string[] | undefined {
+  if (!grades?.length) return undefined;
+  const set = new Set(grades);
+  grades.forEach(g => {
+    const idx = GRADE_ORDER.indexOf(g);
+    if (idx > 0) set.add(GRADE_ORDER[idx - 1]);
+  });
+  return [...set];
+}
+
+export default function PriorMarksUploadPage({ allowedGrades }: { allowedGrades?: string[] } = {}) {
+  const scopedGrades = expandWithFeederGrades(allowedGrades);
   const [academicYear, setAcademicYear] = useState(previousAcademicYear(currentAcademicYear()));
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [fileName, setFileName] = useState("");
@@ -54,7 +70,7 @@ export default function PriorMarksUploadPage() {
   }, []);
 
   const downloadTemplate = () => {
-    const grades = Object.keys(gradeSubjects);
+    const grades = Object.keys(gradeSubjects).filter(g => !scopedGrades?.length || scopedGrades.includes(g));
     const allSubjects = [...new Set(Object.values(gradeSubjects).flat())].sort();
     if (!grades.length || !allSubjects.length) return;
     const header = ["Grade", ...allSubjects];
@@ -85,6 +101,7 @@ export default function PriorMarksUploadPage() {
           const row = grid[i];
           const grade = normalizeGradeLabel(row[0]);
           if (!grade) continue;
+          if (scopedGrades?.length && !scopedGrades.includes(grade)) continue;
           for (let c = 0; c < subjectCols.length; c++) {
             const subject = subjectCols[c];
             if (!subject) continue;
@@ -135,6 +152,7 @@ export default function PriorMarksUploadPage() {
         <p className="text-sm text-gray-500">
           Upload each stage's final-exam averages (one file per stage: Name/Grade in the first column, one column per subject).
           Teachers automatically see the matching previous-grade number for whatever they teach this year.
+          {scopedGrades?.length ? ` You can only upload/view grades relevant to your stage: ${scopedGrades.join(", ")}.` : ""}
         </p>
       </div>
 
@@ -210,7 +228,7 @@ export default function PriorMarksUploadPage() {
         </div>
         {loadingExisting ? (
           <div className="p-6 text-center text-gray-400 text-sm">Loading…</div>
-        ) : existing.length === 0 ? (
+        ) : existing.filter((r: any) => !scopedGrades?.length || scopedGrades.includes(r.grade)).length === 0 ? (
           <div className="p-6 text-center text-gray-400 text-sm">Nothing uploaded for this year yet</div>
         ) : (
           <table className="w-full text-xs">
@@ -222,7 +240,7 @@ export default function PriorMarksUploadPage() {
               </tr>
             </thead>
             <tbody>
-              {existing.map((r: any) => (
+              {existing.filter((r: any) => !scopedGrades?.length || scopedGrades.includes(r.grade)).map((r: any) => (
                 <tr key={r.id} className="border-b border-gray-100">
                   <td className="px-4 py-2">{r.grade}</td>
                   <td className="px-4 py-2">{r.subject}</td>
