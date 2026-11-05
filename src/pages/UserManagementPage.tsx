@@ -647,6 +647,7 @@ export default function UserManagementPage() {
                     <option value="ahm">AHM</option>
                     <option value="admin">Admin</option>
                     <option value="principal">Principal</option>
+                    <option value="hr">HR</option>
                   </select>
                 </div>
                 <div>
@@ -942,6 +943,7 @@ export default function UserManagementPage() {
                                             <option value="ahm">AHM</option>
                                             <option value="admin">Admin</option>
                                             <option value="principal">Principal</option>
+                                            <option value="hr">HR</option>
                                           </select>
                                         </div>
                                         <div>
@@ -1346,6 +1348,7 @@ export default function UserManagementPage() {
                     <option value="ahm">AHM</option>
                     <option value="admin">Admin</option>
                     <option value="principal">Principal</option>
+                    <option value="hr">HR</option>
                   </select>
                 </div>
                 <div>

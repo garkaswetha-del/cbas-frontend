@@ -542,6 +542,25 @@ function App() {
     );
   }
 
+  // HR: a dedicated login that lands straight in the shared HR module (hiring for
+  // both campuses from here) — no sidebar, no access to anything else.
+  if (user.role === "hr") {
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <div className="bg-indigo-900 px-4 py-3 flex items-center justify-between">
+          <div>
+            <h1 className="text-white text-sm font-bold leading-tight">{getSchoolName()}</h1>
+            <p className="text-indigo-300 text-xs">HR</p>
+          </div>
+          <button onClick={handleLogout} className="text-indigo-200 hover:text-white text-xs px-3 py-1.5 border border-indigo-600 rounded-lg hover:bg-indigo-800">
+            🚪 Sign Out
+          </button>
+        </div>
+        <HRPage />
+      </div>
+    );
+  }
+
   // Office: user management, student management, calendar with full create/edit access
   if (user.role === "office") {
     return (

@@ -78,7 +78,7 @@ const EMPTY_FORM = {
   name: "", email: "", contact_no: "", address: "", locality: "",
   qualification: "", experience_years: "", experience_detail: "", skills: "",
   guardian_name: "", religion: "", caste: "",
-  previous_salary: "", expected_salary: "", subject_applied_for: "", school_stage: "", source_portal: "",
+  previous_salary: "", expected_salary: "", subject_applied_for: "", school_stage: "", branch: "", source_portal: "",
 };
 
 function ApplicationsTab() {
@@ -86,6 +86,8 @@ function ApplicationsTab() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("");
+  const [branchFilter, setBranchFilter] = useState("");
+  const [uploadBranch, setUploadBranch] = useState("Nanjangudu");
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState<any>(EMPTY_FORM);
   const [resumeFile, setResumeFile] = useState<string>("");
@@ -102,13 +104,13 @@ function ApplicationsTab() {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await axios.get(`${API}/hr/applicants`, { params: { search: search || undefined, stage: stageFilter || undefined } });
+      const r = await axios.get(`${API}/hr/applicants`, { params: { search: search || undefined, stage: stageFilter || undefined, branch: branchFilter || undefined } });
       setApplicants(r.data || []);
     } catch { setApplicants([]); }
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [search, stageFilter]);
+  useEffect(() => { load(); }, [search, stageFilter, branchFilter]);
 
   const handleResumeFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -178,6 +180,7 @@ function ApplicationsTab() {
     try {
       const formData = new FormData();
       Array.from(files).forEach(f => formData.append("files", f));
+      formData.append("branch", uploadBranch);
       const r = await axios.post(`${API}/hr/applicants/upload-resumes`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
@@ -203,6 +206,16 @@ function ApplicationsTab() {
         <select value={stageFilter} onChange={e => setStageFilter(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
           <option value="">All stages</option>
           {Object.entries(STAGE_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </select>
+        <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+          <option value="">All branches</option>
+          <option value="Nanjangudu">Nanjangudu</option>
+          <option value="KR Nagar">KR Nagar</option>
+        </select>
+        <select value={uploadBranch} onChange={e => setUploadBranch(e.target.value)} title="Branch these uploaded resumes belong to"
+          className="border border-indigo-300 rounded px-2 py-1.5 text-sm bg-indigo-50">
+          <option value="Nanjangudu">Upload as: Nanjangudu</option>
+          <option value="KR Nagar">Upload as: KR Nagar</option>
         </select>
         <button onClick={() => resumesRef.current?.click()} disabled={uploadingResumes} className="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
           {uploadingResumes ? "Reading resumes..." : "📄 Upload Resumes (PDF/Word)"}
@@ -252,6 +265,15 @@ function ApplicationsTab() {
                 {["Foundation", "Preparatory", "Middle", "Secondary"].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Branch Applying For *</label>
+              <select value={form.branch || ""} onChange={e => setForm((f: any) => ({ ...f, branch: e.target.value }))}
+                className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                <option value="">— Select —</option>
+                <option value="Nanjangudu">Nanjangudu</option>
+                <option value="KR Nagar">KR Nagar</option>
+              </select>
+            </div>
             <div className="col-span-2">
               <label className="text-xs text-gray-500 block mb-1">Address</label>
               <input value={form.address} onChange={e => setForm((f: any) => ({ ...f, address: e.target.value }))}
@@ -280,6 +302,7 @@ function ApplicationsTab() {
             <thead>
               <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
                 <th className="px-3 py-2 text-left">Name</th>
+                <th className="px-3 py-2 text-left">Branch</th>
                 <th className="px-3 py-2 text-left">Subject</th>
                 <th className="px-3 py-2 text-left">Qualification</th>
                 <th className="px-3 py-2 text-left">Experience</th>
@@ -293,6 +316,7 @@ function ApplicationsTab() {
                 <Fragment key={a.id}>
                   <tr className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>
                     <td className="px-3 py-2 font-medium text-gray-800">{a.name || "—"}</td>
+                    <td className="px-3 py-2">{a.branch || "—"}</td>
                     <td className="px-3 py-2">{a.subject_applied_for || "—"}</td>
                     <td className="px-3 py-2">{a.qualification || "—"}</td>
                     <td className="px-3 py-2">{a.experience_years ? `${a.experience_years} yrs` : "—"}</td>
@@ -306,7 +330,7 @@ function ApplicationsTab() {
                   </tr>
                   {expanded === a.id && (
                     <tr className="bg-indigo-50/40">
-                      <td colSpan={7} className="px-4 py-3">
+                      <td colSpan={8} className="px-4 py-3">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                           <div><span className="text-gray-400">Email:</span> {a.email || "—"}</div>
                           <div><span className="text-gray-400">Address:</span> {a.address || "—"}</div>
