@@ -4994,7 +4994,7 @@ Respond with ONLY a valid JSON object, no other text:
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY2}` },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "openai/gpt-oss-120b",
           max_tokens: 4000,
           temperature: 0.2,
           response_format: { type: "json_object" },
@@ -5072,7 +5072,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${domain} 
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY2}` },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }], max_tokens: 3000 }),
+        body: JSON.stringify({ model: "openai/gpt-oss-120b", messages: [{ role: "user", content: prompt }], max_tokens: 3000 }),
       });
       const d = await res.json();
       if (!res.ok) setGenMsg(`AI Error: ${d.error?.message || res.status}`);
@@ -5768,7 +5768,7 @@ Title: ${ppMode === "practice" ? "Practice" : "Assessment"} Paper — ${user?.na
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method:"POST",
         headers:{"Content-Type":"application/json","Authorization":`Bearer ${GROQ_KEY2}`},
-        body: JSON.stringify({ model:"llama-3.3-70b-versatile", messages:[{role:"user",content:prompt}], max_tokens:3000 }),
+        body: JSON.stringify({ model:"openai/gpt-oss-120b", messages:[{role:"user",content:prompt}], max_tokens:3000 }),
       });
       const d = await res.json();
       if (!res.ok) { setMsg(`❌ GROQ Error ${res.status}: ${d.error?.message||JSON.stringify(d)}`); }
@@ -6363,7 +6363,7 @@ function AIToolsTab({ user, mappings, academicYear }: any) {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
-      body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }], max_tokens: maxTokens, temperature: 0.7 }),
+      body: JSON.stringify({ model: "openai/gpt-oss-120b", messages: [{ role: "user", content: prompt }], max_tokens: maxTokens, temperature: 0.7 }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error?.message || `Groq API error ${res.status}`);
@@ -7485,7 +7485,7 @@ Format exactly:
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }], max_tokens: 1500, temperature: 0.5 }),
+        body: JSON.stringify({ model: "openai/gpt-oss-120b", messages: [{ role: "user", content: prompt }], max_tokens: 1500, temperature: 0.5 }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -7737,7 +7737,7 @@ FORMAT — repeat for every student (do not skip any):
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "openai/gpt-oss-120b",
           messages: [{ role: "user", content: prompt }],
           max_tokens: Math.min(600 + selectedStudents.length * numQuestions * 55, 6000),
           temperature: 0.7,

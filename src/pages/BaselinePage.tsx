@@ -2725,7 +2725,7 @@ ANSWER KEY:
       const res = await fetch(GROQ_API, {
         method:"POST",
         headers:{"Content-Type":"application/json","Authorization":`Bearer ${GROQ_KEY}`},
-        body: JSON.stringify({ model:"llama-3.3-70b-versatile", messages:[{role:"user",content:prompt}], max_tokens:3000 }),
+        body: JSON.stringify({ model:"openai/gpt-oss-120b", messages:[{role:"user",content:prompt}], max_tokens:3000 }),
       });
       const d = await res.json();
       setOutput(d.choices?.[0]?.message?.content || "No response");
@@ -2747,7 +2747,7 @@ ANSWER KEY:
         const res = await fetch(GROQ_API, {
           method:"POST",
           headers:{"Content-Type":"application/json","Authorization":`Bearer ${GROQ_KEY}`},
-          body: JSON.stringify({ model:"llama-3.3-70b-versatile", messages:[{role:"user",content:prompt}], max_tokens:2000 }),
+          body: JSON.stringify({ model:"openai/gpt-oss-120b", messages:[{role:"user",content:prompt}], max_tokens:2000 }),
         });
         const d = await res.json();
         const paper = d.choices?.[0]?.message?.content || "";
