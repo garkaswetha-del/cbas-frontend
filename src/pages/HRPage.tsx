@@ -111,21 +111,30 @@ function ApplicationsTab() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); setSelected(new Set()); }, [search, stageFilter, branchFilter]);
+  // Debounced so typing in the search box doesn't refetch (and flash the table) on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => load(), search ? 400 : 0);
+    return () => clearTimeout(t);
+  }, [search, stageFilter, branchFilter]);
+  useEffect(() => { setSelected(new Set()); }, [search, stageFilter, branchFilter]);
 
   const toggleShortlist = async (a: any) => {
+    const next = !a.is_shortlisted;
+    setApplicants(prev => prev.map(x => x.id === a.id ? { ...x, is_shortlisted: next, stage: next ? "shortlisted" : "applied" } : x));
     try {
-      await axios.patch(`${API}/hr/applicants/${a.id}/shortlist`, { is_shortlisted: !a.is_shortlisted });
-      load();
-    } catch { setMessage("❌ Error updating shortlist"); setTimeout(() => setMessage(""), 3000); }
+      await axios.patch(`${API}/hr/applicants/${a.id}/shortlist`, { is_shortlisted: next });
+    } catch {
+      setApplicants(prev => prev.map(x => x.id === a.id ? { ...x, is_shortlisted: a.is_shortlisted, stage: a.stage } : x));
+      setMessage("❌ Error updating shortlist"); setTimeout(() => setMessage(""), 3000);
+    }
   };
 
   const deleteApplicant = async (a: any) => {
     if (!confirm(`Delete ${a.name || "this applicant"}? This can't be undone.`)) return;
     try {
       await axios.delete(`${API}/hr/applicants/${a.id}`);
+      setApplicants(prev => prev.filter(x => x.id !== a.id));
       setMessage("✅ Applicant deleted");
-      load();
     } catch { setMessage("❌ Error deleting applicant"); }
     setTimeout(() => setMessage(""), 3000);
   };
@@ -145,11 +154,12 @@ function ApplicationsTab() {
   const deleteSelected = async () => {
     if (selected.size === 0) return;
     if (!confirm(`Delete ${selected.size} selected applicant(s)? This can't be undone.`)) return;
+    const ids = Array.from(selected);
     try {
-      await axios.post(`${API}/hr/applicants/bulk-delete`, { ids: Array.from(selected) });
-      setMessage(`✅ Deleted ${selected.size} applicant(s)`);
+      await axios.post(`${API}/hr/applicants/bulk-delete`, { ids });
+      setApplicants(prev => prev.filter(x => !selected.has(x.id)));
+      setMessage(`✅ Deleted ${ids.length} applicant(s)`);
       setSelected(new Set());
-      load();
     } catch { setMessage("❌ Error deleting applicants"); }
     setTimeout(() => setMessage(""), 3000);
   };
