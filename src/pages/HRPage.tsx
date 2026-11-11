@@ -112,6 +112,23 @@ function ApplicationsTab() {
 
   useEffect(() => { load(); }, [search, stageFilter, branchFilter]);
 
+  const toggleShortlist = async (a: any) => {
+    try {
+      await axios.patch(`${API}/hr/applicants/${a.id}/shortlist`, { is_shortlisted: !a.is_shortlisted });
+      load();
+    } catch { setMessage("❌ Error updating shortlist"); setTimeout(() => setMessage(""), 3000); }
+  };
+
+  const deleteApplicant = async (a: any) => {
+    if (!confirm(`Delete ${a.name || "this applicant"}? This can't be undone.`)) return;
+    try {
+      await axios.delete(`${API}/hr/applicants/${a.id}`);
+      setMessage("✅ Applicant deleted");
+      load();
+    } catch { setMessage("❌ Error deleting applicant"); }
+    setTimeout(() => setMessage(""), 3000);
+  };
+
   const handleResumeFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     setResumeFileName(file.name);
@@ -309,28 +326,36 @@ function ApplicationsTab() {
                 <th className="px-3 py-2 text-left">Locality</th>
                 <th className="px-3 py-2 text-left">Contact</th>
                 <th className="px-3 py-2 text-center">Stage</th>
+                <th className="px-3 py-2 text-center">Shortlist</th>
+                <th className="px-3 py-2 text-center">Delete</th>
               </tr>
             </thead>
             <tbody>
               {applicants.map(a => (
                 <Fragment key={a.id}>
-                  <tr className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>
-                    <td className="px-3 py-2 font-medium text-gray-800">{a.name || "—"}</td>
-                    <td className="px-3 py-2">{a.branch || "—"}</td>
-                    <td className="px-3 py-2">{a.subject_applied_for || "—"}</td>
-                    <td className="px-3 py-2">{a.qualification || "—"}</td>
-                    <td className="px-3 py-2">{a.experience_years ? `${a.experience_years} yrs` : "—"}</td>
-                    <td className="px-3 py-2">{a.locality || "—"}</td>
-                    <td className="px-3 py-2">{a.contact_no || a.email || "—"}</td>
-                    <td className="px-3 py-2 text-center">
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="px-3 py-2 font-medium text-gray-800 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.name || "—"}</td>
+                    <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.branch || "—"}</td>
+                    <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.subject_applied_for || "—"}</td>
+                    <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.qualification || "—"}</td>
+                    <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.experience_years ? `${a.experience_years} yrs` : "—"}</td>
+                    <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.locality || "—"}</td>
+                    <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.contact_no || a.email || "—"}</td>
+                    <td className="px-3 py-2 text-center cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>
                       <span className={`px-2 py-0.5 rounded-full font-medium ${STAGE_COLORS[a.stage] || "bg-gray-100 text-gray-500"}`}>
                         {STAGE_LABELS[a.stage] || a.stage}
                       </span>
                     </td>
+                    <td className="px-3 py-2 text-center">
+                      <input type="checkbox" checked={!!a.is_shortlisted} onChange={() => toggleShortlist(a)} className="w-4 h-4 accent-indigo-600" title="Shortlist this candidate" />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button onClick={() => deleteApplicant(a)} className="text-red-500 hover:text-red-700" title="Delete applicant">🗑</button>
+                    </td>
                   </tr>
                   {expanded === a.id && (
                     <tr className="bg-indigo-50/40">
-                      <td colSpan={8} className="px-4 py-3">
+                      <td colSpan={10} className="px-4 py-3">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                           <div><span className="text-gray-400">Email:</span> {a.email || "—"}</div>
                           <div><span className="text-gray-400">Address:</span> {a.address || "—"}</div>
@@ -342,7 +367,7 @@ function ApplicationsTab() {
                           <div><span className="text-gray-400">Expected Salary:</span> {fmtMoney(a.expected_salary)}</div>
                           <div><span className="text-gray-400">Source:</span> {a.source_portal || "—"}</div>
                           <div><span className="text-gray-400">Applied:</span> {fmtDate(a.created_at)}</div>
-                          {a.resume_file && <div><a href={a.resume_file} download={`${a.name || "resume"}`} className="text-indigo-600 underline">Resume</a></div>}
+                          {a.resume_file && <div><a href={a.resume_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline">View Resume</a></div>}
                         </div>
                       </td>
                     </tr>
