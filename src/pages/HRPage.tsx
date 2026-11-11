@@ -100,6 +100,7 @@ function ApplicationsTab() {
   const resumesRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
   const [uploadingResumes, setUploadingResumes] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = async () => {
     setLoading(true);
@@ -110,7 +111,7 @@ function ApplicationsTab() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [search, stageFilter, branchFilter]);
+  useEffect(() => { load(); setSelected(new Set()); }, [search, stageFilter, branchFilter]);
 
   const toggleShortlist = async (a: any) => {
     try {
@@ -126,6 +127,30 @@ function ApplicationsTab() {
       setMessage("✅ Applicant deleted");
       load();
     } catch { setMessage("❌ Error deleting applicant"); }
+    setTimeout(() => setMessage(""), 3000);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected(prev => prev.size === applicants.length ? new Set() : new Set(applicants.map(a => a.id)));
+  };
+
+  const deleteSelected = async () => {
+    if (selected.size === 0) return;
+    if (!confirm(`Delete ${selected.size} selected applicant(s)? This can't be undone.`)) return;
+    try {
+      await axios.post(`${API}/hr/applicants/bulk-delete`, { ids: Array.from(selected) });
+      setMessage(`✅ Deleted ${selected.size} applicant(s)`);
+      setSelected(new Set());
+      load();
+    } catch { setMessage("❌ Error deleting applicants"); }
     setTimeout(() => setMessage(""), 3000);
   };
 
@@ -251,6 +276,16 @@ function ApplicationsTab() {
         "Import Excel" is only for when you already have a spreadsheet of candidates typed out somewhere.
       </p>
 
+      {selected.size > 0 && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+          <span className="text-xs text-red-700 font-medium">{selected.size} selected</span>
+          <button onClick={deleteSelected} className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 font-semibold">
+            🗑 Delete Selected
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-xs text-gray-500 underline">Clear selection</button>
+        </div>
+      )}
+
       {message && (
         <div className={`mb-4 px-4 py-2 rounded text-sm border ${message.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>
           {message}
@@ -318,6 +353,9 @@ function ApplicationsTab() {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
+                <th className="px-3 py-2 text-center">
+                  <input type="checkbox" checked={applicants.length > 0 && selected.size === applicants.length} onChange={toggleSelectAll} className="w-4 h-4 accent-red-600" title="Select all" />
+                </th>
                 <th className="px-3 py-2 text-left">Name</th>
                 <th className="px-3 py-2 text-left">Branch</th>
                 <th className="px-3 py-2 text-left">Subject</th>
@@ -334,6 +372,9 @@ function ApplicationsTab() {
               {applicants.map(a => (
                 <Fragment key={a.id}>
                   <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="px-3 py-2 text-center">
+                      <input type="checkbox" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} className="w-4 h-4 accent-red-600" />
+                    </td>
                     <td className="px-3 py-2 font-medium text-gray-800 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.name || "—"}</td>
                     <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.branch || "—"}</td>
                     <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.subject_applied_for || "—"}</td>
@@ -355,7 +396,7 @@ function ApplicationsTab() {
                   </tr>
                   {expanded === a.id && (
                     <tr className="bg-indigo-50/40">
-                      <td colSpan={10} className="px-4 py-3">
+                      <td colSpan={11} className="px-4 py-3">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                           <div><span className="text-gray-400">Email:</span> {a.email || "—"}</div>
                           <div><span className="text-gray-400">Address:</span> {a.address || "—"}</div>
