@@ -26,12 +26,13 @@ const STAGE_COLORS: Record<string, string> = {
   selected: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700", hired: "bg-emerald-100 text-emerald-700",
 };
 
-type HiringSubTab = "applications" | "shortlist" | "interviews" | "scores" | "selection" | "induction";
+type HiringSubTab = "dashboard" | "applications" | "shortlist" | "interviews" | "scores" | "selection" | "induction";
 
 export default function HRPage() {
-  const [hiringSubTab, setHiringSubTab] = useState<HiringSubTab>("applications");
+  const [hiringSubTab, setHiringSubTab] = useState<HiringSubTab>("dashboard");
 
   const SUB_TABS: { id: HiringSubTab; label: string }[] = [
+    { id: "dashboard", label: "Dashboard" },
     { id: "applications", label: "Applications" },
     { id: "shortlist", label: "Shortlist" },
     { id: "interviews", label: "Interviews" },
@@ -61,12 +62,102 @@ export default function HRPage() {
         ))}
       </div>
 
+      {hiringSubTab === "dashboard" && <DashboardTab />}
       {hiringSubTab === "applications" && <ApplicationsTab />}
       {hiringSubTab === "shortlist" && <ShortlistTab />}
       {hiringSubTab === "interviews" && <InterviewsTab />}
       {hiringSubTab === "scores" && <ScoresTab />}
       {hiringSubTab === "selection" && <SelectionTab />}
       {hiringSubTab === "induction" && <InductionAdminTab />}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DASHBOARD
+// ─────────────────────────────────────────────────────────────────
+function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="bg-white rounded-xl shadow border border-gray-200 p-4 text-center">
+      <div className={`text-2xl font-bold ${color}`}>{value}</div>
+      <div className="text-xs text-gray-500 mt-1">{label}</div>
+    </div>
+  );
+}
+
+function BreakdownCard({ title, data }: { title: string; data: Record<string, number> }) {
+  const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
+  const max = entries.length ? Math.max(...entries.map(e => e[1])) : 1;
+  return (
+    <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
+      <h3 className="text-sm font-bold text-gray-700 mb-3">{title}</h3>
+      {entries.length === 0 ? (
+        <p className="text-xs text-gray-400">No data yet</p>
+      ) : (
+        <div className="space-y-2">
+          {entries.map(([key, count]) => (
+            <div key={key} className="flex items-center gap-2 text-xs">
+              <span className="w-28 shrink-0 truncate text-gray-600" title={key}>{key}</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                <div className="bg-indigo-500 h-3 rounded-full" style={{ width: `${(count / max) * 100}%` }} />
+              </div>
+              <span className="w-6 text-right font-semibold text-gray-700">{count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DashboardTab() {
+  const [summary, setSummary] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await axios.get(`${API}/hr/dashboard/summary`);
+      setSummary(r.data);
+    } catch { setSummary(null); }
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  if (loading) return <div className="p-8 text-center text-gray-400 text-sm">Loading…</div>;
+  if (!summary) return <div className="p-8 text-center text-gray-400 text-sm">Couldn't load dashboard data</div>;
+
+  const pipelineOrder = ["applied", "shortlisted", "interview_scheduled", "interviewed", "selected", "rejected", "hired"];
+  const pipelineData: Record<string, number> = {};
+  pipelineOrder.forEach(k => { pipelineData[STAGE_LABELS[k] || k] = summary.byPipelineStage[k] || 0; });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard label="Total Applicants" value={summary.totalApplicants} color="text-gray-800" />
+        <StatCard label="Shortlisted" value={summary.shortlisted} color="text-blue-600" />
+        <StatCard label="Interviews Scheduled" value={summary.interviews.total} color="text-yellow-600" />
+        <StatCard label="Interviewed" value={summary.interviews.attended} color="text-purple-600" />
+        <StatCard label="Selected" value={summary.selected} color="text-green-600" />
+        <StatCard label="Hired" value={summary.hired} color="text-emerald-600" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <BreakdownCard title="By Branch" data={summary.byBranch} />
+        <BreakdownCard title="By Subject Applied For" data={summary.bySubject} />
+        <BreakdownCard title="By School Stage (a candidate covering multiple stages counts in each)" data={summary.byStage} />
+        <BreakdownCard title="Pipeline Status" data={pipelineData} />
+      </div>
+
+      <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
+        <h3 className="text-sm font-bold text-gray-700 mb-3">Interviews</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard label="Total Scheduled" value={summary.interviews.total} color="text-gray-800" />
+          <StatCard label="Attended" value={summary.interviews.attended} color="text-green-600" />
+          <StatCard label="Absent" value={summary.interviews.absent} color="text-red-500" />
+          <StatCard label="Upcoming / Not Marked" value={summary.interviews.upcoming} color="text-yellow-600" />
+        </div>
+      </div>
     </div>
   );
 }
