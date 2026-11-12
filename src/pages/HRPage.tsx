@@ -451,7 +451,7 @@ function ApplicationsTab() {
       )}
 
       <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-        {loading ? (
+        {loading && applicants.length === 0 ? (
           <div className="p-8 text-center text-gray-400 text-sm">Loading…</div>
         ) : applicants.length === 0 ? (
           <div className="p-8 text-center text-gray-400 text-sm">No applicants yet</div>
@@ -807,7 +807,7 @@ function HiringProcessTab() {
       )}
 
       <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-        {loading ? (
+        {loading && applicants.length === 0 ? (
           <div className="p-8 text-center text-gray-400 text-sm">Loading…</div>
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-gray-400 text-sm">No shortlisted candidates match</div>
@@ -1139,7 +1139,7 @@ function InductionAdminTab() {
             <button onClick={addVideo} className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 font-semibold">Save</button>
           </div>
         )}
-        {loading ? <p className="text-xs text-gray-400">Loading…</p> : videos.length === 0 ? (
+        {loading && videos.length === 0 ? <p className="text-xs text-gray-400">Loading…</p> : videos.length === 0 ? (
           <p className="text-xs text-gray-400">No induction videos yet — new selects won't have anything assigned until you add some.</p>
         ) : (
           <ul className="text-xs space-y-1">
