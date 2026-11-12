@@ -102,6 +102,7 @@ function ApplicationsTab() {
   const [importing, setImporting] = useState(false);
   const [uploadingResumes, setUploadingResumes] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [viewingResume, setViewingResume] = useState<{ name: string; url: string } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -430,7 +431,13 @@ function ApplicationsTab() {
                           <div><span className="text-gray-400">Expected Salary:</span> {fmtMoney(a.expected_salary)}</div>
                           <div><span className="text-gray-400">Source:</span> {a.source_portal || "—"}</div>
                           <div><span className="text-gray-400">Applied:</span> {fmtDate(a.created_at)}</div>
-                          {a.resume_file && <div><a href={a.resume_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline">View Resume</a></div>}
+                          {a.resume_file && (
+                            <div>
+                              <button onClick={() => setViewingResume({ name: a.name || "Resume", url: a.resume_file })} className="text-indigo-600 underline">
+                                View Resume
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -441,6 +448,27 @@ function ApplicationsTab() {
           </table>
         )}
       </div>
+
+      {viewingResume && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setViewingResume(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-700">{viewingResume.name}'s Resume</h3>
+              <button onClick={() => setViewingResume(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none px-2">✕</button>
+            </div>
+            {viewingResume.url.startsWith("data:application/pdf") ? (
+              <iframe src={viewingResume.url} className="flex-1 w-full rounded-b-xl" title="Resume preview" />
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 text-sm text-gray-500">
+                <p>Word files can't be previewed in-browser — only PDF resumes support in-app viewing.</p>
+                <a href={viewingResume.url} download={viewingResume.name} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-xs font-medium">
+                  ⬇ Download instead
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
