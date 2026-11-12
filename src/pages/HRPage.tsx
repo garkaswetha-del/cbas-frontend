@@ -26,7 +26,7 @@ const STAGE_COLORS: Record<string, string> = {
   selected: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700", hired: "bg-emerald-100 text-emerald-700",
 };
 
-type HiringSubTab = "dashboard" | "applications" | "shortlist" | "interviews" | "scores" | "selection" | "induction";
+type HiringSubTab = "dashboard" | "applications" | "process" | "induction";
 
 export default function HRPage() {
   const [hiringSubTab, setHiringSubTab] = useState<HiringSubTab>("dashboard");
@@ -34,10 +34,7 @@ export default function HRPage() {
   const SUB_TABS: { id: HiringSubTab; label: string }[] = [
     { id: "dashboard", label: "Dashboard" },
     { id: "applications", label: "Applications" },
-    { id: "shortlist", label: "Shortlist" },
-    { id: "interviews", label: "Interviews" },
-    { id: "scores", label: "Scores" },
-    { id: "selection", label: "Selection" },
+    { id: "process", label: "Hiring Process" },
     { id: "induction", label: "Induction" },
   ];
 
@@ -45,7 +42,7 @@ export default function HRPage() {
     <div className="p-3 sm:p-6">
       <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-800">HR — Hiring</h1>
-        <p className="text-sm text-gray-500">Applications → Shortlist → Interview → Score → Select → Induction</p>
+        <p className="text-sm text-gray-500">Applications → Hiring Process (Shortlist → Schedule → Interview → Score → Select) → Induction</p>
       </div>
 
       <div className="flex gap-1 mb-4 border-b border-gray-200 overflow-x-auto">
@@ -64,10 +61,7 @@ export default function HRPage() {
 
       {hiringSubTab === "dashboard" && <DashboardTab />}
       {hiringSubTab === "applications" && <ApplicationsTab />}
-      {hiringSubTab === "shortlist" && <ShortlistTab />}
-      {hiringSubTab === "interviews" && <InterviewsTab />}
-      {hiringSubTab === "scores" && <ScoresTab />}
-      {hiringSubTab === "selection" && <SelectionTab />}
+      {hiringSubTab === "process" && <HiringProcessTab />}
       {hiringSubTab === "induction" && <InductionAdminTab />}
     </div>
   );
@@ -565,58 +559,101 @@ function ApplicationsTab() {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// SHORTLIST
+// HIRING PROCESS (merged: Shortlist -> Schedule -> Interview -> Score -> Select)
 // ─────────────────────────────────────────────────────────────────
-function ShortlistTab() {
+const PROCESS_STAGES = ["Foundation", "Preparatory", "Middle", "Secondary"];
+const STEP_LABELS: Record<string, string> = {
+  needs_scheduling: "Needs Scheduling",
+  awaiting_interview: "Awaiting Interview",
+  absent: "Absent",
+  needs_scoring: "Needs Scoring",
+  needs_decision: "Needs Decision",
+  hold: "On Hold",
+  selected: "Selected",
+  rejected: "Rejected",
+};
+const STEP_COLORS: Record<string, string> = {
+  needs_scheduling: "bg-gray-100 text-gray-600",
+  awaiting_interview: "bg-yellow-100 text-yellow-700",
+  absent: "bg-red-100 text-red-700",
+  needs_scoring: "bg-purple-100 text-purple-700",
+  needs_decision: "bg-blue-100 text-blue-700",
+  hold: "bg-orange-100 text-orange-700",
+  selected: "bg-green-100 text-green-700",
+  rejected: "bg-red-100 text-red-700",
+};
+function stepFor(iv: any): string {
+  if (!iv) return "needs_scheduling";
+  if (iv.result === "selected") return "selected";
+  if (iv.result === "rejected") return "rejected";
+  if (iv.result === "hold") return "hold";
+  if (iv.attended === false) return "absent";
+  if (iv.attended === null || iv.attended === undefined) return "awaiting_interview";
+  const hasScores = iv.written_marks != null || iv.oral_marks != null || iv.demo_marks != null;
+  return hasScores ? "needs_decision" : "needs_scoring";
+}
+
+function HiringProcessTab() {
   const [applicants, setApplicants] = useState<any[]>([]);
   const [interviews, setInterviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [onlyShortlisted, setOnlyShortlisted] = useState(true);
+  const [message, setMessage] = useState("");
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const [stepFilter, setStepFilter] = useState("");
   const [qualFilter, setQualFilter] = useState("");
   const [minExp, setMinExp] = useState("");
   const [localityFilter, setLocalityFilter] = useState("");
+
   const [schedForm, setSchedForm] = useState<Record<string, { date: string; time: string; interviewer: string }>>({});
   const [scheduling, setScheduling] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
+
+  const [questionsMap, setQuestionsMap] = useState<Record<string, { question: string; expected_answer: string }[]>>({});
+  const [loadingQuestions, setLoadingQuestions] = useState<string | null>(null);
+  const [overrides, setOverrides] = useState<Record<string, { subject: string; stage: string }>>({});
+
+  const [scoreEdits, setScoreEdits] = useState<Record<string, any>>({});
+  const [savingScores, setSavingScores] = useState<string | null>(null);
+
+  const [emailPrompt, setEmailPrompt] = useState<{ applicantId: string; email: string } | null>(null);
+  const [deciding, setDeciding] = useState<string | null>(null);
+  const [letter, setLetter] = useState<{ name: string; dataUri: string } | null>(null);
+
+  const stored = localStorage.getItem("cbas_user");
+  const currentUser = stored ? JSON.parse(stored) : null;
 
   const load = async () => {
     setLoading(true);
     try {
-      const [a, iv] = await Promise.all([
-        axios.get(`${API}/hr/applicants`),
+      const [apps, ivs] = await Promise.all([
+        axios.get(`${API}/hr/applicants`, { params: { shortlisted: "true" } }),
         axios.get(`${API}/hr/interviews`),
       ]);
-      setApplicants(a.data || []);
-      setInterviews(iv.data || []);
+      setApplicants(apps.data || []);
+      setInterviews(ivs.data || []);
     } catch { setApplicants([]); setInterviews([]); }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
 
-  const toggle = async (a: any) => {
-    try {
-      await axios.patch(`${API}/hr/applicants/${a.id}/shortlist`, { is_shortlisted: !a.is_shortlisted });
-      load();
-    } catch {}
-  };
-
   const interviewFor = (applicantId: string) => interviews.find((i: any) => i.applicant_id === applicantId);
 
-  const fieldFor = (a: any) => {
-    if (schedForm[a.id]) return schedForm[a.id];
-    const iv = interviewFor(a.id);
-    return { date: iv?.interview_date?.slice(0, 10) || "", time: iv?.slot_time || "", interviewer: iv?.interviewer_name || "" };
+  const rows = applicants.map(a => ({ applicant: a, interview: interviewFor(a.id) }));
+  const filtered = rows.filter(({ applicant: a, interview: iv }) => {
+    if (stepFilter && stepFor(iv) !== stepFilter) return false;
+    if (qualFilter && !(a.qualification || "").toLowerCase().includes(qualFilter.toLowerCase())) return false;
+    if (minExp && Number(a.experience_years || 0) < Number(minExp)) return false;
+    if (localityFilter && !(a.locality || "").toLowerCase().includes(localityFilter.toLowerCase())) return false;
+    return true;
+  });
+
+  // ---- scheduling ----
+  const fieldFor = (a: any, iv: any) => schedForm[a.id] || { date: iv?.interview_date?.slice(0, 10) || "", time: iv?.slot_time || "", interviewer: iv?.interviewer_name || "" };
+  const setField = (a: any, iv: any, key: "date" | "time" | "interviewer", value: string) => {
+    setSchedForm(prev => ({ ...prev, [a.id]: { ...fieldFor(a, iv), [key]: value } }));
   };
-
-  const setField = (a: any, key: "date" | "time" | "interviewer", value: string) => {
-    setSchedForm(prev => ({ ...prev, [a.id]: { ...fieldFor(a), [key]: value } }));
-  };
-
-  const stored = localStorage.getItem("cbas_user");
-  const currentUser = stored ? JSON.parse(stored) : null;
-
-  const scheduleFor = async (a: any) => {
-    const f = fieldFor(a);
+  const scheduleFor = async (a: any, iv: any) => {
+    const f = fieldFor(a, iv);
     if (!f.date) { setMessage("❌ Pick a date first"); setTimeout(() => setMessage(""), 3000); return; }
     setScheduling(a.id);
     try {
@@ -630,349 +667,45 @@ function ShortlistTab() {
     setTimeout(() => setMessage(""), 3000);
   };
 
-  const filtered = applicants.filter(a => {
-    if (onlyShortlisted && !a.is_shortlisted) return false;
-    if (qualFilter && !(a.qualification || "").toLowerCase().includes(qualFilter.toLowerCase())) return false;
-    if (minExp && Number(a.experience_years || 0) < Number(minExp)) return false;
-    if (localityFilter && !(a.locality || "").toLowerCase().includes(localityFilter.toLowerCase())) return false;
-    return true;
-  });
+  // ---- notify / attendance ----
+  const notify = async (iv: any) => { await axios.patch(`${API}/hr/interviews/${iv.id}/notified`); load(); };
+  const attendance = async (iv: any, attended: boolean) => { await axios.patch(`${API}/hr/interviews/${iv.id}/attendance`, { attended }); load(); };
 
-  return (
-    <div>
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <label className="flex items-center gap-1.5 text-sm text-gray-700">
-          <input type="checkbox" checked={onlyShortlisted} onChange={e => setOnlyShortlisted(e.target.checked)} className="accent-indigo-600" />
-          Shortlisted only
-        </label>
-        <input value={qualFilter} onChange={e => setQualFilter(e.target.value)} placeholder="Filter: qualification"
-          className="border border-gray-300 rounded px-2 py-1.5 text-xs" />
-        <input value={minExp} onChange={e => setMinExp(e.target.value)} placeholder="Min experience (yrs)" type="number"
-          className="border border-gray-300 rounded px-2 py-1.5 text-xs w-40" />
-        <input value={localityFilter} onChange={e => setLocalityFilter(e.target.value)} placeholder="Filter: locality"
-          className="border border-gray-300 rounded px-2 py-1.5 text-xs" />
-      </div>
-
-      {message && (
-        <div className={`mb-4 px-4 py-2 rounded text-sm border ${message.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>
-          {message}
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-gray-400 text-sm">Loading…</div>
-        ) : filtered.length === 0 ? (
-          <div className="p-8 text-center text-gray-400 text-sm">No candidates match</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
-                  <th className="px-3 py-2 text-center">Shortlist</th>
-                  <th className="px-3 py-2 text-left">Name</th>
-                  <th className="px-3 py-2 text-left">Subject</th>
-                  <th className="px-3 py-2 text-left">Qualification</th>
-                  <th className="px-3 py-2 text-left">Experience</th>
-                  <th className="px-3 py-2 text-left">Locality</th>
-                  <th className="px-3 py-2 text-left">Interview Date</th>
-                  <th className="px-3 py-2 text-left">Time</th>
-                  <th className="px-3 py-2 text-left">Interviewer</th>
-                  <th className="px-3 py-2 text-center">Schedule</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(a => {
-                  const iv = interviewFor(a.id);
-                  const f = fieldFor(a);
-                  return (
-                    <tr key={a.id} className="border-b border-gray-100">
-                      <td className="px-3 py-2 text-center">
-                        <input type="checkbox" checked={a.is_shortlisted} onChange={() => toggle(a)} className="w-4 h-4 accent-indigo-600" />
-                      </td>
-                      <td className="px-3 py-2 font-medium text-gray-800">{a.name || "—"}</td>
-                      <td className="px-3 py-2">{a.subject_applied_for || "—"}</td>
-                      <td className="px-3 py-2">{a.qualification || "—"}</td>
-                      <td className="px-3 py-2">{a.experience_years ? `${a.experience_years} yrs` : "—"}</td>
-                      <td className="px-3 py-2">{a.locality || "—"}</td>
-                      <td className="px-2 py-2">
-                        <input type="date" value={f.date} onChange={e => setField(a, "date", e.target.value)}
-                          className="border border-gray-300 rounded px-1.5 py-1 text-xs w-36" />
-                      </td>
-                      <td className="px-2 py-2">
-                        <input value={f.time} onChange={e => setField(a, "time", e.target.value)} placeholder="10:30 AM"
-                          className="border border-gray-300 rounded px-1.5 py-1 text-xs w-24" />
-                      </td>
-                      <td className="px-2 py-2">
-                        <input value={f.interviewer} onChange={e => setField(a, "interviewer", e.target.value)} placeholder="Interviewer"
-                          className="border border-gray-300 rounded px-1.5 py-1 text-xs w-28" />
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        <button onClick={() => scheduleFor(a)} disabled={scheduling === a.id}
-                          className="px-2.5 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 font-medium whitespace-nowrap">
-                          {scheduling === a.id ? "..." : iv ? "🔄 Reschedule" : "📅 Schedule"}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────
-// INTERVIEWS
-// ─────────────────────────────────────────────────────────────────
-function InterviewsTab() {
-  const [dateFilter, setDateFilter] = useState("");
-  const [interviews, setInterviews] = useState<any[]>([]);
-  const [counts, setCounts] = useState<any[]>([]);
-  const [shortlisted, setShortlisted] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [schedForm, setSchedForm] = useState({ applicant_id: "", interview_date: "", slot_time: "", interviewer_name: "" });
-  const [message, setMessage] = useState("");
-
-  const load = async () => {
-    setLoading(true);
+  // ---- NCF questions ----
+  const overrideFor = (a: any) => overrides[a.id] || {
+    subject: a.subject_applied_for || "",
+    stage: Array.isArray(a.school_stage) ? (a.school_stage.length === 1 ? a.school_stage[0] : "") : (a.school_stage || ""),
+  };
+  const setOverride = (a: any, key: "subject" | "stage", value: string) => {
+    setOverrides(prev => ({ ...prev, [a.id]: { ...overrideFor(a), [key]: value } }));
+  };
+  const genQuestions = async (a: any) => {
+    const ov = overrideFor(a);
+    setLoadingQuestions(a.id);
     try {
-      const [iv, cnt, apps] = await Promise.all([
-        axios.get(`${API}/hr/interviews`, { params: { date: dateFilter || undefined } }),
-        axios.get(`${API}/hr/interviews/counts-by-date`),
-        axios.get(`${API}/hr/applicants`, { params: { shortlisted: "true" } }),
-      ]);
-      setInterviews(iv.data || []);
-      setCounts(cnt.data || []);
-      setShortlisted(apps.data || []);
-    } catch { setInterviews([]); setCounts([]); setShortlisted([]); }
-    setLoading(false);
-  };
-  useEffect(() => { load(); }, [dateFilter]);
-
-  const stored = localStorage.getItem("cbas_user");
-  const currentUser = stored ? JSON.parse(stored) : null;
-
-  const schedule = async () => {
-    if (!schedForm.applicant_id || !schedForm.interview_date) { setMessage("❌ Pick a candidate and a date"); setTimeout(() => setMessage(""), 3000); return; }
-    try {
-      await axios.post(`${API}/hr/interviews/schedule`, { ...schedForm, scheduled_by: currentUser?.name });
-      setMessage("✅ Interview scheduled");
-      setSchedForm({ applicant_id: "", interview_date: "", slot_time: "", interviewer_name: "" });
-      load();
-    } catch { setMessage("❌ Error scheduling"); }
-    setTimeout(() => setMessage(""), 3000);
-  };
-
-  const notify = async (id: string) => { await axios.patch(`${API}/hr/interviews/${id}/notified`); load(); };
-  const attendance = async (id: string, attended: boolean) => { await axios.patch(`${API}/hr/interviews/${id}/attendance`, { attended }); load(); };
-
-  const [questionsMap, setQuestionsMap] = useState<Record<string, { question: string; expected_answer: string }[]>>({});
-  const [loadingQuestions, setLoadingQuestions] = useState<string | null>(null);
-  const STAGES = ["Foundation", "Preparatory", "Middle", "Secondary"];
-  const [overrides, setOverrides] = useState<Record<string, { subject: string; stage: string }>>({});
-  // If the applicant spans multiple stages (e.g. Middle + Secondary), the single-select below
-  // can't default to "both" — leave it blank so the interviewer picks which one to test.
-  const overrideFor = (iv: any) => overrides[iv.applicant_id] || {
-    subject: iv.applicant?.subject_applied_for || "",
-    stage: Array.isArray(iv.applicant?.school_stage) ? (iv.applicant.school_stage.length === 1 ? iv.applicant.school_stage[0] : "") : (iv.applicant?.school_stage || ""),
-  };
-  const setOverride = (iv: any, key: "subject" | "stage", value: string) => {
-    setOverrides(prev => ({ ...prev, [iv.applicant_id]: { ...overrideFor(iv), [key]: value } }));
-  };
-  const genQuestions = async (iv: any) => {
-    const applicantId = iv.applicant_id;
-    const ov = overrideFor(iv);
-    setLoadingQuestions(applicantId);
-    try {
-      const r = await axios.get(`${API}/hr/applicants/${applicantId}/interview-questions`, {
+      const r = await axios.get(`${API}/hr/applicants/${a.id}/interview-questions`, {
         params: { subject: ov.subject || undefined, stage: ov.stage || undefined },
       });
-      setQuestionsMap(p => ({ ...p, [applicantId]: r.data?.questions || [] }));
-    } catch { setQuestionsMap(p => ({ ...p, [applicantId]: [] })); }
+      setQuestionsMap(p => ({ ...p, [a.id]: r.data?.questions || [] }));
+    } catch { setQuestionsMap(p => ({ ...p, [a.id]: [] })); }
     setLoadingQuestions(null);
   };
 
-  return (
-    <div>
-      {message && (
-        <div className={`mb-4 px-4 py-2 rounded text-sm border ${message.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>
-          {message}
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl shadow border border-gray-200 p-4 mb-4">
-        <h3 className="text-sm font-bold text-gray-700 mb-3">Schedule an interview</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end">
-          <div className="col-span-2">
-            <label className="text-xs text-gray-500 block mb-1">Candidate (shortlisted)</label>
-            <select value={schedForm.applicant_id} onChange={e => setSchedForm(f => ({ ...f, applicant_id: e.target.value }))}
-              className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
-              <option value="">-- Select --</option>
-              {shortlisted.map(a => <option key={a.id} value={a.id}>{a.name} · {a.subject_applied_for}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Date</label>
-            <input type="date" value={schedForm.interview_date} onChange={e => setSchedForm(f => ({ ...f, interview_date: e.target.value }))}
-              className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full" />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Time slot</label>
-            <input value={schedForm.slot_time} onChange={e => setSchedForm(f => ({ ...f, slot_time: e.target.value }))} placeholder="10:30 AM"
-              className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full" />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Interviewer</label>
-            <input value={schedForm.interviewer_name} onChange={e => setSchedForm(f => ({ ...f, interviewer_name: e.target.value }))}
-              className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full" />
-          </div>
-        </div>
-        <button onClick={schedule} className="mt-3 px-4 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 font-semibold">Schedule</button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <label className="text-xs text-gray-500">Filter by date:</label>
-        <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs" />
-        {dateFilter && <button onClick={() => setDateFilter("")} className="text-xs text-indigo-600 underline">Clear</button>}
-        <div className="flex flex-wrap gap-1.5 ml-2">
-          {counts.map((c: any) => (
-            <button key={c.interview_date} onClick={() => setDateFilter(c.interview_date)}
-              className={`px-2 py-1 rounded-full text-xs border ${dateFilter === c.interview_date ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-300"}`}>
-              {fmtDate(c.interview_date)} ({c.count})
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-gray-400 text-sm">Loading…</div>
-        ) : interviews.length === 0 ? (
-          <div className="p-8 text-center text-gray-400 text-sm">No interviews {dateFilter ? "on this date" : "scheduled yet"}</div>
-        ) : (
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
-                <th className="px-3 py-2 text-left">Candidate</th>
-                <th className="px-3 py-2 text-left">Date / Time</th>
-                <th className="px-3 py-2 text-left">Interviewer</th>
-                <th className="px-3 py-2 text-center">Notified</th>
-                <th className="px-3 py-2 text-center">Attendance</th>
-                <th className="px-3 py-2 text-center">NCF Questions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {interviews.map((iv: any) => (
-                <>
-                <tr key={iv.id} className="border-b border-gray-100">
-                  <td className="px-3 py-2 font-medium text-gray-800">{iv.applicant?.name || "—"}</td>
-                  <td className="px-3 py-2">{fmtDate(iv.interview_date)} {iv.slot_time}</td>
-                  <td className="px-3 py-2">{iv.interviewer_name || "—"}</td>
-                  <td className="px-3 py-2 text-center">
-                    {iv.candidate_notified
-                      ? <span className="text-green-600">✓ Notified</span>
-                      : <button onClick={() => notify(iv.id)} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200">Mark Notified</button>}
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    {iv.attended === true && <span className="text-green-600">✓ Attended</span>}
-                    {iv.attended === false && <span className="text-red-500">✗ Absent</span>}
-                    {iv.attended === null && (
-                      <span className="inline-flex gap-1">
-                        <button onClick={() => attendance(iv.id, true)} className="px-2 py-0.5 bg-green-100 text-green-700 rounded hover:bg-green-200">Attended</button>
-                        <button onClick={() => attendance(iv.id, false)} className="px-2 py-0.5 bg-red-100 text-red-700 rounded hover:bg-red-200">Absent</button>
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    <div className="flex flex-col items-center gap-1">
-                      <div className="flex gap-1">
-                        <input value={overrideFor(iv).subject} onChange={e => setOverride(iv, "subject", e.target.value)} placeholder="Subject"
-                          title="Subject (override if blank or wrong)" className="border border-gray-300 rounded px-1 py-0.5 text-xs w-20" />
-                        <select value={overrideFor(iv).stage} onChange={e => setOverride(iv, "stage", e.target.value)}
-                          title="Stage (override if blank or wrong)" className="border border-gray-300 rounded px-1 py-0.5 text-xs w-24">
-                          <option value="">Stage</option>
-                          {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
-                      <button onClick={() => genQuestions(iv)} disabled={loadingQuestions === iv.applicant_id}
-                        className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50">
-                        {loadingQuestions === iv.applicant_id ? "Generating..." : questionsMap[iv.applicant_id] ? "🔄 Regenerate" : "🤖 Generate"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                {questionsMap[iv.applicant_id] && (
-                  <tr className="border-b border-gray-100 bg-purple-50">
-                    <td colSpan={6} className="px-4 py-3">
-                      {questionsMap[iv.applicant_id].length === 0 ? (
-                        <p className="text-gray-400">No questions generated — check the Groq API key is configured.</p>
-                      ) : (
-                        <ol className="list-decimal list-inside space-y-3 text-gray-700">
-                          {questionsMap[iv.applicant_id].map((q, i) => (
-                            <li key={i}>
-                              <span className="font-medium">{q.question}</span>
-                              {q.expected_answer && (
-                                <div className="ml-5 mt-1 text-gray-600 bg-white rounded border border-purple-200 px-2 py-1">
-                                  <span className="font-semibold text-purple-700">Expected answer: </span>{q.expected_answer}
-                                </div>
-                              )}
-                            </li>
-                          ))}
-                        </ol>
-                      )}
-                    </td>
-                  </tr>
-                )}
-                </>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────
-// SCORES
-// ─────────────────────────────────────────────────────────────────
-function ScoresTab() {
-  const [interviews, setInterviews] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [edits, setEdits] = useState<Record<string, any>>({});
-  const [saving, setSaving] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const r = await axios.get(`${API}/hr/interviews`);
-      const attended = (r.data || []).filter((iv: any) => iv.attended === true);
-      setInterviews(attended);
-      const initial: Record<string, any> = {};
-      attended.forEach((iv: any) => {
-        initial[iv.id] = {
-          written_marks: iv.written_marks ?? "", written_max: iv.written_max ?? "",
-          oral_marks: iv.oral_marks ?? "", oral_max: iv.oral_max ?? "",
-          demo_marks: iv.demo_marks ?? "", demo_max: iv.demo_max ?? "",
-          notes: iv.notes ?? "",
-        };
-      });
-      setEdits(initial);
-    } catch { setInterviews([]); }
-    setLoading(false);
+  // ---- scores ----
+  const scoreFieldsFor = (iv: any) => scoreEdits[iv.id] || {
+    written_marks: iv.written_marks ?? "", written_max: iv.written_max ?? "",
+    oral_marks: iv.oral_marks ?? "", oral_max: iv.oral_max ?? "",
+    demo_marks: iv.demo_marks ?? "", demo_max: iv.demo_max ?? "",
+    notes: iv.notes ?? "",
   };
-  useEffect(() => { load(); }, []);
-
-  const save = async (id: string) => {
-    setSaving(id);
+  const setScoreField = (iv: any, key: string, value: string) => {
+    setScoreEdits(prev => ({ ...prev, [iv.id]: { ...scoreFieldsFor(iv), [key]: value } }));
+  };
+  const saveScores = async (iv: any) => {
+    setSavingScores(iv.id);
+    const e = scoreFieldsFor(iv);
     try {
-      const e = edits[id];
-      await axios.patch(`${API}/hr/interviews/${id}/scores`, {
+      await axios.patch(`${API}/hr/interviews/${iv.id}/scores`, {
         written_marks: e.written_marks === "" ? null : Number(e.written_marks),
         written_max: e.written_max === "" ? null : Number(e.written_max),
         oral_marks: e.oral_marks === "" ? null : Number(e.oral_marks),
@@ -984,113 +717,31 @@ function ScoresTab() {
       setMessage("✅ Scores saved");
       load();
     } catch { setMessage("❌ Error saving scores"); }
-    setSaving(null);
+    setSavingScores(null);
     setTimeout(() => setMessage(""), 3000);
   };
-
-  const field = (id: string, key: string) => (
-    <input
-      type="number" step="0.5"
-      value={edits[id]?.[key] ?? ""}
-      onChange={e => setEdits(prev => ({ ...prev, [id]: { ...prev[id], [key]: e.target.value } }))}
-      className="border border-gray-300 rounded px-1.5 py-1 text-xs w-16 text-right"
-    />
+  const scoreInput = (iv: any, key: string) => (
+    <input type="number" step="0.5" value={scoreFieldsFor(iv)[key] ?? ""}
+      onChange={e => setScoreField(iv, key, e.target.value)}
+      className="border border-gray-300 rounded px-1.5 py-1 text-xs w-16 text-right" />
   );
-
-  return (
-    <div>
-      {message && (
-        <div className={`mb-4 px-4 py-2 rounded text-sm border ${message.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>
-          {message}
-        </div>
-      )}
-      <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-gray-400 text-sm">Loading…</div>
-        ) : interviews.length === 0 ? (
-          <div className="p-8 text-center text-gray-400 text-sm">No attended interviews to score yet</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
-                  <th className="px-3 py-2 text-left">Candidate</th>
-                  <th className="px-3 py-2 text-center" colSpan={2}>Written</th>
-                  <th className="px-3 py-2 text-center" colSpan={2}>Oral</th>
-                  <th className="px-3 py-2 text-center" colSpan={2}>Demo</th>
-                  <th className="px-3 py-2 text-left">Notes</th>
-                  <th className="px-3 py-2 text-center">Save</th>
-                </tr>
-              </thead>
-              <tbody>
-                {interviews.map((iv: any) => (
-                  <tr key={iv.id} className="border-b border-gray-100">
-                    <td className="px-3 py-2 font-medium text-gray-800">{iv.applicant?.name || "—"}</td>
-                    <td className="px-1 py-2">{field(iv.id, "written_marks")}</td>
-                    <td className="px-1 py-2 text-gray-400">/ {field(iv.id, "written_max")}</td>
-                    <td className="px-1 py-2">{field(iv.id, "oral_marks")}</td>
-                    <td className="px-1 py-2 text-gray-400">/ {field(iv.id, "oral_max")}</td>
-                    <td className="px-1 py-2">{field(iv.id, "demo_marks")}</td>
-                    <td className="px-1 py-2 text-gray-400">/ {field(iv.id, "demo_max")}</td>
-                    <td className="px-2 py-2">
-                      <input value={edits[iv.id]?.notes ?? ""} onChange={e => setEdits(prev => ({ ...prev, [iv.id]: { ...prev[iv.id], notes: e.target.value } }))}
-                        className="border border-gray-300 rounded px-1.5 py-1 text-xs w-32" />
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <button onClick={() => save(iv.id)} disabled={saving === iv.id} className="px-2.5 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50">
-                        {saving === iv.id ? "..." : "💾"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────
-// SELECTION
-// ─────────────────────────────────────────────────────────────────
-function SelectionTab() {
-  const [interviews, setInterviews] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
-  const [emailPrompt, setEmailPrompt] = useState<{ id: string; email: string } | null>(null);
-  const [deciding, setDeciding] = useState<string | null>(null);
-  const [letter, setLetter] = useState<{ name: string; dataUri: string } | null>(null);
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const r = await axios.get(`${API}/hr/interviews`);
-      const scored = (r.data || []).filter((iv: any) => iv.attended === true && iv.result === 'pending');
-      scored.sort((a: any, b: any) => total(b) - total(a));
-      setInterviews(scored);
-    } catch { setInterviews([]); }
-    setLoading(false);
-  };
-  useEffect(() => { load(); }, []);
-
-  const total = (iv: any) => (Number(iv.written_marks) || 0) + (Number(iv.oral_marks) || 0) + (Number(iv.demo_marks) || 0);
+  const totalScore = (iv: any) => (Number(iv.written_marks) || 0) + (Number(iv.oral_marks) || 0) + (Number(iv.demo_marks) || 0);
   const totalMax = (iv: any) => (Number(iv.written_max) || 0) + (Number(iv.oral_max) || 0) + (Number(iv.demo_max) || 0);
 
-  const decide = async (iv: any, result: "selected" | "rejected" | "hold", email?: string) => {
+  // ---- decision ----
+  const decide = async (a: any, iv: any, result: "selected" | "rejected" | "hold", email?: string) => {
     setDeciding(iv.id);
     try {
       const r = await axios.patch(`${API}/hr/interviews/${iv.id}/decide`, { result, email });
       if (result === "selected" && r.data?.temp_password) {
-        setMessage(`✅ ${iv.applicant?.name} selected. Login created — temp password: ${r.data.temp_password} (share this with them; induction has been assigned)`);
+        setMessage(`✅ ${a.name} selected. Login created — temp password: ${r.data.temp_password} (share this with them; induction has been assigned)`);
       } else {
         setMessage(`✅ Marked ${result}`);
       }
       if (result === "selected" && r.data?.applicant_id) {
         try {
-          const a = await axios.get(`${API}/hr/applicants/${r.data.applicant_id}`);
-          if (a.data?.appointment_letter) setLetter({ name: a.data.name || "Candidate", dataUri: a.data.appointment_letter });
+          const ar = await axios.get(`${API}/hr/applicants/${r.data.applicant_id}`);
+          if (ar.data?.appointment_letter) setLetter({ name: ar.data.name || "Candidate", dataUri: ar.data.appointment_letter });
         } catch {}
       }
       setEmailPrompt(null);
@@ -1100,14 +751,26 @@ function SelectionTab() {
     }
     setDeciding(null);
   };
-
-  const trySelect = (iv: any) => {
-    if (!iv.applicant?.email) { setEmailPrompt({ id: iv.id, email: "" }); return; }
-    decide(iv, "selected");
+  const trySelect = (a: any, iv: any) => {
+    if (!a.email) { setEmailPrompt({ applicantId: a.id, email: "" }); return; }
+    decide(a, iv, "selected");
   };
 
   return (
     <div>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <select value={stepFilter} onChange={e => setStepFilter(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+          <option value="">All steps</option>
+          {Object.entries(STEP_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </select>
+        <input value={qualFilter} onChange={e => setQualFilter(e.target.value)} placeholder="Filter: qualification"
+          className="border border-gray-300 rounded px-2 py-1.5 text-xs" />
+        <input value={minExp} onChange={e => setMinExp(e.target.value)} placeholder="Min experience (yrs)" type="number"
+          className="border border-gray-300 rounded px-2 py-1.5 text-xs w-40" />
+        <input value={localityFilter} onChange={e => setLocalityFilter(e.target.value)} placeholder="Filter: locality"
+          className="border border-gray-300 rounded px-2 py-1.5 text-xs" />
+      </div>
+
       {message && (
         <div className="mb-4 px-4 py-2 rounded text-sm border bg-green-50 border-green-300 text-green-800 flex items-center justify-between flex-wrap gap-2">
           <span>{message}</span>
@@ -1126,8 +789,10 @@ function SelectionTab() {
           <div className="flex gap-2">
             <input value={emailPrompt.email} onChange={e => setEmailPrompt(p => p && { ...p, email: e.target.value })} placeholder="email@example.com"
               className="border border-gray-300 rounded px-2 py-1 text-xs flex-1" />
-            <button onClick={() => { const iv = interviews.find(i => i.id === emailPrompt.id); if (iv) decide(iv, "selected", emailPrompt.email); }}
-              className="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Confirm & Select</button>
+            <button onClick={() => {
+              const row = rows.find(r => r.applicant.id === emailPrompt.applicantId);
+              if (row && row.interview) decide(row.applicant, row.interview, "selected", emailPrompt.email);
+            }} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Confirm & Select</button>
             <button onClick={() => setEmailPrompt(null)} className="px-3 py-1 bg-gray-100 text-xs rounded hover:bg-gray-200">Cancel</button>
           </div>
         </div>
@@ -1136,33 +801,154 @@ function SelectionTab() {
       <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-400 text-sm">Loading…</div>
-        ) : interviews.length === 0 ? (
-          <div className="p-8 text-center text-gray-400 text-sm">No scored, pending candidates right now</div>
+        ) : filtered.length === 0 ? (
+          <div className="p-8 text-center text-gray-400 text-sm">No shortlisted candidates match</div>
         ) : (
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
-                <th className="px-3 py-2 text-left">Candidate</th>
+                <th className="px-3 py-2 text-left">Name</th>
                 <th className="px-3 py-2 text-left">Subject</th>
-                <th className="px-3 py-2 text-right">Total</th>
-                <th className="px-3 py-2 text-center">Decision</th>
+                <th className="px-3 py-2 text-left">School Stage</th>
+                <th className="px-3 py-2 text-left">Qualification</th>
+                <th className="px-3 py-2 text-left">Experience</th>
+                <th className="px-3 py-2 text-center">Step</th>
               </tr>
             </thead>
             <tbody>
-              {interviews.map((iv: any) => (
-                <tr key={iv.id} className="border-b border-gray-100">
-                  <td className="px-3 py-2 font-medium text-gray-800">{iv.applicant?.name || "—"}</td>
-                  <td className="px-3 py-2">{iv.applicant?.subject_applied_for || "—"}</td>
-                  <td className="px-3 py-2 text-right font-semibold">{total(iv)} / {totalMax(iv) || "—"}</td>
-                  <td className="px-3 py-2 text-center">
-                    <span className="inline-flex gap-1">
-                      <button onClick={() => trySelect(iv)} disabled={deciding === iv.id} className="px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50">Select</button>
-                      <button onClick={() => decide(iv, "hold")} disabled={deciding === iv.id} className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 disabled:opacity-50">Hold</button>
-                      <button onClick={() => decide(iv, "rejected")} disabled={deciding === iv.id} className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50">Reject</button>
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {filtered.map(({ applicant: a, interview: iv }) => {
+                const step = stepFor(iv);
+                const f = fieldFor(a, iv);
+                return (
+                  <Fragment key={a.id}>
+                    <tr className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>
+                      <td className="px-3 py-2 font-medium text-gray-800">{a.name || "—"}</td>
+                      <td className="px-3 py-2">{a.subject_applied_for || "—"}</td>
+                      <td className="px-3 py-2">{(a.school_stage && a.school_stage.length) ? a.school_stage.join(", ") : "—"}</td>
+                      <td className="px-3 py-2">{a.qualification || "—"}</td>
+                      <td className="px-3 py-2">{a.experience_years ? `${a.experience_years} yrs` : "—"}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`px-2 py-0.5 rounded-full font-medium ${STEP_COLORS[step]}`}>{STEP_LABELS[step]}</span>
+                      </td>
+                    </tr>
+                    {expanded === a.id && (
+                      <tr className="bg-indigo-50/30">
+                        <td colSpan={6} className="px-4 py-4">
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="text-xs font-bold text-gray-600 mb-2">📅 Interview Schedule</h4>
+                              <div className="flex flex-wrap gap-2 items-end">
+                                <input type="date" value={f.date} onChange={e => setField(a, iv, "date", e.target.value)}
+                                  className="border border-gray-300 rounded px-2 py-1 text-xs" />
+                                <input value={f.time} onChange={e => setField(a, iv, "time", e.target.value)} placeholder="10:30 AM"
+                                  className="border border-gray-300 rounded px-2 py-1 text-xs w-24" />
+                                <input value={f.interviewer} onChange={e => setField(a, iv, "interviewer", e.target.value)} placeholder="Interviewer"
+                                  className="border border-gray-300 rounded px-2 py-1 text-xs w-32" />
+                                <button onClick={() => scheduleFor(a, iv)} disabled={scheduling === a.id}
+                                  className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 font-medium">
+                                  {scheduling === a.id ? "..." : iv ? "🔄 Reschedule" : "📅 Schedule"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {iv && (
+                              <div className="flex flex-wrap items-center gap-6">
+                                <div>
+                                  <span className="text-xs font-bold text-gray-600 mr-2">Notified:</span>
+                                  {iv.candidate_notified
+                                    ? <span className="text-green-600 text-xs">✓ Notified</span>
+                                    : <button onClick={() => notify(iv)} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs hover:bg-indigo-200">Mark Notified</button>}
+                                </div>
+                                <div>
+                                  <span className="text-xs font-bold text-gray-600 mr-2">Attendance:</span>
+                                  {iv.attended === true && <span className="text-green-600 text-xs">✓ Attended</span>}
+                                  {iv.attended === false && <span className="text-red-500 text-xs">✗ Absent</span>}
+                                  {iv.attended === null && (
+                                    <span className="inline-flex gap-1">
+                                      <button onClick={() => attendance(iv, true)} className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200">Attended</button>
+                                      <button onClick={() => attendance(iv, false)} className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200">Absent</button>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            <div>
+                              <h4 className="text-xs font-bold text-gray-600 mb-2">🤖 NCF Interview Questions</h4>
+                              <div className="flex flex-wrap gap-2 items-center mb-2">
+                                <input value={overrideFor(a).subject} onChange={e => setOverride(a, "subject", e.target.value)} placeholder="Subject"
+                                  title="Subject (override if blank or wrong)" className="border border-gray-300 rounded px-2 py-1 text-xs w-28" />
+                                <select value={overrideFor(a).stage} onChange={e => setOverride(a, "stage", e.target.value)}
+                                  title="Stage (override if blank or wrong)" className="border border-gray-300 rounded px-2 py-1 text-xs w-28">
+                                  <option value="">Stage</option>
+                                  {PROCESS_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                                <button onClick={() => genQuestions(a)} disabled={loadingQuestions === a.id}
+                                  className="px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50 text-xs">
+                                  {loadingQuestions === a.id ? "Generating..." : questionsMap[a.id] ? "🔄 Regenerate" : "🤖 Generate"}
+                                </button>
+                              </div>
+                              {questionsMap[a.id] && (
+                                questionsMap[a.id].length === 0 ? (
+                                  <p className="text-gray-400 text-xs">No questions generated — check the Groq API key is configured.</p>
+                                ) : (
+                                  <ol className="list-decimal list-inside space-y-2 text-gray-700 bg-purple-50 rounded p-3">
+                                    {questionsMap[a.id].map((q, i) => (
+                                      <li key={i}>
+                                        <span className="font-medium">{q.question}</span>
+                                        {q.expected_answer && (
+                                          <div className="ml-5 mt-1 text-gray-600 bg-white rounded border border-purple-200 px-2 py-1">
+                                            <span className="font-semibold text-purple-700">Expected answer: </span>{q.expected_answer}
+                                          </div>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ol>
+                                )
+                              )}
+                            </div>
+
+                            {iv && iv.attended === true && (
+                              <div>
+                                <h4 className="text-xs font-bold text-gray-600 mb-2">📝 Scores</h4>
+                                <div className="flex flex-wrap gap-3 items-end">
+                                  <div><label className="block text-[10px] text-gray-400">Written</label>{scoreInput(iv, "written_marks")} / {scoreInput(iv, "written_max")}</div>
+                                  <div><label className="block text-[10px] text-gray-400">Oral</label>{scoreInput(iv, "oral_marks")} / {scoreInput(iv, "oral_max")}</div>
+                                  <div><label className="block text-[10px] text-gray-400">Demo</label>{scoreInput(iv, "demo_marks")} / {scoreInput(iv, "demo_max")}</div>
+                                  <div className="flex-1 min-w-[150px]">
+                                    <label className="block text-[10px] text-gray-400">Notes</label>
+                                    <input value={scoreFieldsFor(iv).notes} onChange={e => setScoreField(iv, "notes", e.target.value)}
+                                      className="border border-gray-300 rounded px-2 py-1 text-xs w-full" />
+                                  </div>
+                                  <button onClick={() => saveScores(iv)} disabled={savingScores === iv.id}
+                                    className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 text-xs">
+                                    {savingScores === iv.id ? "..." : "💾 Save Scores"}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {iv && iv.attended === true && iv.result === "pending" && (
+                              <div>
+                                <h4 className="text-xs font-bold text-gray-600 mb-2">✅ Decision — Total: {totalScore(iv)} / {totalMax(iv) || "—"}</h4>
+                                <span className="inline-flex gap-1">
+                                  <button onClick={() => trySelect(a, iv)} disabled={deciding === iv.id} className="px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 text-xs">Select</button>
+                                  <button onClick={() => decide(a, iv, "hold")} disabled={deciding === iv.id} className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 disabled:opacity-50 text-xs">Hold</button>
+                                  <button onClick={() => decide(a, iv, "rejected")} disabled={deciding === iv.id} className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50 text-xs">Reject</button>
+                                </span>
+                              </div>
+                            )}
+
+                            {iv && iv.result !== "pending" && (
+                              <p className="text-xs text-gray-500">Result: <span className="font-semibold">{iv.result}</span></p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         )}
