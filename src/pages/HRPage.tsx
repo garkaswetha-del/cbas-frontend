@@ -639,12 +639,22 @@ function InterviewsTab() {
   const notify = async (id: string) => { await axios.patch(`${API}/hr/interviews/${id}/notified`); load(); };
   const attendance = async (id: string, attended: boolean) => { await axios.patch(`${API}/hr/interviews/${id}/attendance`, { attended }); load(); };
 
-  const [questionsMap, setQuestionsMap] = useState<Record<string, string[]>>({});
+  const [questionsMap, setQuestionsMap] = useState<Record<string, { question: string; expected_answer: string }[]>>({});
   const [loadingQuestions, setLoadingQuestions] = useState<string | null>(null);
-  const genQuestions = async (applicantId: string) => {
+  const STAGES = ["Foundation", "Preparatory", "Middle", "Secondary"];
+  const [overrides, setOverrides] = useState<Record<string, { subject: string; stage: string }>>({});
+  const overrideFor = (iv: any) => overrides[iv.applicant_id] || { subject: iv.applicant?.subject_applied_for || "", stage: iv.applicant?.school_stage || "" };
+  const setOverride = (iv: any, key: "subject" | "stage", value: string) => {
+    setOverrides(prev => ({ ...prev, [iv.applicant_id]: { ...overrideFor(iv), [key]: value } }));
+  };
+  const genQuestions = async (iv: any) => {
+    const applicantId = iv.applicant_id;
+    const ov = overrideFor(iv);
     setLoadingQuestions(applicantId);
     try {
-      const r = await axios.get(`${API}/hr/applicants/${applicantId}/interview-questions`);
+      const r = await axios.get(`${API}/hr/applicants/${applicantId}/interview-questions`, {
+        params: { subject: ov.subject || undefined, stage: ov.stage || undefined },
+      });
       setQuestionsMap(p => ({ ...p, [applicantId]: r.data?.questions || [] }));
     } catch { setQuestionsMap(p => ({ ...p, [applicantId]: [] })); }
     setLoadingQuestions(null);
@@ -742,10 +752,21 @@ function InterviewsTab() {
                     )}
                   </td>
                   <td className="px-3 py-2 text-center">
-                    <button onClick={() => genQuestions(iv.applicant_id)} disabled={loadingQuestions === iv.applicant_id}
-                      className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50">
-                      {loadingQuestions === iv.applicant_id ? "Generating..." : questionsMap[iv.applicant_id] ? "🔄 Regenerate" : "🤖 Generate"}
-                    </button>
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="flex gap-1">
+                        <input value={overrideFor(iv).subject} onChange={e => setOverride(iv, "subject", e.target.value)} placeholder="Subject"
+                          title="Subject (override if blank or wrong)" className="border border-gray-300 rounded px-1 py-0.5 text-xs w-20" />
+                        <select value={overrideFor(iv).stage} onChange={e => setOverride(iv, "stage", e.target.value)}
+                          title="Stage (override if blank or wrong)" className="border border-gray-300 rounded px-1 py-0.5 text-xs w-24">
+                          <option value="">Stage</option>
+                          {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <button onClick={() => genQuestions(iv)} disabled={loadingQuestions === iv.applicant_id}
+                        className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50">
+                        {loadingQuestions === iv.applicant_id ? "Generating..." : questionsMap[iv.applicant_id] ? "🔄 Regenerate" : "🤖 Generate"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
                 {questionsMap[iv.applicant_id] && (
@@ -754,8 +775,17 @@ function InterviewsTab() {
                       {questionsMap[iv.applicant_id].length === 0 ? (
                         <p className="text-gray-400">No questions generated — check the Groq API key is configured.</p>
                       ) : (
-                        <ol className="list-decimal list-inside space-y-1 text-gray-700">
-                          {questionsMap[iv.applicant_id].map((q, i) => <li key={i}>{q}</li>)}
+                        <ol className="list-decimal list-inside space-y-3 text-gray-700">
+                          {questionsMap[iv.applicant_id].map((q, i) => (
+                            <li key={i}>
+                              <span className="font-medium">{q.question}</span>
+                              {q.expected_answer && (
+                                <div className="ml-5 mt-1 text-gray-600 bg-white rounded border border-purple-200 px-2 py-1">
+                                  <span className="font-semibold text-purple-700">Expected answer: </span>{q.expected_answer}
+                                </div>
+                              )}
+                            </li>
+                          ))}
                         </ol>
                       )}
                     </td>
