@@ -438,18 +438,26 @@ function ApplicationsTab() {
 // ─────────────────────────────────────────────────────────────────
 function ShortlistTab() {
   const [applicants, setApplicants] = useState<any[]>([]);
+  const [interviews, setInterviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [onlyShortlisted, setOnlyShortlisted] = useState(true);
   const [qualFilter, setQualFilter] = useState("");
   const [minExp, setMinExp] = useState("");
   const [localityFilter, setLocalityFilter] = useState("");
+  const [schedForm, setSchedForm] = useState<Record<string, { date: string; time: string; interviewer: string }>>({});
+  const [scheduling, setScheduling] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
 
   const load = async () => {
     setLoading(true);
     try {
-      const r = await axios.get(`${API}/hr/applicants`);
-      setApplicants(r.data || []);
-    } catch { setApplicants([]); }
+      const [a, iv] = await Promise.all([
+        axios.get(`${API}/hr/applicants`),
+        axios.get(`${API}/hr/interviews`),
+      ]);
+      setApplicants(a.data || []);
+      setInterviews(iv.data || []);
+    } catch { setApplicants([]); setInterviews([]); }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -459,6 +467,36 @@ function ShortlistTab() {
       await axios.patch(`${API}/hr/applicants/${a.id}/shortlist`, { is_shortlisted: !a.is_shortlisted });
       load();
     } catch {}
+  };
+
+  const interviewFor = (applicantId: string) => interviews.find((i: any) => i.applicant_id === applicantId);
+
+  const fieldFor = (a: any) => {
+    if (schedForm[a.id]) return schedForm[a.id];
+    const iv = interviewFor(a.id);
+    return { date: iv?.interview_date?.slice(0, 10) || "", time: iv?.slot_time || "", interviewer: iv?.interviewer_name || "" };
+  };
+
+  const setField = (a: any, key: "date" | "time" | "interviewer", value: string) => {
+    setSchedForm(prev => ({ ...prev, [a.id]: { ...fieldFor(a), [key]: value } }));
+  };
+
+  const stored = localStorage.getItem("cbas_user");
+  const currentUser = stored ? JSON.parse(stored) : null;
+
+  const scheduleFor = async (a: any) => {
+    const f = fieldFor(a);
+    if (!f.date) { setMessage("❌ Pick a date first"); setTimeout(() => setMessage(""), 3000); return; }
+    setScheduling(a.id);
+    try {
+      await axios.post(`${API}/hr/interviews/schedule`, {
+        applicant_id: a.id, interview_date: f.date, slot_time: f.time, interviewer_name: f.interviewer, scheduled_by: currentUser?.name,
+      });
+      setMessage(`✅ Interview scheduled for ${a.name || "candidate"}`);
+      load();
+    } catch { setMessage("❌ Error scheduling"); }
+    setScheduling(null);
+    setTimeout(() => setMessage(""), 3000);
   };
 
   const filtered = applicants.filter(a => {
@@ -484,38 +522,72 @@ function ShortlistTab() {
           className="border border-gray-300 rounded px-2 py-1.5 text-xs" />
       </div>
 
+      {message && (
+        <div className={`mb-4 px-4 py-2 rounded text-sm border ${message.startsWith("✅") ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>
+          {message}
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-400 text-sm">Loading…</div>
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-gray-400 text-sm">No candidates match</div>
         ) : (
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
-                <th className="px-3 py-2 text-center">Shortlist</th>
-                <th className="px-3 py-2 text-left">Name</th>
-                <th className="px-3 py-2 text-left">Subject</th>
-                <th className="px-3 py-2 text-left">Qualification</th>
-                <th className="px-3 py-2 text-left">Experience</th>
-                <th className="px-3 py-2 text-left">Locality</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(a => (
-                <tr key={a.id} className="border-b border-gray-100">
-                  <td className="px-3 py-2 text-center">
-                    <input type="checkbox" checked={a.is_shortlisted} onChange={() => toggle(a)} className="w-4 h-4 accent-indigo-600" />
-                  </td>
-                  <td className="px-3 py-2 font-medium text-gray-800">{a.name || "—"}</td>
-                  <td className="px-3 py-2">{a.subject_applied_for || "—"}</td>
-                  <td className="px-3 py-2">{a.qualification || "—"}</td>
-                  <td className="px-3 py-2">{a.experience_years ? `${a.experience_years} yrs` : "—"}</td>
-                  <td className="px-3 py-2">{a.locality || "—"}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
+                  <th className="px-3 py-2 text-center">Shortlist</th>
+                  <th className="px-3 py-2 text-left">Name</th>
+                  <th className="px-3 py-2 text-left">Subject</th>
+                  <th className="px-3 py-2 text-left">Qualification</th>
+                  <th className="px-3 py-2 text-left">Experience</th>
+                  <th className="px-3 py-2 text-left">Locality</th>
+                  <th className="px-3 py-2 text-left">Interview Date</th>
+                  <th className="px-3 py-2 text-left">Time</th>
+                  <th className="px-3 py-2 text-left">Interviewer</th>
+                  <th className="px-3 py-2 text-center">Schedule</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map(a => {
+                  const iv = interviewFor(a.id);
+                  const f = fieldFor(a);
+                  return (
+                    <tr key={a.id} className="border-b border-gray-100">
+                      <td className="px-3 py-2 text-center">
+                        <input type="checkbox" checked={a.is_shortlisted} onChange={() => toggle(a)} className="w-4 h-4 accent-indigo-600" />
+                      </td>
+                      <td className="px-3 py-2 font-medium text-gray-800">{a.name || "—"}</td>
+                      <td className="px-3 py-2">{a.subject_applied_for || "—"}</td>
+                      <td className="px-3 py-2">{a.qualification || "—"}</td>
+                      <td className="px-3 py-2">{a.experience_years ? `${a.experience_years} yrs` : "—"}</td>
+                      <td className="px-3 py-2">{a.locality || "—"}</td>
+                      <td className="px-2 py-2">
+                        <input type="date" value={f.date} onChange={e => setField(a, "date", e.target.value)}
+                          className="border border-gray-300 rounded px-1.5 py-1 text-xs w-36" />
+                      </td>
+                      <td className="px-2 py-2">
+                        <input value={f.time} onChange={e => setField(a, "time", e.target.value)} placeholder="10:30 AM"
+                          className="border border-gray-300 rounded px-1.5 py-1 text-xs w-24" />
+                      </td>
+                      <td className="px-2 py-2">
+                        <input value={f.interviewer} onChange={e => setField(a, "interviewer", e.target.value)} placeholder="Interviewer"
+                          className="border border-gray-300 rounded px-1.5 py-1 text-xs w-28" />
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <button onClick={() => scheduleFor(a)} disabled={scheduling === a.id}
+                          className="px-2.5 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 font-medium whitespace-nowrap">
+                          {scheduling === a.id ? "..." : iv ? "🔄 Reschedule" : "📅 Schedule"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
