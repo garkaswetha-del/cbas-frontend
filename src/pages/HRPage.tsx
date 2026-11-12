@@ -607,13 +607,21 @@ function HiringProcessTab() {
 
   const [schedForm, setSchedForm] = useState<Record<string, { date: string; time: string; interviewer: string }>>({});
   const [scheduling, setScheduling] = useState<string | null>(null);
+  const [schedOpen, setSchedOpen] = useState<Set<string>>(new Set());
 
   const [questionsMap, setQuestionsMap] = useState<Record<string, { question: string; expected_answer: string }[]>>({});
   const [loadingQuestions, setLoadingQuestions] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, { subject: string; stage: string }>>({});
+  const [questionsOpen, setQuestionsOpen] = useState<Set<string>>(new Set());
+  const toggleSet = (set: Set<string>, setter: (s: Set<string>) => void, id: string) => {
+    const next = new Set(set);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setter(next);
+  };
 
   const [scoreEdits, setScoreEdits] = useState<Record<string, any>>({});
   const [savingScores, setSavingScores] = useState<string | null>(null);
+  const [scoresOpen, setScoresOpen] = useState<Set<string>>(new Set());
 
   const [emailPrompt, setEmailPrompt] = useState<{ applicantId: string; email: string } | null>(null);
   const [deciding, setDeciding] = useState<string | null>(null);
@@ -831,121 +839,181 @@ function HiringProcessTab() {
                         <span className={`px-2 py-0.5 rounded-full font-medium ${STEP_COLORS[step]}`}>{STEP_LABELS[step]}</span>
                       </td>
                     </tr>
-                    {expanded === a.id && (
+                    {expanded === a.id && (() => {
+                      const hasScores = !!iv && (iv.written_marks != null || iv.oral_marks != null || iv.demo_marks != null);
+                      const scheduleIsOpen = !iv || schedOpen.has(a.id);
+                      const scoresAreOpen = !hasScores || scoresOpen.has(iv?.id);
+                      return (
                       <tr className="bg-indigo-50/30">
                         <td colSpan={6} className="px-4 py-4">
-                          <div className="space-y-4">
-                            <div>
-                              <h4 className="text-xs font-bold text-gray-600 mb-2">📅 Interview Schedule</h4>
-                              <div className="flex flex-wrap gap-2 items-end">
-                                <input type="date" value={f.date} onChange={e => setField(a, iv, "date", e.target.value)}
-                                  className="border border-gray-300 rounded px-2 py-1 text-xs" />
-                                <input value={f.time} onChange={e => setField(a, iv, "time", e.target.value)} placeholder="10:30 AM"
-                                  className="border border-gray-300 rounded px-2 py-1 text-xs w-24" />
-                                <input value={f.interviewer} onChange={e => setField(a, iv, "interviewer", e.target.value)} placeholder="Interviewer"
-                                  className="border border-gray-300 rounded px-2 py-1 text-xs w-32" />
-                                <button onClick={() => scheduleFor(a, iv)} disabled={scheduling === a.id}
-                                  className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 font-medium">
-                                  {scheduling === a.id ? "..." : iv ? "🔄 Reschedule" : "📅 Schedule"}
-                                </button>
+                          <div className="space-y-4 max-w-3xl">
+                            {/* Step 1: Schedule */}
+                            <div className="flex gap-3">
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${iv ? "bg-green-500 text-white" : "bg-indigo-600 text-white"}`}>
+                                {iv ? "✓" : "1"}
+                              </div>
+                              <div className="flex-1 pb-1">
+                                {scheduleIsOpen ? (
+                                  <>
+                                    <p className="text-xs font-bold text-gray-600 mb-1.5">Schedule Interview</p>
+                                    <div className="flex flex-wrap gap-2 items-end">
+                                      <input type="date" value={f.date} onChange={e => setField(a, iv, "date", e.target.value)}
+                                        className="border border-gray-300 rounded px-2 py-1 text-xs" />
+                                      <input value={f.time} onChange={e => setField(a, iv, "time", e.target.value)} placeholder="10:30 AM"
+                                        className="border border-gray-300 rounded px-2 py-1 text-xs w-24" />
+                                      <input value={f.interviewer} onChange={e => setField(a, iv, "interviewer", e.target.value)} placeholder="Interviewer"
+                                        className="border border-gray-300 rounded px-2 py-1 text-xs w-32" />
+                                      <button onClick={() => { scheduleFor(a, iv); if (iv) toggleSet(schedOpen, setSchedOpen, a.id); }} disabled={scheduling === a.id}
+                                        className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 font-medium">
+                                        {scheduling === a.id ? "..." : iv ? "Save" : "📅 Schedule"}
+                                      </button>
+                                      {iv && <button onClick={() => toggleSet(schedOpen, setSchedOpen, a.id)} className="text-xs text-gray-400 underline">Cancel</button>}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <p className="text-xs text-gray-700">
+                                      <span className="font-semibold text-gray-600">Scheduled:</span> {fmtDate(iv.interview_date)} {iv.slot_time}
+                                      {iv.interviewer_name ? ` · ${iv.interviewer_name}` : ""}
+                                    </p>
+                                    <button onClick={() => toggleSet(schedOpen, setSchedOpen, a.id)} className="text-xs text-indigo-600 underline">✏️ Edit</button>
+                                  </div>
+                                )}
                               </div>
                             </div>
 
+                            {/* Step 2: Notify & Attendance */}
                             {iv && (
-                              <div className="flex flex-wrap items-center gap-6">
-                                <div>
-                                  <span className="text-xs font-bold text-gray-600 mr-2">Notified:</span>
-                                  {iv.candidate_notified
-                                    ? <span className="text-green-600 text-xs">✓ Notified</span>
-                                    : <button onClick={() => notify(iv)} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs hover:bg-indigo-200">Mark Notified</button>}
+                              <div className="flex gap-3">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                  iv.attended === true ? "bg-green-500 text-white" : iv.attended === false ? "bg-red-500 text-white" : "bg-indigo-600 text-white"
+                                }`}>
+                                  {iv.attended === true ? "✓" : iv.attended === false ? "✗" : "2"}
                                 </div>
-                                <div>
-                                  <span className="text-xs font-bold text-gray-600 mr-2">Attendance:</span>
-                                  {iv.attended === true && <span className="text-green-600 text-xs">✓ Attended</span>}
-                                  {iv.attended === false && <span className="text-red-500 text-xs">✗ Absent</span>}
-                                  {iv.attended === null && (
-                                    <span className="inline-flex gap-1">
-                                      <button onClick={() => attendance(iv, true)} className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200">Attended</button>
-                                      <button onClick={() => attendance(iv, false)} className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200">Absent</button>
-                                    </span>
+                                <div className="flex-1 pb-1">
+                                  <p className="text-xs font-bold text-gray-600 mb-1.5">Notify & Attendance</p>
+                                  <div className="flex flex-wrap items-center gap-4 text-xs">
+                                    {iv.candidate_notified
+                                      ? <span className="text-green-600">✓ Notified</span>
+                                      : <button onClick={() => notify(iv)} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200">Mark Notified</button>}
+                                    {iv.attended === true && <span className="text-green-600">✓ Attended</span>}
+                                    {iv.attended === false && <span className="text-red-500">✗ Absent</span>}
+                                    {iv.attended === null && (
+                                      <span className="inline-flex gap-1">
+                                        <button onClick={() => attendance(iv, true)} className="px-2 py-0.5 bg-green-100 text-green-700 rounded hover:bg-green-200">Attended</button>
+                                        <button onClick={() => attendance(iv, false)} className="px-2 py-0.5 bg-red-100 text-red-700 rounded hover:bg-red-200">Absent</button>
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Step 3: Scores */}
+                            {iv && iv.attended === true && (
+                              <div className="flex gap-3">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${hasScores ? "bg-green-500 text-white" : "bg-indigo-600 text-white"}`}>
+                                  {hasScores ? "✓" : "3"}
+                                </div>
+                                <div className="flex-1 pb-1">
+                                  {scoresAreOpen ? (
+                                    <>
+                                      <p className="text-xs font-bold text-gray-600 mb-1.5">Scores</p>
+                                      <div className="flex flex-wrap gap-3 items-end">
+                                        <div><label className="block text-[10px] text-gray-400">Written</label>{scoreInput(iv, "written_marks")} / {scoreInput(iv, "written_max")}</div>
+                                        <div><label className="block text-[10px] text-gray-400">Oral</label>{scoreInput(iv, "oral_marks")} / {scoreInput(iv, "oral_max")}</div>
+                                        <div><label className="block text-[10px] text-gray-400">Demo</label>{scoreInput(iv, "demo_marks")} / {scoreInput(iv, "demo_max")}</div>
+                                        <div className="flex-1 min-w-[150px]">
+                                          <label className="block text-[10px] text-gray-400">Notes</label>
+                                          <input value={scoreFieldsFor(iv).notes} onChange={e => setScoreField(iv, "notes", e.target.value)}
+                                            className="border border-gray-300 rounded px-2 py-1 text-xs w-full" />
+                                        </div>
+                                        <button onClick={() => { saveScores(iv); toggleSet(scoresOpen, setScoresOpen, iv.id); }} disabled={savingScores === iv.id}
+                                          className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 text-xs">
+                                          {savingScores === iv.id ? "..." : "💾 Save"}
+                                        </button>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="flex items-center justify-between flex-wrap gap-2">
+                                      <p className="text-xs text-gray-700">
+                                        <span className="font-semibold text-gray-600">Total:</span> {totalScore(iv)} / {totalMax(iv) || "—"}
+                                        <span className="text-gray-400"> (Written {iv.written_marks ?? "—"}, Oral {iv.oral_marks ?? "—"}, Demo {iv.demo_marks ?? "—"})</span>
+                                      </p>
+                                      <button onClick={() => toggleSet(scoresOpen, setScoresOpen, iv.id)} className="text-xs text-indigo-600 underline">✏️ Edit</button>
+                                    </div>
                                   )}
                                 </div>
                               </div>
                             )}
 
-                            <div>
-                              <h4 className="text-xs font-bold text-gray-600 mb-2">🤖 NCF Interview Questions</h4>
-                              <div className="flex flex-wrap gap-2 items-center mb-2">
-                                <input value={overrideFor(a).subject} onChange={e => setOverride(a, "subject", e.target.value)} placeholder="Subject"
-                                  title="Subject (override if blank or wrong)" className="border border-gray-300 rounded px-2 py-1 text-xs w-28" />
-                                <select value={overrideFor(a).stage} onChange={e => setOverride(a, "stage", e.target.value)}
-                                  title="Stage (override if blank or wrong)" className="border border-gray-300 rounded px-2 py-1 text-xs w-28">
-                                  <option value="">Stage</option>
-                                  {PROCESS_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                                <button onClick={() => genQuestions(a)} disabled={loadingQuestions === a.id}
-                                  className="px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50 text-xs">
-                                  {loadingQuestions === a.id ? "Generating..." : questionsMap[a.id] ? "🔄 Regenerate" : "🤖 Generate"}
-                                </button>
-                              </div>
-                              {questionsMap[a.id] && (
-                                questionsMap[a.id].length === 0 ? (
-                                  <p className="text-gray-400 text-xs">No questions generated — check the Groq API key is configured.</p>
-                                ) : (
-                                  <ol className="list-decimal list-inside space-y-2 text-gray-700 bg-purple-50 rounded p-3">
-                                    {questionsMap[a.id].map((q, i) => (
-                                      <li key={i}>
-                                        <span className="font-medium">{q.question}</span>
-                                        {q.expected_answer && (
-                                          <div className="ml-5 mt-1 text-gray-600 bg-white rounded border border-purple-200 px-2 py-1">
-                                            <span className="font-semibold text-purple-700">Expected answer: </span>{q.expected_answer}
-                                          </div>
-                                        )}
-                                      </li>
-                                    ))}
-                                  </ol>
-                                )
-                              )}
-                            </div>
-
+                            {/* Step 4: Decision */}
                             {iv && iv.attended === true && (
-                              <div>
-                                <h4 className="text-xs font-bold text-gray-600 mb-2">📝 Scores</h4>
-                                <div className="flex flex-wrap gap-3 items-end">
-                                  <div><label className="block text-[10px] text-gray-400">Written</label>{scoreInput(iv, "written_marks")} / {scoreInput(iv, "written_max")}</div>
-                                  <div><label className="block text-[10px] text-gray-400">Oral</label>{scoreInput(iv, "oral_marks")} / {scoreInput(iv, "oral_max")}</div>
-                                  <div><label className="block text-[10px] text-gray-400">Demo</label>{scoreInput(iv, "demo_marks")} / {scoreInput(iv, "demo_max")}</div>
-                                  <div className="flex-1 min-w-[150px]">
-                                    <label className="block text-[10px] text-gray-400">Notes</label>
-                                    <input value={scoreFieldsFor(iv).notes} onChange={e => setScoreField(iv, "notes", e.target.value)}
-                                      className="border border-gray-300 rounded px-2 py-1 text-xs w-full" />
-                                  </div>
-                                  <button onClick={() => saveScores(iv)} disabled={savingScores === iv.id}
-                                    className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 text-xs">
-                                    {savingScores === iv.id ? "..." : "💾 Save Scores"}
-                                  </button>
+                              <div className="flex gap-3">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${iv.result !== "pending" ? "bg-green-500 text-white" : "bg-indigo-600 text-white"}`}>
+                                  {iv.result !== "pending" ? "✓" : "4"}
+                                </div>
+                                <div className="flex-1 pb-1">
+                                  <p className="text-xs font-bold text-gray-600 mb-1.5">Decision</p>
+                                  {iv.result === "pending" ? (
+                                    <span className="inline-flex gap-1">
+                                      <button onClick={() => trySelect(a, iv)} disabled={deciding === iv.id} className="px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 text-xs">Select</button>
+                                      <button onClick={() => decide(a, iv, "hold")} disabled={deciding === iv.id} className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 disabled:opacity-50 text-xs">Hold</button>
+                                      <button onClick={() => decide(a, iv, "rejected")} disabled={deciding === iv.id} className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50 text-xs">Reject</button>
+                                    </span>
+                                  ) : (
+                                    <p className="text-xs text-gray-700">Result: <span className="font-semibold capitalize">{iv.result}</span></p>
+                                  )}
                                 </div>
                               </div>
                             )}
+                          </div>
 
-                            {iv && iv.attended === true && iv.result === "pending" && (
-                              <div>
-                                <h4 className="text-xs font-bold text-gray-600 mb-2">✅ Decision — Total: {totalScore(iv)} / {totalMax(iv) || "—"}</h4>
-                                <span className="inline-flex gap-1">
-                                  <button onClick={() => trySelect(a, iv)} disabled={deciding === iv.id} className="px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 text-xs">Select</button>
-                                  <button onClick={() => decide(a, iv, "hold")} disabled={deciding === iv.id} className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 disabled:opacity-50 text-xs">Hold</button>
-                                  <button onClick={() => decide(a, iv, "rejected")} disabled={deciding === iv.id} className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50 text-xs">Reject</button>
-                                </span>
+                          {/* Separate tool, not part of the sequential flow — usable anytime */}
+                          <div className="mt-4 pt-3 border-t border-dashed border-gray-300 max-w-3xl">
+                            <button onClick={() => toggleSet(questionsOpen, setQuestionsOpen, a.id)} className="text-xs font-bold text-purple-700 flex items-center gap-1">
+                              🤖 NCF Interview Questions {questionsOpen.has(a.id) ? "▲" : "▼"}
+                            </button>
+                            {questionsOpen.has(a.id) && (
+                              <div className="mt-2">
+                                <div className="flex flex-wrap gap-2 items-center mb-2">
+                                  <input value={overrideFor(a).subject} onChange={e => setOverride(a, "subject", e.target.value)} placeholder="Subject"
+                                    title="Subject (override if blank or wrong)" className="border border-gray-300 rounded px-2 py-1 text-xs w-28" />
+                                  <select value={overrideFor(a).stage} onChange={e => setOverride(a, "stage", e.target.value)}
+                                    title="Stage (override if blank or wrong)" className="border border-gray-300 rounded px-2 py-1 text-xs w-28">
+                                    <option value="">Stage</option>
+                                    {PROCESS_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                                  </select>
+                                  <button onClick={() => genQuestions(a)} disabled={loadingQuestions === a.id}
+                                    className="px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50 text-xs">
+                                    {loadingQuestions === a.id ? "Generating..." : questionsMap[a.id] ? "🔄 Regenerate" : "🤖 Generate"}
+                                  </button>
+                                </div>
+                                {questionsMap[a.id] && (
+                                  questionsMap[a.id].length === 0 ? (
+                                    <p className="text-gray-400 text-xs">No questions generated — check the Groq API key is configured.</p>
+                                  ) : (
+                                    <ol className="list-decimal list-inside space-y-2 text-gray-700 bg-purple-50 rounded p-3">
+                                      {questionsMap[a.id].map((q, i) => (
+                                        <li key={i}>
+                                          <span className="font-medium">{q.question}</span>
+                                          {q.expected_answer && (
+                                            <div className="ml-5 mt-1 text-gray-600 bg-white rounded border border-purple-200 px-2 py-1">
+                                              <span className="font-semibold text-purple-700">Expected answer: </span>{q.expected_answer}
+                                            </div>
+                                          )}
+                                        </li>
+                                      ))}
+                                    </ol>
+                                  )
+                                )}
                               </div>
-                            )}
-
-                            {iv && iv.result !== "pending" && (
-                              <p className="text-xs text-gray-500">Result: <span className="font-semibold">{iv.result}</span></p>
                             )}
                           </div>
                         </td>
                       </tr>
-                    )}
+                      );
+                    })()}
                   </Fragment>
                 );
               })}
