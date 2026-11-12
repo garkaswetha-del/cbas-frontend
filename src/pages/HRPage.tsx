@@ -74,11 +74,12 @@ export default function HRPage() {
 // ─────────────────────────────────────────────────────────────────
 // APPLICATIONS
 // ─────────────────────────────────────────────────────────────────
+const SCHOOL_STAGES = ["Foundation", "Preparatory", "Middle", "Secondary"];
 const EMPTY_FORM = {
   name: "", email: "", contact_no: "", address: "", locality: "",
   qualification: "", experience_years: "", experience_detail: "", skills: "",
   guardian_name: "", religion: "", caste: "",
-  previous_salary: "", expected_salary: "", subject_applied_for: "", school_stage: "", branch: "", source_portal: "",
+  previous_salary: "", expected_salary: "", subject_applied_for: "", school_stage: [] as string[], branch: "", source_portal: "",
 };
 
 function ApplicationsTab() {
@@ -320,12 +321,21 @@ function ApplicationsTab() {
               </div>
             ))}
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Stage Applying For</label>
-              <select value={form.school_stage || ""} onChange={e => setForm((f: any) => ({ ...f, school_stage: e.target.value }))}
-                className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
-                <option value="">— Select —</option>
-                {["Foundation", "Preparatory", "Middle", "Secondary"].map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <label className="text-xs text-gray-500 block mb-1">Stage(s) Applying For</label>
+              <div className="flex flex-wrap gap-2 border border-gray-300 rounded px-2 py-1.5">
+                {SCHOOL_STAGES.map(s => (
+                  <label key={s} className="flex items-center gap-1 text-xs text-gray-700">
+                    <input type="checkbox" checked={(form.school_stage || []).includes(s)}
+                      onChange={e => setForm((f: any) => ({
+                        ...f,
+                        school_stage: e.target.checked ? [...(f.school_stage || []), s] : (f.school_stage || []).filter((x: string) => x !== s),
+                      }))}
+                      className="w-3.5 h-3.5 accent-indigo-600" />
+                    {s}
+                  </label>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-0.5">Select more than one if they cover grades spanning stages (e.g. grade 8 & 9).</p>
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Branch Applying For *</label>
@@ -389,7 +399,7 @@ function ApplicationsTab() {
                     <td className="px-3 py-2 font-medium text-gray-800 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.name || "—"}</td>
                     <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.branch || "—"}</td>
                     <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.subject_applied_for || "—"}</td>
-                    <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.school_stage || "—"}</td>
+                    <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{(a.school_stage && a.school_stage.length) ? a.school_stage.join(", ") : "—"}</td>
                     <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.qualification || "—"}</td>
                     <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.experience_years ? `${a.experience_years} yrs` : "—"}</td>
                     <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.locality || "—"}</td>
@@ -645,7 +655,12 @@ function InterviewsTab() {
   const [loadingQuestions, setLoadingQuestions] = useState<string | null>(null);
   const STAGES = ["Foundation", "Preparatory", "Middle", "Secondary"];
   const [overrides, setOverrides] = useState<Record<string, { subject: string; stage: string }>>({});
-  const overrideFor = (iv: any) => overrides[iv.applicant_id] || { subject: iv.applicant?.subject_applied_for || "", stage: iv.applicant?.school_stage || "" };
+  // If the applicant spans multiple stages (e.g. Middle + Secondary), the single-select below
+  // can't default to "both" — leave it blank so the interviewer picks which one to test.
+  const overrideFor = (iv: any) => overrides[iv.applicant_id] || {
+    subject: iv.applicant?.subject_applied_for || "",
+    stage: Array.isArray(iv.applicant?.school_stage) ? (iv.applicant.school_stage.length === 1 ? iv.applicant.school_stage[0] : "") : (iv.applicant?.school_stage || ""),
+  };
   const setOverride = (iv: any, key: "subject" | "stage", value: string) => {
     setOverrides(prev => ({ ...prev, [iv.applicant_id]: { ...overrideFor(iv), [key]: value } }));
   };
