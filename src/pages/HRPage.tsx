@@ -369,6 +369,7 @@ function ApplicationsTab() {
                 <th className="px-3 py-2 text-left">Name</th>
                 <th className="px-3 py-2 text-left">Branch</th>
                 <th className="px-3 py-2 text-left">Subject</th>
+                <th className="px-3 py-2 text-left">School Stage</th>
                 <th className="px-3 py-2 text-left">Qualification</th>
                 <th className="px-3 py-2 text-left">Experience</th>
                 <th className="px-3 py-2 text-left">Locality</th>
@@ -388,6 +389,7 @@ function ApplicationsTab() {
                     <td className="px-3 py-2 font-medium text-gray-800 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.name || "—"}</td>
                     <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.branch || "—"}</td>
                     <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.subject_applied_for || "—"}</td>
+                    <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.school_stage || "—"}</td>
                     <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.qualification || "—"}</td>
                     <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.experience_years ? `${a.experience_years} yrs` : "—"}</td>
                     <td className="px-3 py-2 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>{a.locality || "—"}</td>
@@ -406,7 +408,7 @@ function ApplicationsTab() {
                   </tr>
                   {expanded === a.id && (
                     <tr className="bg-indigo-50/40">
-                      <td colSpan={11} className="px-4 py-3">
+                      <td colSpan={12} className="px-4 py-3">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                           <div><span className="text-gray-400">Email:</span> {a.email || "—"}</div>
                           <div><span className="text-gray-400">Address:</span> {a.address || "—"}</div>
