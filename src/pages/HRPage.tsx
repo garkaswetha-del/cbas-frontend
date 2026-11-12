@@ -836,7 +836,20 @@ function HiringProcessTab() {
                       <td className="px-3 py-2">{a.qualification || "—"}</td>
                       <td className="px-3 py-2">{a.experience_years ? `${a.experience_years} yrs` : "—"}</td>
                       <td className="px-3 py-2 text-center">
-                        <span className={`px-2 py-0.5 rounded-full font-medium ${STEP_COLORS[step]}`}>{STEP_LABELS[step]}</span>
+                        {step === "needs_scheduling" ? (
+                          <div className="flex items-center gap-1 justify-center flex-wrap" onClick={e => e.stopPropagation()}>
+                            <input type="date" value={f.date} onChange={e => setField(a, iv, "date", e.target.value)}
+                              className="border border-gray-300 rounded px-1.5 py-1 text-xs w-32" />
+                            <input value={f.time} onChange={e => setField(a, iv, "time", e.target.value)} placeholder="Time"
+                              className="border border-gray-300 rounded px-1.5 py-1 text-xs w-16" />
+                            <button onClick={() => scheduleFor(a, iv)} disabled={scheduling === a.id}
+                              className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 text-xs font-medium whitespace-nowrap">
+                              {scheduling === a.id ? "..." : "📅 Schedule"}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className={`px-2 py-0.5 rounded-full font-medium ${STEP_COLORS[step]}`}>{STEP_LABELS[step]}</span>
+                        )}
                       </td>
                     </tr>
                     {expanded === a.id && (() => {
@@ -971,8 +984,9 @@ function HiringProcessTab() {
 
                           {/* Separate tool, not part of the sequential flow — usable anytime */}
                           <div className="mt-4 pt-3 border-t border-dashed border-gray-300 max-w-3xl">
-                            <button onClick={() => toggleSet(questionsOpen, setQuestionsOpen, a.id)} className="text-xs font-bold text-purple-700 flex items-center gap-1">
-                              🤖 NCF Interview Questions {questionsOpen.has(a.id) ? "▲" : "▼"}
+                            <button onClick={() => toggleSet(questionsOpen, setQuestionsOpen, a.id)}
+                              className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-3 py-1.5 flex items-center gap-1.5 hover:bg-purple-100">
+                              🤖 NCF Interview Questions <span>{questionsOpen.has(a.id) ? "▲ Hide" : "▼ Show"}</span>
                             </button>
                             {questionsOpen.has(a.id) && (
                               <div className="mt-2">
