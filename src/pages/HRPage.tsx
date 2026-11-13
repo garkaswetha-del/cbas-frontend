@@ -244,12 +244,13 @@ function DashboardTab() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
         <StatCard label="Total Applicants" value={summary.totalApplicants} color="text-gray-800" onClick={() => showApplicants("All Applicants", applicants)} />
         <StatCard label="Shortlisted" value={summary.shortlisted} color="text-blue-600" onClick={() => showApplicants("Shortlisted", applicants.filter(a => a.is_shortlisted))} />
         <StatCard label="Interviews Scheduled" value={summary.interviews.total} color="text-yellow-600" onClick={() => showInterviews("Interviews Scheduled", interviews)} />
         <StatCard label="Interviewed" value={summary.interviews.attended} color="text-purple-600" onClick={() => showInterviews("Interviewed (Attended)", interviews.filter(i => i.attended === true))} />
         <StatCard label="Selected" value={summary.selected} color="text-green-600" onClick={() => showApplicants("Selected", applicants.filter(a => a.stage === "selected"))} />
+        <StatCard label="Joined" value={summary.joined} color="text-teal-600" onClick={() => showApplicants("Joined", applicants.filter(a => a.joined))} />
         <StatCard label="Hired" value={summary.hired} color="text-emerald-600" onClick={() => showApplicants("Hired", applicants.filter(a => a.stage === "hired"))} />
       </div>
 
@@ -874,6 +875,11 @@ function HiringProcessTab() {
   const [emailPrompt, setEmailPrompt] = useState<{ applicantId: string; email: string } | null>(null);
   const [deciding, setDeciding] = useState<string | null>(null);
   const [letter, setLetter] = useState<{ name: string; dataUri: string } | null>(null);
+  const [resultOpen, setResultOpen] = useState<Set<string>>(new Set());
+
+  const [savingJoin, setSavingJoin] = useState<string | null>(null);
+  const [generatingLetter, setGeneratingLetter] = useState<string | null>(null);
+  const [joinedFilter, setJoinedFilter] = useState("");
 
   const stored = localStorage.getItem("cbas_user");
   const currentUser = stored ? JSON.parse(stored) : null;
@@ -902,6 +908,8 @@ function HiringProcessTab() {
     if (localityFilter && !(a.locality || "").toLowerCase().includes(localityFilter.toLowerCase())) return false;
     if (subjectFilter && !(a.subject_applied_for || "").toLowerCase().includes(subjectFilter.toLowerCase())) return false;
     if (stageFilter && !((a.school_stage && a.school_stage.length) ? a.school_stage : []).includes(stageFilter)) return false;
+    if (joinedFilter === "joined" && !a.joined) return false;
+    if (joinedFilter === "not_joined" && a.joined) return false;
     return true;
   });
 
@@ -1003,12 +1011,6 @@ function HiringProcessTab() {
       } else {
         setMessage(`✅ Marked ${result}`);
       }
-      if (result === "selected" && r.data?.applicant_id) {
-        try {
-          const ar = await axios.get(`${API}/hr/applicants/${r.data.applicant_id}`);
-          if (ar.data?.appointment_letter) setLetter({ name: ar.data.name || "Candidate", dataUri: ar.data.appointment_letter });
-        } catch {}
-      }
       setEmailPrompt(null);
       load();
     } catch (e: any) {
@@ -1019,6 +1021,31 @@ function HiringProcessTab() {
   const trySelect = (a: any, iv: any) => {
     if (!a.email) { setEmailPrompt({ applicantId: a.id, email: "" }); return; }
     decide(a, iv, "selected");
+  };
+
+  // ---- joining & appointment letter ----
+  const setJoining = async (a: any, patch: Partial<{ joining_date: string; joined: boolean }>) => {
+    setApplicants(prev => prev.map(x => x.id === a.id ? { ...x, ...patch } : x));
+    setSavingJoin(a.id);
+    try {
+      await axios.patch(`${API}/hr/applicants/${a.id}`, patch);
+    } catch {
+      setApplicants(prev => prev.map(x => x.id === a.id ? { ...x, joined: a.joined, joining_date: a.joining_date } : x));
+      setMessage("❌ Error saving joining info"); setTimeout(() => setMessage(""), 3000);
+    }
+    setSavingJoin(null);
+  };
+  const generateLetter = async (a: any) => {
+    setGeneratingLetter(a.id);
+    try {
+      const r = await axios.post(`${API}/hr/applicants/${a.id}/generate-appointment-letter`);
+      setLetter({ name: a.name || "Candidate", dataUri: r.data.appointment_letter });
+      setMessage("✅ Appointment letter generated");
+    } catch (e: any) {
+      setMessage("❌ " + (e?.response?.data?.message || "Error generating letter"));
+    }
+    setGeneratingLetter(null);
+    setTimeout(() => setMessage(""), 4000);
   };
 
   return (
@@ -1039,6 +1066,11 @@ function HiringProcessTab() {
         <select value={stageFilter} onChange={e => setStageFilter(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs">
           <option value="">All stages</option>
           {PROCESS_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={joinedFilter} onChange={e => setJoinedFilter(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs">
+          <option value="">Joined: any</option>
+          <option value="joined">Joined</option>
+          <option value="not_joined">Not joined yet</option>
         </select>
       </div>
 
@@ -1117,14 +1149,18 @@ function HiringProcessTab() {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-center whitespace-nowrap">
-                      {iv.result === "pending" ? (
+                      {iv.result === "pending" || resultOpen.has(iv.id) ? (
                         <span className="inline-flex gap-1">
-                          <button onClick={() => trySelect(a, iv)} disabled={deciding === iv.id} className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50">Select</button>
-                          <button onClick={() => decide(a, iv, "hold")} disabled={deciding === iv.id} className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 disabled:opacity-50">Hold</button>
-                          <button onClick={() => decide(a, iv, "rejected")} disabled={deciding === iv.id} className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50">Reject</button>
+                          <button onClick={() => { trySelect(a, iv); toggleSet(resultOpen, setResultOpen, iv.id); }} disabled={deciding === iv.id} className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50">Select</button>
+                          <button onClick={() => { decide(a, iv, "hold"); toggleSet(resultOpen, setResultOpen, iv.id); }} disabled={deciding === iv.id} className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 disabled:opacity-50">Hold</button>
+                          <button onClick={() => { decide(a, iv, "rejected"); toggleSet(resultOpen, setResultOpen, iv.id); }} disabled={deciding === iv.id} className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50">Reject</button>
+                          {iv.result !== "pending" && <button onClick={() => toggleSet(resultOpen, setResultOpen, iv.id)} className="text-gray-400 underline">Cancel</button>}
                         </span>
                       ) : (
-                        <button onClick={() => setExpanded(a.id)} className="text-indigo-600 underline">View</button>
+                        <span className="inline-flex gap-2">
+                          <button onClick={() => toggleSet(resultOpen, setResultOpen, iv.id)} className="text-indigo-600 underline">✏️ Edit</button>
+                          <button onClick={() => setExpanded(a.id)} className="text-gray-500 underline">View</button>
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -1297,15 +1333,51 @@ function HiringProcessTab() {
                                 </div>
                                 <div className="flex-1 pb-1">
                                   <p className="text-xs font-bold text-gray-600 mb-1.5">Decision</p>
-                                  {iv.result === "pending" ? (
-                                    <span className="inline-flex gap-1">
-                                      <button onClick={() => trySelect(a, iv)} disabled={deciding === iv.id} className="px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 text-xs">Select</button>
-                                      <button onClick={() => decide(a, iv, "hold")} disabled={deciding === iv.id} className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 disabled:opacity-50 text-xs">Hold</button>
-                                      <button onClick={() => decide(a, iv, "rejected")} disabled={deciding === iv.id} className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50 text-xs">Reject</button>
+                                  {iv.result === "pending" || resultOpen.has(iv.id) ? (
+                                    <span className="inline-flex gap-1 items-center">
+                                      <button onClick={() => { trySelect(a, iv); toggleSet(resultOpen, setResultOpen, iv.id); }} disabled={deciding === iv.id} className="px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 text-xs">Select</button>
+                                      <button onClick={() => { decide(a, iv, "hold"); toggleSet(resultOpen, setResultOpen, iv.id); }} disabled={deciding === iv.id} className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 disabled:opacity-50 text-xs">Hold</button>
+                                      <button onClick={() => { decide(a, iv, "rejected"); toggleSet(resultOpen, setResultOpen, iv.id); }} disabled={deciding === iv.id} className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50 text-xs">Reject</button>
+                                      {iv.result !== "pending" && <button onClick={() => toggleSet(resultOpen, setResultOpen, iv.id)} className="text-xs text-gray-400 underline">Cancel</button>}
                                     </span>
                                   ) : (
-                                    <p className="text-xs text-gray-700">Result: <span className="font-semibold capitalize">{iv.result}</span></p>
+                                    <div className="flex items-center justify-between flex-wrap gap-2">
+                                      <p className="text-xs text-gray-700">Result: <span className="font-semibold capitalize">{iv.result}</span></p>
+                                      <button onClick={() => toggleSet(resultOpen, setResultOpen, iv.id)} className="text-xs text-indigo-600 underline">✏️ Edit</button>
+                                    </div>
                                   )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Step 5: Joining & Appointment Letter */}
+                            {iv && iv.result === "selected" && (
+                              <div className="flex gap-3">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${a.joined ? "bg-green-500 text-white" : "bg-indigo-600 text-white"}`}>
+                                  {a.joined ? "✓" : "5"}
+                                </div>
+                                <div className="flex-1 pb-1">
+                                  <p className="text-xs font-bold text-gray-600 mb-1.5">Joining</p>
+                                  <div className="flex flex-wrap gap-3 items-end">
+                                    <div>
+                                      <label className="block text-[10px] text-gray-400">Joining Date</label>
+                                      <input type="date" value={a.joining_date ? a.joining_date.slice(0, 10) : ""}
+                                        onChange={e => setJoining(a, { joining_date: e.target.value })}
+                                        className="border border-gray-300 rounded px-2 py-1 text-xs" />
+                                    </div>
+                                    <label className="flex items-center gap-1 text-xs text-gray-700 pb-1.5">
+                                      <input type="checkbox" checked={!!a.joined}
+                                        onChange={e => setJoining(a, { joined: e.target.checked })}
+                                        className="w-3.5 h-3.5 accent-indigo-600" />
+                                      Joined
+                                    </label>
+                                    {savingJoin === a.id && <span className="text-[10px] text-gray-400">Saving...</span>}
+                                    <button onClick={() => generateLetter(a)} disabled={!a.joined || generatingLetter === a.id}
+                                      title={!a.joined ? "Mark as joined first" : ""}
+                                      className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 text-xs font-medium">
+                                      {generatingLetter === a.id ? "..." : a.appointment_letter ? "🔄 Regenerate Appointment Letter" : "📄 Generate Appointment Letter"}
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             )}
