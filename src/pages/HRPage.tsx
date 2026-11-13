@@ -160,24 +160,30 @@ function DrillModal({ drill, onClose }: { drill: { title: string; kind: "applica
               <thead>
                 <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
                   <th className="px-3 py-2 text-left">Candidate</th>
-                  <th className="px-3 py-2 text-left">Date</th>
-                  <th className="px-3 py-2 text-left">Time</th>
-                  <th className="px-3 py-2 text-left">Interviewer</th>
-                  <th className="px-3 py-2 text-center">Attended</th>
+                  <th className="px-3 py-2 text-center">Written</th>
+                  <th className="px-3 py-2 text-center">Oral</th>
+                  <th className="px-3 py-2 text-center">Demo</th>
                   <th className="px-3 py-2 text-center">Result</th>
                 </tr>
               </thead>
               <tbody>
-                {drill.rows.map((i: any) => (
-                  <tr key={i.id} className="border-b border-gray-100">
-                    <td className="px-3 py-2 font-medium text-gray-800">{i.applicant?.name || "—"}</td>
-                    <td className="px-3 py-2">{fmtDate(i.interview_date)}</td>
-                    <td className="px-3 py-2">{i.slot_time || "—"}</td>
-                    <td className="px-3 py-2">{i.interviewer_name || "—"}</td>
-                    <td className="px-3 py-2 text-center">{i.attended === true ? "✅" : i.attended === false ? "❌" : "—"}</td>
-                    <td className="px-3 py-2 text-center">{i.result || "—"}</td>
-                  </tr>
-                ))}
+                {drill.rows.map((i: any) => {
+                  const roundCell = (round: "written" | "oral" | "demo") => {
+                    const date = i[`${round}_date`];
+                    const attended = i[`${round}_attended`];
+                    if (!date) return <span className="text-gray-300">—</span>;
+                    return <span>{fmtDate(date)} {attended === true ? "✅" : attended === false ? "❌" : ""}</span>;
+                  };
+                  return (
+                    <tr key={i.id} className="border-b border-gray-100">
+                      <td className="px-3 py-2 font-medium text-gray-800">{i.applicant?.name || "—"}</td>
+                      <td className="px-3 py-2 text-center whitespace-nowrap">{roundCell("written")}</td>
+                      <td className="px-3 py-2 text-center whitespace-nowrap">{roundCell("oral")}</td>
+                      <td className="px-3 py-2 text-center whitespace-nowrap">{roundCell("demo")}</td>
+                      <td className="px-3 py-2 text-center">{i.result || "—"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
@@ -248,7 +254,7 @@ function DashboardTab() {
         <StatCard label="Total Applicants" value={summary.totalApplicants} color="text-gray-800" onClick={() => showApplicants("All Applicants", applicants)} />
         <StatCard label="Shortlisted" value={summary.shortlisted} color="text-blue-600" onClick={() => showApplicants("Shortlisted", applicants.filter(a => a.is_shortlisted))} />
         <StatCard label="Interviews Scheduled" value={summary.interviews.total} color="text-yellow-600" onClick={() => showInterviews("Interviews Scheduled", interviews)} />
-        <StatCard label="Interviewed" value={summary.interviews.attended} color="text-purple-600" onClick={() => showInterviews("Interviewed (Attended)", interviews.filter(i => i.attended === true))} />
+        <StatCard label="Interviewed" value={summary.interviews.attended} color="text-purple-600" onClick={() => showInterviews("Interviewed (completed Written, Oral & Demo)", interviews.filter(i => i.demo_attended === true))} />
         <StatCard label="Selected" value={summary.selected} color="text-green-600" onClick={() => showApplicants("Selected", applicants.filter(a => a.stage === "selected"))} />
         <StatCard label="Joined" value={summary.joined} color="text-teal-600" onClick={() => showApplicants("Joined", applicants.filter(a => a.joined))} />
         <StatCard label="Hired" value={summary.hired} color="text-emerald-600" onClick={() => showApplicants("Hired", applicants.filter(a => a.stage === "hired"))} />
@@ -312,9 +318,9 @@ function DashboardTab() {
         <h3 className="text-sm font-bold text-gray-700 mb-3">Interviews</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard label="Total Scheduled" value={summary.interviews.total} color="text-gray-800" onClick={() => showInterviews("Total Scheduled Interviews", interviews)} />
-          <StatCard label="Attended" value={summary.interviews.attended} color="text-green-600" onClick={() => showInterviews("Attended", interviews.filter(i => i.attended === true))} />
-          <StatCard label="Absent" value={summary.interviews.absent} color="text-red-500" onClick={() => showInterviews("Absent", interviews.filter(i => i.attended === false))} />
-          <StatCard label="Upcoming / Not Marked" value={summary.interviews.upcoming} color="text-yellow-600" onClick={() => showInterviews("Upcoming / Not Marked", interviews.filter(i => i.attended === null || i.attended === undefined))} />
+          <StatCard label="Attended" value={summary.interviews.attended} color="text-green-600" onClick={() => showInterviews("Attended (completed all 3 rounds)", interviews.filter(i => i.demo_attended === true))} />
+          <StatCard label="Absent" value={summary.interviews.absent} color="text-red-500" onClick={() => showInterviews("Absent (at some round)", interviews.filter(i => i.written_attended === false || i.oral_attended === false || i.demo_attended === false))} />
+          <StatCard label="Upcoming / Not Marked" value={summary.interviews.upcoming} color="text-yellow-600" onClick={() => showInterviews("Upcoming / Not Marked", interviews.filter(i => i.demo_attended !== true && i.written_attended !== false && i.oral_attended !== false && i.demo_attended !== false))} />
         </div>
       </div>
 
@@ -810,34 +816,62 @@ function ApplicationsTab() {
 // ─────────────────────────────────────────────────────────────────
 const PROCESS_STAGES = ["Foundation", "Preparatory", "Middle", "Secondary"];
 const STEP_LABELS: Record<string, string> = {
-  needs_scheduling: "Needs Scheduling",
-  awaiting_interview: "Awaiting Interview",
-  absent: "Absent",
-  needs_scoring: "Needs Scoring",
+  needs_written_schedule: "Needs Written Schedule",
+  awaiting_written: "Awaiting Written",
+  written_absent: "Absent (Written)",
+  needs_oral_schedule: "Needs Oral Schedule",
+  awaiting_oral: "Awaiting Oral",
+  oral_absent: "Absent (Oral)",
+  needs_demo_schedule: "Needs Demo Schedule",
+  awaiting_demo: "Awaiting Demo",
+  demo_absent: "Absent (Demo)",
   needs_decision: "Needs Decision",
   hold: "On Hold",
   selected: "Selected",
   rejected: "Rejected",
 };
 const STEP_COLORS: Record<string, string> = {
-  needs_scheduling: "bg-gray-100 text-gray-600",
-  awaiting_interview: "bg-yellow-100 text-yellow-700",
-  absent: "bg-red-100 text-red-700",
-  needs_scoring: "bg-purple-100 text-purple-700",
+  needs_written_schedule: "bg-gray-100 text-gray-600",
+  awaiting_written: "bg-yellow-100 text-yellow-700",
+  written_absent: "bg-red-100 text-red-700",
+  needs_oral_schedule: "bg-gray-100 text-gray-600",
+  awaiting_oral: "bg-yellow-100 text-yellow-700",
+  oral_absent: "bg-red-100 text-red-700",
+  needs_demo_schedule: "bg-gray-100 text-gray-600",
+  awaiting_demo: "bg-yellow-100 text-yellow-700",
+  demo_absent: "bg-red-100 text-red-700",
   needs_decision: "bg-blue-100 text-blue-700",
   hold: "bg-orange-100 text-orange-700",
   selected: "bg-green-100 text-green-700",
   rejected: "bg-red-100 text-red-700",
 };
+// Each round only becomes reachable once the previous one's attendance is marked
+// (or HR explicitly overrides past an absence) — see written/oral_proceed_anyway.
 function stepFor(iv: any): string {
-  if (!iv) return "needs_scheduling";
+  if (!iv) return "needs_written_schedule";
   if (iv.result === "selected") return "selected";
   if (iv.result === "rejected") return "rejected";
   if (iv.result === "hold") return "hold";
-  if (iv.attended === false) return "absent";
-  if (iv.attended === null || iv.attended === undefined) return "awaiting_interview";
-  const hasScores = iv.written_marks != null || iv.oral_marks != null || iv.demo_marks != null;
-  return hasScores ? "needs_decision" : "needs_scoring";
+
+  if (!iv.written_date) return "needs_written_schedule";
+  if (iv.written_attended === null || iv.written_attended === undefined) return "awaiting_written";
+  if (iv.written_attended === false && !iv.written_proceed_anyway) return "written_absent";
+
+  if (!iv.oral_date) return "needs_oral_schedule";
+  if (iv.oral_attended === null || iv.oral_attended === undefined) return "awaiting_oral";
+  if (iv.oral_attended === false && !iv.oral_proceed_anyway) return "oral_absent";
+
+  if (!iv.demo_date) return "needs_demo_schedule";
+  if (iv.demo_attended === null || iv.demo_attended === undefined) return "awaiting_demo";
+  if (iv.demo_attended === false) return "demo_absent";
+
+  return "needs_decision";
+}
+function roundNeedingSchedule(step: string): "written" | "oral" | "demo" | null {
+  if (step === "needs_written_schedule") return "written";
+  if (step === "needs_oral_schedule") return "oral";
+  if (step === "needs_demo_schedule") return "demo";
+  return null;
 }
 
 function HiringProcessTab() {
@@ -856,7 +890,6 @@ function HiringProcessTab() {
 
   const [schedForm, setSchedForm] = useState<Record<string, { date: string; time: string; interviewer: string }>>({});
   const [scheduling, setScheduling] = useState<string | null>(null);
-  const [schedOpen, setSchedOpen] = useState<Set<string>>(new Set());
 
   const [questionsMap, setQuestionsMap] = useState<Record<string, { question: string; expected_answer: string }[]>>({});
   const [loadingQuestions, setLoadingQuestions] = useState<string | null>(null);
@@ -913,29 +946,40 @@ function HiringProcessTab() {
     return true;
   });
 
-  // ---- scheduling ----
-  const fieldFor = (a: any, iv: any) => schedForm[a.id] || { date: iv?.interview_date?.slice(0, 10) || "", time: iv?.slot_time || "", interviewer: iv?.interviewer_name || "" };
-  const setField = (a: any, iv: any, key: "date" | "time" | "interviewer", value: string) => {
-    setSchedForm(prev => ({ ...prev, [a.id]: { ...fieldFor(a, iv), [key]: value } }));
+  // ---- scheduling (per round — written/oral/demo each have their own date) ----
+  const ROUND_LABELS: Record<string, string> = { written: "Written", oral: "Oral", demo: "Demo" };
+  const NEXT_ROUND: Record<string, string> = { written: "oral", oral: "demo" };
+  type Round = "written" | "oral" | "demo";
+
+  const fieldFor = (a: any, iv: any, round: Round) => {
+    const key = `${a.id}__${round}`;
+    if (schedForm[key]) return schedForm[key];
+    return { date: iv?.[`${round}_date`]?.slice(0, 10) || "", time: iv?.[`${round}_time`] || "", interviewer: iv?.[`${round}_interviewer`] || "" };
   };
-  const scheduleFor = async (a: any, iv: any) => {
-    const f = fieldFor(a, iv);
+  const setField = (a: any, iv: any, round: Round, key: "date" | "time" | "interviewer", value: string) => {
+    const k = `${a.id}__${round}`;
+    setSchedForm(prev => ({ ...prev, [k]: { ...fieldFor(a, iv, round), [key]: value } }));
+  };
+  const scheduleFor = async (a: any, iv: any, round: Round) => {
+    const f = fieldFor(a, iv, round);
     if (!f.date) { setMessage("❌ Pick a date first"); setTimeout(() => setMessage(""), 3000); return; }
-    setScheduling(a.id);
+    const k = `${a.id}__${round}`;
+    setScheduling(k);
     try {
       await axios.post(`${API}/hr/interviews/schedule`, {
-        applicant_id: a.id, interview_date: f.date, slot_time: f.time, interviewer_name: f.interviewer, scheduled_by: currentUser?.name,
+        applicant_id: a.id, round, interview_date: f.date, slot_time: f.time, interviewer_name: f.interviewer, scheduled_by: currentUser?.name,
       });
-      setMessage(`✅ Interview scheduled for ${a.name || "candidate"}`);
+      setMessage(`✅ ${ROUND_LABELS[round]} interview scheduled for ${a.name || "candidate"}`);
       load();
     } catch { setMessage("❌ Error scheduling"); }
     setScheduling(null);
     setTimeout(() => setMessage(""), 3000);
   };
 
-  // ---- notify / attendance ----
-  const notify = async (iv: any) => { await axios.patch(`${API}/hr/interviews/${iv.id}/notified`); load(); };
-  const attendance = async (iv: any, attended: boolean) => { await axios.patch(`${API}/hr/interviews/${iv.id}/attendance`, { attended }); load(); };
+  // ---- notify / attendance / proceed-anyway (per round) ----
+  const notify = async (iv: any, round: Round) => { await axios.patch(`${API}/hr/interviews/${iv.id}/notified`, { round }); load(); };
+  const attendance = async (iv: any, round: Round, attended: boolean) => { await axios.patch(`${API}/hr/interviews/${iv.id}/attendance`, { round, attended }); load(); };
+  const proceedAnyway = async (iv: any, round: "written" | "oral") => { await axios.patch(`${API}/hr/interviews/${iv.id}/proceed-anyway`, { round, value: true }); load(); };
 
   // ---- NCF questions ----
   const overrideFor = (a: any) => overrides[a.id] || {
@@ -957,28 +1001,25 @@ function HiringProcessTab() {
     setLoadingQuestions(null);
   };
 
-  // ---- scores ----
-  const scoreFieldsFor = (iv: any) => scoreEdits[iv.id] || {
-    written_marks: iv.written_marks ?? "", written_max: iv.written_max ?? "",
-    oral_marks: iv.oral_marks ?? "", oral_max: iv.oral_max ?? "",
-    demo_marks: iv.demo_marks ?? "", demo_max: iv.demo_max ?? "",
-    notes: iv.notes ?? "",
+  // ---- scores (per round — each round has its own marks/max/notes) ----
+  const scoreFieldsFor = (iv: any, round: Round) => {
+    const key = `${iv.id}__${round}`;
+    if (scoreEdits[key]) return scoreEdits[key];
+    return { marks: iv[`${round}_marks`] ?? "", max: iv[`${round}_max`] ?? "", notes: iv[`${round}_notes`] ?? "" };
   };
-  const setScoreField = (iv: any, key: string, value: string) => {
-    setScoreEdits(prev => ({ ...prev, [iv.id]: { ...scoreFieldsFor(iv), [key]: value } }));
+  const setScoreField = (iv: any, round: Round, key: "marks" | "max" | "notes", value: string) => {
+    const k = `${iv.id}__${round}`;
+    setScoreEdits(prev => ({ ...prev, [k]: { ...scoreFieldsFor(iv, round), [key]: value } }));
   };
-  const saveScores = async (iv: any) => {
-    setSavingScores(iv.id);
-    const e = scoreFieldsFor(iv);
+  const saveScores = async (iv: any, round: Round) => {
+    const k = `${iv.id}__${round}`;
+    setSavingScores(k);
+    const e = scoreFieldsFor(iv, round);
     try {
       await axios.patch(`${API}/hr/interviews/${iv.id}/scores`, {
-        written_marks: e.written_marks === "" ? null : Number(e.written_marks),
-        written_max: e.written_max === "" ? null : Number(e.written_max),
-        oral_marks: e.oral_marks === "" ? null : Number(e.oral_marks),
-        oral_max: e.oral_max === "" ? null : Number(e.oral_max),
-        demo_marks: e.demo_marks === "" ? null : Number(e.demo_marks),
-        demo_max: e.demo_max === "" ? null : Number(e.demo_max),
-        notes: e.notes,
+        [`${round}_marks`]: e.marks === "" ? null : Number(e.marks),
+        [`${round}_max`]: e.max === "" ? null : Number(e.max),
+        [`${round}_notes`]: e.notes,
       });
       setMessage("✅ Scores saved");
       load();
@@ -986,9 +1027,9 @@ function HiringProcessTab() {
     setSavingScores(null);
     setTimeout(() => setMessage(""), 3000);
   };
-  const scoreInput = (iv: any, key: string) => (
-    <input type="number" step="0.5" value={scoreFieldsFor(iv)[key] ?? ""}
-      onChange={e => setScoreField(iv, key, e.target.value)}
+  const scoreInput = (iv: any, round: Round, field: "marks" | "max") => (
+    <input type="number" step="0.5" value={scoreFieldsFor(iv, round)[field] ?? ""}
+      onChange={e => setScoreField(iv, round, field, e.target.value)}
       className="border border-gray-300 rounded px-1.5 py-1 text-xs w-16 text-right" />
   );
   const totalScore = (iv: any) => (Number(iv.written_marks) || 0) + (Number(iv.oral_marks) || 0) + (Number(iv.demo_marks) || 0);
@@ -998,7 +1039,7 @@ function HiringProcessTab() {
   // interviewer needs when e.g. filtering to "Science, Middle" to decide between
   // everyone who sat that combination's interview.
   const scoreboard = filtered
-    .filter(({ interview: iv }) => iv && iv.attended === true)
+    .filter(({ interview: iv }) => iv && iv.demo_attended === true)
     .sort((x, y) => totalScore(y.interview) - totalScore(x.interview));
 
   // ---- decision ----
@@ -1046,6 +1087,95 @@ function HiringProcessTab() {
     }
     setGeneratingLetter(null);
     setTimeout(() => setMessage(""), 4000);
+  };
+
+  // One self-contained schedule -> notify -> attendance -> marks block, reused for
+  // each of the three rounds since they're now scheduled/attended independently.
+  const renderRoundStep = (a: any, iv: any, round: Round, stepNum: number) => {
+    const dateVal = iv?.[`${round}_date`];
+    const attended = iv?.[`${round}_attended`];
+    const notified = iv?.[`${round}_notified`];
+    const marksSet = iv?.[`${round}_marks`] != null;
+    const f = fieldFor(a, iv, round);
+    const schedKey = `${a.id}__${round}`;
+    const scoreKey = `${iv?.id}__${round}`;
+    const scoresAreOpen = !marksSet || scoresOpen.has(scoreKey);
+    const circleColor = attended === true ? "bg-green-500 text-white" : attended === false ? "bg-red-500 text-white" : "bg-indigo-600 text-white";
+    const nextRound = NEXT_ROUND[round];
+
+    return (
+      <div className="flex gap-3" key={round}>
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${circleColor}`}>
+          {attended === true ? "✓" : attended === false ? "✗" : stepNum}
+        </div>
+        <div className="flex-1 pb-1">
+          <p className="text-xs font-bold text-gray-600 mb-1.5">{ROUND_LABELS[round]} Round</p>
+
+          {!dateVal ? (
+            <div className="flex flex-wrap gap-2 items-end">
+              <input type="date" value={f.date} onChange={e => setField(a, iv, round, "date", e.target.value)}
+                className="border border-gray-300 rounded px-2 py-1 text-xs" />
+              <input value={f.time} onChange={e => setField(a, iv, round, "time", e.target.value)} placeholder="10:30 AM"
+                className="border border-gray-300 rounded px-2 py-1 text-xs w-24" />
+              <input value={f.interviewer} onChange={e => setField(a, iv, round, "interviewer", e.target.value)} placeholder="Interviewer"
+                className="border border-gray-300 rounded px-2 py-1 text-xs w-32" />
+              <button onClick={() => scheduleFor(a, iv, round)} disabled={scheduling === schedKey}
+                className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 font-medium">
+                {scheduling === schedKey ? "..." : "📅 Schedule"}
+              </button>
+            </div>
+          ) : attended === null || attended === undefined ? (
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <p className="text-gray-700">
+                <span className="font-semibold text-gray-600">Scheduled:</span> {fmtDate(dateVal)} {iv[`${round}_time`] || ""}
+                {iv[`${round}_interviewer`] ? ` · ${iv[`${round}_interviewer`]}` : ""}
+              </p>
+              {notified
+                ? <span className="text-green-600">✓ Notified</span>
+                : <button onClick={() => notify(iv, round)} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200">Mark Notified</button>}
+              <span className="inline-flex gap-1">
+                <button onClick={() => attendance(iv, round, true)} className="px-2 py-0.5 bg-green-100 text-green-700 rounded hover:bg-green-200">Attended</button>
+                <button onClick={() => attendance(iv, round, false)} className="px-2 py-0.5 bg-red-100 text-red-700 rounded hover:bg-red-200">Absent</button>
+              </span>
+            </div>
+          ) : attended === false ? (
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <span className="text-red-500 font-medium">✗ Absent</span>
+              {nextRound && (
+                iv[`${round}_proceed_anyway`] ? (
+                  <span className="text-indigo-600">✓ Allowed to proceed to {ROUND_LABELS[nextRound]} anyway</span>
+                ) : (
+                  <button onClick={() => proceedAnyway(iv, round as "written" | "oral")} className="text-indigo-600 underline">
+                    Let them proceed to {ROUND_LABELS[nextRound]} anyway
+                  </button>
+                )
+              )}
+            </div>
+          ) : scoresAreOpen ? (
+            <div className="flex flex-wrap gap-3 items-end">
+              <div><label className="block text-[10px] text-gray-400">Marks</label>{scoreInput(iv, round, "marks")} / {scoreInput(iv, round, "max")}</div>
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-[10px] text-gray-400">{ROUND_LABELS[round]} Notes</label>
+                <input value={scoreFieldsFor(iv, round).notes} onChange={e => setScoreField(iv, round, "notes", e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs w-full" />
+              </div>
+              <button onClick={() => { saveScores(iv, round); toggleSet(scoresOpen, setScoresOpen, scoreKey); }} disabled={savingScores === scoreKey}
+                className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 text-xs">
+                {savingScores === scoreKey ? "..." : "💾 Save"}
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-xs text-gray-700">
+                <span className="font-semibold text-gray-600">{ROUND_LABELS[round]}:</span> {iv[`${round}_marks`] ?? "—"}{iv[`${round}_max`] ? ` / ${iv[`${round}_max`]}` : ""}
+                {iv[`${round}_notes`] && <span className="text-gray-400"> — {iv[`${round}_notes`]}</span>}
+              </p>
+              <button onClick={() => toggleSet(scoresOpen, setScoresOpen, scoreKey)} className="text-xs text-indigo-600 underline">✏️ Edit</button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -1139,7 +1269,10 @@ function HiringProcessTab() {
                     <td className="px-3 py-2 text-center whitespace-nowrap">{iv.oral_marks ?? "—"}{iv.oral_max ? ` / ${iv.oral_max}` : ""}</td>
                     <td className="px-3 py-2 text-center whitespace-nowrap">{iv.demo_marks ?? "—"}{iv.demo_max ? ` / ${iv.demo_max}` : ""}</td>
                     <td className="px-3 py-2 text-center font-semibold whitespace-nowrap">{totalScore(iv)}{totalMax(iv) ? ` / ${totalMax(iv)}` : ""}</td>
-                    <td className="px-3 py-2 min-w-[160px] max-w-xs whitespace-pre-wrap">{iv.notes || "—"}</td>
+                    <td className="px-3 py-2 min-w-[160px] max-w-xs whitespace-pre-wrap">
+                      {[iv.written_notes && `W: ${iv.written_notes}`, iv.oral_notes && `O: ${iv.oral_notes}`, iv.demo_notes && `D: ${iv.demo_notes}`]
+                        .filter(Boolean).join("\n") || "—"}
+                    </td>
                     <td className="px-3 py-2 text-center whitespace-nowrap">
                       <span className={`px-2 py-0.5 rounded-full font-medium ${
                         iv.result === "selected" ? "bg-green-100 text-green-700" : iv.result === "rejected" ? "bg-red-100 text-red-700" :
@@ -1191,7 +1324,8 @@ function HiringProcessTab() {
             <tbody>
               {filtered.map(({ applicant: a, interview: iv }) => {
                 const step = stepFor(iv);
-                const f = fieldFor(a, iv);
+                const roundToSchedule = roundNeedingSchedule(step);
+                const f = roundToSchedule ? fieldFor(a, iv, roundToSchedule) : null;
                 return (
                   <Fragment key={a.id}>
                     <tr className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>
@@ -1201,15 +1335,16 @@ function HiringProcessTab() {
                       <td className="px-3 py-2">{a.qualification || "—"}</td>
                       <td className="px-3 py-2">{a.experience_years ? `${a.experience_years} yrs` : "—"}</td>
                       <td className="px-3 py-2 text-center">
-                        {step === "needs_scheduling" ? (
+                        {roundToSchedule && f ? (
                           <div className="flex items-center gap-1 justify-center flex-wrap" onClick={e => e.stopPropagation()}>
-                            <input type="date" value={f.date} onChange={e => setField(a, iv, "date", e.target.value)}
+                            <span className="text-[10px] text-gray-400 font-medium">{ROUND_LABELS[roundToSchedule]}:</span>
+                            <input type="date" value={f.date} onChange={e => setField(a, iv, roundToSchedule, "date", e.target.value)}
                               className="border border-gray-300 rounded px-1.5 py-1 text-xs w-32" />
-                            <input value={f.time} onChange={e => setField(a, iv, "time", e.target.value)} placeholder="Time"
+                            <input value={f.time} onChange={e => setField(a, iv, roundToSchedule, "time", e.target.value)} placeholder="Time"
                               className="border border-gray-300 rounded px-1.5 py-1 text-xs w-16" />
-                            <button onClick={() => scheduleFor(a, iv)} disabled={scheduling === a.id}
+                            <button onClick={() => scheduleFor(a, iv, roundToSchedule)} disabled={scheduling === `${a.id}__${roundToSchedule}`}
                               className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 text-xs font-medium whitespace-nowrap">
-                              {scheduling === a.id ? "..." : "📅 Schedule"}
+                              {scheduling === `${a.id}__${roundToSchedule}` ? "..." : "📅 Schedule"}
                             </button>
                           </div>
                         ) : (
@@ -1218,115 +1353,21 @@ function HiringProcessTab() {
                       </td>
                     </tr>
                     {expanded === a.id && (() => {
-                      const hasScores = !!iv && (iv.written_marks != null || iv.oral_marks != null || iv.demo_marks != null);
-                      const scheduleIsOpen = !iv || schedOpen.has(a.id);
-                      const scoresAreOpen = !hasScores || scoresOpen.has(iv?.id);
                       return (
                       <tr className="bg-indigo-50/30">
                         <td colSpan={6} className="px-4 py-4">
                           <div className="space-y-4 max-w-3xl">
-                            {/* Step 1: Schedule */}
-                            <div className="flex gap-3">
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${iv ? "bg-green-500 text-white" : "bg-indigo-600 text-white"}`}>
-                                {iv ? "✓" : "1"}
-                              </div>
-                              <div className="flex-1 pb-1">
-                                {scheduleIsOpen ? (
-                                  <>
-                                    <p className="text-xs font-bold text-gray-600 mb-1.5">Schedule Interview</p>
-                                    <div className="flex flex-wrap gap-2 items-end">
-                                      <input type="date" value={f.date} onChange={e => setField(a, iv, "date", e.target.value)}
-                                        className="border border-gray-300 rounded px-2 py-1 text-xs" />
-                                      <input value={f.time} onChange={e => setField(a, iv, "time", e.target.value)} placeholder="10:30 AM"
-                                        className="border border-gray-300 rounded px-2 py-1 text-xs w-24" />
-                                      <input value={f.interviewer} onChange={e => setField(a, iv, "interviewer", e.target.value)} placeholder="Interviewer"
-                                        className="border border-gray-300 rounded px-2 py-1 text-xs w-32" />
-                                      <button onClick={() => { scheduleFor(a, iv); if (iv) toggleSet(schedOpen, setSchedOpen, a.id); }} disabled={scheduling === a.id}
-                                        className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 font-medium">
-                                        {scheduling === a.id ? "..." : iv ? "Save" : "📅 Schedule"}
-                                      </button>
-                                      {iv && <button onClick={() => toggleSet(schedOpen, setSchedOpen, a.id)} className="text-xs text-gray-400 underline">Cancel</button>}
-                                    </div>
-                                  </>
-                                ) : (
-                                  <div className="flex items-center justify-between flex-wrap gap-2">
-                                    <p className="text-xs text-gray-700">
-                                      <span className="font-semibold text-gray-600">Scheduled:</span> {fmtDate(iv.interview_date)} {iv.slot_time}
-                                      {iv.interviewer_name ? ` · ${iv.interviewer_name}` : ""}
-                                    </p>
-                                    <button onClick={() => toggleSet(schedOpen, setSchedOpen, a.id)} className="text-xs text-indigo-600 underline">✏️ Edit</button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
+                            {/* Step 1: Written round */}
+                            {renderRoundStep(a, iv, "written", 1)}
 
-                            {/* Step 2: Notify & Attendance */}
-                            {iv && (
-                              <div className="flex gap-3">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                                  iv.attended === true ? "bg-green-500 text-white" : iv.attended === false ? "bg-red-500 text-white" : "bg-indigo-600 text-white"
-                                }`}>
-                                  {iv.attended === true ? "✓" : iv.attended === false ? "✗" : "2"}
-                                </div>
-                                <div className="flex-1 pb-1">
-                                  <p className="text-xs font-bold text-gray-600 mb-1.5">Notify & Attendance</p>
-                                  <div className="flex flex-wrap items-center gap-4 text-xs">
-                                    {iv.candidate_notified
-                                      ? <span className="text-green-600">✓ Notified</span>
-                                      : <button onClick={() => notify(iv)} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200">Mark Notified</button>}
-                                    {iv.attended === true && <span className="text-green-600">✓ Attended</span>}
-                                    {iv.attended === false && <span className="text-red-500">✗ Absent</span>}
-                                    {iv.attended === null && (
-                                      <span className="inline-flex gap-1">
-                                        <button onClick={() => attendance(iv, true)} className="px-2 py-0.5 bg-green-100 text-green-700 rounded hover:bg-green-200">Attended</button>
-                                        <button onClick={() => attendance(iv, false)} className="px-2 py-0.5 bg-red-100 text-red-700 rounded hover:bg-red-200">Absent</button>
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
+                            {/* Step 2: Oral round — unlocked once Written is attended (or overridden) */}
+                            {(iv?.written_attended === true || iv?.written_proceed_anyway) && renderRoundStep(a, iv, "oral", 2)}
 
-                            {/* Step 3: Scores */}
-                            {iv && iv.attended === true && (
-                              <div className="flex gap-3">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${hasScores ? "bg-green-500 text-white" : "bg-indigo-600 text-white"}`}>
-                                  {hasScores ? "✓" : "3"}
-                                </div>
-                                <div className="flex-1 pb-1">
-                                  {scoresAreOpen ? (
-                                    <>
-                                      <p className="text-xs font-bold text-gray-600 mb-1.5">Scores</p>
-                                      <div className="flex flex-wrap gap-3 items-end">
-                                        <div><label className="block text-[10px] text-gray-400">Written</label>{scoreInput(iv, "written_marks")} / {scoreInput(iv, "written_max")}</div>
-                                        <div><label className="block text-[10px] text-gray-400">Oral</label>{scoreInput(iv, "oral_marks")} / {scoreInput(iv, "oral_max")}</div>
-                                        <div><label className="block text-[10px] text-gray-400">Demo</label>{scoreInput(iv, "demo_marks")} / {scoreInput(iv, "demo_max")}</div>
-                                        <div className="flex-1 min-w-[150px]">
-                                          <label className="block text-[10px] text-gray-400">Notes</label>
-                                          <input value={scoreFieldsFor(iv).notes} onChange={e => setScoreField(iv, "notes", e.target.value)}
-                                            className="border border-gray-300 rounded px-2 py-1 text-xs w-full" />
-                                        </div>
-                                        <button onClick={() => { saveScores(iv); toggleSet(scoresOpen, setScoresOpen, iv.id); }} disabled={savingScores === iv.id}
-                                          className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 text-xs">
-                                          {savingScores === iv.id ? "..." : "💾 Save"}
-                                        </button>
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div className="flex items-center justify-between flex-wrap gap-2">
-                                      <p className="text-xs text-gray-700">
-                                        <span className="font-semibold text-gray-600">Total:</span> {totalScore(iv)} / {totalMax(iv) || "—"}
-                                        <span className="text-gray-400"> (Written {iv.written_marks ?? "—"}, Oral {iv.oral_marks ?? "—"}, Demo {iv.demo_marks ?? "—"})</span>
-                                      </p>
-                                      <button onClick={() => toggleSet(scoresOpen, setScoresOpen, iv.id)} className="text-xs text-indigo-600 underline">✏️ Edit</button>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
+                            {/* Step 3: Demo round — unlocked once Oral is attended (or overridden) */}
+                            {(iv?.oral_attended === true || iv?.oral_proceed_anyway) && renderRoundStep(a, iv, "demo", 3)}
 
-                            {/* Step 4: Decision */}
-                            {iv && iv.attended === true && (
+                            {/* Step 4: Decision — unlocked once Demo is attended */}
+                            {iv && iv.demo_attended === true && (
                               <div className="flex gap-3">
                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${iv.result !== "pending" ? "bg-green-500 text-white" : "bg-indigo-600 text-white"}`}>
                                   {iv.result !== "pending" ? "✓" : "4"}
