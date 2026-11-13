@@ -850,6 +850,8 @@ function HiringProcessTab() {
   const [qualFilter, setQualFilter] = useState("");
   const [minExp, setMinExp] = useState("");
   const [localityFilter, setLocalityFilter] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState("");
+  const [stageFilter, setStageFilter] = useState("");
 
   const [schedForm, setSchedForm] = useState<Record<string, { date: string; time: string; interviewer: string }>>({});
   const [scheduling, setScheduling] = useState<string | null>(null);
@@ -898,6 +900,8 @@ function HiringProcessTab() {
     if (qualFilter && !(a.qualification || "").toLowerCase().includes(qualFilter.toLowerCase())) return false;
     if (minExp && Number(a.experience_years || 0) < Number(minExp)) return false;
     if (localityFilter && !(a.locality || "").toLowerCase().includes(localityFilter.toLowerCase())) return false;
+    if (subjectFilter && !(a.subject_applied_for || "").toLowerCase().includes(subjectFilter.toLowerCase())) return false;
+    if (stageFilter && !((a.school_stage && a.school_stage.length) ? a.school_stage : []).includes(stageFilter)) return false;
     return true;
   });
 
@@ -982,6 +986,13 @@ function HiringProcessTab() {
   const totalScore = (iv: any) => (Number(iv.written_marks) || 0) + (Number(iv.oral_marks) || 0) + (Number(iv.demo_marks) || 0);
   const totalMax = (iv: any) => (Number(iv.written_max) || 0) + (Number(iv.oral_max) || 0) + (Number(iv.demo_max) || 0);
 
+  // Attended candidates among the current filter — the side-by-side comparison an
+  // interviewer needs when e.g. filtering to "Science, Middle" to decide between
+  // everyone who sat that combination's interview.
+  const scoreboard = filtered
+    .filter(({ interview: iv }) => iv && iv.attended === true)
+    .sort((x, y) => totalScore(y.interview) - totalScore(x.interview));
+
   // ---- decision ----
   const decide = async (a: any, iv: any, result: "selected" | "rejected" | "hold", email?: string) => {
     setDeciding(iv.id);
@@ -1023,6 +1034,12 @@ function HiringProcessTab() {
           className="border border-gray-300 rounded px-2 py-1.5 text-xs w-40" />
         <input value={localityFilter} onChange={e => setLocalityFilter(e.target.value)} placeholder="Filter: locality"
           className="border border-gray-300 rounded px-2 py-1.5 text-xs" />
+        <input value={subjectFilter} onChange={e => setSubjectFilter(e.target.value)} placeholder="Filter: subject"
+          className="border border-gray-300 rounded px-2 py-1.5 text-xs" />
+        <select value={stageFilter} onChange={e => setStageFilter(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs">
+          <option value="">All stages</option>
+          {PROCESS_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
       </div>
 
       {message && (
@@ -1048,6 +1065,72 @@ function HiringProcessTab() {
               if (row && row.interview) decide(row.applicant, row.interview, "selected", emailPrompt.email);
             }} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Confirm & Select</button>
             <button onClick={() => setEmailPrompt(null)} className="px-3 py-1 bg-gray-100 text-xs rounded hover:bg-gray-200">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {scoreboard.length > 0 && (
+        <div className="bg-white rounded-xl shadow border-2 border-indigo-200 overflow-hidden mb-4">
+          <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between flex-wrap gap-1">
+            <h3 className="text-xs font-bold text-indigo-800">
+              📊 Scoreboard — {scoreboard.length} candidate{scoreboard.length > 1 ? "s" : ""} to compare
+              {(subjectFilter || stageFilter) && ` (${subjectFilter || "any subject"}${stageFilter ? `, ${stageFilter}` : ""})`}
+            </h3>
+            <p className="text-[10px] text-indigo-500">Sorted by total score, highest first — use the Subject / Stage filters above to narrow this down</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
+                  <th className="px-3 py-2 text-left">Name</th>
+                  <th className="px-3 py-2 text-left">Subject</th>
+                  <th className="px-3 py-2 text-left">Stage</th>
+                  <th className="px-3 py-2 text-center">Written</th>
+                  <th className="px-3 py-2 text-center">Oral</th>
+                  <th className="px-3 py-2 text-center">Demo</th>
+                  <th className="px-3 py-2 text-center">Total</th>
+                  <th className="px-3 py-2 text-left">Notes</th>
+                  <th className="px-3 py-2 text-center">Result</th>
+                  <th className="px-3 py-2 text-center">Decide</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scoreboard.map(({ applicant: a, interview: iv }, idx) => (
+                  <tr key={a.id} className={`border-b border-gray-100 ${idx === 0 && totalScore(iv) > 0 ? "bg-green-50/50" : ""}`}>
+                    <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">
+                      {a.name || "—"}
+                      {idx === 0 && totalScore(iv) > 0 && <span className="ml-1" title="Highest score in this comparison">🏆</span>}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">{a.subject_applied_for || "—"}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{(a.school_stage && a.school_stage.length) ? a.school_stage.join(", ") : "—"}</td>
+                    <td className="px-3 py-2 text-center whitespace-nowrap">{iv.written_marks ?? "—"}{iv.written_max ? ` / ${iv.written_max}` : ""}</td>
+                    <td className="px-3 py-2 text-center whitespace-nowrap">{iv.oral_marks ?? "—"}{iv.oral_max ? ` / ${iv.oral_max}` : ""}</td>
+                    <td className="px-3 py-2 text-center whitespace-nowrap">{iv.demo_marks ?? "—"}{iv.demo_max ? ` / ${iv.demo_max}` : ""}</td>
+                    <td className="px-3 py-2 text-center font-semibold whitespace-nowrap">{totalScore(iv)}{totalMax(iv) ? ` / ${totalMax(iv)}` : ""}</td>
+                    <td className="px-3 py-2 min-w-[160px] max-w-xs whitespace-pre-wrap">{iv.notes || "—"}</td>
+                    <td className="px-3 py-2 text-center whitespace-nowrap">
+                      <span className={`px-2 py-0.5 rounded-full font-medium ${
+                        iv.result === "selected" ? "bg-green-100 text-green-700" : iv.result === "rejected" ? "bg-red-100 text-red-700" :
+                        iv.result === "hold" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-500"
+                      }`}>
+                        {iv.result === "pending" ? "Pending" : iv.result}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-center whitespace-nowrap">
+                      {iv.result === "pending" ? (
+                        <span className="inline-flex gap-1">
+                          <button onClick={() => trySelect(a, iv)} disabled={deciding === iv.id} className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50">Select</button>
+                          <button onClick={() => decide(a, iv, "hold")} disabled={deciding === iv.id} className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 disabled:opacity-50">Hold</button>
+                          <button onClick={() => decide(a, iv, "rejected")} disabled={deciding === iv.id} className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50">Reject</button>
+                        </span>
+                      ) : (
+                        <button onClick={() => setExpanded(a.id)} className="text-indigo-600 underline">View</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

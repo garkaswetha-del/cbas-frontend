@@ -547,7 +547,7 @@ function App() {
   if (user.role === "hr") {
     return (
       <div className="min-h-screen bg-gray-100">
-        <div className="bg-indigo-900 px-4 py-3 flex items-center justify-between">
+        <div className="sticky top-0 z-40 bg-indigo-900 px-4 py-3 flex items-center justify-between shadow">
           <div>
             <h1 className="text-white text-sm font-bold leading-tight">{getSchoolName()}</h1>
             <p className="text-indigo-300 text-xs">HR</p>
