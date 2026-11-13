@@ -70,16 +70,20 @@ export default function HRPage() {
 // ─────────────────────────────────────────────────────────────────
 // DASHBOARD
 // ─────────────────────────────────────────────────────────────────
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+function StatCard({ label, value, color, onClick }: { label: string; value: number; color: string; onClick?: () => void }) {
   return (
-    <div className="bg-white rounded-xl shadow border border-gray-200 p-4 text-center">
+    <div
+      onClick={onClick}
+      className={`bg-white rounded-xl shadow border border-gray-200 p-4 text-center ${onClick ? "cursor-pointer hover:shadow-md hover:border-indigo-300 transition" : ""}`}
+      title={onClick ? "Click to see who they are" : undefined}
+    >
       <div className={`text-2xl font-bold ${color}`}>{value}</div>
       <div className="text-xs text-gray-500 mt-1">{label}</div>
     </div>
   );
 }
 
-function BreakdownCard({ title, data }: { title: string; data: Record<string, number> }) {
+function BreakdownCard({ title, data, onSelect }: { title: string; data: Record<string, number>; onSelect?: (key: string) => void }) {
   const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
   const max = entries.length ? Math.max(...entries.map(e => e[1])) : 1;
   return (
@@ -90,13 +94,19 @@ function BreakdownCard({ title, data }: { title: string; data: Record<string, nu
       ) : (
         <div className="space-y-2">
           {entries.map(([key, count]) => (
-            <div key={key} className="flex items-center gap-2 text-xs">
+            <button
+              key={key}
+              onClick={() => onSelect?.(key)}
+              disabled={!onSelect}
+              className={`w-full flex items-center gap-2 text-xs text-left ${onSelect ? "hover:bg-gray-50 rounded cursor-pointer" : "cursor-default"}`}
+              title={onSelect ? "Click to see who they are" : undefined}
+            >
               <span className="w-28 shrink-0 truncate text-gray-600" title={key}>{key}</span>
               <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
                 <div className="bg-indigo-500 h-3 rounded-full" style={{ width: `${(count / max) * 100}%` }} />
               </div>
               <span className="w-6 text-right font-semibold text-gray-700">{count}</span>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -104,15 +114,97 @@ function BreakdownCard({ title, data }: { title: string; data: Record<string, nu
   );
 }
 
+// Shows the actual people/interviews behind a clicked stat, breakdown row, or matrix cell
+function DrillModal({ drill, onClose }: { drill: { title: string; kind: "applicants" | "interviews"; rows: any[] }; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+          <h3 className="text-sm font-bold text-gray-700">{drill.title} ({drill.rows.length})</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none px-2">✕</button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {drill.rows.length === 0 ? (
+            <p className="p-6 text-center text-xs text-gray-400">No one here yet</p>
+          ) : drill.kind === "applicants" ? (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
+                  <th className="px-3 py-2 text-left">Name</th>
+                  <th className="px-3 py-2 text-left">Branch</th>
+                  <th className="px-3 py-2 text-left">Subject</th>
+                  <th className="px-3 py-2 text-left">School Stage</th>
+                  <th className="px-3 py-2 text-left">Contact</th>
+                  <th className="px-3 py-2 text-center">Pipeline</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drill.rows.map((a: any) => (
+                  <tr key={a.id} className="border-b border-gray-100">
+                    <td className="px-3 py-2 font-medium text-gray-800">{a.name || "—"}</td>
+                    <td className="px-3 py-2">{a.branch || "—"}</td>
+                    <td className="px-3 py-2">{a.subject_applied_for || "—"}</td>
+                    <td className="px-3 py-2">{(a.school_stage && a.school_stage.length) ? a.school_stage.join(", ") : "—"}</td>
+                    <td className="px-3 py-2">{a.contact_no || a.email || "—"}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`px-2 py-0.5 rounded-full font-medium ${STAGE_COLORS[a.stage] || "bg-gray-100 text-gray-500"}`}>
+                        {STAGE_LABELS[a.stage] || a.stage}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
+                  <th className="px-3 py-2 text-left">Candidate</th>
+                  <th className="px-3 py-2 text-left">Date</th>
+                  <th className="px-3 py-2 text-left">Time</th>
+                  <th className="px-3 py-2 text-left">Interviewer</th>
+                  <th className="px-3 py-2 text-center">Attended</th>
+                  <th className="px-3 py-2 text-center">Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drill.rows.map((i: any) => (
+                  <tr key={i.id} className="border-b border-gray-100">
+                    <td className="px-3 py-2 font-medium text-gray-800">{i.applicant?.name || "—"}</td>
+                    <td className="px-3 py-2">{fmtDate(i.interview_date)}</td>
+                    <td className="px-3 py-2">{i.slot_time || "—"}</td>
+                    <td className="px-3 py-2">{i.interviewer_name || "—"}</td>
+                    <td className="px-3 py-2 text-center">{i.attended === true ? "✅" : i.attended === false ? "❌" : "—"}</td>
+                    <td className="px-3 py-2 text-center">{i.result || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DashboardTab() {
   const [summary, setSummary] = useState<any>(null);
+  const [applicants, setApplicants] = useState<any[]>([]);
+  const [interviews, setInterviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [drill, setDrill] = useState<{ title: string; kind: "applicants" | "interviews"; rows: any[] } | null>(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const r = await axios.get(`${API}/hr/dashboard/summary`);
-      setSummary(r.data);
+      const [s, a, i] = await Promise.all([
+        axios.get(`${API}/hr/dashboard/summary`),
+        axios.get(`${API}/hr/applicants`),
+        axios.get(`${API}/hr/interviews`),
+      ]);
+      setSummary(s.data);
+      setApplicants(a.data || []);
+      setInterviews(i.data || []);
     } catch { setSummary(null); }
     setLoading(false);
   };
@@ -124,34 +216,108 @@ function DashboardTab() {
   const pipelineOrder = ["applied", "shortlisted", "interview_scheduled", "interviewed", "selected", "rejected", "hired"];
   const pipelineData: Record<string, number> = {};
   pipelineOrder.forEach(k => { pipelineData[STAGE_LABELS[k] || k] = summary.byPipelineStage[k] || 0; });
+  const labelToStage: Record<string, string> = {};
+  pipelineOrder.forEach(k => { labelToStage[STAGE_LABELS[k] || k] = k; });
+
+  const showApplicants = (title: string, rows: any[]) => setDrill({ title, kind: "applicants", rows });
+  const showInterviews = (title: string, rows: any[]) => setDrill({ title, kind: "interviews", rows });
+
+  // Stage x Subject matrix — a candidate covering multiple stages is counted once per stage they cover
+  const matrix: Record<string, Record<string, { applied: any[]; selected: any[] }>> = {};
+  const stageSet = new Set<string>(SCHOOL_STAGES);
+  const subjectSet = new Set<string>();
+  for (const a of applicants) {
+    const subj = a.subject_applied_for || "Unspecified";
+    subjectSet.add(subj);
+    const aStages: string[] = (a.school_stage && a.school_stage.length) ? a.school_stage : ["Unspecified"];
+    for (const s of aStages) {
+      stageSet.add(s);
+      if (!matrix[s]) matrix[s] = {};
+      if (!matrix[s][subj]) matrix[s][subj] = { applied: [], selected: [] };
+      matrix[s][subj].applied.push(a);
+      if (a.stage === "selected" || a.stage === "hired") matrix[s][subj].selected.push(a);
+    }
+  }
+  const stageOrderPref = [...SCHOOL_STAGES, "Unspecified"];
+  const matrixStages = stageOrderPref.filter(s => stageSet.has(s)).concat(Array.from(stageSet).filter(s => !stageOrderPref.includes(s)));
+  const matrixSubjects = Array.from(subjectSet).sort((a, b) => a === "Unspecified" ? 1 : b === "Unspecified" ? -1 : a.localeCompare(b));
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard label="Total Applicants" value={summary.totalApplicants} color="text-gray-800" />
-        <StatCard label="Shortlisted" value={summary.shortlisted} color="text-blue-600" />
-        <StatCard label="Interviews Scheduled" value={summary.interviews.total} color="text-yellow-600" />
-        <StatCard label="Interviewed" value={summary.interviews.attended} color="text-purple-600" />
-        <StatCard label="Selected" value={summary.selected} color="text-green-600" />
-        <StatCard label="Hired" value={summary.hired} color="text-emerald-600" />
+        <StatCard label="Total Applicants" value={summary.totalApplicants} color="text-gray-800" onClick={() => showApplicants("All Applicants", applicants)} />
+        <StatCard label="Shortlisted" value={summary.shortlisted} color="text-blue-600" onClick={() => showApplicants("Shortlisted", applicants.filter(a => a.is_shortlisted))} />
+        <StatCard label="Interviews Scheduled" value={summary.interviews.total} color="text-yellow-600" onClick={() => showInterviews("Interviews Scheduled", interviews)} />
+        <StatCard label="Interviewed" value={summary.interviews.attended} color="text-purple-600" onClick={() => showInterviews("Interviewed (Attended)", interviews.filter(i => i.attended === true))} />
+        <StatCard label="Selected" value={summary.selected} color="text-green-600" onClick={() => showApplicants("Selected", applicants.filter(a => a.stage === "selected"))} />
+        <StatCard label="Hired" value={summary.hired} color="text-emerald-600" onClick={() => showApplicants("Hired", applicants.filter(a => a.stage === "hired"))} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <BreakdownCard title="By Branch" data={summary.byBranch} />
-        <BreakdownCard title="By Subject Applied For" data={summary.bySubject} />
-        <BreakdownCard title="By School Stage (a candidate covering multiple stages counts in each)" data={summary.byStage} />
-        <BreakdownCard title="Pipeline Status" data={pipelineData} />
+        <BreakdownCard title="By Branch" data={summary.byBranch} onSelect={key => showApplicants(`Branch: ${key}`, applicants.filter(a => (a.branch || "Unspecified") === key))} />
+        <BreakdownCard title="By Subject Applied For" data={summary.bySubject} onSelect={key => showApplicants(`Subject: ${key}`, applicants.filter(a => (a.subject_applied_for || "Unspecified") === key))} />
+        <BreakdownCard title="By School Stage (a candidate covering multiple stages counts in each)" data={summary.byStage} onSelect={key => showApplicants(`Stage: ${key}`, applicants.filter(a => ((a.school_stage && a.school_stage.length) ? a.school_stage : ["Unspecified"]).includes(key)))} />
+        <BreakdownCard title="Pipeline Status" data={pipelineData} onSelect={label => showApplicants(`Pipeline: ${label}`, applicants.filter(a => (a.stage || "applied") === (labelToStage[label] || label)))} />
+      </div>
+
+      <div className="bg-white rounded-xl shadow border border-gray-200 p-4 overflow-x-auto">
+        <h3 className="text-sm font-bold text-gray-700 mb-1">Stage × Subject Breakdown</h3>
+        <p className="text-[11px] text-gray-400 mb-3">Each cell: applied, with selected/hired in green. Click a number to see who they are.</p>
+        {matrixSubjects.length === 0 ? (
+          <p className="text-xs text-gray-400">No data yet</p>
+        ) : (
+          <table className="text-xs border-collapse w-full">
+            <thead>
+              <tr>
+                <th className="px-3 py-2 text-left border-b border-gray-200 text-gray-600">Stage</th>
+                {matrixSubjects.map(subj => (
+                  <th key={subj} className="px-3 py-2 text-center border-b border-gray-200 text-gray-600 whitespace-nowrap">{subj}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {matrixStages.map(s => (
+                <tr key={s} className="border-b border-gray-100">
+                  <td className="px-3 py-2 font-medium text-gray-700 whitespace-nowrap">{s}</td>
+                  {matrixSubjects.map(subj => {
+                    const cell = matrix[s]?.[subj] || { applied: [], selected: [] };
+                    return (
+                      <td key={subj} className="px-3 py-2 text-center whitespace-nowrap">
+                        {cell.applied.length === 0 ? (
+                          <span className="text-gray-300">—</span>
+                        ) : (
+                          <>
+                            <button onClick={() => showApplicants(`${s} — ${subj}`, cell.applied)} className="text-gray-700 hover:text-indigo-600 hover:underline font-medium">
+                              {cell.applied.length}
+                            </button>
+                            {cell.selected.length > 0 && (
+                              <button onClick={() => showApplicants(`${s} — ${subj} (Selected/Hired)`, cell.selected)} className="text-green-600 hover:underline ml-1 text-[11px]">
+                                ({cell.selected.length})
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
         <h3 className="text-sm font-bold text-gray-700 mb-3">Interviews</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard label="Total Scheduled" value={summary.interviews.total} color="text-gray-800" />
-          <StatCard label="Attended" value={summary.interviews.attended} color="text-green-600" />
-          <StatCard label="Absent" value={summary.interviews.absent} color="text-red-500" />
-          <StatCard label="Upcoming / Not Marked" value={summary.interviews.upcoming} color="text-yellow-600" />
+          <StatCard label="Total Scheduled" value={summary.interviews.total} color="text-gray-800" onClick={() => showInterviews("Total Scheduled Interviews", interviews)} />
+          <StatCard label="Attended" value={summary.interviews.attended} color="text-green-600" onClick={() => showInterviews("Attended", interviews.filter(i => i.attended === true))} />
+          <StatCard label="Absent" value={summary.interviews.absent} color="text-red-500" onClick={() => showInterviews("Absent", interviews.filter(i => i.attended === false))} />
+          <StatCard label="Upcoming / Not Marked" value={summary.interviews.upcoming} color="text-yellow-600" onClick={() => showInterviews("Upcoming / Not Marked", interviews.filter(i => i.attended === null || i.attended === undefined))} />
         </div>
       </div>
+
+      {drill && <DrillModal drill={drill} onClose={() => setDrill(null)} />}
     </div>
   );
 }
@@ -188,6 +354,8 @@ function ApplicationsTab() {
   const [uploadingResumes, setUploadingResumes] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [viewingResume, setViewingResume] = useState<{ name: string; url: string } | null>(null);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -223,6 +391,25 @@ function ApplicationsTab() {
       setApplicants(prev => prev.filter(x => x.id !== a.id));
       setMessage("✅ Applicant deleted");
     } catch { setMessage("❌ Error deleting applicant"); }
+    setTimeout(() => setMessage(""), 3000);
+  };
+
+  // Opens the edit form pre-filled with this applicant — used when the resume didn't
+  // clearly state the subject/stage (or got it wrong) and HR needs to set it by hand.
+  const openEdit = (a: any) => setEditing({ ...a, school_stage: a.school_stage || [] });
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    setSavingEdit(true);
+    const { id, name, email, contact_no, locality, qualification, experience_years, subject_applied_for, school_stage, branch } = editing;
+    const payload = { name, email, contact_no, locality, qualification, experience_years, subject_applied_for, school_stage, branch };
+    try {
+      const r = await axios.patch(`${API}/hr/applicants/${id}`, payload);
+      setApplicants(prev => prev.map(x => x.id === id ? { ...x, ...r.data } : x));
+      setMessage("✅ Applicant updated");
+      setEditing(null);
+    } catch { setMessage("❌ Error updating applicant"); }
+    setSavingEdit(false);
     setTimeout(() => setMessage(""), 3000);
   };
 
@@ -472,7 +659,7 @@ function ApplicationsTab() {
                 <th className="px-3 py-2 text-left">Contact</th>
                 <th className="px-3 py-2 text-center">Stage</th>
                 <th className="px-3 py-2 text-center">Shortlist</th>
-                <th className="px-3 py-2 text-center">Delete</th>
+                <th className="px-3 py-2 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -499,7 +686,10 @@ function ApplicationsTab() {
                       <input type="checkbox" checked={!!a.is_shortlisted} onChange={() => toggleShortlist(a)} className="w-4 h-4 accent-indigo-600" title="Shortlist this candidate" />
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <button onClick={() => deleteApplicant(a)} className="text-red-500 hover:text-red-700" title="Delete applicant">🗑</button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button onClick={() => openEdit(a)} className="text-indigo-500 hover:text-indigo-700" title="Edit applicant">✏️</button>
+                        <button onClick={() => deleteApplicant(a)} className="text-red-500 hover:text-red-700" title="Delete applicant">🗑</button>
+                      </div>
                     </td>
                   </tr>
                   {expanded === a.id && (
@@ -551,6 +741,62 @@ function ApplicationsTab() {
                 </a>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {editing && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setEditing(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-700">Edit {editing.name || "Applicant"}</h3>
+              <button onClick={() => setEditing(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none px-2">✕</button>
+            </div>
+            <div className="p-4 grid grid-cols-2 gap-3">
+              {[
+                ["name", "Name"], ["email", "Email"], ["contact_no", "Contact No"],
+                ["locality", "Locality / Where they stay"], ["qualification", "Qualification"], ["experience_years", "Experience (years)"],
+                ["subject_applied_for", "Subject Applying For"],
+              ].map(([key, label]) => (
+                <div key={key}>
+                  <label className="text-xs text-gray-500 block mb-1">{label}</label>
+                  <input value={editing[key] ?? ""} onChange={e => setEditing((f: any) => ({ ...f, [key]: e.target.value }))}
+                    className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full" />
+                </div>
+              ))}
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Branch</label>
+                <select value={editing.branch || ""} onChange={e => setEditing((f: any) => ({ ...f, branch: e.target.value }))}
+                  className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full">
+                  <option value="">— Select —</option>
+                  <option value="Nanjangudu">Nanjangudu</option>
+                  <option value="KR Nagar">KR Nagar</option>
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs text-gray-500 block mb-1">Stage(s) Applying For</label>
+                <div className="flex flex-wrap gap-2 border border-gray-300 rounded px-2 py-1.5">
+                  {SCHOOL_STAGES.map(s => (
+                    <label key={s} className="flex items-center gap-1 text-xs text-gray-700">
+                      <input type="checkbox" checked={(editing.school_stage || []).includes(s)}
+                        onChange={e => setEditing((f: any) => ({
+                          ...f,
+                          school_stage: e.target.checked ? [...(f.school_stage || []), s] : (f.school_stage || []).filter((x: string) => x !== s),
+                        }))}
+                        className="w-3.5 h-3.5 accent-indigo-600" />
+                      {s}
+                    </label>
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-0.5">Use this when the resume didn't clearly state the subject/stage, or to correct a wrong auto-fill.</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-200">
+              <button onClick={() => setEditing(null)} className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">Cancel</button>
+              <button onClick={saveEdit} disabled={savingEdit} className="px-4 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold">
+                {savingEdit ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
           </div>
         </div>
       )}
